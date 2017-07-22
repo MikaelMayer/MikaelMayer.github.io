@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<!-- saved from url=(0063)http://localhost:12345/target/scala-2.11/classes/index-dev.html -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>Programming Without Regret</title>
+  
+  <style>
+  
+  .programblock {
+    width:calc(50% - 60px);
+    max-width:400px;
+    height:300px;
+    vertical-align:top;
+    background-color: transparent;
+    z-index: 1;
+  }
+  
+  .corrector {
+    color: pink;
+    z-index: -1;
+  }
+  
+  .unmodifiable {
+    background-color: lightgray;
+    height:100px;
+  }
+  h1 {
+   margin-left: 10px;
+  }
+  p {
+    margin-left: 10px;
+    max-width:800px;
+  }
+  </style>
+</head>
+<body style="margin: 0px;">
+<textarea id="programdebug" class="programblock corrector" style="position:absolute"></textarea>
+<textarea id="program" class="programblock">(\n.\p. p n n) (\f.\x. x)
+</textarea>
+<div style="display:inline-block;width:100px;">
+produces<br>
+<!--input type="button" id="executebutton" value="=> Execute =>"><br>
+<input type="button" id="repairbutton" value="<= Repair <="><br-->
+<i>type \ to have λ</i>
+</div>
+<textarea id="valuedebug" class="programblock corrector" style="position:absolute"></textarea>
+<textarea id="value" class="programblock">\p. p (\f.\x. x) (\f.\x. x) 
+</textarea><br>
+<textarea id="programpretty" class="programblock unmodifiable">(n =&gt; (n, n))(0)
+</textarea>
+<div style="display:inline-block;width:100px">
+</div>
+<textarea id="valuepretty" class="programblock unmodifiable">(0, 0)
+</textarea><br>
+<h1>Welcome to the "Programming without Regret" demo</h1>
+<p>
+Please enter valid lambda calculus programs on the left.
+The system computes their value on the right.
+You can then change the value on the right to see the program to change if there is a valid repair.</p>
+<p>
+The lambda calculus expressions are pretty-printed in the gray boxes, but these cannot be modified at this moment.</p>
+
+<script type="text/javascript" src="./ProgrammingWithoutRegret_files/example-fastopt.js.téléchargement"></script>
+<script>
+    example.ScalaJSExample().main(
+      document.getElementById("program"),
+      document.getElementById("programdebug"),
+      document.getElementById("value"),
+      document.getElementById("valuedebug"),
+      document.getElementById("programpretty"),
+      document.getElementById("valuepretty"))
+      ;
+</script>
+
+
+</body></html>
