@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0058)http://localhost:12345/target/scala-2.11/classes/main.html -->
+<!-- saved from url=(0063)http://localhost:12345/target/scala-2.11/classes/index-dev.html -->
 <html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
   <title>Programming Without Regret</title>
   
@@ -30,11 +30,35 @@
     margin-left: 10px;
     max-width:800px;
   }
+  body {
+      text-align: center;
+      margin: 0px;
+  }
+  #description {
+      max-width: 800px;
+      display:inline-block;
+      text-align:left;
+  }
+  #description pre {
+      display:inline-block;
+      margin: 2px;
+  }
+  #description > table td:nth-child(2) {
+      padding-left: 20px;
+  }
+  #description > table tr:not(:first-child) td {
+      border-top: 1px solid #AAA;
+  }
   </style>
 </head>
-<body style="margin: 0px;">
+<body>
+<h1>Welcome to the "Programming without Regret" demo</h1>
 <textarea id="programdebug" class="programblock corrector" style="position:absolute"></textarea>
-<textarea id="program" class="programblock">(\n.\p.p n n) (\f.\x.x)
+<textarea id="program" class="programblock">let x = (λn.λp.p n n) (λf.λx.x) in
+let greet = "Hello" in
+let whom = " world" in
+let greetings = greet + whom in
+λp.p greetings x
 </textarea>
 <div style="display:inline-block;width:100px;">
 produces<br>
@@ -43,7 +67,7 @@ produces<br>
 <i>type \ to have λ</i>
 </div>
 <textarea id="valuedebug" class="programblock corrector" style="position:absolute"></textarea>
-<textarea id="value" class="programblock">\p. p (\f.\x. x) (\f.\x. x) 
+<textarea id="value" class="programblock">\p. p (\f.\x. x) (\f.\x. x)
 </textarea><br>
 <textarea id="programpretty" class="programblock unmodifiable">(n =&gt; (n, n))(0)
 </textarea>
@@ -51,13 +75,69 @@ produces<br>
 </div>
 <textarea id="valuepretty" class="programblock unmodifiable">(0, 0)
 </textarea><br>
-<h1>Welcome to the "Programming without Regret" demo</h1>
-<p>
-Please enter valid lambda calculus programs on the left.
-The system computes their value on the right.
-You can then change the value on the right to see the program to change if there is a valid repair.</p>
-<p>
-The lambda calculus expressions are pretty-printed in the gray boxes, but these cannot be modified at this moment.</p>
+
+<div id="description">
+Enter a program that computes a value on the left.
+The system computes the value on the right.
+You can then change the value on the right to see the program to change if there is a valid repair.<br><br>
+
+Supported syntax:<br>
+    <table>
+        <tbody><tr>
+            <td>
+                <pre>let ID = EXPR in EXPR</pre>
+            </td>
+            <td>
+                variable evaluation and assignment
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <pre>{ label = EXPR, label2 = EXPR }</pre><br>
+                <pre>{ label = EXPR } &amp; { label2 = EXPR }</pre>
+            </td>
+            <td>
+                records of labelled values (the operator &amp; concatenates records, the comma is syntactic sugar)
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <pre>EXPR.label</pre><br>
+            </td>
+            <td>
+                extracts the value associated to a label in a record
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <pre>"abcd"</pre><br>
+                <pre>EXPR + EXPR</pre>
+            </td>
+            <td>
+                string values and string concatenation
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <pre>EXPR EXPR</pre>
+            </td>
+            <td>
+                lambda application
+            </td>
+        </tr>
+
+        <tr>
+            <td>
+                <pre>\x. EXPR</pre>
+                <pre>λx. EXPR</pre>
+            </td>
+            <td>
+                lambda abstraction
+            </td>
+        </tr>
+    </tbody></table>
+
+</div>
 
 <script type="text/javascript" src="./main_files/example-fastopt.js.téléchargement"></script>
 <script>
