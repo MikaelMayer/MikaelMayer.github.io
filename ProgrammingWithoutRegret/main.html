@@ -1,155 +1,183 @@
 <!DOCTYPE html>
-<!-- saved from url=(0063)http://localhost:12345/target/scala-2.11/classes/index-dev.html -->
-<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<html>
+<head>
   <title>Programming Without Regret</title>
-  
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+  <link rel="stylesheet" type="text/css" href="bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" type="text/css" href="bootstrap/css/bootstrap-theme.min.css">
   <style>
-  
+
+  body {
+    height: 100%;
+    width: 100%;
+    position: absolute;
+  }
+
+  div.container {
+    height: calc(100% - 100px);
+    position: absolute;
+    width: 100%;
+  }
+
+  #programview, #outputview, #outputcode {
+    height:100%;
+  }
+
   .programblock {
-    width:calc(50% - 60px);
-    max-width:400px;
-    height:150px;
-    vertical-align:top;
+    /*width:calc(50% - 60px);*/
+    /*max-width:400px;*/
+    height:calc(100% - 60px);
+    width: 100%;
+    /*vertical-align:top;*/
     background-color: transparent;
     z-index: 1;
+    font-family: monospace;
   }
   
   .corrector {
-    color: pink;
+    color: red;
     z-index: -1;
+    position:absolute;
+    width: calc(100% - 30px) !important;
   }
-  
-  .unmodifiable {
-    background-color: lightgray;
-    height:50px;
-  }
-  h1 {
-   margin-left: 10px;
-  }
-  p {
-    margin-left: 10px;
-    max-width:800px;
-  }
-  body {
-      text-align: center;
-      margin: 0px;
-  }
-  #description {
+  /*#description {
       max-width: 800px;
       display:inline-block;
       text-align:left;
-  }
+  }*/
   #description pre {
       display:inline-block;
-      margin: 2px;
+      margin: 0px;
+      padding: 0px;
   }
-  #description > table td:nth-child(2) {
+  /*#description > table td:nth-child(2) {
       padding-left: 20px;
   }
   #description > table tr:not(:first-child) td {
       border-top: 1px solid #AAA;
-  }
-  </style>
+  }*/
+
+
+  /* The switch - the box around the slider */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 30px;
+  height: 17px;
+  vertical-align: middle;
+}
+
+/* Hide default HTML checkbox */
+.switch input {display:none;}
+
+/* The slider */
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 13px;
+  width: 13px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+input:checked + .slider {
+  background-color: #2196F3;
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px #2196F3;
+}
+
+input:checked + .slider:before {
+  -webkit-transform: translateX(13px);
+  -ms-transform: translateX(13px);
+  transform: translateX(13px);
+}
+
+/* Rounded sliders */
+.slider.round {
+  border-radius: 17px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}
+
+.switch + label {
+  cursor: pointer;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.switch:not(:first-child) {
+  margin-left: 20px;
+}
+menu h2 {
+  display: inline-block;
+}
+
+#programview {
+  resize: both;
+}
+
+.hidden {
+  display: none !important;
+}
+
+#outputhtml {
+    text-align: initial;
+}
+</style>
 </head>
 <body>
-<h1>Welcome to the "Programming without Regret" demo</h1>
-<textarea id="programdebug" class="programblock corrector" style="position:absolute"></textarea>
-<textarea id="program" class="programblock">let x = (λn.λp.p n n) (λf.λx.x) in
-let greet = "Hello" in
-let whom = " world" in
-let greetings = greet + whom in
-λp.p greetings x
-</textarea>
-<div style="display:inline-block;width:100px;">
-produces<br>
-<!--input type="button" id="executebutton" value="=> Execute =>"><br>
-<input type="button" id="repairbutton" value="<= Repair <="><br-->
-<i>type \ to have λ</i>
-</div>
-<textarea id="valuedebug" class="programblock corrector" style="position:absolute"></textarea>
-<textarea id="value" class="programblock">\p. p (\f.\x. x) (\f.\x. x)
-</textarea><br>
-<textarea id="programpretty" class="programblock unmodifiable">(n =&gt; (n, n))(0)
-</textarea>
-<div style="display:inline-block;width:100px">
-</div>
-<textarea id="valuepretty" class="programblock unmodifiable">(0, 0)
-</textarea><br>
-
-<div id="description">
-Enter a program that computes a value on the left.
-The system computes the value on the right.
-You can then change the value on the right to see the program to change if there is a valid repair.<br><br>
-
-Supported syntax:<br>
-    <table>
-        <tbody><tr>
-            <td>
-                <pre>let ID = EXPR in EXPR</pre>
-            </td>
-            <td>
-                variable evaluation and assignment
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <pre>{ label = EXPR, label2 = EXPR }</pre><br>
-                <pre>{ label = EXPR } &amp; { label2 = EXPR }</pre>
-            </td>
-            <td>
-                records of labelled values (the operator &amp; concatenates records, the comma is syntactic sugar)
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <pre>EXPR.label</pre><br>
-            </td>
-            <td>
-                extracts the value associated to a label in a record
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <pre>"abcd"</pre><br>
-                <pre>EXPR + EXPR</pre>
-            </td>
-            <td>
-                string values and string concatenation
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <pre>EXPR EXPR</pre>
-            </td>
-            <td>
-                lambda application
-            </td>
-        </tr>
-
-        <tr>
-            <td>
-                <pre>\x. EXPR</pre>
-                <pre>λx. EXPR</pre>
-            </td>
-            <td>
-                lambda abstraction
-            </td>
-        </tr>
-    </tbody></table>
-
-</div>
-
-<script type="text/javascript" src="./main_files/example-fastopt.js.téléchargement"></script>
+<h1>Loading...</h1>
+<script type="text/javascript" src="lambda-perfect-opt.js?mp=141"></script>
+<script type="text/javascript" src="/workbench.js"></script>
 <script>
-    example.ScalaJSExample().main(
-      document.getElementById("program"),
-      document.getElementById("programdebug"),
-      document.getElementById("value"),
-      document.getElementById("valuedebug"),
-      document.getElementById("programpretty"),
-      document.getElementById("valuepretty"))
-      ;
+var prenewline = function (e) {
+    console.log("calling prenewline")
+    if (e.keyCode === 13) {
+    console.log("This was Enter !")
+          document.execCommand('insertHTML', false, "\n");
+        return false;
+    }
+};
+function loadScript(url, callback){
+    var script = document.createElement("script")
+    script.type = "text/javascript";
+
+    if (script.readyState){  //IE
+        script.onreadystatechange = function(){
+            if (script.readyState == "loaded" ||
+                    script.readyState == "complete"){
+                script.onreadystatechange = null;
+                callback();
+            }
+        };
+    } else {  //Others
+        script.onload = function(){
+            callback();
+        };
+    }
+    script.src = url;
+    document.getElementsByTagName("head")[0].appendChild(script);
+}
+   LambdaPerfect.main();
 </script>
-
-
-</body></html>
+</body>
+</html>
