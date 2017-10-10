@@ -50,12 +50,6 @@
       margin: 0px;
       padding: 0px;
   }
-  /*#description > table td:nth-child(2) {
-      padding-left: 20px;
-  }
-  #description > table tr:not(:first-child) td {
-      border-top: 1px solid #AAA;
-  }*/
 
 
   /* The switch - the box around the slider */
@@ -125,12 +119,14 @@ input:checked + .slider:before {
 }
 
 .switch:not(:first-child) {
-  margin-left: 20px;
+  margin-left: 10px;
 }
 menu h2 {
   display: inline-block;
 }
-
+menu > select {
+  margin-left: 10px;
+}
 #programview {
   resize: both;
 }
@@ -142,11 +138,22 @@ menu h2 {
 #outputhtml {
     text-align: initial;
 }
+
+.computing {
+  background-color: #CCC;
+}
+
+.repairok {
+  background-color: #8F8;
+}
+.repairnotok {
+  background-color: #F88;
+}
 </style>
 </head>
 <body>
 <h1>Loading...</h1>
-<script type="text/javascript" src="lambda-perfect-opt.js?mp=142"></script>
+<script type="text/javascript" src="lambda-perfect-opt.js?mp=157"></script>
 <script type="text/javascript" src="/workbench.js"></script>
 <script>
 var prenewline = function (e) {
