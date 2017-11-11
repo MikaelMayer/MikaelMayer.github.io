@@ -28,12 +28,12 @@ let cell formula value displayFormula =
     styles = {display = reversiblechoice "none" "inline-block" displayFormula},
     children=[value]}] in
 
-let range min max = 
+let range min max =
   letrec aux acc i = if(i == max) acc ++ [max] else aux (acc ++ [i]) (i + 1) in
   aux [] min in
 
 letrec columnToInteger x = {A=1, B=2, C=3, D=4, E=5, F=6, G=7, H=8, I=9, J=10, K=11, L=12, M=13, N=14, O=15, P=16, Q=17, R=18, S=19,T=20,U=21,V=22,W=23, X=24,Y=25,Z=26,
-default = \x. 
+default = \x.
   if(matchIn "^[a-z]$" x) (
     columnToInteger x.toUpperCase
   ) else if(matchIn "^[a-zA-Z]+$" x) (
@@ -46,7 +46,7 @@ default = \x.
 let integerToCOlumn = [" ", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S","T","U","V","W","X","Y","Z"] in
 
 letrec rowToInteger x = {`1`=1, `2`=2, `3`=3, `4`=4, `5`=5, `6`=6, `7`=7, `8`=8, `9`=9, `0`=0,
-default = \x. 
+default = \x.
   if(matchIn "^[0-9]+$" x) (
    let last = replaceAllIn "^(.*)(.)$" x "$2" in
    let init = replaceAllIn "^(.*)(.)$" x "$1" in
@@ -54,14 +54,14 @@ default = \x.
   ) else 0
 }  x in
 
-let formulas = 
+let formulas =
   [[``"First"``,   ``"Last"``,       ``"Name"``,   ``"Age died"``],
    [``"Albert"``,  ``"Einstein"``,   ``A2 + " " + B2``, ``76``],
    [``"Raymond"``, ``"Queneau"``,    ``A3 + " " + B3``, ``73``],
    [``"Georges"``, ``"Charpak"``,    ``A4 + " " + B4``, ``86``],
    [``""``,        ``""``,           ``"Total:"``,      ``sum [D2,D3,D4]``]] in
-   
-let map f list = 
+
+let map f list =
   letrec aux acc l = l match {
     case [] => acc
     case [head] ++ tail => aux (acc ++ [f head]) tail
@@ -69,12 +69,12 @@ let map f list =
 
 let addColumn formulas =
   map (\row. row ++ [``"-"``]) formulas in
-let addRow formulas = 
+let addRow formulas =
   formulas ++ [(map (\i. ``"-"``) (range 1 (formulas 0).length))] in
 let ifActivated inputUpdater = { apply= \i. "false",
     update= \p. if(p.outputNew == "true") {value = inputUpdater p.input} else {value = p.input}
   } in
-  
+
 /*
 let fix computation init =
   letrec aux current =
@@ -83,14 +83,14 @@ let fix computation init =
   in aux init in*/ // Use this fix function when the equality will work at compile-time.
 
 let evaluationlength = 2 in
-  
+
 let fix computation init =
-  letrec aux n current = if(n == 0) current else 
+  letrec aux n current = if(n == 0) current else
     let newN = n - 1 in
     let newComputation = computation current in
     aux newN newComputation in
   aux evaluationlength init in
-  
+
 let values =
    fix (\computations.
    let inlineKnown computation = replaceAllIn ``\b([a-zA-Z]{1,2})([1-9][0-9]*)\b`` computation (\m.
@@ -107,7 +107,7 @@ let values =
        ) else (m.group 0)
      ) else (m.group 0)
    ) in
-   let oneStep computation = 
+   let oneStep computation =
      let i = inlineKnown computation in
      evaluate (library + i) match {
      case x & {value = v} => {value = v}
@@ -121,8 +121,8 @@ let values =
      }) row
    ) computations) formulas in
 
-   
-   
+
+
 let display formulas values =
    let display_cell formula value =
      let valueForCell = value match {
@@ -131,8 +131,8 @@ let display formulas values =
        case "" + _ => {tag="span", styles={color="red"}, children = [{tag="#text", value="No evaluation made"}]}
      } in
      {tag="td", children=cell formula valueForCell ({apply=\l.l, update=\p. {value = p.input}} false)}
-   in 
-     
+   in
+
    letrec display_cells index acc fs vs = [fs, vs] match {
      case [[fcell] ++ ftail, [vcell] ++ vtail] =>
        let newAcc = acc ++ [display_cell fcell vcell] in
@@ -140,7 +140,7 @@ let display formulas values =
      case _ => {tag="tr", children=[{tag="td", children=[{tag="#text", value = "" + index}]}] ++ acc}
    } in
    letrec display_rows acc fs vs = [fs, vs] match {
-     case [[frow] ++ ftail, [vrow] ++ vtail] => 
+     case [[frow] ++ ftail, [vrow] ++ vtail] =>
        let newAcc = acc ++ [display_cells (acc.length + 1) [] frow vrow] in
        display_rows newAcc ftail vtail
      case _ =>
