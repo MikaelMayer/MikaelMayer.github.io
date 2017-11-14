@@ -55,11 +55,11 @@ default = \x.
 }  x in
 
 let formulas =
-  [[``"First"``,   ``"Last"``,       ``"Name"``,   ``"Age died"``],
-   [``"Albert"``,  ``"Einstein"``,   ``A2 + " " + B2``, ``76``],
-   [``"Raymond"``, ``"Queneau"``,    ``A3 + " " + B3``, ``73``],
-   [``"Georges"``, ``"Charpak"``,    ``A4 + " " + B4``, ``86``],
-   [``""``,        ``""``,           ``"Total:"``,      ``sum [D2,D3,D4]``]] in
+  [[``"Type"``,   ``"€"``,       ``"$"``,        ``"100€ = $"+E1``, ``117``],
+   [``"Transport"`` , ``150``,   ``A2*!E1/100``, ``""``,           ``""``],
+   [``"Hotel"``     , ``470``,   ``A3*!E1/100``, ``""``,           ``""``],
+   [``"Conference"``, ``110``,   ``A3*!E1/100``, ``""``,           ``""``],
+   [``"Totals:"``   , ``sum [B2, B3, B4]``,   ``sum [C2, C3, C4]``,  ``""``,           ``""``]] in
 
 let map f list =
   letrec aux acc l = l match {
@@ -90,6 +90,8 @@ let fix computation init =
     let newComputation = computation current in
     aux newN newComputation in
   aux evaluationlength init in
+
+let displayFormulas = false in
 
 let values =
    fix (\computations.
@@ -130,7 +132,7 @@ let display formulas values =
        case {error=m} => {tag="span", styles={color="red"}, children = [{tag="#text", value=m}]}
        case "" + _ => {tag="span", styles={color="red"}, children = [{tag="#text", value="No evaluation made"}]}
      } in
-     {tag="td", children=cell formula valueForCell ({apply=\l.l, update=\p. {value = p.input}} false)}
+     {tag="td", children=cell formula valueForCell ({apply=\l.l, update=\p. {value = p.input}} displayFormulas)}
    in
 
    letrec display_cells index acc fs vs = [fs, vs] match {
@@ -181,4 +183,5 @@ For example,
   color: #FFF;
 }
 ``}]},
-display formulas values]
+display formulas values,{tag="br"},
+"Show all formulas: ", displayFormulas]

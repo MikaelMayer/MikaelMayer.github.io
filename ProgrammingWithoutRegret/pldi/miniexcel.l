@@ -55,11 +55,11 @@ default = \x.
 }  x in
 
 let formulas =
-  [[``"First"``,   ``"Last"``,       ``"Name"``,   ``"Age died"``],
-   [``"Albert"``,  ``"Einstein"``,   ``A2 + " " + B2``, ``76``],
-   [``"Raymond"``, ``"Queneau"``,    ``A3 + " " + B3``, ``73``],
-   [``"Georges"``, ``"Charpak"``,    ``A4 + " " + B4``, ``86``],
-   [``""``,        ``""``,           ``"Total:"``,      ``sum [D2,D3,D4]``]] in
+  [[``"Expense:"``  , ``"€"``,   ``"$"``       , ``117``],
+   [``"Transport"`` , ``150``,   ``B2*!D1/100``, ``""``],
+   [``"Hotel"``     , ``470``,   ``B3*!D1/100``, ``""``],
+   [``"Conference"``, ``110``,   ``B4*!D1/100``, ``""``],
+   [``"Totals:"``   , ``B2+B3+B4``,   ``sum [C2, C3, C4]``,  ``"(100€ = $"+D1+")"``]] in
 
 let map f list =
   letrec aux acc l = l match {
@@ -82,7 +82,7 @@ let fix computation init =
     if(next == current) next else (aux next)
   in aux init in*/ // Use this fix function when the equality will work at compile-time.
 
-let evaluationlength = 2 in
+let [evaluationlength, displayFormulas] = [3, false] in
 
 let fix computation init =
   letrec aux n current = if(n == 0) current else
@@ -130,7 +130,7 @@ let display formulas values =
        case {error=m} => {tag="span", styles={color="red"}, children = [{tag="#text", value=m}]}
        case "" + _ => {tag="span", styles={color="red"}, children = [{tag="#text", value="No evaluation made"}]}
      } in
-     {tag="td", children=cell formula valueForCell ({apply=\l.l, update=\p. {value = p.input}} false)}
+     {tag="td", children=cell formula valueForCell ({apply=\l.l, update=\p. {value = p.input}} displayFormulas)}
    in
 
    letrec display_cells index acc fs vs = [fs, vs] match {
@@ -180,5 +180,9 @@ For example,
   background-color: #44E;
   color: #FFF;
 }
+input[type="number"] {
+  width: 50px;
+}
 ``}]},
-display formulas values]
+display formulas values,{tag="br"},
+"Show all formulas: ", displayFormulas]

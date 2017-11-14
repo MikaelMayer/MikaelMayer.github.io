@@ -13,7 +13,7 @@ letrec drop n array =
       let newN = n- 1 in
       drop newN tail
   }) in
-let map = (\f. {
+let map = !(\f. {
   apply= \input.
   letrec map_aux = {
     apply = \l. l match {
