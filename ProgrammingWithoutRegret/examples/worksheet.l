@@ -1,6 +1,7 @@
 // download: worksheet.html
 // output: html
 // updatedelay: 0
+// hideprogram: true
 
 // Allows you to write sentences of the form
 // varname = varexpr
@@ -156,8 +157,8 @@ let code id codestr =
  { tag="code", attributes={onclick="document.getElementById(\"" + id + "\").textContent = this.textContent"}, styles={cursor="pointer"},
    children = [{tag="#text", value = codestr}]} in
 
-[{tag="h1",children=[{tag="#text", value="Worksheet"}]},
-``The text zone below is a worksheet.
+[{tag="h1",children=[{tag="#text", value="Reversible Worksheet"}]},
+``The text zone below is a reversible worksheet.
 You can type in, one per line, assignments on the form <code>name = expr</code>, or expressions <code>expr</code>.<br>
 Furthermore, you can edit the outputs that appear after 2 seconds on the right of each expression.<br>
 Try the examples below the textarea by clicking them:``,
