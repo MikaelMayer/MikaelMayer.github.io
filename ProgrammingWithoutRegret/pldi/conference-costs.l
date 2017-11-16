@@ -9,7 +9,7 @@ let minBound bound = {
     else {} } in
 let participants          = 200 in
 let registrationFee       = 50 in
-let sponsors              = 20000 in
+let sponsors              = 17000 in
 let lunch = (minBound 20)   30 in
 let venue                 = 30000 in 
 let days                  = !3 in

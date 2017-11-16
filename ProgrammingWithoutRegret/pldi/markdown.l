@@ -92,4 +92,5 @@ let markdown text =
     }
   )
 in
+"<pre>" + original + "</pre>" +
 !markdown original

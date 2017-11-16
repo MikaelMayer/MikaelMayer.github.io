@@ -4,7 +4,7 @@
 let abbr text symbol = ``<abbr title="@text">@symbol</abbr>`` in
 let definitions = {
   def_eps  = ["empty word", "ε", "%eps"],
-  def_conc = ["concatenation", "%emp", "%concat"],
+  def_conc = ["concatenation", "·", "%concat"],
   def_emp  = ["empty set", "∅", "%emp"],
   def_A    = ["alphabet", "A", "%A"],
   def_union = ["union","∪","%union"],
@@ -24,6 +24,20 @@ let macrosValues =
     case [] => acc
     case [key] ++ tail => let newAcc = acc ++ [definitions key] in aux newAcc tail
   } in aux [] macrosKeys in
+  
+letrec take n array =
+  if(n==array.length) array else (array match {
+    case [] => array
+    case init ++ [last] =>
+      take n init
+  }) in
+letrec drop n array =
+  if(n==0) array else (array match {
+    case [] => array
+    case [head] ++ tail =>
+      let newN = n- 1 in
+      drop newN tail
+  }) in
   
 let notations = {
   apply=\input.
@@ -96,9 +110,9 @@ let render = { apply=\pars.
     }
   } in
   aux "" "" pars,
-  unapply=\outs.
+  updateAlign=\p.
     letrec aux acc outs = outs match {
-      case [] => { value = acc }
+      case [] => acc
       case [{tag = "h1", children= notations fullChapterTitle}] ++ tail =>
         let chapterTitle = replaceFirstIn "^\\w+\\s+\\d+\\.\\s+" fullChapterTitle "" in
         let newAcc = acc ++ [{title=chapterTitle, type="chapter"}] in
@@ -114,10 +128,11 @@ let render = { apply=\pars.
         let newAcc = acc ++ [head] in
         aux newAcc tail
     } in
-    aux [] outs
+    let reverseInserted = aux [] p.inserted in
+    {value = (take p.insertionIndex p.input) ++ reverseInserted ++ (drop (p.insertionIndex+p.deletedCount) p.input)}
 } in
 // Final rendering:
-{ tag = "DIV", children = [
+{ tag = "DIV", children = ![
   { tag = "STYLE", children=``
 h1 {
   font-size: large;

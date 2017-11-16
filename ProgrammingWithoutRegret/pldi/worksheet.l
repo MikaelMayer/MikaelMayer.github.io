@@ -45,7 +45,7 @@ let map = !(\f. {
 let expressions = [
   { name = "people", expr = ``200``},
   { name = "regFee", expr = ``50``},
-  { name = "sponsors", expr = ``!20000``},
+  { name = "sponsors", expr = ``!17000``},
   { name = "lunch", expr = ``(minoredBy 20) 30``},
   { name = "venue", expr = ``30000``},
   { name = "days", expr = ``!3``},

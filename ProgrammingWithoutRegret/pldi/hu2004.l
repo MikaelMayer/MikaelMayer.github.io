@@ -188,28 +188,6 @@ let transform addrbook =
           map renderIndexEntry sortedChildren}
     ] ++ sortedChildren
   } in
-
-[{tag="h1", children="(2004) XML transformations"},
-``In <a href="https://dl.acm.org/citation.cfm?id=1014025">[Hu 2004]</a>, they synchronized an address book and a modified version of it with a sorted index using the following program:
-<pre>
-sortX ˆ; Dup ˆ;
-applyX [0] (modifyRootX Index ˆ; Map keepX) ˆ;
-moveX [0] [0, 0] ˆ; hoistX Dup
-</pre>
-Unfortunately, you could not modify the "Index" tag from the output, and that you cannot add elements to the index list.
-Using our approach, you can do that. The program is clearer:
-<pre>
-let sortedChildren = sort (get "name" "") addrbook.children in
-let renderIndexEntry person = 
-  { tag="name", children = [
-    { tag = get "name" "anonymous" person, children = []}]} in 
-{ tag="addrbook", children = [
-    { tag="index", children =
-        map renderIndexEntry sortedChildren}
- ] ++ sortedChildren }
-</pre>
-``,
-"Click here to validate the changes below",{tag= "br"},
-prettyPrint addrbook,
+["Click here to validate the changes below<br>",
 prettyPrint (transform addrbook)]
 

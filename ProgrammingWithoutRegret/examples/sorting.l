@@ -18,7 +18,7 @@ letrec drop n array =
   if(n==0) array else (array match {
     case [] => array
     case [head] ++ tail =>
-      let newN = n-1 in
+      let newN = n - 1 in
       drop newN tail
   }) in
 letrec sort toComparable = { apply=\list.

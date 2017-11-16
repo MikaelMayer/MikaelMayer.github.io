@@ -1,4 +1,4 @@
-let lang = "fr"  in
+let lang = "en"  in
 let translations = { 
  en= {
    lang= "Language",

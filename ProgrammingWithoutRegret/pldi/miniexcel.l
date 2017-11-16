@@ -57,9 +57,8 @@ default = \x.
 let formulas =
   [[``"Expense:"``  , ``"€"``,   ``"$"``       , ``117``],
    [``"Transport"`` , ``150``,   ``B2*!D1/100``, ``""``],
-   [``"Hotel"``     , ``470``,   ``B3*!D1/100``, ``""``],
-   [``"Conference"``, ``110``,   ``B4*!D1/100``, ``""``],
-   [``"Totals:"``   , ``B2+B3+B4``,   ``sum [C2, C3, C4]``,  ``"(100€ = $"+D1+")"``]] in
+   [``"Conference"``, ``110``,   ``B3*!D1/100``, ``""``],
+   [``"Totals:"``   , ``B2+B3``,   ``sum [C2, C3]``,  ``"(100€ = $"+D1+")"``]] in
 
 let map f list =
   letrec aux acc l = l match {
@@ -156,16 +155,7 @@ let display formulas values =
             }]}
    } in display_rows [] formulas values
 in
-[{tag="h1", children="Reversible Spreadsheet"},
-``Below is an excel-like table that contains formulas and displays only the values. By double-clicking on an element (e.g.  C2, C3, C4, D5, ...), the formula appear and you can modify it.
-But you can also <span style="color:red"><b>modify the values that were computed from formulas</b></span>, something no other spreadsheet editor can afford!<br>
-We apologize that, for now, you need to wait a bit when you double-click to display the formula, because the re-generation makes the focus to be lost.<br>
-<br>
-For example,
-<li>try to modify the formula of A1 to "First" + C1, then edit the value "FirstName" to insert a space between the two words.</li>
-<li>Add a new column E, and double click on the dash in E2 to insert the formula <code>A2 + " " + B2 + " died at age " + D2</code></li>``,
-``Note that the spreadsheet performs @evaluationlength rounds of computation. If you need more (to e.g. replace <code>A2 + " " + B2</code> by <code>C2</code> in the last example), increase this number.``,
-{tag="style", children=[{tag="#text", value=``th, td:first-child {
+[{tag="style", children=[{tag="#text", value=``th, td:first-child {
   background-color: #EEE;
   color: #222;
   text-align: center;
