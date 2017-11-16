@@ -92,5 +92,5 @@ let markdown text =
     }
   )
 in
-"<pre>" + original + "</pre>" +
-!markdown original
+[{tag="textarea", attributes={onkeyup = "if(typeof mdtimer != 'undefined') clearTimeout(mdtimer); mdtimer = setTimeout((function(self) { return function() { self.innerText = self.value }})(this),2000)"}, styles = {margin = "0px", width = "100%", `min-height` = "150px", height = "250px"},children=original},
+!markdown original]
