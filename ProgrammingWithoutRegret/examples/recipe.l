@@ -15,7 +15,7 @@
   }  x in
   let language = "French" in
   let otherLanguage = if(language == "French") "English" else "French" in
-  let txt = ``<button onclick="this.setAttribute('value','@otherLanguage')" value="@language">To @otherLanguage</button>`` + 
+  let txt = 
   ({French = ``
   <h1>Moelleux chocolat amandes</h1>
   Recette pour multdivby[20,1000] petits gâteaux.<br>
@@ -84,7 +84,10 @@
     }
 
     ) in
-  { apply=\x. x ,
+    ``<button onclick="this.setAttribute('value','@otherLanguage')" value="@language">To @otherLanguage</button><br>`` +
+    ({English=``<i>Hint:</i> Use prop[5] for a proportional number 5, plurs[5] to place an s if the quantity (5) is greater than 1.``,
+     French=``<i>Astuce:</i> Ecrire prop[5] pour un nombre proportionel 5, plurs[5] pour un 's' conditionel si la quantité 5 est plus grande que 1.``} language) + 
+  ({ apply=\x. x ,
     unapply=\output. {
       value = 
         replaceAllIn "(prop\\w*|plur\\w+)\\[(\\d+)\\]" output (\m.
@@ -94,4 +97,4 @@
       case "plur" + plural => "ifmany" + plural + "[" + amount + "," + base + "]"
     }
   )
-  } } result
+  } } result)
