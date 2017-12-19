@@ -16,13 +16,39 @@ letrec latexToHTML latex =
   let res = unnestedLatexToHTML latex in
   if(res == latex) res else latexToHTML res in
 [
-{tag="script", children=``
+{tag="style", attributes={type="text/css"}, children=``
+  @font-face {
+    font-family: "Computer Modern";
+    src: url('http://mirrors.ctan.org/fonts/cm-unicode/fonts/otf/cmunss.otf');
+  }
+  @font-face {
+    font-family: "Computer Modern";
+    src: url('http://mirrors.ctan.org/fonts/cm-unicode/fonts/otf/cmunsx.otf');
+    font-weight: bold;
+  }
+  @font-face {
+    font-family: "Computer Modern";
+    src: url('http://mirrors.ctan.org/fonts/cm-unicode/fonts/otf/cmunsi.otf');
+    font-style: italic, oblique;
+  }
+  @font-face {
+    font-family: "Computer Modern";
+    src: url('http://mirrors.ctan.org/fonts/cm-unicode/fonts/otf/cmunbxo.otf');
+    font-weight: bold;
+    font-style: italic, oblique;
+  }
+
+  #content {
+    font-family: "Computer Modern", sans-serif;
+  }
+``},
+/*{tag="script", children=``
 if(document.getElementById("mathjaxscript") == null) {
   var script = document.createElement("script");
   script.setAttribute("id", "mathjaxscript");
   script.setAttribute("src", "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML");
   document.head.append(script);
-}``},
+}``},*/
 { tag="div", attributes={id="content"}, children=
 latexToHTML ``
 \section{LaTeX to HTML converter}
