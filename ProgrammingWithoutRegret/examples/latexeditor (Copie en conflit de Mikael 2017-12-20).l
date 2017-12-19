@@ -1,5 +1,5 @@
 //output: html
-//hideprogram: false
+//hideprogram: true
 //download: latex-to-html.html
 
 letrec strToInt x = {`1`=1, `2`=2, `3`=3, `4`=4, `5`=5, `6`=6, `7`=7, `8`=8, `9`=9, `0`=0,
@@ -151,47 +151,40 @@ let commands = {
     , toHtml = \toHtml.\opts.\arg.
       let [argHtml, newOpts] = toHtml opts arg in
       [{tag="i", children = argHtml}, newOpts]},
-  `\ldots` = {arity = 0, toHtml = \toHtml.\opts.\arg. [{tag="span", children=[{tag = "#text",
- value = "…"}]}, opts]},
   `\newcommand` =
-    let extractCommand  = \block.block match {
-      case {tag="command", name=cmdName} => {value = cmdName}
-      case {tag="block", children=[{tag="command", name=cmdName}]} => {value = cmdName}
+    let Command  = {unapply= \block.block match {
+      case {type="command", name=cmdName} => {value = cmdName}
+      case {type="block", children=[{type="command", name=cmdName}]} => {value = cmdName}
       case _ => {}
-    } in
+    } } in
+  
     { inspect = \rightArgs. // Returns the arguments to the command and the remaining that it does not parse.
       rightArgs match {
-        case [cmdOpt] ++ rem =>
-          extractCommand cmdOpt match {
-            case {value= cmdName} => rem match {
-              case [{tag="rawtext", value=text}, definition] ++ rem =>
-                extractFirstIn ``\[(\d+)\]`` text match {
-                  case {value = [d]} => [[cmdName, strToInt d, definition], rem]
-                  case {} => [["Expected [number] for the number of arguments, got " + text], rightArgs]
-                }
-              case [definition] ++ rem =>
-                [[cmdName, 0, definition], rem]
-              case _ => [["Expected \\newcommand{"+cmdName+"}[optional num args]{definition}"], rightArgs]
+        case [Command cmdName] ++ [{type="rawtext", value=text}] ++ [definition] ++ rem =>
+            extractFirstIn ``\[(\d+)\]`` text match {
+              case {value = [d]} => [[cmdName, strToInt d, definition], rem]
+              case {} => [["Expected [number] for the number of arguments, got " + text], rightArgs]
             }
-            case {} =>  [["No command name after \\newcommand, from " + log "" cmdOpt], rightArgs]
-          }
+        case [Command cmdName] ++ [definition] ++ rem =>
+          [[cmdName, 0, definition], rem]
+        case _ => [["Expected \newcommand{\command}[num args]{definition}"], rightArgs]
       }
     , toHtml = \toHtml.\opts.\arg.
       if(arg.length == 1) [htmlError (arg 0) "???", opts] else (
         let [cmdName, arity, definition] = arg in
         let newOpts = opts & { customCommands = opts.customCommands &
-          record cmdName
-            { arity = arity,
-              toHtml = \toHtml.\opts.\arg.
-                // Perform the replacement of #1 with argument 1, #2 with argument 2, and so on.
-                // For now, just output the definition.
-                let [argHtml, newOpts] = toHtml opts [definition] in
-                [argHtml, newOpts]
-            }
-          } in
+              record cmdName
+                { arity = arity,
+                  toHtml = \toHtml.\opts.\arg.
+                    // Perform the replacement of #1 with argument 1, #2 with argument 2, and so on.
+                    // For now, just output the definition.
+                    let [argHtml, newOpts] = toHtml opts definition in
+                    [argHtml, newOpts]
+                }
+              } in
         [{tag="span", attributes={class="newcommand"}}, newOpts]
       )
-    },
+    }
   default = \x.
     { arity = 0
     , toHtml = \toHtml.\opts.\arg.    
@@ -205,14 +198,14 @@ letrec toHtmlWithoutRefs state tree =
     case [{tag="rawtext", value=text}] ++ rem => let newAcc = acc ++ [{tag="#text",value=text}] in
       aux state newAcc rem
     case [{tag="command", name=cmdname}] ++ rem =>
-      let cmddef = (commands & state.customCommands) cmdname in
+      let cmddef = commands cmdname in
       let [args, remainder] = cmddef match {
-        case {arity=n} =>
+        case {arity=n, toHtml=fun} =>
           splitAt n rem
-        case {inspect=inspect} =>
+        case {inspector=inspect, toHtml=fun} =>
           inspect rem
       } in
-      let [toAdd, newState] = cmddef.toHtml toHtmlWithoutRefs state args in
+      let [toAdd, newState] = cmddef.fun toHtmlWithoutRefs state args in
       let newAcc = acc ++ [toAdd] in
       aux newState newAcc remainder
 
@@ -235,6 +228,8 @@ let toHtml x =
       let replaceKey = {
         apply = \refname,txt. log ``refname = @refname, txt= @txt`` txt,
         update = \p. // Lookup for the reference in the options.
+          let dummy = log ``updating refname and txt with `` p in
+          let dummy2 = log ``Options are`` opts in
           let [oldRefname, oldTxt] = p.input in
           let newText = p.outputNew in
           letrec traverse keys = keys match {
@@ -252,16 +247,16 @@ let toHtml x =
     case _ => tree
   } in
   replaceReferences raw in
-let latex = ``\newcommand{\small}{mini}
-\section{\LaTeX{} editing in Html}\label{sec:introduction}
-This \small{} \LaTeX{} editor is \textit{bidirectional} and supports \small{} \textbf{textual} changes. Rename '\small{}' to 'lightweight' to see\ldots
-\section{It supports reference update}\label{sec:commands}
+let latex = ``\section{\LaTeX{} editing in Html}\label{sec:introduction}
+This lightweight \LaTeX{} editor is \textit{bidirectional} and supports small \textbf{textual} changes.
+\section{Supported commands}\label{sec:commands}
 This editor features a subset of \LaTeX{} commands, for example references.
 Section \ref{sec:introduction}.
 Change the previous number to 2 or 2.1. See how it updates the source code.
 
 \subsection{Others}\label{others}
-%TODO support more commands.`` in
+%TODO support more commands.
+`` in
 [
 {tag="style", attributes={type="text/css"}, children=``
 #content {
@@ -297,7 +292,7 @@ Change the previous number to 2 or 2.1. See how it updates the source code.
   margin-right: -0.15em;
 }
 ``},
-{tag="textarea", attributes = {onchange="this.textContent = this.value"}, styles={`font-family`="monospace", width="100%", `min-height` = "200px"}, children = [{tag="#text", value = latex}]},
+{tag="textarea", attributes = {onchange="this.textContent = this.value"}, styles={`font-family`="monospace", width="100%", `min-height` = "150px"}, children = [{tag="#text", value = latex}]},
   {tag="div", attributes={id="content"}, children=
 toHtml 
   (parse (tokens latex)) }]
