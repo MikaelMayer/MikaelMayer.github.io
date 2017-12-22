@@ -167,14 +167,6 @@ menu > select {
   <script type="text/javascript" src="lambda-perfect-opt.js?mp=58"></script>
 <script type="text/javascript" src="/workbench.js"></script>
 <script>
-var prenewline = function (e) {
-    console.log("calling prenewline")
-    if (e.keyCode === 13) {
-    console.log("This was Enter !")
-          document.execCommand('insertHTML', false, "\n");
-        return false;
-    }
-};
 function loadScript(url, callback){
     var script = document.createElement("script")
     script.type = "text/javascript";
