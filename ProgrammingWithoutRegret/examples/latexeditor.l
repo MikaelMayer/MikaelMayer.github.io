@@ -431,6 +431,6 @@ Only frac, exponent and indices in math mode: $\frac{b^2-4ac}{2}$.
    onchange="this.textContent = this.value",
    onkeyup=``if(typeof timer != "undefined") clearTimeout(timer); timer = setTimeout((function(self){ return function() { self.textContent = self.value; } })(this), 2000);``  
 }, styles={`font-family`="monospace", width="100%", `min-height` = "200px"}, children = [{tag="#text", value = latex}]},
-  {tag="div", attributes={id="content"}, children=
+  {tag="div", attributes={id="content"}, styles={display="inline-block"}, children=
 toHtml 
   (parse (tokens latex)) }]
