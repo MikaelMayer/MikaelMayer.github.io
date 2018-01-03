@@ -206,10 +206,11 @@ function initClient() {
 
     // Handle the initial sign-in state.
     updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
-    //authorizeButton.onclick = handleAuthClick;
-    //signoutButton.onclick = handleSignoutClick;
   });
 }
+
+var googleDriveIsSignedIn = false;
+var googleDriveIsSignedInStateCallback = undefined
 
 /**
  *  Called when the signed in status changes, to update the UI
@@ -217,9 +218,11 @@ function initClient() {
  */
 function updateSigninStatus(isSignedIn) {
   if (isSignedIn) {
+    googleDriveIsSignedIn = true
     if (typeof googleDriveIsSignedInStateCallback == "function") {
       console.log("Calling the callback");
       googleDriveIsSignedInStateCallback();
+      googleDriveIsSignedInStateCallback = undefined;
     } else {
       console.log("No callback after signing in...")
     }
@@ -228,7 +231,7 @@ function updateSigninStatus(isSignedIn) {
     //signoutButton.style.display = 'block';
     //listFiles();
   } else {
-    handleAuthClick();
+    googleDriveIsSignedIn = false
     //authorizeButton.style.display = 'block';
     //signoutButton.style.display = 'none';
   }
@@ -238,7 +241,12 @@ function updateSigninStatus(isSignedIn) {
  *  Sign in the user upon button click.
  */
 function handleAuthClick(event) {
-  gapi.auth2.getAuthInstance().signIn();
+  if(typeof gapi == "undefined")
+    setTimeout(handleAuthClick, 100)
+  else if(typeof gapi.auth2 == "undefined")
+    setTimeout(handleAuthClick, 100)
+  else
+    gapi.auth2.getAuthInstance().signIn();
 }
 
 /**
