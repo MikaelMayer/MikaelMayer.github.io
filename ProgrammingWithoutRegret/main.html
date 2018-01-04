@@ -160,6 +160,9 @@ menu > select {
 .repairnotok {
   background-color: #F88;
 }
+#connecttogoogledrive > img {
+  width: 1em;
+}
 </style>
 </head>
 <body>
@@ -198,6 +201,7 @@ function initClient() {
   gapi.client.init({
     apiKey: API_KEY,
     clientId: CLIENT_ID,
+    prompt: 'none',
     discoveryDocs: DISCOVERY_DOCS,
     scope: SCOPES
   }).then(function () {
@@ -217,7 +221,13 @@ var googleDriveIsSignedInStateCallback = undefined
  *  appropriately. After a sign-in, the API is called.
  */
 function updateSigninStatus(isSignedIn) {
+  var connecttogoogledrive = document.getElementById("connecttogoogledrive")
   if (isSignedIn) {
+    if(typeof connecttogoogledrive != "undefined") {
+      connecttogoogledrive.firstChild.setAttribute("src", "images/google-drive-48.png")
+      connecttogoogledrive.setAttribute("title", "Connected to Google Drive")
+    }
+
     googleDriveIsSignedIn = true
     if (typeof googleDriveIsSignedInStateCallback == "function") {
       console.log("Calling the callback");
@@ -226,14 +236,13 @@ function updateSigninStatus(isSignedIn) {
     } else {
       console.log("No callback after signing in...")
     }
-    //googleDriveIsSignedInState = "Sig
-    //authorizeButton.style.display = 'none';
-    //signoutButton.style.display = 'block';
-    //listFiles();
   } else {
+    if(typeof connecttogoogledrive != "undefined") {
+      connecttogoogledrive.firstChild.setAttribute("src", "images/google-drive-monochromatic-48.png")
+      connecttogoogledrive.setAttribute("title", "")
+    }
+
     googleDriveIsSignedIn = false
-    //authorizeButton.style.display = 'block';
-    //signoutButton.style.display = 'none';
   }
 }
 
@@ -245,8 +254,10 @@ function handleAuthClick(event) {
     setTimeout(handleAuthClick, 100)
   else if(typeof gapi.auth2 == "undefined")
     setTimeout(handleAuthClick, 100)
-  else
+  else {
+    console.log("handleAuthClick")
     gapi.auth2.getAuthInstance().signIn();
+  }
 }
 
 /**
