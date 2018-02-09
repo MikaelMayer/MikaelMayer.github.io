@@ -6,7 +6,12 @@ letrec indices list = list match {
   case [] => []
   case [head] ++ tail => (indices tail) ++ [tail.length]
 } in
-
+let zipWithIndex list = 
+  letrec aux index list =
+    list match {
+      case [] => []
+      case [head] ++ tail => [[head, index]] ++ aux (index + 1) tail
+    } in aux 0 list in
 letrec map list fun = list match {
   case [] => []
   case [head] ++ tail => [fun head] ++ (map tail fun)
@@ -183,7 +188,7 @@ let choix = [
   [1, 0, false],
   [1, 1, true ],
   [1, 2, false],
-  [2, 0, true ],
+  [2, 0, false ],
   [2, 1, true ],
   [2, 2, true ]
 ] in
@@ -312,9 +317,25 @@ t.table.withAttrs {
     )]
   )
 ] in
+let date = "Thursday, September 28th 2017" in
+let urlencode txt = replaceAllIn "\n" (replaceAllIn " " (replaceAllIn "/" (replaceAllIn ":" txt "%2F5")  "%2F") "%20") "%0A" in
+let command = join (map (zipWithIndex menus) (\menuIndex. 
+  let [menu, index] = menuIndex in
+  let {children=[{value=t}]} = total index in
+  if(t == "0") "" else " " + t + " Pizza " + menu
+)) "," in
+let sms = ``Hello Pizzaiolo,
+For the lunch of @date, we would like to order@command.
+I'll pick up the pizzas at 1:15pm.
+Best regards,
+Mikael
+`` in
+let encodedsms = urlencode sms in
+let emaiPreview = ``<a contenteditable="false" href="mailto:pizzaiolo@@gmail.com?subject=Pizzas for @date&body=@encodedsms">Send this email to the pizzaiolo</a><br><pre style="white-space:pre-wrap">@sms</pre>`` in
 t.div [
   css,
-  t.h1 [text "Pizza meeting"],
+  t.h1 [text ("Pizza meeting, " + date)],
   t.p [text "Choose your favorite pizzas. We will order some to satisfy everyone."],
-  page
+  page,
+  emaiPreview
 ]

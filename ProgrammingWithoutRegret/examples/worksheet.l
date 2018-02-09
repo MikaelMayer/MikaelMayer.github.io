@@ -43,9 +43,15 @@ let map = !(\f. {
 }) in
 
 let expressions = [
-  { name = "greet", expr = ``"Hello" + " "``},
-  { name = "whom", expr = ``"World"``},
-  { name = "", expr = ``greet + whom``}
+  { name = "people", expr = ``200``},
+  { name = "regFee", expr = ``50``},
+  { name = "sponsors", expr = ``!17000``},
+  { name = "lunch", expr = ``(minoredBy 20) 30``},
+  { name = "venue", expr = ``30000``},
+  { name = "days", expr = ``!3``},
+  { name = "income", expr = ``!people*regFee + !sponsors``},
+  { name = "expenses", expr = ``!people*lunch*days + !venue``},
+  { name = "surplus", expr = ``income - expenses``}
 ] in
 
 import {

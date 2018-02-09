@@ -130,7 +130,7 @@ let htmlConst html =
     { arity = 0,
     toHtml = \toHtml.\opts.\arg. [html, opts]} in
 let newcommandinstantiate args =
-  letrec aux html = (log "result" ((log "newcommandinstantiate" html) match {
+  letrec aux html = html match {
     case {tag="block", children=c} =>
       html & { children = aux c }
     case {tag="replacement", nth=n} =>
@@ -141,7 +141,7 @@ let newcommandinstantiate args =
     case [head] ++ tail =>
       [aux head] ++ aux tail
     case _ => html
-  })) in aux in
+  } in aux in
 let commands = {
 /*  `\noindent` = // negative space.
     { arity = 0
@@ -192,6 +192,8 @@ let commands = {
   `\textsc` = htmlWrapper (\argsHtml. {tag="span", styles={`font-variant` = "small-caps"}, children=argsHtml}),
   `\ldots` = htmlConst {tag="span", children=[{tag = "#text",
  value = "…"}]},
+  `\textbackslash` = htmlConst {tag="span", children=[{tag = "#text",
+ value = "\\"}]},
   `\newcommand` =
     let extractCommand  = \block.block match {
       case {tag="command", name=cmdName} => {value = cmdName}
@@ -293,19 +295,27 @@ let splitargs n array =
       case [] =>
         [[], array]
   } in aux [] n array in
+let escape txt = 
+  let txt2 = replaceAllIn "\\\\" txt "\\textbackslash{}" in
+  let txt3 = replaceAllIn "<B>(.*)</B>" txt2 "\\textbf{$1}" in
+  let txt4 = replaceAllIn "<I>(.*)</I>" txt3 "\\textit{$1}" in
+  txt4 in
 letrec toHtmlWithoutRefs state tree =
   letrec aux state acc tree = tree match {
     case [] => [acc, state]
     case [{tag="block", children=children}] ++ rem => let newTree = children ++ rem in
       aux state acc newTree
     case [{tag="rawtext", value=text}] ++ rem =>
+      let finalText = {apply = \x. x,
+         updateAlign = \p. {value = let d = log "lens update = " p in let res = p.left + escape p.inserted + p.right in log "res = " res }
+        } text in
       if(state.indent && matchIn ``^[\s]*\S`` text)
         let newState = state & {indent = false, newline = false} in
         let accWithParagraph = acc ++ newline state ++ indent state in
-        let newAcc = accWithParagraph ++ [{tag="#text",value=text}] in
+        let newAcc = accWithParagraph ++ [{tag="#text",value=finalText}] in
         aux newState newAcc rem
       else
-        let newAcc = acc ++ [{tag="#text",value=text}] in
+        let newAcc = acc ++ [{tag="#text",value=finalText}] in
         aux state newAcc rem
     case [{tag="newpar"}] ++ rem =>
       let newState = state & { indent = true, newline = true } in
@@ -342,10 +352,18 @@ let initOptions = {
   sectionCounter= !0,
   subsectionCounter= !0,
   mathmode = false  } in
+letrec htmlOf text_tree = text_tree match {
+  case [] => ""
+  case [head] ++ tail => htmlOf head + htmlOf tail 
+  case {tag="#text", value=value} => value // Needs some escape here.
+  case {tag=m, children=children} => "<"+m+">" + htmlOf children + "</"+m+">"
+} in
 let toHtml x =
   let [raw, opts] = toHtmlWithoutRefs initOptions x in
   letrec replaceReferences tree = tree match {
-    case [head] ++ tail => [replaceReferences head] ++ (replaceReferences tail)
+    case [head] ++ tail => {apply = \x.x
+    , update = \p. let d = log "will go through?" p in if (p.outputNew.length != p.outputOriginal.length && p.outputOriginal.length == 1) let e = log "yes" in {value = log "final value=" [{tag="#text", value = htmlOf [p.outputNew]}]} else {}
+    } [replaceReferences head] ++ (replaceReferences tail)
     case [] => []
     case {tag="ref",value=refname} => let txt = opts ("label-" + refname) in
       let replaceKey = {
@@ -426,11 +444,20 @@ Only frac, exponent and indices in math mode: $\frac{b^2-4ac}{2}$.
   }
 .fraction span.fdn {border-top: thin solid black;}
 .fraction span.bar {display: none;}
+latex-sc {
+  font-variant: small-caps;
+}
 ``},
 {tag="textarea", attributes = {
    onchange="this.textContent = this.value",
    onkeyup=``if(typeof timer != "undefined") clearTimeout(timer); timer = setTimeout((function(self){ return function() { self.textContent = self.value; } })(this), 2000);``  
 }, styles={`font-family`="monospace", width="100%", `min-height` = "200px"}, children = [{tag="#text", value = latex}]},
+  ``<button type="button" class="btn btn-default btn-sm" onclick="document.execCommand( 'bold',false,null)" contenteditable="false">
+          <span class="glyphicon glyphicon-bold"></span> Bold
+   </button><button type="button" class="btn btn-default btn-sm" onclick="document.execCommand('italic',false,null);" contenteditable="false">
+     <span class="glyphicon glyphicon-italic"></span> Italic
+   </button>
+   ``,
   {tag="div", attributes={id="content"}, styles={display="inline-block"}, children=
 toHtml 
   (parse (tokens latex)) }]

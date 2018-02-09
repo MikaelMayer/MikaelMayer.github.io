@@ -56,9 +56,9 @@ default = \x.
 
 let formulas =
   [[``"Type"``,   ``"€"``,       ``"$"``,        ``"100€ = $"+E1``, ``117``],
-   [``"Transport"`` , ``150``,   ``A2*!E1/100``, ``""``,           ``""``],
-   [``"Hotel"``     , ``470``,   ``A3*!E1/100``, ``""``,           ``""``],
-   [``"Conference"``, ``110``,   ``A3*!E1/100``, ``""``,           ``""``],
+   [``"Transport"`` , ``150``,   ``B2*!E1/100``, ``""``,           ``""``],
+   [``"Hotel"``     , ``470``,   ``B3*!E1/100``, ``""``,           ``""``],
+   [``"Conference"``, ``110``,   ``B4*!E1/100``, ``""``,           ``""``],
    [``"Totals:"``   , ``sum [B2, B3, B4]``,   ``sum [C2, C3, C4]``,  ``""``,           ``""``]] in
 
 let map f list =
@@ -82,7 +82,7 @@ let fix computation init =
     if(next == current) next else (aux next)
   in aux init in*/ // Use this fix function when the equality will work at compile-time.
 
-let evaluationlength = 2 in
+let evaluationlength = 3 in
 
 let fix computation init =
   letrec aux n current = if(n == 0) current else
