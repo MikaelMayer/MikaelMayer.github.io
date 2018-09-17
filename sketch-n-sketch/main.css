@@ -2,7 +2,7 @@
  * General                                                                    *
  ******************************************************************************/
 
-*:not(.outputCanvas *) {
+* {
   margin: 0;
   padding: 0;
   -webkit-box-sizing: border-box;
@@ -26,7 +26,7 @@ body {
   user-select: none;
 }
 
-a:not(.outputCanvas a) {
+a {
   color: inherit;
   text-decoration: none;
 }
@@ -117,6 +117,14 @@ code {
   -ms-transition: -ms-transform 0.5s;
   -o-transition: -o-transform 0.5s;
   transition: transform 0.5s;
+}
+
+.dragger .ui-button.close {
+  -webkit-box-sizing: content-box;
+  -moz-box-sizing: content-box;
+  -ms-box-sizing: content-box;
+  -o-box-sizing: content-box;
+  box-sizing: content-box;
 }
 
 .ui-button.close:hover {
@@ -579,13 +587,13 @@ code {
 .mode-indicator {
   align-self: center;
 
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   background-color: var(--pop-color-clear);
   transition: background-color 0.2s;
 
   border: 1px solid var(--subtle-border-color);
-  border-radius: 5px;
+  border-radius: 6px;
 }
 
 .mode-icon-wrapper.active .mode-indicator {
@@ -608,6 +616,11 @@ code {
   height: 100%;
   word-wrap: break-word;
   text-align: center;
+}
+
+.mode-icon .text-button img {
+  width: 100%;
+  height: 100%;
 }
 
 .mode-separator {
@@ -680,6 +693,44 @@ code {
   overflow: auto;
   position: relative;
   font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
+}
+
+/* Output Canvas children styles */
+
+#outputCanvas h1,
+#outputCanvas h2,
+#outputCanvas h3,
+#outputCanvas h4,
+#outputCanvas h5,
+#outputCanvas h6,
+#outputCanvas ul,
+#outputCanvas ol,
+#outputCanvas p
+{
+  margin: 0.75em 0;
+}
+
+#outputCanvas a {
+  color: blue;
+  text-decoration: underline;
+}
+
+#outputCanvas a:active {
+  color: red;
+}
+
+#outputCanvas a:visited {
+  color: purple;
+}
+
+#outputCanvas button {
+  padding: 1px 7px 2px;
+}
+
+#outputCanvas ul,
+#outputCanvas ol
+{
+  padding-inline-start: 40px;
 }
 
 #svgWidgetsLayer {
@@ -958,12 +1009,27 @@ code {
  * Synthesis Menu                                                             *
  ******************************************************************************/
 
-.synthesis-results .hover-menu .text-button {
+.synthesis-results .hover-menu .text-button,
+.synthesis-results .just-description
+{
+  display: block;
   width: 450px;
   height: auto;
-  padding: 7px;
   line-height: 1.4em;
   white-space: normal;
+  position: relative;
+}
+
+.synthesis-results .hover-menu .text-button {
+  padding: 7px;
+}
+
+.synthesis-results .just-description {
+  margin: 7px 0;
+  padding: 0 7px;
+}
+
+.synthesis-results .hover-menu .text-button {
   border-bottom: 1px solid var(--subtle-border-color);
 }
 
@@ -977,6 +1043,65 @@ code {
 
 .synthesis-results .hover-menu-indicator {
   display: none;
+}
+
+/******************************************************************************
+ * Result Text                                                                *
+ ******************************************************************************/
+
+.result-text-plain {
+}
+
+.result-text-header {
+  font-size: 1em;
+  position: relative;
+  z-index: 1;
+}
+
+.result-text-header:before {
+  content: "";
+  display: block;
+
+  border-bottom: 1px dashed var(--main-border-color);
+
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  z-index: -1;
+}
+
+.result-text-header .result-text-content {
+  background-color: var(--panel-bg-color);
+  margin-left: 20px;
+  padding: 0 5px;
+}
+
+.result-text-header.error {
+  color: var(--alert-warning-text-color);
+}
+
+.result-text-code,
+.result-text-type
+{
+  margin: 0 15px;
+  padding: 5px 10px;
+  border: 1px dashed var(--main-border-color);
+  border-radius: 5px;
+  display: block;
+}
+
+.result-text-code {
+}
+
+.result-text-type {
+}
+
+.result-text-hint {
+}
+
+.result-text-hint-annotation {
+  text-decoration: underline;
 }
 
 /******************************************************************************
