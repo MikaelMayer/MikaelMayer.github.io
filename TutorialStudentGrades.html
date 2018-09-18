@@ -1,47 +1,48 @@
 <html>
 <body><div class='outer'><div class='inner' contenteditable='False'><h1>Sketch-n-sketch Tutorial - Fair grades</h1>
 <i>This tutorial assumes that you have
-<a href='https://mikaelmayer.github.io/sketch-n-sketch/'>Sketch-n-sketch</a> running on your browser. If you encounter editing issues, try resizing your window.</i><br><br>At last, your teaching assistants corrected all the assignments,
+<a href='https://mikaelmayer.github.io/sketch-n-sketch/'>Sketch-n-sketch</a> running on your browser.
+The 'left pane' references the left half of that interface, whereas the 'right pane' references the right half of that interface. If you encounter editing issues, try resizing your window.</i><br><br>At last, your teaching assistants have graded all the assignments,
 the mid-terms and the final exam.
-They provided you with a list of student names and their average grade over 100.
-How to fairly map these grades to letters, such as A+, A, A-, B+... until E?<br>To start, replace the program in the Sketch-n-sketch editor on the left pane, by selecting everything and pasting the following code:
-<newcode code='-- We will write code here #1\r\n\r\n-- Displays the interface\r\nmain = <span><h1>Fair grades</h1>\r\n  We want to give a grade to our students.<br><br>\r\n  Graphics coming soon...\r\n  </span>'></newcode>
+They've provided you with a list of student names and their average grades out of 100.
+How do you fairly map these scores to letter grades, such as A+, A, A-, B+ ... down to E?<br>To start, replace the program in the Sketch-n-sketch editor by selecting everything and pasting the following code on the left pane of the Sketch-n-sketch editor:
+<newcode code='-- We will write code here #1\r\n\r\n-- Displays the interface\r\nmain = <span><h1>Fair grades</h1>\r\n  We want to give grades to our students.<br><br>\r\n  Graphics coming soon...\r\n  </span>'></newcode>
 <code class='snippet'>-- We will write code here #1
 
 -- Displays the interface
 main = &lt;span&gt;&lt;h1&gt;Fair grades&lt;/h1&gt;
-  We want to give a grade to our students.&lt;br&gt;&lt;br&gt;
+  We want to give grades to our students.&lt;br&gt;&lt;br&gt;
   Graphics coming soon...
   &lt;/span&gt;</code>
-After clicking on "Run", you should have the result below on the right.
+After clicking on "Run", you should see the below result in the right pane.
 Note that the <code>main = </code> is optional, if the program ends with an expression, it will automatically insert <code>main = </code> in front of it.
 <div class='outputwrapper'><span><h1>Fair grades</h1>
-  We want to give a grade to our students.<br><br>
+  We want to give grades to our students.<br><br>
   Graphics coming soon...
   </span></div>
 <h2>Update basics</h2>
 Sketch-n-sketch not only displays the webpage, it allows you to modify it.<br>In the right panel,
-<ul><li>type "student" inside "Fair grades" so that it becomes "Fair student grades".<hiddenreplacepath path='Fair grades' code='Fair student grades'></hiddenreplacepath><div class='outputwrapper'><span><h1>Fair student grades</h1>
-  We want to give a grade to our students.<br><br>
+<ul><li>type "student" inside "Fair grades" so that it becomes "Fair student grades".<hiddenreplace placeHolder='Fair grades' code='Fair student grades'></hiddenreplace><div class='outputwrapper'><span><h1>Fair student grades</h1>
+  We want to give grades to our students.<br><br>
   Graphics coming soon...
   </span></div></li>
 <li>A pop-up menu "Output Editor" appears on the left panel.</li>
 <li>Hover over "Update program".</li>
 <li>Hover over the first solution.</li>
-<li>You see that the code is updated accordingly:<code class='snippet'>-- We will write code here #1
+<li>You'll see that the code is updated accordingly:<code class='snippet'>-- We will write code here #1
 
 -- Displays the interface
 main = &lt;span&gt;&lt;h1&gt;Fair student grades&lt;/h1&gt;
-  We want to give a grade to our students.&lt;br&gt;&lt;br&gt;
+  We want to give grades to our students.&lt;br&gt;&lt;br&gt;
   Graphics coming soon...
   &lt;/span&gt;</code></li>
 <li>Click on the first solution to accept the change.</li></ul>
-For your information, right next to the right panel, a button labelled "Auto Sync" enables the propagation of non-ambiguous changes automatically, if activated. We are not using it in this tutorial.
+FYI: Right next to the right panel, a button labelled "Auto Sync" enables the propagation of unambiguous changes automatically. We won't be using it in this tutorial.
 <h2>Import the grades</h2>
-Out of the spreadsheet that your assistants provided you with,
-you managed to export a comma-separated value file containing on each line a name and a grade.
+From the spreadsheet that your assistants provided you, you
+generated a Comma-Separated Value (CSV) file with each line containing a name and a grade.
 Fortunately, sketch-n-sketch can handle raw strings by enclosing them in triple quotes <code>"""</code>.
-Let us assign this string data to the variable <code>input_data</code><br><span>Replace the code <code>-- We will write code here #1</code> (line 1) by<code class='snippet'>input_data = """Alice,64.7
+Let us assign this string data to the variable <code>input_data</code><br><span>Replace the code <code>-- We will write code here #1</code> (line 1) with<code class='snippet'>input_data = """Alice,64.7
 Bob,78.5
 Eve,57.9
 Seya,100
@@ -72,7 +73,7 @@ Rudolph,83.2
 Rafael,86.6"""
 
 -- We will write code here #2</code></span><h2>Convert student data</h2>
-If you want to display this data, you could simply insert in the <code>main</code> the code <code>@input_data</code>, but that would only display the string, which would not be very helpful.<br>First, we convert this data to a list of datatypes like <code>Student "Alice" 64.7</code> and store it to a variable <code>studentsGrades</code>.<br><span>Replace the code <code>-- We will write code here #2</code> (line 31) by<code class='snippet'>type Student = Student String Num
+If you want to display this data, you could simply insert <code>@input_data</code> into the <code>main</code> code, but that would only display the string, which would not be very helpful.<br>First, we convert this data to a list of datatypes like <code>Student "Alice" 64.7</code> and store it to a variable <code>studentsGrades</code>.<br><span>Replace the code <code>-- We will write code here #2</code> (line 31) with<code class='snippet'>type Student = Student String Num
 
 studentsGrades = 
   input_data
@@ -82,11 +83,11 @@ studentsGrades =
       Student name (Update.freeze &lt;| String.toFloat gradeString)
   )
 
--- We will write code here #3</code></span>First notice how we define a datatype constructor <code>Student</code> that accepts a string (the name) and a number (the grade over 100). This datatype is like a pair that stores the two pieces of information.<br>The construcion <code>b |&gt; f a</code> is equivalent to the more natural <code>f a b</code> (a function <code>f</code> applied to two arguments <code>a</code> and <code>b</code>) but it is a good way to visualize the transformation step by step.<br>Here, we use the library function <code>Regex.split</code> to split the <code>input_data</code> on newlines, which gives us a list of strings.
-Then, each of these "lines" is extracted against a regular expression for the informations before and after the comma, so that we can build a data <code>Student</code> with the extracted <code>name</code> and the grade that we convert to a float (number).<br>Note that we also add <code>Update.freeze</code> to make sure we will never modify this grade indirectly.
+-- We will write code here #3</code></span>First, notice how we define a datatype constructor <code>Student</code> that accepts a string (the name) and a number (the grade out of 100). This datatype is like a pair that stores the two pieces of information.<br>The construction <code>b |&gt; f a</code> is equivalent to the more natural <code>f a b</code> (a function <code>f</code> applied to two arguments <code>a</code> and <code>b</code>) but it is a good way to visualize the transformation step by step.<br>Here, we use the library function <code>Regex.split</code> to split the <code>input_data</code> on newlines, which gives us a list of strings.
+Then, a regular expression is applied to each of these "lines" to extract the data before and after the comma, so that we can build a <code>Student</code> datum with the extracted <code>name</code> and the grade that we convert to a float (number).<br>Note that we also add <code>Update.freeze</code> to make sure we will never modify this grade indirectly via the output.
 <h2>Define the cut-offs</h2>
-We need to define associations between letters and minimum grades to obtain them.
-We suppose that we have a first guess (e.g. from previous year, or a linear guess).<br><span>Replace the code <code>-- We will write code here #3</code> (line 41) by<code class='snippet'>type CutOff = Student String Num
+We need to define associations between letter grades and the minimum scores (i.e., cutoffs) required to obtain them.
+Let's say we have a first guess (e.g., using the cutoffs from the previous year, or a simple linear function).<br><span>Replace the code <code>-- We will write code here #3</code> (line 41) with<code class='snippet'>type CutOff = CutOff String Num
 
 cutoffs = [
   CutOff "A+" 96.8,
@@ -102,7 +103,7 @@ cutoffs = [
   CutOff "E"  0]
 
 -- We will write code here #4</code></span><h2>Example: get students in each group</h2>
-Just as an exercise, if we wanted to display how many students obtained a letter given "B-" and "A+", we could insert the following code next to <code>Graphics coming soon...</code> in <code>main</code>:
+Just as an exercise, if we wanted to display how many students obtained a grade between "B-" and "A+" (both inclusive), we could insert the following code next to <code>Graphics coming soon...</code> in <code>main</code>:
 <code class='snippet'>@(let
     thresholdOf name =
       let aux cutoffs = case cutoffs of
@@ -117,16 +118,16 @@ Just as an exercise, if we wanted to display how many students obtained a letter
   |&gt; List.filterMap (\Student name grade -&gt;
     if grade &gt;= minGrade &amp;&amp; grade &lt; maxGrade
     then Just name else Nothing)
-  |&gt; String.join ", ") ++ " are above B-"
+  |&gt; String.join ", ") ++ " have at least a B-"
 )</code>
-You would end up with the following output on the right-hand side.
+You would end up with the following output in the right pane.
 <div class='outputwrapper'><span><h1>Fair student grades</h1>
-  We want to give a grade to our students.<br><br>
-  Bob, Madelene, Clarita, Ulrike, Ferdinand, Tamara, Kellee, Leanne, Leonore, Linette, Salley, Aleisha, Sabine, Misti, Jenny, Nubia, Tennillee, Margaret, Loida, Rudolph, Rafael are above B-
+  We want to give grades to our students.<br><br>
+  Bob, Madelene, Clarita, Ulrike, Ferdinand, Tamara, Kellee, Leanne, Leonore, Linette, Salley, Aleisha, Sabine, Misti, Jenny, Nubia, Tennillee, Margaret, Loida, Rudolph, Rafael have at least a B-
   </span></div>
 This is just an example to illustrate general-purpose computing techniques (such as recursion, pattern matching, list construction and deconstruction), but for now you can discard this code snippet.<h2>Display cut-offs and grades as SVG</h2>
-We display cut-offs as horizontal lines, and the grades as bars,
-to "see" where the cuts are. To make it meaningful, we sort students by grade.<br><span>Replace the code <code>-- We will write code here #4</code> (line 56) by<code class='snippet'>sortedGrades =
+We display cut-offs as horizontal black lines, and the grades as short blue lines,
+to "see" where the grades are in relation to the cutoffs. To make it meaningful, we sort students by grade.<br><span>Replace the code <code>-- We will write code here #4</code> (line 56) with<code class='snippet'>sortedGrades =
   studentsGrades
   |&gt; sortBy (\(Student _ n1) (Student _ n2) -&gt; n1 &gt; n2) 
 
@@ -163,23 +164,23 @@ height = 389
 chart = barChart 50 0 width height
 
 -- We will write code here #5</code></span>
-<span>Replace the code <code>Graphics coming soon...</code> (line 97) by<code class='snippet'>&lt;span contenteditable="false"&gt;
+<span>Replace the code <code>Graphics coming soon...</code> (line 97) with<code class='snippet'>&lt;span contenteditable="false"&gt;
 &lt;svg width=toString(width + 100)
      height=toString(height)&gt;@chart&lt;/svg&gt;&lt;/span&gt;&lt;br&gt;
 
  Table coming soon...
 </code></span><br>You should obtain the following result, after running the program.
 <div class='outputwrapper'><span><h1>Fair student grades</h1>
-  We want to give a grade to our students.<br><br>
+  We want to give grades to our students.<br><br>
   <span contenteditable='false'>
 <svg xmlns='http://www.w3.org/2000/svg' width='550' height='389'><rect x='50' y='0' width='450' height='389' fill='lightgray' stroke='gray' stroke-width='5'></rect><line x1='50' y1='261.408' x2='65.51724137931035' y2='261.408' stroke='blue' stroke-width='2'></line><line x1='65.51724137931035' y1='218.618' x2='81.0344827586207' y2='218.618' stroke='blue' stroke-width='2'></line><line x1='81.0344827586207' y1='163.769' x2='96.55172413793105' y2='163.769' stroke='blue' stroke-width='2'></line><line x1='96.55172413793103' y1='152.09900000000002' x2='112.06896551724138' y2='152.09900000000002' stroke='blue' stroke-width='2'></line><line x1='112.06896551724138' y1='137.31699999999998' x2='127.58620689655173' y2='137.31699999999998' stroke='blue' stroke-width='2'></line><line x1='127.58620689655173' y1='134.983' x2='143.10344827586206' y2='134.983' stroke='blue' stroke-width='2'></line><line x1='143.10344827586206' y1='130.704' x2='158.6206896551724' y2='130.704' stroke='blue' stroke-width='2'></line><line x1='158.6206896551724' y1='99.58399999999995' x2='174.13793103448276' y2='99.58399999999995' stroke='blue' stroke-width='2'></line><line x1='174.13793103448276' y1='83.63499999999999' x2='189.6551724137931' y2='83.63499999999999' stroke='blue' stroke-width='2'></line><line x1='189.6551724137931' y1='70.40899999999999' x2='205.17241379310346' y2='70.40899999999999' stroke='blue' stroke-width='2'></line><line x1='205.17241379310346' y1='66.90800000000002' x2='220.6896551724138' y2='66.90800000000002' stroke='blue' stroke-width='2'></line><line x1='220.6896551724138' y1='66.51899999999995' x2='236.20689655172416' y2='66.51899999999995' stroke='blue' stroke-width='2'></line><line x1='236.20689655172413' y1='65.35199999999998' x2='251.72413793103448' y2='65.35199999999998' stroke='blue' stroke-width='2'></line><line x1='251.72413793103448' y1='64.96300000000002' x2='267.2413793103448' y2='64.96300000000002' stroke='blue' stroke-width='2'></line><line x1='267.2413793103448' y1='63.40699999999998' x2='282.7586206896552' y2='63.40699999999998' stroke='blue' stroke-width='2'></line><line x1='282.7586206896552' y1='60.295000000000016' x2='298.2758620689655' y2='60.295000000000016' stroke='blue' stroke-width='2'></line><line x1='298.2758620689655' y1='52.125999999999976' x2='313.7931034482759' y2='52.125999999999976' stroke='blue' stroke-width='2'></line><line x1='313.7931034482759' y1='51.73700000000002' x2='329.3103448275862' y2='51.73700000000002' stroke='blue' stroke-width='2'></line><line x1='329.3103448275862' y1='45.51299999999998' x2='344.82758620689657' y2='45.51299999999998' stroke='blue' stroke-width='2'></line><line x1='344.82758620689657' y1='45.12399999999997' x2='360.3448275862069' y2='45.12399999999997' stroke='blue' stroke-width='2'></line><line x1='360.3448275862069' y1='44.346000000000004' x2='375.86206896551727' y2='44.346000000000004' stroke='blue' stroke-width='2'></line><line x1='375.86206896551727' y1='36.954999999999984' x2='391.3793103448276' y2='36.954999999999984' stroke='blue' stroke-width='2'></line><line x1='391.3793103448276' y1='30.341999999999985' x2='406.89655172413796' y2='30.341999999999985' stroke='blue' stroke-width='2'></line><line x1='406.89655172413796' y1='29.952999999999975' x2='422.4137931034483' y2='29.952999999999975' stroke='blue' stroke-width='2'></line><line x1='422.41379310344826' y1='25.284999999999968' x2='437.9310344827586' y2='25.284999999999968' stroke='blue' stroke-width='2'></line><line x1='437.9310344827586' y1='19.061000000000035' x2='453.44827586206895' y2='19.061000000000035' stroke='blue' stroke-width='2'></line><line x1='453.44827586206895' y1='5.8349999999999795' x2='468.9655172413793' y2='5.8349999999999795' stroke='blue' stroke-width='2'></line><line x1='468.9655172413793' y1='5.8349999999999795' x2='484.48275862068965' y2='5.8349999999999795' stroke='blue' stroke-width='2'></line><line x1='484.48275862068965' y1='0' x2='500' y2='0' stroke='blue' stroke-width='2'></line><line x1='50' y1='12.448000000000011' x2='500' y2='12.448000000000011' stroke='black' stroke-width='2'></line><text x='20' y='12.448000000000011' style='fill:black;font-family:monospace;font-size:12pt'>A+</text><text x='510' y='12.448000000000011' style='fill:black;font-family:monospace;font-size:12pt'>A+</text><line x1='50' y1='38.9' x2='500' y2='38.9' stroke='black' stroke-width='2'></line><text x='20' y='38.9' style='fill:black;font-family:monospace;font-size:12pt'>A</text><text x='510' y='38.9' style='fill:black;font-family:monospace;font-size:12pt'>A</text><line x1='50' y1='54.46' x2='500' y2='54.46' stroke='black' stroke-width='2'></line><text x='20' y='54.46' style='fill:black;font-family:monospace;font-size:12pt'>A-</text><text x='510' y='54.46' style='fill:black;font-family:monospace;font-size:12pt'>A-</text><line x1='50' y1='66.51899999999998' x2='500' y2='66.51899999999998' stroke='black' stroke-width='2'></line><text x='20' y='66.51899999999998' style='fill:black;font-family:monospace;font-size:12pt'>B+</text><text x='510' y='66.51899999999998' style='fill:black;font-family:monospace;font-size:12pt'>B+</text><line x1='50' y1='93.36' x2='500' y2='93.36' stroke='black' stroke-width='2'></line><text x='20' y='93.36' style='fill:black;font-family:monospace;font-size:12pt'>B</text><text x='510' y='93.36' style='fill:black;font-family:monospace;font-size:12pt'>B</text><line x1='50' y1='122.53500000000001' x2='500' y2='122.53500000000001' stroke='black' stroke-width='2'></line><text x='20' y='122.53500000000001' style='fill:black;font-family:monospace;font-size:12pt'>B-</text><text x='510' y='122.53500000000001' style='fill:black;font-family:monospace;font-size:12pt'>B-</text><line x1='50' y1='151.71' x2='500' y2='151.71' stroke='black' stroke-width='2'></line><text x='20' y='151.71' style='fill:black;font-family:monospace;font-size:12pt'>C+</text><text x='510' y='151.71' style='fill:black;font-family:monospace;font-size:12pt'>C+</text><line x1='50' y1='171.93800000000002' x2='500' y2='171.93800000000002' stroke='black' stroke-width='2'></line><text x='20' y='171.93800000000002' style='fill:black;font-family:monospace;font-size:12pt'>C</text><text x='510' y='171.93800000000002' style='fill:black;font-family:monospace;font-size:12pt'>C</text><line x1='50' y1='231.84400000000002' x2='500' y2='231.84400000000002' stroke='black' stroke-width='2'></line><text x='20' y='231.84400000000002' style='fill:black;font-family:monospace;font-size:12pt'>C-</text><text x='510' y='231.84400000000002' style='fill:black;font-family:monospace;font-size:12pt'>C-</text><line x1='50' y1='274.245' x2='500' y2='274.245' stroke='black' stroke-width='2'></line><text x='20' y='274.245' style='fill:black;font-family:monospace;font-size:12pt'>D</text><text x='510' y='274.245' style='fill:black;font-family:monospace;font-size:12pt'>D</text><line x1='50' y1='389' x2='500' y2='389' stroke='black' stroke-width='2'></line><text x='20' y='389' style='fill:black;font-family:monospace;font-size:12pt'>E</text><text x='510' y='389' style='fill:black;font-family:monospace;font-size:12pt'>E</text></svg></span><br>
 
  Table coming soon...
 
-  </span></div><br>Thanks to SVG editing capabilities, we can now move the horizontal lines up and down to change cut-offs.<br>Make sure the line <span>line 48</span> is visible in the code editor (in the left panel).<br>Your task is now to move the cut-off of the letter B (in the right panel) to accept one more student (by dragging it slowly below).
+  </span></div><br>Thanks to SVG editing capabilities, we can now move the horizontal lines up and down to change the cut-offs.<br>Make sure the line <span>line 48</span> is visible in the code editor (in the left panel).<br>Your task is now to move the cut-off of the letter B (in the right panel) to accept one more student (by dragging it slowly below).
 A pop-up "Output Editor" appears. Hover over "Update program", it then takes 1 second to find where to change the cut-off. Click on the solution to accept it.
 You should obtain something like the following on the right-hand side.<br><div class='outputwrapper'><span><h1>Fair student grades</h1>
-  We want to give a grade to our students.<br><br>
+  We want to give grades to our students.<br><br>
   <span contenteditable='false'>
 <svg xmlns='http://www.w3.org/2000/svg' width='550' height='389'><rect x='50' y='0' width='450' height='389' fill='lightgray' stroke='gray' stroke-width='5'></rect><line x1='50' y1='261.408' x2='65.51724137931035' y2='261.408' stroke='blue' stroke-width='2'></line><line x1='65.51724137931035' y1='218.618' x2='81.0344827586207' y2='218.618' stroke='blue' stroke-width='2'></line><line x1='81.0344827586207' y1='163.769' x2='96.55172413793105' y2='163.769' stroke='blue' stroke-width='2'></line><line x1='96.55172413793103' y1='152.09900000000002' x2='112.06896551724138' y2='152.09900000000002' stroke='blue' stroke-width='2'></line><line x1='112.06896551724138' y1='137.31699999999998' x2='127.58620689655173' y2='137.31699999999998' stroke='blue' stroke-width='2'></line><line x1='127.58620689655173' y1='134.983' x2='143.10344827586206' y2='134.983' stroke='blue' stroke-width='2'></line><line x1='143.10344827586206' y1='130.704' x2='158.6206896551724' y2='130.704' stroke='blue' stroke-width='2'></line><line x1='158.6206896551724' y1='99.58399999999995' x2='174.13793103448276' y2='99.58399999999995' stroke='blue' stroke-width='2'></line><line x1='174.13793103448276' y1='83.63499999999999' x2='189.6551724137931' y2='83.63499999999999' stroke='blue' stroke-width='2'></line><line x1='189.6551724137931' y1='70.40899999999999' x2='205.17241379310346' y2='70.40899999999999' stroke='blue' stroke-width='2'></line><line x1='205.17241379310346' y1='66.90800000000002' x2='220.6896551724138' y2='66.90800000000002' stroke='blue' stroke-width='2'></line><line x1='220.6896551724138' y1='66.51899999999995' x2='236.20689655172416' y2='66.51899999999995' stroke='blue' stroke-width='2'></line><line x1='236.20689655172413' y1='65.35199999999998' x2='251.72413793103448' y2='65.35199999999998' stroke='blue' stroke-width='2'></line><line x1='251.72413793103448' y1='64.96300000000002' x2='267.2413793103448' y2='64.96300000000002' stroke='blue' stroke-width='2'></line><line x1='267.2413793103448' y1='63.40699999999998' x2='282.7586206896552' y2='63.40699999999998' stroke='blue' stroke-width='2'></line><line x1='282.7586206896552' y1='60.295000000000016' x2='298.2758620689655' y2='60.295000000000016' stroke='blue' stroke-width='2'></line><line x1='298.2758620689655' y1='52.125999999999976' x2='313.7931034482759' y2='52.125999999999976' stroke='blue' stroke-width='2'></line><line x1='313.7931034482759' y1='51.73700000000002' x2='329.3103448275862' y2='51.73700000000002' stroke='blue' stroke-width='2'></line><line x1='329.3103448275862' y1='45.51299999999998' x2='344.82758620689657' y2='45.51299999999998' stroke='blue' stroke-width='2'></line><line x1='344.82758620689657' y1='45.12399999999997' x2='360.3448275862069' y2='45.12399999999997' stroke='blue' stroke-width='2'></line><line x1='360.3448275862069' y1='44.346000000000004' x2='375.86206896551727' y2='44.346000000000004' stroke='blue' stroke-width='2'></line><line x1='375.86206896551727' y1='36.954999999999984' x2='391.3793103448276' y2='36.954999999999984' stroke='blue' stroke-width='2'></line><line x1='391.3793103448276' y1='30.341999999999985' x2='406.89655172413796' y2='30.341999999999985' stroke='blue' stroke-width='2'></line><line x1='406.89655172413796' y1='29.952999999999975' x2='422.4137931034483' y2='29.952999999999975' stroke='blue' stroke-width='2'></line><line x1='422.41379310344826' y1='25.284999999999968' x2='437.9310344827586' y2='25.284999999999968' stroke='blue' stroke-width='2'></line><line x1='437.9310344827586' y1='19.061000000000035' x2='453.44827586206895' y2='19.061000000000035' stroke='blue' stroke-width='2'></line><line x1='453.44827586206895' y1='5.8349999999999795' x2='468.9655172413793' y2='5.8349999999999795' stroke='blue' stroke-width='2'></line><line x1='468.9655172413793' y1='5.8349999999999795' x2='484.48275862068965' y2='5.8349999999999795' stroke='blue' stroke-width='2'></line><line x1='484.48275862068965' y1='0' x2='500' y2='0' stroke='blue' stroke-width='2'></line><line x1='50' y1='12.448000000000011' x2='500' y2='12.448000000000011' stroke='black' stroke-width='2'></line><text x='20' y='12.448000000000011' style='fill:black;font-family:monospace;font-size:12pt'>A+</text><text x='510' y='12.448000000000011' style='fill:black;font-family:monospace;font-size:12pt'>A+</text><line x1='50' y1='38.9' x2='500' y2='38.9' stroke='black' stroke-width='2'></line><text x='20' y='38.9' style='fill:black;font-family:monospace;font-size:12pt'>A</text><text x='510' y='38.9' style='fill:black;font-family:monospace;font-size:12pt'>A</text><line x1='50' y1='54.46' x2='500' y2='54.46' stroke='black' stroke-width='2'></line><text x='20' y='54.46' style='fill:black;font-family:monospace;font-size:12pt'>A-</text><text x='510' y='54.46' style='fill:black;font-family:monospace;font-size:12pt'>A-</text><line x1='50' y1='66.51899999999998' x2='500' y2='66.51899999999998' stroke='black' stroke-width='2'></line><text x='20' y='66.51899999999998' style='fill:black;font-family:monospace;font-size:12pt'>B+</text><text x='510' y='66.51899999999998' style='fill:black;font-family:monospace;font-size:12pt'>B+</text><line x1='50' y1='106.19699999999999' x2='500' y2='106.19699999999999' stroke='black' stroke-width='2'></line><text x='20' y='106.19699999999999' style='fill:black;font-family:monospace;font-size:12pt'>B</text><text x='510' y='106.19699999999999' style='fill:black;font-family:monospace;font-size:12pt'>B</text><line x1='50' y1='122.53500000000001' x2='500' y2='122.53500000000001' stroke='black' stroke-width='2'></line><text x='20' y='122.53500000000001' style='fill:black;font-family:monospace;font-size:12pt'>B-</text><text x='510' y='122.53500000000001' style='fill:black;font-family:monospace;font-size:12pt'>B-</text><line x1='50' y1='151.71' x2='500' y2='151.71' stroke='black' stroke-width='2'></line><text x='20' y='151.71' style='fill:black;font-family:monospace;font-size:12pt'>C+</text><text x='510' y='151.71' style='fill:black;font-family:monospace;font-size:12pt'>C+</text><line x1='50' y1='171.93800000000002' x2='500' y2='171.93800000000002' stroke='black' stroke-width='2'></line><text x='20' y='171.93800000000002' style='fill:black;font-family:monospace;font-size:12pt'>C</text><text x='510' y='171.93800000000002' style='fill:black;font-family:monospace;font-size:12pt'>C</text><line x1='50' y1='231.84400000000002' x2='500' y2='231.84400000000002' stroke='black' stroke-width='2'></line><text x='20' y='231.84400000000002' style='fill:black;font-family:monospace;font-size:12pt'>C-</text><text x='510' y='231.84400000000002' style='fill:black;font-family:monospace;font-size:12pt'>C-</text><line x1='50' y1='274.245' x2='500' y2='274.245' stroke='black' stroke-width='2'></line><text x='20' y='274.245' style='fill:black;font-family:monospace;font-size:12pt'>D</text><text x='510' y='274.245' style='fill:black;font-family:monospace;font-size:12pt'>D</text><line x1='50' y1='389' x2='500' y2='389' stroke='black' stroke-width='2'></line><text x='20' y='389' style='fill:black;font-family:monospace;font-size:12pt'>E</text><text x='510' y='389' style='fill:black;font-family:monospace;font-size:12pt'>E</text></svg></span><br>
 
@@ -189,14 +190,14 @@ You should obtain something like the following on the right-hand side.<br><div c
 <h2>First lens: 1-digit cut-offs</h2>
 After this update, the cut-off number for the letter B might start to have a lot of decimals.
 However, only one is necessary.
-To avoid this, we add a lens to modify how the cut-off is updated.<br><span>Replace the code <code>-- We will write code here #5</code> (line 92) by<code class='snippet'>updateDecimal = Update.lens {
+To avoid this, we add a lens to modify how the cut-off is updated.<br><span>Replace the code <code>-- We will write code here #5</code> (line 92) with<code class='snippet'>updateDecimal = Update.lens {
   apply cutOff = cutOff
   update {input=oldCutOff,outputNew=newCutOff} =
     Ok (Inputs [round (newCutOff * 10) / 10])
 }
 
 -- We will write code here #6</code></span>
-<span>Replace the code <code>freeze 100! - cutoff</code> (line 76) by<code class='snippet'>freeze 100! - updateDecimal cutoff</code></span>
+<span>Replace the code <code>freeze 100! - cutoff</code> (line 76) with<code class='snippet'>freeze 100! - updateDecimal cutoff</code></span>
 A lens is a pair of two functions (here <code>apply</code> and <code>update</code>),
 such that the first contains the logic to compute forward, and the second the logic to back-propagate an updated value.
 In our case, this function takes the new output and round it to the nearest multiple of 0.1.
@@ -204,7 +205,7 @@ Since a lens is a record, we invoke it on an argument using a special constructo
 You will observe that, on update, the cut-off contains only once decimal in the code.
 <h2>Table of results</h2>
 At this point, we hope that our cut-offs are well placed.
-We now want to know how many students there are in each category.<br><span>Replace the code <code>-- We will write code here #6</code> (line 98) by<code class='snippet'>assignLetter avg = 
+We now want to know how many students there are in each category.<br><span>Replace the code <code>-- We will write code here #6</code> (line 98) with<code class='snippet'>assignLetter avg = 
   List.find (\CutOff letter cutoff -&gt; avg &gt;= cutoff) cutoffs |&gt;
   case of
     Nothing -&gt; error &lt;|
@@ -250,7 +251,7 @@ displayBuckets =
 &lt;/table&gt;
 
 -- We will write code here #7</code></span>
-<span>Replace the code <code> Table coming soon...</code> (line 152) by<code class='snippet'>&lt;h2&gt;Grade by category&lt;/h2&gt;
+<span>Replace the code <code> Table coming soon...</code> (line 152) with<code class='snippet'>&lt;h2&gt;Grade by category&lt;/h2&gt;
 @displayBuckets</code></span>
 You should see the following table appear below the graph in the output view:
 <div class='outputwrapper'><span><h2>Grade by category</h2>
@@ -325,7 +326,7 @@ We want to know if there are unfair letter attribution.
 A possibly unfair letter attribution arises if two student grades are very close to each other (e.g. the difference is below 0.5),
 but they have been assigned different letters.
 To avoid being contested, it is better to make sure there is no possibly unfair letter attribution.
-We compute and display this information in the table.<br><span>Replace the code <code>-- We will write code here #7</code> (line 143) by<code class='snippet'>ifunfair i =
+We compute and display this information in the table.<br><span>Replace the code <code>-- We will write code here #7</code> (line 143) with<code class='snippet'>ifunfair i =
   if i == 0 then "" else let
   epsilon = 0.5{0-1.9}
   (CutOff nameA cutoffA, studentsAbove) = nth buckets (i - 1)
@@ -342,8 +343,8 @@ We compute and display this information in the table.<br><span>Replace the code 
 
 -- We will write code here #8
 </code></span>
-<span>Replace the code <code>&lt;th&gt;Cut-offs&lt;/th&gt;</code> (line 124) by<code class='snippet'>&lt;th&gt;Cut-offs&lt;/th&gt;&lt;th&gt;Status&lt;/th&gt;</code></span>
-<span>Replace the code <code>&lt;td&gt;@cutoff&lt;/td&gt;</code> (line 138) by<code class='snippet'>&lt;td&gt;@cutoff&lt;/td&gt;&lt;td&gt;@ifunfair(i)&lt;/td&gt;</code></span>
+<span>Replace the code <code>&lt;th&gt;Cut-offs&lt;/th&gt;</code> (line 124) with<code class='snippet'>&lt;th&gt;Cut-offs&lt;/th&gt;&lt;th&gt;Status&lt;/th&gt;</code></span>
+<span>Replace the code <code>&lt;td&gt;@cutoff&lt;/td&gt;</code> (line 138) with<code class='snippet'>&lt;td&gt;@cutoff&lt;/td&gt;&lt;td&gt;@ifunfair(i)&lt;/td&gt;</code></span>
 <div class='outputwrapper'><span><h2>Grade by category</h2>
   <table>
   <tr><th>Grade</th><th>Students</th><th>Groupped</th>
@@ -417,7 +418,7 @@ What if we had a way to just resolve the potential complaint using buttons, such
 <h2>Button to modify cut-offs</h2>
 Adding buttons to upgrade or downgrade a student's means that these buttons will modify the cut-off.
 This behavior can be locally defined with the following trick:
-When we click a button, it modifies a property using JavaScript that is supposed to contain the cut-off, with a new cut-off.<br>Let us focus on the function "ifunfair" for this task.<br><span>Replace the code <code>was assigned @nameA&lt;/span&gt;</code> (position unknown) by<code class='snippet'>was assigned @nameA.
+When we click a button, it modifies a property using JavaScript that is supposed to contain the cut-off, with a new cut-off.<br>Let us focus on the function "ifunfair" for this task.<br><span>Replace the code <code>assigned @nameA&lt;/span&gt;</code> (line 154) with<code class='snippet'>assigned @nameA.
 &lt;button onclick="""this.setAttribute('v', '@(gradeB - 0.1)')"""
  v=toString(updateDecimal cutoffA)&gt;Give @nameA to @envier
 &lt;/button&gt;
@@ -457,7 +458,12 @@ When we click a button, it modifies a property using JavaScript that is supposed
       
       <td>76</td><td><span>Loida (82.8, B) might protest that
       Kellee had almost the same grade (82.9) but was
-      assigned B+</span></td>
+      assigned B+.
+<button onclick='this.setAttribute(\'v\', \'82.7\')' v='82.9'>Give B+ to Loida
+</button>
+<button onclick='this.setAttribute(\'v\', \'83\')' v='82.9'>Give B to Kellee
+</button>
+</span></td>
       </tr><tr style='background:white'>
       <td>B-</td>
       <td title='Ferdinand:74.4'>1</td>
@@ -500,7 +506,7 @@ Sometimes we wish we could simply change the number of students in a group to ch
 In usual interfaces it is impossible, but in Sketch-n-Sketch
 we can add a lens applied to the displayed number of students.
 This lens takes care of modifying the cut-offs in the backward direction.
-Note that we never change the count itself.<br><span>Replace the code <code>-- We will write code here #8</code> (line 158) by<code class='snippet'>updateGroupCount bucketNum cutoff numStudents =
+Note that we never change the count itself.<br><span>Replace the code <code>-- We will write code here #8</code> (line 165) with<code class='snippet'>updateGroupCount bucketNum cutoff numStudents =
   Update.lens2 {
   apply (cutoff, count) = count
   update {input=(cutoff, prevCount), outputNew=newCount} =
@@ -519,7 +525,7 @@ Note that we never change the count itself.<br><span>Replace the code <code>-- W
       Student _ belowCutoff = hd declassed
       in Ok (Inputs [(belowCutoff + 0.1, prevCount)])
   } cutoff numStudents</code></span>
-<span>Replace the code <code>@List.length(students)</code> (line 130) by<code class='snippet'>@updateGroupCount(i)(cutoff)&lt;|
+<span>Replace the code <code>@List.length(students)</code> (line 130) with<code class='snippet'>@updateGroupCount(i)(cutoff)&lt;|
         List.length(students)</code></span><br>Try now to change the number of students in one group to see the cut-offs change appropriately.
 For example, you can decrease to 4 the number of students in B+ (downgrade Kellee) or increase to 6 the number of students in B+ (upgrade Loida).
 <div class='outputwrapper'><span><h2>Grade by category</h2>
@@ -554,7 +560,12 @@ For example, you can decrease to 4 the number of students in B+ (downgrade Kelle
       
       <td>76</td><td><span>Loida (82.8, B) might protest that
       Kellee had almost the same grade (82.9) but was
-      assigned B+</span></td>
+      assigned B+.
+<button onclick='this.setAttribute(\'v\', \'82.7\')' v='82.9'>Give B+ to Loida
+</button>
+<button onclick='this.setAttribute(\'v\', \'83\')' v='82.9'>Give B to Kellee
+</button>
+</span></td>
       </tr><tr style='background:white'>
       <td>B-</td>
       <td title='Ferdinand:74.4'>1</td>
@@ -632,7 +643,7 @@ studentsGrades =
       Student name (Update.freeze &lt;| String.toFloat gradeString)
   )
 
-type CutOff = Student String Num
+type CutOff = CutOff String Num
 
 cutoffs = [
   CutOff "A+" 96.8,
@@ -746,7 +757,14 @@ ifunfair i =
       if gradeA - gradeB &lt; epsilon then
       &lt;span&gt;@envier (@gradeB, @nameB) might protest that
       @enviee had almost the same grade (@gradeA) but was
-      assigned @nameA&lt;/span&gt;
+      assigned @nameA.
+&lt;button onclick="""this.setAttribute('v', '@(gradeB - 0.1)')"""
+ v=toString(updateDecimal cutoffA)&gt;Give @nameA to @envier
+&lt;/button&gt;
+&lt;button onclick="""this.setAttribute('v', '@(gradeA + 0.1)')"""
+ v=toString(updateDecimal cutoffA)&gt;Give @nameB to @enviee
+&lt;/button&gt;
+&lt;/span&gt;
       else &lt;span&gt;&lt;/span&gt;
     _ -&gt; &lt;span&gt;&lt;/span&gt;
 
@@ -773,7 +791,7 @@ updateGroupCount bucketNum cutoff numStudents =
 
 -- Displays the interface
 main = &lt;span&gt;&lt;h1&gt;Fair student grades&lt;/h1&gt;
-  We want to give a grade to our students.&lt;br&gt;&lt;br&gt;
+  We want to give grades to our students.&lt;br&gt;&lt;br&gt;
   &lt;span contenteditable="false"&gt;
 &lt;svg width=toString(width + 100)
      height=toString(height)&gt;@chart&lt;/svg&gt;&lt;/span&gt;&lt;br&gt;
