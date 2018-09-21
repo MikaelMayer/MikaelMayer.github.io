@@ -39,7 +39,7 @@ After clicking on "Run", you should see the below result in the right pane.<br><
 </table></div>
 Let us explain this code a bit.<br>First because we want to change the data, we prepend <code>@Update.expressionFreeze</code> to the rendered table to make sure the expression itself will not be modified when we change the output, only the data.<br>Second, we transform the list of images to a list of <code>&lt;tr></code> rows containing two <code>&lt;td></code> cells. The first cell contains one image, the second cell the name.<br>Because the rows we are importing will contain whitespace, mostly newlines (which our program does not produce), we make sure to remove them with the instruction <code>Update.onUpdate (Html.filter (not &lt;&lt; Html.isEmptyText))</code>.
 This instruction is the last one because it will be the first to execute when the program executes in reverse.<br>Note that the <code>main = </code> is optional, if the program ends with an expression, it will automatically insert <code>main = </code> in front of it.<br>Great. You can try to rename "dog" in the output to see that it can rename it in the input file.<br>Now, time to import the images.<br>On the website, right-click on the table. In major browsers a menu "Inspect" or "Inspector" will lead you to a developer console that will display you the source code of the page at this point. To display the actual source code, you might have to right-click the element again and "edit as HTML".
-Now select the first 8 rows in the Html source. A row starts with <tr> and ends with </tr>.
+Now select the first 8 rows in the Html source. A row starts with &lt;tr> and ends with &lt;/tr>.
 Alternatively, here are the rows, you can copy them from here as well.<br><code class="snippet">&lt;tr>
 &lt;td>&lt;img src="/images/kitchen/034.jpg">&lt;/td>
 &lt;td>barbecue&lt;/td>
@@ -310,7 +310,7 @@ if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {
   })(@parent), 1000)
 }"""</code></span><br>After running the program, you should obtain the following game.
 Click on the squares to reveal them.
-<div class="outputwrapper"><dummy1537500031237><div>
+<div class="outputwrapper"><dummy1537500397898><div>
   Translation menu coming soon. The game is in English.
   <div class="pairsContainer">
     <div class="flip-container" num="0" ignore-selected="false">
@@ -516,7 +516,7 @@ Click on the squares to reveal them.
 [ignore-visible=true] {
   display:block;
 }</style>
-  </div></dummy1537500031237></div><br>A few notes for how we achieved this result:
+  </div></dummy1537500397898></div><br>A few notes for how we achieved this result:
 <ul>
 <li>When attributes are prefixed with <code>ignore-</code>, their modifications are ignored by the update engine. Hence, we allow the javascript to only modify these attributes. Because CSS can read attributes, we can change the appearance of cards when we click on them, without triggering the update engine.</li>
 <li>We actually create complex javascript code inside the "onclick" event of cards, by inlining the codes for <code>isOkToSelecct</code> and <code>checkPair</code> That's fine, we are not looking at the generated source code anyway.</li>
@@ -647,7 +647,7 @@ Another (more advanced) way is to use <code>InputsWithDiffs</code> and a list of
 and their <i>difference</i> with the old value. That way, the engine does not need to compute differences itself.</li>
 </ul>
 <br>The result should look like:
-<div class="outputwrapper"><dummy1537500031912><div>
+<div class="outputwrapper"><dummy1537500398472><div>
   <menu>
       <button title="Make the selected text translatable" onclick="&#13;&#10;        var r = window.getSelection().getRangeAt(0);&#13;&#10;        var t = r.cloneContents().textContent;&#13;&#10;        document.execCommand( &#39;insertText&#39;, false, &quot;{:&quot; + t + &quot;:}&quot;)" contenteditable="false">Make selection translatable</button>
       <select selected-index="1" onchange="this.setAttribute(&#39;selected-index&#39;, this.selectedIndex)"><option v="0">English</option><option v="1" selected="selected">French</option></select>
@@ -857,7 +857,7 @@ and their <i>difference</i> with the old value. That way, the engine does not ne
 [ignore-visible=true] {
   display:block;
 }</style>
-  </div></dummy1537500031912></div><br>As an exercise you can translate the remaining in the language of your choice.
+  </div></dummy1537500398472></div><br>As an exercise you can translate the remaining in the language of your choice.
 <h2>Experiments</h2>
 If you have more time, you can try to accomplish the following tasks:
 <ul>
