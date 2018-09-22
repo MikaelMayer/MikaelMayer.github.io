@@ -2,8 +2,8 @@
 <body><div class="outer"><div class="inner" contenteditable="False"><h1>Sketch-n-sketch Tutorial - Multilingual Memory game</h1>
 <i>This tutorial assumes that you have
 <a href="https://mikaelmayer.github.io/sketch-n-sketch/">Sketch-n-sketch</a> running on your browser.
-The 'left pane' references the left half of that interface, whereas the 'right pane' references the right half of that interface. If you encounter editing issues, try resizing your window.</i><br><br>The memory game consists of pairs of identical cards face down.
-The player returns two cards. If they are the same, they are left face visible.
+The 'left pane' references the left half of that interface, whereas the 'right pane' references the right half of that interface. If you encounter editing issues, try resizing your window.</i><br><br>The memory game consists of pairs of identical cards placed face down.
+The player turns over two cards. If they are the same, they are left face up.
 If they are not, they are turned back face down.<br><br>In this tutorial, we will create an educational variant of the memory game
  to associate images to their transcriptions in a given language.
 This is our roadmap:
@@ -11,13 +11,13 @@ This is our roadmap:
 <li>Import images and descriptions</li>
 <li>Design a functional memory game</li>
 <li>Add translations to the game</li>
-</ul><h2>Import images and descriptions.</h2>
-We will import images and descriptions from <a href="https://www.englisch-hilfen.de/en/words/kitchen.htm">this website</a>. Visit the link to see how the table looks like.<br>We want to import this table as a source code we can work with.
-For that, the trick is to actually write a source code with some dummy data,
-transform it to be rendered as the table,
-and add the remaining rows by copying them from the website and pasting them in the output.
+</ul><h2>Import images and descriptions</h2>
+We will import images and descriptions from <a href="https://www.englisch-hilfen.de/en/words/kitchen.htm">this website</a>. Visit the link to see what the table looks like.<br>We want to import this table as source code we can work with.
+For that, the trick is to actually write source code with some dummy data,
+transform it to be rendered as a table,
+and add the remaining rows by copying them from the website and pasting them into the output.
 Sketch-n-sketch will figure out for us how to reverse the execution and, finally,
-update our source data to produce the given table.<br>In sketch-n-sketch, erase the previous program and replace it with the following:
+update our source data to produce the given table.<br>In sketch-n-sketch, erase the program in the left pane and replace it with the following:
 <newcode code="images = [&#13;&#10;  Image &quot;dog&quot; &quot;https://upload.wikimedia.org/wikipedia/commons/7/7d/Labrador_Chocolate.jpg&quot;&#13;&#10;]&#13;&#10;&#13;&#10;-- We will write code here #1&#13;&#10;&#13;&#10;main = <table>&#13;&#10;@Update.expressionFreeze<|<tbody>@(&#13;&#10;  images&#13;&#10;  |> List.map (\Image name url ->&#13;&#10;     <tr><td><img src=url></td><td>@name</td></tr>)&#13;&#10;  |> Update.onUpdate (&#13;&#10;     Html.filter (not << Html.isEmptyText))&#13;&#10;  )</tbody>&#13;&#10;</table>"></newcode>
 <code class="snippet">images = [
   Image "dog" "https://upload.wikimedia.org/wikipedia/commons/7/7d/Labrador_Chocolate.jpg"
@@ -37,10 +37,10 @@ main = &lt;table>
 After clicking on "Run", you should see the below result in the right pane.<br><div class="outputwrapper"><table>
 <tbody><tr><td><img src="https://upload.wikimedia.org/wikipedia/commons/7/7d/Labrador_Chocolate.jpg"></td><td>dog</td></tr></tbody>
 </table></div>
-Let us explain this code a bit.<br>First because we want to change the data, we prepend <code>@Update.expressionFreeze</code> to the rendered table to make sure the expression itself will not be modified when we change the output, only the data.<br>Second, we transform the list of images to a list of <code>&lt;tr></code> rows containing two <code>&lt;td></code> cells. The first cell contains one image, the second cell the name.<br>Because the rows we are importing will contain whitespace, mostly newlines (which our program does not produce), we make sure to remove them with the instruction <code>Update.onUpdate (Html.filter (not &lt;&lt; Html.isEmptyText))</code>.
-This instruction is the last one because it will be the first to execute when the program executes in reverse.<br>Note that the <code>main = </code> is optional, if the program ends with an expression, it will automatically insert <code>main = </code> in front of it.<br>Great. You can try to rename "dog" in the output to see that it can rename it in the input file.<br>Now, time to import the images.<br>On the website, right-click on the table. In major browsers a menu "Inspect" or "Inspector" will lead you to a developer console that will display you the source code of the page at this point. To display the actual source code, you might have to right-click the element again and "edit as HTML".
+Let us explain this code a bit.<br>First because we want to change the data, we prepend <code>@Update.expressionFreeze</code> to the rendered table to make sure the expression itself will not be modified when we change the output, only the data.<br>Second, we transform the list of images to a list of <code>&lt;tr></code> rows, each containing two <code>&lt;td></code> cells. The first cell contains the image, the second cell the name.<br>Because the rows we are importing will contain whitespace, mostly newlines (which our program does not produce), we make sure to remove them with the instruction <code>Update.onUpdate (Html.filter (not &lt;&lt; Html.isEmptyText))</code>.
+This instruction is the last one because it will be the first to execute when the program executes in reverse.<br>Note that the <code>main = </code> is optional, if the program ends with an expression, it will automatically insert <code>main = </code> in front of it.<br>Great. You can try to rename "dog" in the output to see that the rename propagates to the corresponding <code>Image</code>.<br>Now, time to import the images.<br>On the website, right-click on the table. In major browsers a menu item "Inspect" or "Inspector" will lead you to a developer console that will display the source code of the page at this point. To display the actual source code, you might have to right-click the element again and "edit as HTML".
 Now select the first 8 rows in the Html source. A row starts with &lt;tr> and ends with &lt;/tr>.
-Alternatively, here are the rows, you can copy them from here as well.<br><code class="snippet">&lt;tr>
+Alternatively, you can copy the rows from the box below.<br><code class="snippet">&lt;tr>
 &lt;td>&lt;img src="/images/kitchen/034.jpg">&lt;/td>
 &lt;td>barbecue&lt;/td>
 &lt;/tr>
@@ -71,15 +71,15 @@ Alternatively, here are the rows, you can copy them from here as well.<br><code 
 &lt;tr>
 &lt;td>&lt;img src="/images/kitchen/006.jpg">&lt;/td>
 &lt;td>corkscrew&lt;/td>
-&lt;/tr></code><br>Once you have this data is in the clipboard, click on the "Html" button to the right of the Sketch-n-sketch interface to see the source code as html. Paste the clipboard content right after the last <code>&lt;/tr></code>.
-The popup "Output Editor" appears, hover "Update program", click on the first solution.
-The variable 'images' is now populated.<br>You successfully imported a data that, else, would have taken you regular expressions or custom programs to parse.<br><br>You now need to fix the URL of the images you imported, because they are relative, 
-Delete the first row containing the dog picture (and the comma in front of the second entry).
+&lt;/tr></code><br>Once you have this data is in the clipboard, click on the "Html" button to the right of the Sketch-n-sketch interface to see the source code as html. Paste the clipboard contents right after the last <code>&lt;/tr></code>.
+The popup "Output Editor" appears; hover over "Update program" and click on the first solution.
+The variable 'images' is now populated.<br>You've successfully imported data that would have normally required the use of regular expressions or custom programs to parse.<br><br>You now need to fix the URL of the images you imported, because they are relative.
+In the code, <b>delete the first row<b> containing the information about the dog (and the comma in front of the second entry).
 <hiddenreplace placeholder="images = [&#13;&#10;  Image &quot;dog&quot; &quot;https://upload.wikimedia.org/wikipedia/commons/7/7d/Labrador_Chocolate.jpg&quot;&#13;&#10;]" code="images = [&#13;&#10;  Image &quot;barbecue&quot; &quot;/images/kitchen/034.jpg&quot;&#13;&#10;, Image &quot;bread basket&quot; &quot;/images/kitchen/024.jpg&quot;&#13;&#10;, Image &quot;cake slice&quot; &quot;/images/kitchen/037.jpg&quot;&#13;&#10;, Image &quot;champagne cooler&quot; &quot;/images/kitchen/007.jpg&quot;&#13;&#10;, Image &quot;chest freezer&quot; &quot;/images/kitchen/020.jpg&quot;&#13;&#10;, Image &quot;coffee machine&quot; &quot;/images/kitchen/035.jpg&quot;&#13;&#10;, Image &quot;cooker, stove&quot; &quot;/images/kitchen/032.jpg&quot;&#13;&#10;, Image &quot;corkscrew&quot; &quot;/images/kitchen/006.jpg&quot;&#13;&#10;]"></hiddenreplace>
 <span>Replace the code <code>img src=url</code> (line 18) with<code class="snippet">img src="https://www.englisch-hilfen.de"+url</code></span><br>You should now obtain the following table:
 <div class="outputwrapper"><table>
 <tbody><tr><td><img src="https://www.englisch-hilfen.de/images/kitchen/034.jpg"></td><td>barbecue</td></tr><tr><td><img src="https://www.englisch-hilfen.de/images/kitchen/024.jpg"></td><td>bread basket</td></tr><tr><td><img src="https://www.englisch-hilfen.de/images/kitchen/037.jpg"></td><td>cake slice</td></tr><tr><td><img src="https://www.englisch-hilfen.de/images/kitchen/007.jpg"></td><td>champagne cooler</td></tr><tr><td><img src="https://www.englisch-hilfen.de/images/kitchen/020.jpg"></td><td>chest freezer</td></tr><tr><td><img src="https://www.englisch-hilfen.de/images/kitchen/035.jpg"></td><td>coffee machine</td></tr><tr><td><img src="https://www.englisch-hilfen.de/images/kitchen/032.jpg"></td><td>cooker, stove</td></tr><tr><td><img src="https://www.englisch-hilfen.de/images/kitchen/006.jpg"></td><td>corkscrew</td></tr></tbody>
-</table></div><br>For your information, the source code at this point is:
+</table></div><br>FYI: the source code at this point is:
 <code class="snippet">images = [
   Image "barbecue" "/images/kitchen/034.jpg"
 , Image "bread basket" "/images/kitchen/024.jpg"
@@ -131,7 +131,7 @@ card i child =
 	&lt;/div>
 &lt;/div>
 </code></span>
-Now, we add the code for displaying the deck, the css and the javascript.
+Now, we add the css and javascript for displaying the deck.
 <span>Replace the code <code>main = &lt;table>...&lt;/table></code> (line 35) with<code class="snippet">main = Html.forceRefresh &lt;div>
   Translation menu coming soon. The game is in English.
   &lt;div class="pairsContainer">
@@ -310,7 +310,7 @@ if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {
   })(@parent), 1000)
 }"""</code></span><br>After running the program, you should obtain the following game.
 Click on the squares to reveal them.
-<div class="outputwrapper"><dummy1537500397898><div>
+<div class="outputwrapper"><dummy1537582844282><div>
   Translation menu coming soon. The game is in English.
   <div class="pairsContainer">
     <div class="flip-container" num="0" ignore-selected="false">
@@ -516,10 +516,10 @@ Click on the squares to reveal them.
 [ignore-visible=true] {
   display:block;
 }</style>
-  </div></dummy1537500397898></div><br>A few notes for how we achieved this result:
+  </div></dummy1537582844282></div><br>A few notes for how we achieved this result:
 <ul>
-<li>When attributes are prefixed with <code>ignore-</code>, their modifications are ignored by the update engine. Hence, we allow the javascript to only modify these attributes. Because CSS can read attributes, we can change the appearance of cards when we click on them, without triggering the update engine.</li>
-<li>We actually create complex javascript code inside the "onclick" event of cards, by inlining the codes for <code>isOkToSelecct</code> and <code>checkPair</code> That's fine, we are not looking at the generated source code anyway.</li>
+<li>When attributes are prefixed with <code>ignore-</code>, their modifications are ignored by the update engine. Hence, we only allow the javascript to modify these attributes. Because CSS can read attributes, we can change the appearance of cards when we click on them, without triggering the update engine.</li>
+<li>We actually create complex javascript code inside the "onclick" events of cards, by inlining the code for <code>isOkToSelecct</code> and <code>checkPair</code>. That's fine, we are not looking at the generated source code anyway.</li>
 <li>We use similar tricks to display the modal dialog box when the game is over.</li>
 </ul>
 Now try to find the corkscrew and its image (hints: 2North-2East, 1North-1West).
@@ -540,9 +540,9 @@ language = nth languages languageIndex
 The table of translations is a list of pairs of language name and translations.
 Translations are a list of keywords associated to a word in the language.
 From this table, we extract the list of available languages (<code>languages</code>),
-and given a <code>languageIndex</code> we can compute the current language's name.<br>We did not translate the word in French yet because we are going to do it from the game itself soon.<br><br>We need to know when to use translated text and when not. Let us take the convention that any word prefixed with a $ will be subject to translation using the table above.
+and given a <code>languageIndex</code> we can compute the current language's name.<br>We did not translate the word into French yet because we are going to do so from the game itself soon.<br><br>We need to know when to use translated text and when not to. Let us use the convention that any word prefixed with a $ will be subject to translation using the table above.
 <span>Replace the code <code>Image "corkscrew"</code> (line 9) with<code class="snippet">Image "$translation1"</code></span>
-Now we want to see '$translation1' being replaced by 'corkscrew' back again.
+Now, the 'corkscrew' card shows '$translation1' instead - we want to see it go back to being 'corkscrew' again.
 <span>Replace the code <code>-- We will write code here #3</code> (line 22) with<code class="snippet">translate translations languageIndex node =
   let currentTranslation = nth translations languageIndex |> Tuple.second |> Dict.fromList in
   Html.replace """\$(\w+|\$)""" (\m -> 
@@ -555,15 +555,15 @@ Now we want to see '$translation1' being replaced by 'corkscrew' back again.
   -- We will write code here #4</code></span>
 <span>Replace the code <code>main = Html.forceRefresh &lt;div></code> (line 54) with<code class="snippet">main = translate translations languageIndex &lt;|
   Html.forceRefresh &lt;div></code></span>
-<span>Replace the code <code>The game is in English.</code> (line 56) with<code class="snippet">The game is in @(language).</code></span><br>Good job. Now "corkscrew" should be back again.
-But wait, didn't we say that the language is French?
-In the game directly, replace "corkscrew" by "tire-bouchon" (the french translation).
+<span>Replace the code <code>The game is in English.</code> (line 56) with<code class="snippet">The game is in @(language).</code></span><br>Good job. Now it's back to "corkscrew" again.
+But wait, doesn't the game say that the language is French?
+Directly on the corkscrew card, replace "corkscrew" with "tire-bouchon" (the French translation).
 Make sure <span>line 15</span> is visible to see the changes.
 <hiddenreplace placeholder="(&quot;French&quot;, [(&quot;translation1&quot;, &quot;corkscrew&quot;)" code="(&quot;French&quot;, [(&quot;translation1&quot;, &quot;tire-bouchon&quot;)"></hiddenreplace>
 <h2>Add translations from the output</h2>
-For now, we cannot translate anything else than "corkscrew", because it is the only entry in the translation table.
+For now, we cannot translate anything other than "corkscrew", because it is the only entry in the translation table.
 We wish we could directly edit the output and add a flag that says "Add a translation entry for this word".
-We can use lenses for that purpose. We decide that if we write '{:word:}' in the game, it should create an entry for 'word' in every language.
+We can use lenses for this purpose. We decide that if we write '{:word:}' in the game, it should create an entry for 'word' in every language.
 <span>Replace the code <code>-- We will write code here #4</code> (line 31) with<code class="snippet">|> \htmlNode ->
     Update.lens2 {
       apply (htmlNode, _) = htmlNode
@@ -586,22 +586,22 @@ freshVarName name i dictionary =
     if Dict.member (name + toString i) (dictionary) then freshVarName name (i + 1) (dictionary) else name + toString i
 
 -- We will write code here #5</code></span>
-Be careful about the whitespace, there should be two spaces before the first <code>|></code> you just inserted, so that this code stays inside the function.
-Here is the explanation:
+Be careful about the whitespace - there should be two spaces before the first <code>|></code> you just inserted, so that this code stays inside the function.
+Here is an explanation of how the above code works:
 <ul>
 <li>We name the result of translation <code>htmlNode</code>.</li>
-<li>The notation <code>|></code> means "pass the result before to the function to the right.</li>
 <li>We apply a lens to this result and the list of all translations.</li>
-<li>In the forward evaluation, this lens returns the html node</li>
-<li>In the backwards evaluation, it looks for occurrences of {:...:}, create a variable name for them, and add the definitions to all languages in translations. Furthermore, it replaces them by the new variable prefixed with '$'.</li>
-<li>The new variables are guaranteed to not yet exist</li></ul>
+<li>In the forward evaluation, this lens returns the html node.</li>
+<li>In the backwards evaluation, it looks for occurrences of {:...:}, creates variable names for them, and adds the definitions to all languages in translations. Furthermore, it replaces them with the new variables prefixed with '$'.</li>
+<li>The new variable names are guaranteed to not yet exist.</li></ul>
+<li>The notation <code>|></code> means "pass whatever is before <code>|></code> as the argument to the function that comes after <code>|></code>".</li>
 Good. In the output, find and rename "cake slice" to "{:cake slice:}".
 <hiddenreplace placeholder="&quot;translation1&quot;, &quot;corkscrew&quot;)" code="&quot;translation1&quot;, &quot;corkscrew&quot;)&#13;&#10;              , (&quot;translation2&quot;, &quot;cake slice&quot;)"></hiddenreplace>
 <hiddenreplace placeholder="&quot;translation1&quot;, &quot;tire-bouchon&quot;)" code="&quot;translation1&quot;, &quot;corkscrew&quot;)&#13;&#10;              , (&quot;translation2&quot;, &quot;pelle à tarte&quot;)"></hiddenreplace>
 After update, the braces and colon should disappear in the output. You can now replace "cake slice" by "pelle à tarte" and see that this modification is propagated right into the code.
 Had we done this translation automatically, we would have had the French equivalent of "slice of cake", which is not at all the same thing. Translating in context can be very useful.
 <h2>Translation toolbar</h2>
-It can be tedious to manually type the characters {:...:} to translate every word. Fortunately, we can use a button with Javascript that does this on selected text:<br><span>Replace the code <code>Translation menu coming soon.</code> (line 79) with<code class="snippet">&lt;menu>
+It can be tedious to manually type the characters {:...:} to translate every word. Fortunately, using Javascript we can make a button that does this on the selected text:<br><span>Replace the code <code>Translation menu coming soon.</code> (line 79) with<code class="snippet">&lt;menu>
       &lt;button
       title="Make the selected text translatable"
       onclick="""
@@ -613,11 +613,11 @@ It can be tedious to manually type the characters {:...:} to translate every wor
     &lt;/menu></code></span><br>Good. Now, in the output, find and select the text "cooker, stove". Click on the button "Make selection translatable". After the update roundtrip, you can edit the translation to "cuisinière, four". 
 <hiddenreplace placeholder="&quot;translation2&quot;, &quot;cake slice&quot;)" code="&quot;translation1&quot;, &quot;corkscrew&quot;)&#13;&#10;              , (&quot;translation3&quot;, &quot;cooker, stove&quot;)"></hiddenreplace>
 <hiddenreplace placeholder="&quot;translation2&quot;, &quot;pelle à tarte&quot;)" code="&quot;translation1&quot;, &quot;corkscrew&quot;)&#13;&#10;              , (&quot;translation3&quot;, &quot;cuisinière, four&quot;)"></hiddenreplace>
-This is much easier than to manually write {:...:}.<br>What about selecting the language in which we are displaying the game? Easy.
+This is much easier than manually writing {:...:}.<br>What about selecting the language in which we are displaying the game? Easy.
 <span>Replace the code <code>Other menu items coming soon.</code> (line 89) with<code class="snippet">@(Html.select [] languages languageIndex)
 Other menu items coming soon.</code></span>
-<code>Html.select</code> is a lens that displays options with the third argument designating the selected one. It is coded in such a way that, if you change the selection, it changes the third argument.
-Select English, and then go back to French to see how this works.<br>What about adding a new language? For that, we display an input text box that, if submitted,
+<code>Html.select</code> is a lens that displays options, with the third argument designating the selected one. It is coded in such a way that, if you change the selection, it changes the third argument.
+Select English, and then go back to French, to see how this works.<br>What about adding a new language? For that, we display an input text box that, if submitted,
 uses its value as a new language name and copies the current translations for it.<br><span>Replace the code <code>-- We will write code here #5</code> (line 56) with<code class="snippet">langAdder = Update.lens2 {
   apply (languageIndex, translations) = ""
   update {input=(languageIndex, translations), outputNew=newLanguage} =
@@ -640,14 +640,14 @@ uses its value as a new language name and copies the current translations for it
   onchange="this.setAttribute('v',this.value)"></code></span><br>A few notes on what we just did.
 <ul>
 <li>The variable <code>langAdder</code> is computed as the empty string.</li>
-<li>When the input is submitted, the javascript makes langAdder to be updated with the new language name.</li>
-<li>The lens has the power to change the languageIndex and the translations. It duplicates the current translation and append it to the end of the table of translations, and changes the language index to switch to the new language.</li>
-<li>Until now, we return values in lenses with <code>Inputs</code> and a list of possible values.
+<li>When the input is submitted, the Javascript updates langAdder with the new language name.</li>
+<li>The lens has the power to change the languageIndex and the translations. It duplicates the current translation and appends it to the end of the table of translations, and changes the language index to switch to the new language.</li>
+<li>So far, we've returned values in lenses with <code>Inputs</code> and a list of possible values.
 Another (more advanced) way is to use <code>InputsWithDiffs</code> and a list of pair of possible values
-and their <i>difference</i> with the old value. That way, the engine does not need to compute differences itself.</li>
+and their <i>difference</i> to the old values. That way, the engine does not need to compute differences itself.</li>
 </ul>
 <br>The result should look like:
-<div class="outputwrapper"><dummy1537500398472><div>
+<div class="outputwrapper"><dummy1537582845103><div>
   <menu>
       <button title="Make the selected text translatable" onclick="&#13;&#10;        var r = window.getSelection().getRangeAt(0);&#13;&#10;        var t = r.cloneContents().textContent;&#13;&#10;        document.execCommand( &#39;insertText&#39;, false, &quot;{:&quot; + t + &quot;:}&quot;)" contenteditable="false">Make selection translatable</button>
       <select selected-index="1" onchange="this.setAttribute(&#39;selected-index&#39;, this.selectedIndex)"><option v="0">English</option><option v="1" selected="selected">French</option></select>
@@ -857,16 +857,16 @@ and their <i>difference</i> with the old value. That way, the engine does not ne
 [ignore-visible=true] {
   display:block;
 }</style>
-  </div></dummy1537500398472></div><br>As an exercise you can translate the remaining in the language of your choice.
+  </div></dummy1537582845103></div><br>As an exercise, you can translate the remaining cards into the language of your choice.
 <h2>Experiments</h2>
 If you have more time, you can try to accomplish the following tasks:
 <ul>
 <li>Can you translate the text of the button "Make selection translatable" itself?</li>
-<li>And how can we translate the title that appears when we hover over this button?</li>
+<li>And how can we translate the tooltip that appears when we hover over this button?</li>
 <li>Right now, translation names are "translation1", "translation2", which is boring.
 Could you infer a better (unique) name from the content itself? You might find the following code snippet useful: <code>Regex.replace """[^a-zA-Z0-9]""" (\_ -> "") "Word with space"</code></li>
 <li>It can be tedious to see which text is translated and which is not.
-You could replace <code>[["TEXT", definition]]</code> (<span>line 33</span>) by <code>
+You could replace <code>[["TEXT", definition]]</code> (<span>line 33</span>) with <code>
 [&lt;span style="outline: 2px solid lightgreen">@definition&lt;/span>]]</code> to see the difference (e.g. <span style="outline: 2px solid lightgreen">tire-bouchon</span>).
 Could you add a toolbar button that allows you to do the switch easily? Hint: create a boolean <code>doHighlight = True</code> and render a bidirectional checkbox using <code>Html.checkbox "Highlights" "Highlight translatable text" doHighlight</code>.
 </li>
@@ -1158,7 +1158,7 @@ if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {
     }
   })(@parent), 1000)
 }"""</code>
-</div>
+</b></b></div>
 <style>
 #outputCanvas {
   overflow: hidden
