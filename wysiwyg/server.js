@@ -17,10 +17,17 @@ function loadpage(name, overrides) {
     return { ctor: "Err", _0: `File ${name} does not exists`}
   }
   Object.keys(overrides).forEach((key) => {
-    // TODO: Security flaw here, code injection possible.
-    source = `${key}=${overrides[key]}\n\n` + source;
+    var value = overrides[key];
+    // special c
+    var maybeFloat = parseFloat(value)
+    if(maybeFloat === maybeFloat) {
+      // TODO: Security flaw here, code injection possible if value is a closure.
+      source = `${key}=${maybeFloat}\n\n` + source;
+    } else { -- NaN
+      source = `${key}="""${value}"""\n\n` + source;
+    }
   })
-  console.log(source);
+  console.log("############\n" + source);
   var result = module.exports.EvalUpdate.api.evaluate(source)
   if(result.ctor == "Ok") {
     var out = module.exports.EvalUpdate.api.valToHTMLSource(result._0)
@@ -31,7 +38,7 @@ function loadpage(name, overrides) {
       return { ctor: "Err", _0: "Error while converting the result to HTML source file: " + out._0}
     }
   } else {
-    return { ctor: "Err", _0: `Error while interpreting ${name}: ` + out._0}
+    return { ctor: "Err", _0: `Error while interpreting ${name}: ` + result._0}
   }
 }
 
@@ -43,7 +50,7 @@ const server = http.createServer((request, response) => {
     response.statusCode = 200;
     response.setHeader('Content-Type', 'text/html; charset=utf-8');
     if(htmlContent.ctor == "Err") {
-      response.end(`<html><body style="color:#cc0000">${htmlContent._0}</body></html>`)
+      response.end(`<html><body style="color:#cc0000"><div   style="max-width:600px;margin-left:auto;margin-right:auto"><h1>Error report</h1><pre style="white-space:pre-wrap">${htmlContent._0}</pre></div></body></html>`)
     } else {
       response.end(htmlContent._0);
     }
