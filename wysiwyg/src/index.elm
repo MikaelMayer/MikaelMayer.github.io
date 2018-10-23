@@ -1,18 +1,30 @@
-userdata = [("Mikael", 1)]
-options = ["Margherita", "Reine", "Montagnarde"]
+userdata = [
+  ("Mikael", 1)
+  ]
+options = [
+  "Margherita",
+  "Reine",
+  "Montagnarde"]
 
 dictionnaire = [
-  ("English", [ ("Salut1", "Hey")
+  ("English", [ ("abbreviation", "en")
+              , ("Salut1", "Hey")
               , ("Tuveuxquellepizz1", "Which pizza do you want")
               , ("Choixfinaux1", "Final choices")
               , ("achoisiunepizza1", "wants a pizza")
               ]),
-  ("Français", [ ("Salut1", "Salut")
+  ("Français", [ ("abbreviation", "fr")
+               , ("Salut1", "Salut")
                , ("Tuveuxquellepizz1", "Tu veux quelle pizza")
                , ("Choixfinaux1", "Choix finaux")
                , ("achoisiunepizza1", "a choisi une pizza")
                ])
 ]
+
+indexLangue = dictionnaire |>
+  List.indexWhere (\(_, trads) ->
+    List.find ((==) ("abbrevation", hl)) trads /= Nothing)
+  |> max 0
 
 main = Html.translate dictionnaire indexLangue <|
 <html>
@@ -31,10 +43,31 @@ $Tuveuxquellepizz1?
 ) userdata)
 </span>
   </body>
+  <script>
+    function handleMutations() {
+      outputValueObserver.observe
+      ( currentNode
+      , { attributes: true
+        , childList: true
+        , characterData: true
+        , attributeOldValue: true
+        , characterDataOldValue: true
+        , subtree: false
+        }
+      ); 
+    }
+  
+    if (outputValueObserver) {
+      // console.log("outputValueObserver.disconnect()");
+      outputValueObserver.disconnect();
+    }
+
+     outputValueObserver = new MutationObserver(handleMutations);
+  </script>
 </html>
 
 -- This should be configurable.
 bodypermissions = [["contenteditable", "true"]]
 
 user = "Mikael"
-indexLangue = 0
+hl = "en"
