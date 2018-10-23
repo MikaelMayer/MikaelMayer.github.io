@@ -1,4 +1,3 @@
-user = "Mikael"
 userdata = [("Mikael", 1)]
 options = ["Margherita", "Reine", "Montagnarde"]
 
@@ -14,7 +13,6 @@ dictionnaire = [
                , ("achoisiunepizza1", "a choisi une pizza")
                ])
 ]
-indexLangue = 0
 
 main = Html.translate dictionnaire indexLangue <|
 <html>
@@ -37,3 +35,6 @@ $Tuveuxquellepizz1?
 
 -- This should be configurable.
 bodypermissions = [["contenteditable", "true"]]
+
+user = "Mikael"
+indexLangue = 0
