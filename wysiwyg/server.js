@@ -6,6 +6,7 @@ const hostname = '127.0.0.1';
 const port = 3000;
 
 document = {} // So that the evaluation of sns.js does not throw exceptions.
+location = { hash : ""} // so that the evaluation does not throw exceptions.
 
 // Returns a string containing the requested page.
 // If newvalue is defined, performs and update before returning the page.
