@@ -7,31 +7,22 @@ const port = 3000;
 
 document = {} // So that the evaluation of sns.js does not throw exceptions.
 
+// Returns a string containing the requested page.
+// If newvalue is defined, performs and update before returning the page.
 function loadpage(name, overrides, newvalue) {
   // __dirname = path.resolve(); // If in the REPL
   var source = "";
   if(typeof overrides != "object") overrides = {};
+  var env = { vars: overrides };
   try {
     source =  fs.readFileSync(__dirname + "/src/" + name, "utf8");  
   } catch (err) {
     return { ctor: "Err", _0: `File ${name} does not exists`}
   }
-  /*Object.keys(overrides).forEach((key) => {
-    var value = overrides[key];
-    // special c
-    var maybeFloat = parseFloat(value)
-    if(maybeFloat === maybeFloat) {
-      // TODO: Security flaw here, code injection possible if value is a closure.
-      source = `${key}=${maybeFloat}\n\n` + source;
-    } else { -- NaN
-      source = `${key}="""${value}"""\n\n` + source;
-    }
-  })*/
-  //console.log("############\n" + source);
-  function evaluate(source) {
-    var result = module.exports.EvalUpdate.api.evaluate(source);
+  function evaluate(env, source) {
+    var result = exports.evaluateEnv(env)(source);
     if(result.ctor == "Ok") {
-      var out = module.exports.EvalUpdate.api.valToHTMLSource(result._0)
+      var out = exports.valToHTMLSource(result._0)
       if(out.ctor == "Ok") {
         return out;
       } else {
@@ -43,15 +34,17 @@ function loadpage(name, overrides, newvalue) {
   }
   
   if(typeof newvalue == "undefined") {
-    return evaluate(source);
+    return evaluate(env, source);
   } else { // We update the page and re-render it.
-    var newVal = module.exports.EvalUpdate.api.nativeToVal(newvalue);
-    var result = module.exports.EvalUpdate.api.update(source)(newVal);
-    // TODO: Deal with query vars.
+    var newVal = exports.nativeToVal(newvalue);
+    var result = exports.updateEnv(overrides)(source)(newVal);
     if(result.ctor == "Ok") {
-      var newSource = result._0[0]; // TODO: If toolbar, interact to choose ambiguity
+      var newEnvSource = result._0._0; // TODO: If toolbar, interact to choose ambiguity
+      var newEnv = newEnvSource._0;
+      console.log("new env", newEnv)
+      var newSource = newEnvSource._1;
       fs.writeFileSync(__dirname + "/src/" + name, newSource, "utf8");
-      return evaluate(newSource);
+      return evaluate(newEnv, newSource);
     } else return result;
   }
 }
@@ -74,11 +67,9 @@ const server = http.createServer((request, response) => {
     var body = '';
     request.on('data', function (data) {
         body += data;
-        console.log("Partial body: " + body);
     });
     request.on('end', function () {
         var pushedValue = JSON.parse(body);
-        // Old code
         response.statusCode = 200;
         var htmlContent = loadpage(pathname, urlParts.query, pushedValue);
         response.setHeader('Content-Type', 'text/html; charset=utf-8');

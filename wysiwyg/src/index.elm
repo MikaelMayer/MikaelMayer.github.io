@@ -1,23 +1,41 @@
+bodypermissions = [["contenteditable", "true"]]
+
+user  = vars |> case of {user} -> user; _ -> "Laurent"
+hl    = vars |> case of {hl} -> hl; _ -> "en"
+delay = vars |> case of {delay} -> String.toInt delay; _ -> 1000
+
 userdata = [
-  ("Mikael", 1)
+    ("Mikael", 2)
+  , ("Ravi", 4)
+  , ("Laurent", 2)
   ]
-options = [
-  "Margherita",
-  "Reine",
-  "Montagnarde"]
+  
+options = nodejs.fileread "src/pizzas.txt"
+  |> Maybe.withDefaultReplace (freeze """[
+    "$Margharita",
+    "$Queen",
+    "Montagnarde",
+    "Barbecue"]""")
+  |> evaluate
 
 dictionnaire = [
   ("English", [ ("abbreviation", "en")
-              , ("Salut1", "Hey")
-              , ("Tuveuxquellepizz1", "Which pizza do you want")
-              , ("Choixfinaux1", "Final choices")
-              , ("achoisiunepizza1", "wants a pizza")
+              , ("Salut", "Hey")
+              , ("Tuveuxquellepizza", "Which pizza do you want")
+              , ("Choixfinaux", "Final choices")
+              , ("achoisiunepizza", "wants a pizza")
+              , ("Choisistapizza", "Choose your pizza")
+              , ("Margharita", "Margharita")
+              , ("Queen", "Queen")
               ]),
   ("Français", [ ("abbreviation", "fr")
-               , ("Salut1", "Salut")
-               , ("Tuveuxquellepizz1", "Tu veux quelle pizza")
-               , ("Choixfinaux1", "Choix finaux")
-               , ("achoisiunepizza1", "a choisi une pizza")
+               , ("Salut", "Salut")
+               , ("Tuveuxquellepizza", "Tu veux quelle pizza")
+               , ("Choixfinaux", "Choix finaux")
+               , ("achoisiunepizza", "a choisi une pizza")
+               , ("Choisistapizza", "Choisis ta pizza")
+               , ("Margharita", "Margherita")
+               , ("Queen", "Reine")
                ])
 ]
 
@@ -27,23 +45,22 @@ abbreviations = dictionnaire |>
      |> Maybe.withDefault name)
 
 indexLangue = 
-  List.indexWhere ((==) hl) abbreviations
-  |> max 0
+  List.findByAReturnB Tuple.second Tuple.first hl (List.zipWithIndex abbreviations)
+  |> Maybe.withDefaultReplace (freeze 0)
 
 main = Html.translate dictionnaire indexLangue <|
-<html>
-  <body @bodypermissions>
-  <span>$Salut1 @user!<br>
-$Tuveuxquellepizz1?
-@Html.select[]("Choisis ta pizza"::options)(
+<html><head></head><body @bodypermissions>
+  <span>$Salut @user!<br>
+$Tuveuxquellepizza?
+@Html.select[]("$Choisistapizza"::options)(
   listDict.get user userdata
   |> Maybe.orElseReplace (freeze (Just 0))
   |> Maybe.getUnless 0)
 <br><br>
 @Html.select[](List.map Tuple.first dictionnaire)(indexLangue)<br><br>
- $Choixfinaux1<br>
+ $Choixfinaux<br>
 @(List.map (\(name, id) ->
-  <span>@name $achoisiunepizza1 @(nth options (id - 1)).<br></span>
+  <span>@name $achoisiunepizza @(List.findByAReturnB Tuple.first Tuple.second (id - 1) (List.zipWithIndex options) |> Maybe.withDefaultReplace (freeze "qui n'existe pas")).<br></span>
 ) userdata)
 </span>
   <script>
@@ -87,6 +104,8 @@ $Tuveuxquellepizz1?
         var xmlhttp = new XMLHttpRequest();
         xmlhttp.onreadystatechange = function () {
             if (xmlhttp.readyState == XMLHttpRequest.DONE) {
+              //console.log("going to replace with");
+              //console.log(xmlhttp.responseText);
               replaceContent(xmlhttp.responseText);
             }
         };
@@ -117,12 +136,5 @@ $Tuveuxquellepizz1?
        )
      }, 10)    
   </script>
-  </body>
-</html>
-
--- Everything beyond this is configurable from the URL.
-bodypermissions = [["contenteditable", "true"]]
-
-user = "Mikael"
-hl = "en"
-delay = 0
+  
+</body></html>
