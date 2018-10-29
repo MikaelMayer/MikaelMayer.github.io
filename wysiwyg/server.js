@@ -54,6 +54,7 @@ const server = http.createServer((request, response) => {
   if(request.method == "GET") {
     var urlParts = url.parse(request.url, parseQueryString=true);
     var pathname = urlParts.pathname.substring(1); // Without the slash.
+    if(pathname == "") pathname = "index.elm";
     var htmlContent = loadpage(pathname, urlParts.query);
     response.statusCode = 200;
     response.setHeader('Content-Type', 'text/html; charset=utf-8');
