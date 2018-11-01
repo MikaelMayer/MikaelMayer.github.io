@@ -5,10 +5,7 @@ const url = require('url');
 const hostname = '127.0.0.1';
 const port = 3000;
 
-if(typeof document === "undefined" || document === null)
-  document = {}; // So that the evaluation of sns.js does not throw exceptions.
-if(typeof location === "undefined" || location === null)
-  location = { hash : ""}; // so that the evaluation does not throw exceptions.
+const sns = require("sketch-n-sketch");
 
 // Returns a [Result of string containing the requested page, new overrides]
 // If newvalue is defined, performs an update before returning the page.
@@ -26,9 +23,9 @@ function loadpage(name, overrides, newvalue) {
     return [{ ctor: "Err", _0: `File ${name} does not exists`}, overrides];
   }
   function evaluate(env, source) {
-    var result = exports.evaluateEnv(env)(source);
+    var result = sns.evaluateEnv(env)(source);
     if(result.ctor == "Ok") {
-      var out = exports.valToHTMLSource(result._0)
+      var out = sns.valToHTMLSource(result._0)
       if(out.ctor == "Ok") {
         return out;
       } else {
@@ -43,10 +40,10 @@ function loadpage(name, overrides, newvalue) {
     //console.log("just evaluate");
     return [evaluate(env, source), overrides];
   } else { // We update the page and re-render it.
-    var newVal = exports.nativeToVal(newvalue);
+    var newVal = sns.nativeToVal(newvalue);
     //console.log("newVal", newVal);
     //console.log("env", env);
-    var result = exports.updateEnv(env)(source)(newVal);
+    var result = sns.updateEnv(env)(source)(newVal);
     //console.log("result", result);
     if(result.ctor == "Ok") {
       var newEnvSource = result._0._0; // TODO: If toolbar, interact to choose ambiguity
@@ -101,10 +98,7 @@ const server = http.createServer((request, response) => {
 
 
 // Load the Elm program into our namespace.
-with (global) {
-	eval(fs.readFileSync(__dirname + "/../sketch-n-sketch/sns.js", "utf8"));
-  console.log("Sketch-n-sketch Server ready !")
-  server.listen(port, hostname, () => {
+console.log("Sketch-n-sketch Server ready !")
+server.listen(port, hostname, () => {
     console.log(`Server running at http://${hostname}:${port}/`);
   });
-}
