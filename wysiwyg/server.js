@@ -100,7 +100,7 @@ function loadpage(name, overrides, newvalue) {
   // __dirname = path.resolve(); // If in the REPL
   var source = "";
   if(typeof overrides != "object") overrides = {};
-  var env = { vars: overrides, clientscript: clientscript(1000) };
+  var env = { vars: overrides, clientscript: clientscript(1000), sourcefile: "src/"+name };
   var envToOverrides = function (env) {
     return env.vars;
   }
@@ -124,20 +124,22 @@ function loadpage(name, overrides, newvalue) {
   }
   
   if(typeof newvalue == "undefined") {
-    //console.log("just evaluate");
     return [evaluate(env, source), overrides];
   } else { // We update the page and re-render it.
     var newVal = sns.nativeToVal(newvalue);
-    //console.log("newVal", newVal);
-    //console.log("env", env);
     var result = sns.updateEnv(env)(source)(newVal);
-    //console.log("result", result);
     if(result.ctor == "Ok") {
       var newEnvSource = result._0._0; // TODO: If toolbar, interact to choose ambiguity
       var newEnv = newEnvSource._0;
-      //console.log("new env", newEnv)
       var newSource = newEnvSource._1;
-      fs.writeFileSync(__dirname + "/src/" + name, newSource, "utf8");
+      if(newSource != source) {
+        fs.writeFileSync(__dirname + "/src/" + name, newSource, "utf8");
+      }
+      try {
+        newSource =  fs.readFileSync(__dirname + "/src/" + name, "utf8");  
+      } catch (err) {
+        return [{ ctor: "Err", _0: `File ${name} does not exists`}, overrides];
+      }
       return [evaluate(newEnv, newSource), envToOverrides(newEnv)];
     } else return [result, overrides];
   }
