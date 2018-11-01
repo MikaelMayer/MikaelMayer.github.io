@@ -1,5 +1,4 @@
-bodypermissions = [["contenteditable", "true"]]
-
+edit  = vars |> case of {edit} -> edit; _ -> "false"
 user  = vars |> case of {user} -> user; _ -> "Laurent"
 hl    = vars |> case of {hl} -> hl; _ -> "en"
 delay = vars |> case of {delay} -> String.toInt delay; _ -> 1000
@@ -21,12 +20,13 @@ options = nodejs.fileread "src/pizzas.txt"
 dictionnaire = [
   ("English", [ ("abbreviation", "en")
               , ("Salut", "Hey")
-              , ("Tuveuxquellepizza", "Which pizza do you want")
+              , ("Tuveuxquellepizza", "Which pizza do ya want")
               , ("Choixfinaux", "Final choices")
               , ("achoisiunepizza", "wants a pizza")
               , ("Choisistapizza", "Choose your pizza")
               , ("Margharita", "Margharita")
               , ("Queen", "Queen")
+              , ("Montagnarde", "Mountain")
               ]),
   ("Français", [ ("abbreviation", "fr")
                , ("Salut", "Salut")
@@ -36,6 +36,7 @@ dictionnaire = [
                , ("Choisistapizza", "Choisis ta pizza")
                , ("Margharita", "Margherita")
                , ("Queen", "Reine")
+               , ("Montagnarde", "Montagnarde")
                ])
 ]
 
@@ -49,7 +50,7 @@ indexLangue =
   |> Maybe.withDefaultReplace (freeze 0)
 
 main = Html.translate dictionnaire indexLangue <|
-<html><head></head><body @bodypermissions>
+<html><head></head><body @(if edit == "true" then [["contenteditable", "true"]] else [])>
   <span>$Salut @user!<br>
 $Tuveuxquellepizza?
 @Html.select[]("$Choisistapizza"::options)(
@@ -107,6 +108,17 @@ $Tuveuxquellepizza?
               //console.log("going to replace with");
               //console.log(xmlhttp.responseText);
               replaceContent(xmlhttp.responseText);
+              var newQueryStr = xmlhttp.getResponseHeader("New-Query");
+              if(newQueryStr !== null) {
+                var newQuery = JSON.parse(newQueryStr);
+                var newQueryKeys = Object.keys(newQuery);
+                var strQuery = "";
+                for(var i = 0; i < newQueryKeys.length; i++) {
+                  var key = newQueryKeys[i];
+                  strQuery = strQuery + (i == 0 ? "?" : "&") + key + "=" + newQuery[key];
+                }
+                window.history.replaceState({}, "Current page", strQuery);
+              }
             }
         };
         xmlhttp.open("POST", location.pathname + location.search);
