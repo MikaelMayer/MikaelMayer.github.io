@@ -38,7 +38,10 @@ function loadpage(name, overrides, newvalue) {
     return evaluate(env, source);
   } else { // We update the page and re-render it.
     var newVal = exports.nativeToVal(newvalue);
-    var result = exports.updateEnv(overrides)(source)(newVal);
+    console.log("newVal", newVal);
+    console.log("env", env);
+    var result = exports.updateEnv(env)(source)(newVal);
+    console.log("result", result);
     if(result.ctor == "Ok") {
       var newEnvSource = result._0._0; // TODO: If toolbar, interact to choose ambiguity
       var newEnv = newEnvSource._0;
