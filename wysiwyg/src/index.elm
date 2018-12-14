@@ -49,8 +49,8 @@ indexLangue =
   |> Maybe.withDefaultReplace (freeze 0)
 
 main = Html.translate dictionnaire indexLangue <|
-<html><head></head><body @(if edit == "true" then [["contenteditable", "true"]] else [])>
-  <span>$Salut @user!<br>
+<html><body @(if edit == "true" then [["contenteditable", "true"]] else [])>
+  <span>$Salut @user! <br>
 $Tuveuxquellepizza?
 @Html.select[]("$Choisistapizza"::options)(
   listDict.get user userdata

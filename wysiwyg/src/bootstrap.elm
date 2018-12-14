@@ -1,5 +1,5 @@
 listedpages = ["bootstrap.elm", "index.elm", "test.elm"]
-indexPage = 0
+indexPage = 2
 
 mbPage  = vars |> case of {page} -> Just page; _ -> Nothing
 

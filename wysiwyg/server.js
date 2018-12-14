@@ -1,6 +1,11 @@
 
 const fs = require("fs");
+//const https = require('https');
 const http = require('http');
+/*var options = {
+  key: fs.readFileSync('keys/key.pem'),
+  cert: fs.readFileSync('keys/cert.pem')
+};*/
 const url = require('url');
 const hostname = '127.0.0.1';
 const port = 3000;
@@ -8,9 +13,15 @@ const port = 3000;
 const sns = require("sketch-n-sketch");
 
 clientscript = function(editdelay) {
-  return ["script",
+  return [
+  ["script",
   [],
-  [["TEXT", `function domNodeToNativeValue(n) {
+  [["TEXT", `
+  function initSigninV2() {
+    console.log("platform.js loaded");
+  }
+  
+  function domNodeToNativeValue(n) {
       if(n.nodeType == "3") {
         return ["TEXT", n.textContent];
       } else {
@@ -91,7 +102,7 @@ clientscript = function(editdelay) {
          , subtree: true
          }
        )
-     }, 10)`]]];
+     }, 10)`]]]];
 }
 
 // Returns a [Result of string containing the requested page, new overrides]
