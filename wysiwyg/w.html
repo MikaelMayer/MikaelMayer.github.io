@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Experimental git fetch</title>
+</head>
+<body>
+<script src="https://unpkg.com/browserfs"></script>
+<script src="https://unpkg.com/isomorphic-git"></script>
+<script>
+BrowserFS.configure({ fs: "IndexedDB", options: {} }, function (err) {
+  if (err) return console.log(err);
+  window.fs = BrowserFS.BFSRequire("fs");
+  git.plugins.set('fs', window.fs);
+});
+</script>
+</body>
+</html>
