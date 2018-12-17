@@ -12,7 +12,7 @@ BrowserFS.configure({ fs: "IndexedDB", options: {} }, function (err) {
   window.fs = BrowserFS.BFSRequire("fs");
   git.plugins.set('fs', window.fs);
 });
-await git.clone({
+/*await */git.clone({
   dir: '.',
   corsProxy: 'https://cors.isomorphic-git.org',
   url: 'https://github.com/MikaelMayer/MikaelMayer.github.io',
