@@ -250,10 +250,10 @@ div.params > span.variable {
 .abstraction {
   background: repeating-linear-gradient(
     45deg,
-    rgba(0, 0, 255, 0.05),
-    rgba(0, 0, 255, 0.05) 10px,
-    white 10px,
-    white 20px);
+    rgba(0, 0, 255, 0.1),
+    rgba(0, 0, 255, 0.1) 2px,
+    white 2px,
+    white 4px);
 }
 .concretization {
   background: white;
@@ -319,6 +319,9 @@ body a {
   line-height: 1.58;
   letter-spacing: -.003em;
 }
+img.icon {
+  vertical-align: bottom;
+}
 </style></head><body><div>
 
 <h1>Abstract and Concrete: Future of Programming</h1>
@@ -335,7 +338,7 @@ body a {
 
 <!--p>I recently created <a href= "https://github.com/MikaelMayer/Editor">Editor</a>, a local HTTP server to edit dynamic and static webpages in the browser, and have modifications back-propagated to the files themselves. It gave me the idea for this article.</p-->
 
-<p>Because programming is all about abstraction, let us imagine what if, in a fictional word processor interface, we had access to a direct command to <em>abstract</em>.
+<p>Let us imagine what if, in a fictional word processor interface named MikoWord, we had access to a direct command to <em>abstract</em>.
 Since abstractions are for programs the equivalent of arabic positional symbols for numbers, can they also be a good candidate for visually developing software?</p>
 
 <h2>MikoWord Tutorial</h2>
@@ -381,16 +384,14 @@ Welcome to MySoft 1.0!
 <p>
 Note that all <em>declarations</em> like <span class="variable">mysoft</span> will be hidden from the final document's version &mdash; when you print, publish or export it, and the background under "<span class="doc abstraction">MySoft 1.0</span>" will disappear. If you prefer a style other than stripes, go to Settings > Styles > Reused content and change the style.<br>
 
-By opening the @(command "context menu") over <span class="variable">mysoft</span>, you can also specify to display abstractions only when they are needed during edition, depending on where your caret is. For this tutorial, we will always display them.<br> 
+By opening the @(command "context menu") over <span class="variable">mysoft</span>, you can also specify to display abstractions only when they are needed during editing, depending on where your caret is. For this tutorial, we will always display them.<br> 
 Now copy "<span class="doc abstraction">MySoft 1.0</span>" from the title, and paste it to replace "<span class="doc">MySoft 1.0</span>" in the document body. You obtain something like:</p>
 @(mkDoc [("mysoft", ([], <span class="textvalue">MySoft 1.0</span>))] 
 <div>
 <h1><span class="variable">mysoft</span> Tutorial</h1>
 Welcome to <span class="variable">mysoft</span>!
 </div>)
-<p>
-Rename "<span class="doc">1.0</span>" to "<span class="doc">1.1</span>". You can rename it in any of the three places, and you'll obtain:
-</p>
+<p>Note that the second occurrence of "<span class= "doc abstraction">MySoft 1.0</span>" is now highlighted with stripes as well. This means that this occurrence is linked. Now, rename "<span class="doc">1.0</span>" to "<span class="doc">1.1</span>". You can rename it in any of the three places, and you'll obtain:</p>
 @(mkDoc [("mysoft", ([], <span class="textvalue">MySoft 1.1</span>))]
 <div>
 <h1><span class="variable">mysoft</span> Tutorial</h1>
@@ -500,7 +501,7 @@ Save your file. If you forget to save your file and your browser unexpectedly qu
 We want to use these shortcut definitions to augment simple tutorials, by displaying a hint on every command that a tutorial uses. That way, users would not have to remember all these commands or look them up themselves.</p>
 
 <p>Select the last two tables, and @(command "abstract") them.
-Instead of inserting one more name, MikoWord detects that there is a repetition and instead suggest to merge these calls (<img src="FutureofProgramming-lightning.png">). Accept. You will then see the following result:
+Instead of inserting one more name, MikoWord detects that there is a repetition and instead suggest merging these calls (<img class="icon" src="FutureofProgramming-lightning.png">). Accept. You will then see the following result:
 </p>
 @(mkDoc [("items", ([], <span class="table"><span class="tuple"><span
     >Context menu</span><span
@@ -572,7 +573,7 @@ To the right of <span class="variable">save</span>, select "<span class="doc">Sa
 After any edit, remember to <span class="application"><span class="variable">save</span><span>Save</span></span> your document.
 </div>)
 Rename <span class="variable">save</span> to <span class="variable">command</span>, and <span class="variable">arg</span> to <span class="variable">name</span>. We now want the tooltip to be created depending on <span class="variable">name</span>'s content. Select "<span class="doc">CTRL+S</span>" in the remark next to <span class="variable">arg</span> and @(command "abstract") it.
-Click on the little <img src="FutureofProgramming-lightning.png" style="vertical-align:bottom"> and choose "infer". Instead of creating a new variable, it will try to infer its content from the context. In this case, it manages to find a formula:
+Click on the little <img class="icon" src="FutureofProgramming-lightning.png"> and choose "infer". Instead of creating a new variable, it will try to infer its content from the context. In this case, it manages to find a formula:
 @(mkDoc [("items", ([], <span class="table"><span class="tuple"><span
     >Context menu</span><span
     >Right-click or ALT+M</span><span
@@ -588,7 +589,7 @@ Click on the little <img src="FutureofProgramming-lightning.png" style="vertical
 <h2><span class="variable">mysoft</span>: Save actions</h2>
 After any edit, remember to <span class="application"><span class="variable">command</span><span>Save</span></span> your document.
 </div>)
-<p>Once you will be more familiar with the language, you will be able to enter these formulas yourself (@(command "abstract"), then choose "formula" from <img src="FutureofProgramming-lightning.png">).</p>
+<p>Once you will be more familiar with the language, you will be able to enter these formulas yourself (@(command "abstract"), then choose "formula" from <img class="icon"  src="FutureofProgramming-lightning.png">).</p>
 <p>
 Let us add another command in the document similar to <span class="doc">Save</span>.
 Continue to write "<span class="doc">Open the </span>" in the document.
