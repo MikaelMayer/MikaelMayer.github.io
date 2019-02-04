@@ -140,7 +140,7 @@ body a {
 </style></head><body><div>
 
 <h1>Abstract and Concrete: Future of Programming</h1>
-
+<em>2019/02/04 — Mikaël Mayer</em>
 <p>I recently read a <a href="https://www.google.com/url?q=https://hbr.org/2019/01/what-will-software-look-like-once-anyone-can-create-it&amp;sa=D&amp;ust=1549033963248000">very interesting article</a> that highlighted that, until the invention of arabic numbers, multiplication using roman numerals was difficult. The arabic positional number system made it much easier. It was the same for software. Programming software is difficult. Until someone comes up with the equivalent of arabic numbers for programming, it will remain so.</p><p>This made me think profoundly. What makes it that programming software is difficult? Is it that spreadsheets are cryptic? Too many <abbr title="Application Programming Interface">API</abbr>s? Complicated build tools? Not close enough to assembly language? Or to far away?</p>
 
 <p>I am a big fan of the idea of <a href="https://www.google.com/url?q=https://coda.io/welcome&amp;sa=D&amp;ust=1549033963249000">Coda</a> that mixes spreadsheets with word-like documents and makes it possible to create text that appears based on conditions, for example. It is very nice to have a domain-specific language for computing cells as in any spreadsheets, and to be able to insert cells into a document.<br>However, there is no way to create <a href="https://www.youtube.com/watch?v=ZfytHvgHybA">reusable abstractions</a> yet. If abstractions are some day user-definable, it is likely that Coda will end up copying Google Spreadsheet and Microsoft Excel by giving access to their APIs and offering <a href="https://developers.google.com/apps-script/guides/sheets/functions">abstractions as macros</a> that are no longer part of the visible document, and cannot be edited with the same and nice visual interface.</p>
@@ -197,9 +197,9 @@ Welcome to MySoft 1.0!
 </div>
   </div></div>
 <p>
-Don't worry, all declarations like <span class="variable">mysoft</span> will be hidden from the final document's version, and the background will disappear. If you prefer something else than stripes, go to Settings > styles > reused content and change the style.
+Note that all <em>declarations</em> like <span class="variable">mysoft</span> will be hidden from the final document's version — when you print, publish or export it, and the background under "<span class="doc abstraction">MySoft 1.0</span>" will disappear. If you prefer a style other than stripes, go to Settings > Styles > Reused content and change the style.<br>
 
-By opening the <abbr class="command" title="Right-click or ALT+M, anywhere">context menu</abbr> over <span class="variable">mysoft</span>, you can also specify to display abstractions only when they are needed during edition, depending on where your caret it. For this tutorial, we will always display them.<br> 
+By opening the <abbr class="command" title="Right-click or ALT+M, anywhere">context menu</abbr> over <span class="variable">mysoft</span>, you can also specify to display abstractions only when they are needed during edition, depending on where your caret is. For this tutorial, we will always display them.<br> 
 Now copy "<span class="doc abstraction">MySoft 1.0</span>" from the title, and paste it to replace "<span class="doc">MySoft 1.0</span>" in the document body. You obtain something like:</p>
 <div class="docwrapper">
   <div class="docblock doc">
@@ -226,7 +226,10 @@ Rename "<span class="doc">1.0</span>" to "<span class="doc">1.1</span>". You can
 Welcome to <span class="textvalue abstraction" title="mysoft">MySoft 1.1</span>!
 </div>
   </div></div>
-Thanks to automatic correction and from now on, each time you will type "<span class="doc">mysoft</span>" followed by a space, it will replace it with "<span class="doc abstraction">MySoft 1.1</span>".
+From now on, each time you will type "<span class="doc">=mysoft</span>" followed by a space, it will replace it with "<span class="doc abstraction">MySoft 1.1</span>".
+<p>
+Similar to spreadsheets, you can double-click on "<span class="doc abstraction">MySoft 1.1</span>" to display and modify the underlying formula "<span class="doc">mysoft</span>".
+</p>
 <h3>Step 2: Abstract to concrete</h3>
 <p>Let us imagine that, in your document, you want to describe a set of keyboard shortcuts as memos, and then some sample scenarios on how to use them.
 Let us start by creating a sample shortcut table. Create a 3x2 table, remove the borders inside it, and fill it as follow:</p>
@@ -520,9 +523,8 @@ Moreover, if at some point you want to change a remark, such as removing <span c
 
 <h1>Epilogue</h1>
 
-I wrote this tutorial using <a href="https://github.com/MikaelMayer/Editor">Editor</a>, a local HTTP server to edit dynamically generated webpages in the browser.
-
-Let me know what you think in the comments!
+In case you wonder, I did not write this tutorial using even an alpha version of a "MikoWord".
+However, I used a tool that I am developing: <a href="https://github.com/MikaelMayer/Editor">Editor</a>. Editor is a local HTTP server that enables the viewer of the page to modify it, even if the page was dynamically generated. All screenshots have been dynamically generated based on a mix of document and formulas.
 
 </div>
 </body></html>
