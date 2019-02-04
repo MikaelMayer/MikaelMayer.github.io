@@ -70,7 +70,7 @@ mkAssignments context params args =
     ) params args
   |> List.concatMap identity
 
-repeatDef(mapping, listElem) =
+repeatDef (mapping, listElem) =
   case listElem of
     ["span", ["class", "table"]::_, children] ->
       <span class="repeat">@(List.map mapping children)</span>
@@ -308,6 +308,7 @@ body > div {
 body a {
   color: inherit;
   cursor: pointer;
+  text-decoration: underline;
 }
 :root {
   font-family: medium-content-serif-font,Georgia,Cambria,"Times New Roman",Times,serif;
@@ -322,9 +323,9 @@ body a {
 
 <h1>Abstract and Concrete: Future of Programming</h1>
 <em>2019/02/04 &mdash; Mikaël Mayer</em>
-<p>I recently read a <a href="https://www.google.com/url?q=https://hbr.org/2019/01/what-will-software-look-like-once-anyone-can-create-it&amp;sa=D&amp;ust=1549033963248000">very interesting article</a> that highlighted that, until the invention of arabic numbers, multiplication using roman numerals was difficult. The arabic positional number system made it much easier. It was the same for software. Programming software is difficult. Until someone comes up with the equivalent of arabic numbers for programming, it will remain so.</p><p
+<p>I recently came across a <a href="https://hbr.org/2019/01/what-will-software-look-like-once-anyone-can-create-it">very interesting article</a> that highlighted that, until the invention of Arabic numbers, multiplication using roman numerals was difficult. The Arabic positional number system made it much easier. It was the same for software. Programming software is difficult. Until someone comes up with the equivalent of Arabic numbers for programming, it will remain so.</p><p
 
->This made me think profoundly. What makes it that programming software is difficult? Is it that spreadsheets are cryptic? Too many <abbr title="Application Programming Interface">API</abbr>s? Complicated build tools? Not close enough to assembly language? Or to far away?</p>
+>This made me think profoundly. What makes it that programming software is difficult? Is it that programming languages are cryptic? Too many <abbr title="Application Programming Interface">API</abbr>s? Complicated build tools? Not close enough to assembly language? Or too far away?</p>
 
 <p>I am a big fan of the idea of <a href="https://www.google.com/url?q=https://coda.io/welcome&amp;sa=D&amp;ust=1549033963249000">Coda</a>&nbsp;that mixes spreadsheets with word-like documents and makes it possible to create text that appears based on conditions, for example. It is very nice to have a domain-specific language for computing cells as in any spreadsheets, and to be able to insert cells into a document.<br
 
@@ -335,21 +336,21 @@ body a {
 <!--p>I recently created <a href= "https://github.com/MikaelMayer/Editor">Editor</a>, a local HTTP server to edit dynamic and static webpages in the browser, and have modifications back-propagated to the files themselves. It gave me the idea for this article.</p-->
 
 <p>Because programming is all about abstraction, let us imagine what if, in a fictional word processor interface, we had access to a direct command to <em>abstract</em>.
-Since, abstractions are for programs the equivalent of arabic positional symbols for numbers, can they also be a good candidate for developing software?</p>
+Since abstractions are for programs the equivalent of arabic positional symbols for numbers, can they also be a good candidate for visually developing software?</p>
 
 <h2>MikoWord Tutorial</h2>
 
 <p>Welcome to MikoWord!</p>
 
-<p>MikoWord is a word processor for webpages which will satisfy both programmers and non-programmers. MikoWord features two simple but powerful ideas: to abstract and to concretize.
-In this tutorial aimed at beginners, we will explain how to combine these powerful notions by walking through several examples.
+<p>MikoWord is a word processor for webpages which will satisfy both programmers and non-programmers. MikoWord features a simple but powerful tool to <i>abstract</i
+   >.
+In this tutorial aimed at beginners, we will explain how to use this tool by walking through several examples.
 We will create a rich and dynamic help page for an application named MySoft. In this tutorial, you will learn:</p>
 <ul><li
 >How to reuse relevant pieces of information (e.g. the name of a product)</li><li
 >How to reuse partial pieces of informations (e.g. formatting)</li><li
 >How to repeat abstractions (e.g. introducing a list)</li><li
->How to have MikoWord infer asbtractions for you.</li><li
->How to create your own abstractions (advanced)</li></ul>
+>How to have MikoWord infer asbtractions for you.</li></ul>
 </p>
 
 <p>No coding skills are required. Let’s start!</p>
@@ -489,8 +490,8 @@ Continue and @(command "concretize") "<span class="doc">Right-click or ALT+M</sp
     >CTRL+S</span><span
     >When file is not saved yet</span></span>
 </div>)
-Using this interface, if you rename "Keyboard shortcut" by "Shortcut", the renaming would appear in the other tables.
-Rename <span class="variable">table</span> to <span class="variable">memo</span>, <span class="variable">B1</span> to <span class="variable">name</span>, <span class="variable">B2</span> to <span class="variable">shortcut</span> and <span class="variable">B3</span> to <span class="variable">context</span>. Good names are always useful for later.
+Using this interface, if you rename "Keyboard shortcut" to "Shortcut", the renaming would appear in the other tables.
+Rename <span class="variable">table</span> to <span class="variable">memo</span>, <span class="variable">B1</span> to <span class="variable">name</span>, <span class="variable">B2</span> to <span class="variable">shortcut</span> and <span class="variable">B3</span> to <span class="variable">context</span>. It is good practice to give useful names.
 Alternatively, if you wanted to be able to use both names, instead of just renaming <span class="variable">B1</span>, double-click on it to the right of "<span class="doc">of </span>" and write "<span class="doc">B1 as name</span>" in the formula field.
 <br>
 Save your file. If you forget to save your file and your browser unexpectedly quits, a backup will always be available.
@@ -571,7 +572,7 @@ To the right of <span class="variable">save</span>, select "<span class="doc">Sa
 After any edit, remember to <span class="application"><span class="variable">save</span><span>Save</span></span> your document.
 </div>)
 Rename <span class="variable">save</span> to <span class="variable">command</span>, and <span class="variable">arg</span> to <span class="variable">name</span>. We now want the tooltip to be created depending on <span class="variable">name</span>'s content. Select "<span class="doc">CTRL+S</span>" in the remark next to <span class="variable">arg</span> and @(command "abstract") it.
-Click on the little <img src="FutureofProgramming-lightning.png"> and choose "infer". Instead of creating a new variable, it will try to infer its content from the context. In this case, it manages to find a formula:
+Click on the little <img src="FutureofProgramming-lightning.png" style="vertical-align:bottom"> and choose "infer". Instead of creating a new variable, it will try to infer its content from the context. In this case, it manages to find a formula:
 @(mkDoc [("items", ([], <span class="table"><span class="tuple"><span
     >Context menu</span><span
     >Right-click or ALT+M</span><span
@@ -612,8 +613,54 @@ Moreover, if at some point you want to change a remark, such as removing <span c
 
 <h1>Epilogue</h1>
 
-In case you wonder, I did not write this tutorial using even an alpha version of a "MikoWord".
-However, I used a tool that I am developing: <a href= "https://github.com/MikaelMayer/Editor">Editor</a>. Editor is a local HTTP server that enables the viewer of the page to modify it, even if the page was dynamically generated. All screenshots have been dynamically generated based on a mix of document and formulas.
-
+<p>In case you wonder, I did not write this tutorial using even an alpha version of a "MikoWord".
+However, I used a tool that I am developing: <a href= "https://github.com/MikaelMayer/Editor">Editor</a>. Editor is a local HTTP server that enables the viewer of the page to modify it, even if the page was dynamically generated. All screenshots have been dynamically generated based on a mix of document and formulas. I generated the html content of this document using <a href="https://github.com/MikaelMayer/hyde-build-tool">Hyde</a>, a reversible file-to-file converter that I also maintain. Together, Editor and Hyde made the development of this page straightforward.</p><p>Would MikoWord be possible? I think so. MikoWord features the idea of displaying the tree of a <em>program</em> as an HTML tree, after a partial and forgiving evaluator ran on it.
+If you are interested by this project, follow me on <a href="https://twitter.com/MikaelMayer">Twitter</a>.
+If you are interested to contribute, <a list-ghost-attributes="href" prefix="mikael.mayer" onmouseover="this.setAttribute('href', 'mailto:' + this.getAttribute('prefix')+ '@polytechnique.org?subject=I+would+like+to+contribute+to+Future+of+Programming')">send me an email</a>.
+<script>
+var editable = document.querySelector("[contenteditable=true]");
+var onKeypress = e => {
+  console.log("event", e);
+  if(e.keyCode==13 && !e.shiftKey){
+      // If we are inside a paragraph, we split the paragraph.
+      // If we are directly inside a div, we add a paragraph separator.
+      // We delete everything between anchorNode and focusNode
+      var caretSelection = document.getSelection();
+      var x = caretSelection.anchorNode;
+      if(x && x.nodeType == 1) {
+        if(x.parentNode && getComputedStyle(x.parentNode).display == "block") {
+          e.preventDefault(); //Prevent default browser
+          var range = caretSelection.getRangeAt(0);
+          range.deleteContents();
+          caretSelection = document.getSelection();
+          x = caretSelection.anchorNode;
+          if(x.parentNode.tagName == "p") { // Split the p
+            var newPar = document.createElement("p");
+            
+            var fo = caretSelection.anchorOffset;
+            if(fo < x.text.length) {
+              newPar.append(document.createTextNode(x.text.substring(fo)));
+              x.deleteData(fo,x.text.length - fo);
+            }
+            var y = x.nextSibling;
+            while(y) {
+              var yy = y;
+              y = y.nextSibling;
+              newPar.append(yy); // Moves yy
+            }
+            x.parentNode.insertAdjacentElement(newPar);
+          } else { // insert br
+            range.insertNode(document.createElement("br"))
+          }
+        }
+      }
+  }
+}
+if(editable && !editable.configured) {
+  editable.configured = true;
+  console.log("configured editable");
+  editable.addEventListener("keypress", onKeypress, true);
+}
+</script>
 </div>
 </body></html>

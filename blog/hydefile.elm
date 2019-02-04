@@ -22,7 +22,7 @@ Result = { Result |
 
 evalContinue: (Result String value -> a) -> String -> a
 evalContinue callback source =
-  callback <| __evaluate__ __CurrentEnv__ source
+  callback <| __evaluate__ (__CurrentEnv__) source
 
 {- -- Cons: nesting. Pro: Catches errors in chronological order
 all = 
