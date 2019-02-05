@@ -1,6 +1,15 @@
 <html><head><meta content="text/html; charset=UTF-8" http-equiv="content-type">
 <link rel="stylesheet" type="text/css" href="index.css">
 <style>
+.error {
+  color: red;
+  font-weight: bold;
+}
+del {
+  opacity: 0.5;
+  text-decoration: none;
+  font-style: italic;  
+}
 @media (orientation: landscape) {
   body > div {
     margin-left: auto;
@@ -205,16 +214,17 @@ var formatDate = (date) => {
 
 <h1>Abstract and Concrete: Future of Programming</h1>
 <em>2019/02/05 — Mikaël Mayer</em>
-<p>I recently came across a <a href="https://hbr.org/2019/01/what-will-software-look-like-once-anyone-can-create-it">very interesting article</a> that highlighted that, until the invention of Arabic numbers, multiplication using roman numerals was difficult. The Arabic positional number system made it much easier. It was the same for software. Programming software is difficult. Until someone comes up with the equivalent of Arabic numbers for programming, it will remain so.</p><p>This made me think profoundly. What makes it that programming software is difficult? Is it that programming languages are cryptic? Too many <abbr title="Application Programming Interface">API</abbr>s? Complicated build tools? Not close enough to assembly language? Or too far away?</p>
+<p>I recently came across a <a href="https://hbr.org/2019/01/what-will-software-look-like-once-anyone-can-create-it">very interesting article</a> that highlighted that, until the invention of Arabic numbers, multiplication using roman numerals was difficult. The Arabic positional number system made it much easier. It is the same for software. Programming software is difficult. Until someone comes up with the equivalent of Arabic numbers for programming, it will remain so.</p><p>This made me think profoundly. What makes it that programming software is difficult? Is it that programming languages are cryptic? Too many <abbr title="Application Programming Interface">API</abbr>s? Complicated build tools? Not close enough to assembly language? Or too far away? But what if it's abstraction itself that is difficult?</p>
 
-<p>I am a big fan of the idea of <a href="https://www.google.com/url?q=https://coda.io/welcome&amp;sa=D&amp;ust=1549033963249000">Coda</a> that mixes spreadsheets with word-like documents and makes it possible to create text that appears based on conditions, for example. It is very nice to have a domain-specific language for computing cells as in any spreadsheets, and to be able to insert cells into a document.<br>However, in many office-like tools, I still miss a way to create <a href="https://www.youtube.com/watch?v=ZfytHvgHybA">reusable abstractions</a>. Google Spreadsheet and Microsoft Excel give access to APIs and offer <a href="https://developers.google.com/apps-script/guides/sheets/functions">abstractions as macros</a>, but they are no longer part of the visible document, and cannot be edited with the same and nice visual interface.</p>
+<p>I am a big fan of the idea of <a href="https://www.google.com/url?q=https://coda.io/welcome&amp;sa=D&amp;ust=1549033963249000">Coda</a> that mixes spreadsheets with word-like documents and makes it possible to create text that appears based on conditions, for example. It is very nice to have a domain-specific language for computing cells as in any spreadsheets, and to be able to insert cells into a document.<br>However, in many office-like tools, I still miss a way to create <a href="https://www.youtube.com/watch?v=ZfytHvgHybA">reusable abstractions</a>. Google Spreadsheet and Microsoft Excel give access to APIs and offer <a href="https://developers.google.com/apps-script/guides/sheets/functions">abstractions as macros</a>, but they are no longer part of the visible document, and cannot be edited with the same nice visual interface.</p>
 
 <!--p>Programming is all about abstraction. Indeed, <a href="https://www.google.com/url?q=https://www.youtube.com/watch?v%3DV10hzjgoklA&amp;sa=D&amp;ust=1549033963250000">Lambda Calculus</a>&nbsp;is being discovered as the ancestor of all modern programming languages and is the same as logic itself. Moreover, Lambda Calculus features only two building blocks: abstraction and concretization. Isn&rsquo;t all software based on this idea? Starting concrete, and then abstracting away parts that become data inputs, or starting abstract, and then test using concrete values?</p-->
 
 <!--p>I recently created <a href= "https://github.com/MikaelMayer/Editor">Editor</a>, a local HTTP server to edit dynamic and static webpages in the browser, and have modifications back-propagated to the files themselves. It gave me the idea for this article.</p-->
 
 <p>Let us imagine what if, in a mocked word processor interface named MikoWord, we had access to a direct command to <em>abstract</em>.
-Since abstractions are for programs the equivalent of arabic positional symbols for numbers, can they also be a good candidate for visually developing software?</p>
+Can it also be a good candidate for visually developing software?<br><br>Parts in <del>this style</del> can be skipped.
+</p>
 
 <h2>MikoWord Tutorial</h2>
 
@@ -223,7 +233,7 @@ Since abstractions are for programs the equivalent of arabic positional symbols 
 <p>MikoWord is a word processor for webpages which will satisfy both programmers and non-programmers. MikoWord features a simple but powerful tool to <i>abstract</i>.
 In this tutorial aimed at beginners, we will explain how to use this tool by walking through several examples.
 We will create a rich and dynamic help page for an application named MySoft. In this tutorial, you will learn:</p>
-<ul><li>How to reuse relevant pieces of information (e.g. the name of a product)</li><li>How to reuse partial pieces of informations (e.g. formatting)</li><li>How to repeat abstractions (e.g. introducing a list)</li><li>How to have MikoWord infer asbtractions for you.</li><li>How to create custom user interface elements (e.g. a button).</li></ul>
+<ul><li>How to reuse relevant pieces of information (e.g. the name of a product)</li><li>How to partially reuse elements (e.g. formatting)</li><li>How to repeat abstractions (e.g. introducing a list)</li><li>How to have MikoWord infer abstractions for you.</li><li>How to create custom user interface elements (e.g. a button).</li></ul>
 
 
 <p>No coding skills are required. Let’s start!</p>
@@ -248,7 +258,7 @@ In a regular document, every time you update MySoft’s version, you would have 
 In MikoWord, it is easier. Select "<span class="doc">MySoft 1.0</span>", and <abbr class="command" title="ALT+A, concrete elements being selected">abstract</abbr> it.
 </p>
 Abstracting is giving a name to something concrete.
-If you hover over the now dash-colored "<span class="doc abstraction">MySoft 1.0</span>" in the title, you will now see that it has been assigned the name <span class="variable">mysoft</span>. Double-click it to reveal the formula behind it — or touch it for one second on mobile. The portion to the right of <span class="variable">mysoft</span> is called its <em>content</em> and is also like a document:
+If you hover over the "<span class="doc abstraction">MySoft 1.0</span>" that has a stripes background, in the title, you will now see that it has been assigned the name <span class="variable">mysoft</span>. Double-click it to reveal the formula behind it — or touch it for one second on mobile. The portion to the right of <span class="variable">mysoft</span> is called its <em>content</em> and is also like a document, meaning you can further abstract inside, e.g. the name and the version.
 <div class="docwrapper">
   <div class="docblock doc">
   <div class="preamble"><div class="assignment">
@@ -261,9 +271,9 @@ Welcome to MySoft 1.0!
 </div>
   </div></div>
 <p>
-Note that all <em>declarations</em> like <span class="variable">mysoft</span> will be hidden from the final document's version — when you print, publish or export it, and the background under "<span class="doc abstraction">MySoft 1.0</span>" will disappear. If you prefer a style other than stripes, go to Settings > Styles > Reused content and change the style.<br>
+Note that all <em>declarations</em> like <span class="variable">mysoft</span> will be hidden when you print, publish or export it, and the background under "<span class="doc abstraction">MySoft 1.0</span>" will disappear. <del> If you prefer a style other than stripes, go to Settings > Styles > Reused content and change the style.</del><br>
 
-By opening the <abbr class="command" title="Right-click or ALT+M, anywhere">context menu</abbr> over <span class="variable">mysoft</span>, you can also specify to display abstractions only when they are needed during editing, depending on where your caret is. For this tutorial, we will always display them.<br> 
+By opening the <abbr class="command" title="Right-click or ALT+M, anywhere">context menu</abbr> over <span class="variable">mysoft</span>, you could also specify to display abstractions only when they are needed during editing, depending on where your caret is. For this tutorial, we will always display them.<br> 
 Now copy "<span class="doc abstraction">MySoft 1.0</span>" from the title, and paste it to replace "<span class="doc">MySoft 1.0</span>" in the document body. You obtain something like:</p>
 <div class="docwrapper">
   <div class="docblock doc">
@@ -292,8 +302,24 @@ From now on, each time you will type "<span class="doc">=mysoft</span>" followed
 <p>
 Similar to spreadsheets, you can double-click on "<span class="doc abstraction">MySoft 1.1</span>" to display and modify the underlying formula "<span class="doc">mysoft</span>".
 </p>
+<p>You could even further abstract <span class="variable">mysoft</span>'s content, e.g. to extract the version number under a separate name, using the same <abbr class="command" title="ALT+A, concrete elements being selected">abstract</abbr> command:
+<div class="docwrapper">
+  <div class="docblock doc">
+  <div class="preamble"><div class="assignment">
+    <span class="variable">version</span> =
+    <div class="content"><span class="textvalue">1.1</span></div>
+  </div><div class="assignment">
+    <span class="variable">mysoft</span> =
+    <div class="content"><span class="textvalue">MySoft <span class="variable">version</span></span></div>
+  </div></div>
+  <div>
+<h1><span class="textvalue abstraction computed" title="mysoft" formula="<span><span class=&quot;variable&quot;>mysoft</span></span>">MySoft <span class="textvalue abstraction computed" title="version" formula="<span><span class=&quot;variable&quot;>version</span></span>">1.1</span></span> Tutorial</h1>
+Welcome to <span class="textvalue abstraction computed" title="mysoft" formula="<span><span class=&quot;variable&quot;>mysoft</span></span>">MySoft <span class="textvalue abstraction computed" title="version" formula="<span><span class=&quot;variable&quot;>version</span></span>">1.1</span></span>!
+</div>
+  </div></div>
+
 <h3>Step 2: Abstract to concrete</h3>
-<p>Let us imagine that, in your document, you want to describe a set of keyboard shortcuts as memos, and then some sample scenarios on how to use them.
+<p>Let us imagine that, in your document, you want to describe a set of keyboard shortcuts as cards, and then some sample scenarios on how to use them.
 Let us start by creating a sample shortcut table. Create a 3x2 table, remove the borders inside it, and fill it as follow:</p>
 
 <style>
@@ -327,8 +353,8 @@ table.kbd tr:last-child {
 </div>
   </div></div>
 
-We want to reuse this box for the other memos.
-Instead of just copy-pasting it, we will abstract it so that boxes are always using the same style. Select the table, <abbr class="command" title="ALT+A, concrete elements being selected">abstract</abbr> it, and copy-paste it to duplicate it as in the previous section.
+We want to reuse this box for the other cards.
+Instead of just copy-pasting it, we will abstract it so that cards have the same appearance. Not just css styles, but also the same text. Select the table, <abbr class="command" title="ALT+A, concrete elements being selected">abstract</abbr> it, and copy-paste it to duplicate it as in the previous section.
 
 <div class="docwrapper">
   <div class="docblock doc">
@@ -357,7 +383,7 @@ Instead of just copy-pasting it, we will abstract it so that boxes are always us
 </div>
   </div></div>
 
-If you changed one of the values in any table, the change would be propagated to the other tables. We need to specify what values we should be able to change independently. Select "<span class="doc">Context menu</span>" in one of the last two tables and <abbr class="command" title="ALT+C, abstract elements being selected">concretize</abbr> it. Alternatively, you could have selected it from the first table and <abbr class="command" title="ALT+A, concrete elements being selected">abstract</abbr>ed it. The result looks like follows:
+If you changed one of the values in any table, the change would be propagated to the other tables. We need to specify what values are unique to each instance. Select "<span class="doc">Context menu</span>" in one of the last two tables and <abbr class="command" title="ALT+C, abstract elements being selected">concretize</abbr> it. Alternatively, you could have selected it from the first table and <abbr class="command" title="ALT+A, concrete elements being selected">abstract</abbr>ed it. The result is that <span class="variable">table</span> becomes a <i>function</i>. It looks like follows:
 
 <div class="docwrapper">
   <div class="docblock doc">
@@ -386,6 +412,7 @@ If you changed one of the values in any table, the change would be propagated to
 </div>
   </div></div>
 
+Double-click (or long press) on one of the two tables to see that its formula is now <span class="doc">table "Context menu"</span>.<br>
 Rename "<span class="doc">Context Menu</span>" from the last table to "<span class="doc">Save</span>". The change will stay on the modified table:
 
 <div class="docwrapper">
@@ -444,12 +471,13 @@ Continue and <abbr class="command" title="ALT+C, abstract elements being selecte
 </div>
   </div></div>
 Using this interface, if you rename "Keyboard shortcut" to "Shortcut", the renaming would appear in the other tables.
-Rename <span class="variable">table</span> to <span class="variable">memo</span>, <span class="variable">B1</span> to <span class="variable">name</span>, <span class="variable">B2</span> to <span class="variable">shortcut</span> and <span class="variable">B3</span> to <span class="variable">context</span>. It is good practice to give useful names.
-Alternatively, if you wanted to be able to use both names, instead of just renaming <span class="variable">B1</span>, double-click on it to the right of "<span class="doc">of </span>" and write "<span class="doc">B1 as name</span>" in the formula field.
+Rename <span class="variable">table</span> to <span class="variable">card</span>, <span class="variable">B1</span> to <span class="variable">name</span>, <span class="variable">B2</span> to <span class="variable">shortcut</span> and <span class="variable">B3</span> to <span class="variable">context</span>. It is good practice to give useful names.
+<del>
+Alternatively, if you wanted to be able to use both names, instead of just renaming <span class="variable">B1</span>, double-click on it to the right of "<span class="doc">of </span>" and write "<span class="doc">B1 as name</span>" in the formula field.</del>
 <br>
-Save your file. If you forget to save your file and your browser unexpectedly quits, a backup will always be available.
+<del>Save your file. If you forget to save your file and your browser unexpectedly quits, a backup will always be available.</del>
 <h3>Step 3: Advanced abstractions</h3>
-<p>In the previous section, we saw how to define memos for shortcuts.
+<p>In the previous section, we saw how to define cards for shortcuts.
 We want to use these shortcut definitions to augment simple tutorials, by displaying a hint on every command that a tutorial uses. That way, users would not have to remember all these commands or look them up themselves.</p>
 
 <p>Select the last two tables, and <abbr class="command" title="ALT+A, concrete elements being selected">abstract</abbr> them.
@@ -461,7 +489,7 @@ Instead of inserting one more name, MikoWord detects that there is a repetition 
     <span class="variable">items</span> =
     <div class="content"><span class="table"><span class="tuple"><span>Context menu</span><span>Right-click or ALT+M</span><span>When caret blinks in doc</span></span><span class="tuple"><span>Save</span><span>CTRL+S</span><span>When file is not saved yet</span></span></span></div>
   </div><div class="assignment">
-    <span class="variable">memo</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="tuple"><span class="variable">command</span><span class="variable">shortcut</span><span class="variable">context</span></span></span></div> =
+    <span class="variable">card</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="tuple"><span class="variable">command</span><span class="variable">shortcut</span><span class="variable">context</span></span></span></div> =
     <div class="content"><table class="kbd"><tbody>
   <tr><td>Command name:</td><td><span class="variable">command</span></td></tr>
   <tr><td>Keyboard shortcut:</td><td><span class="variable">shortcut</span></td></tr>
@@ -470,7 +498,7 @@ Instead of inserting one more name, MikoWord detects that there is a repetition 
   </table></div>
   </div></div>
   <div>
-  <span class="abstraction computed" title="repeat(memo,items)" formula="repeat(memo,items)"><span class="repeat"><table class="kbd"><tbody>
+  <span class="abstraction computed" title="repeat(card,items)" formula="repeat(card,items)"><span class="repeat"><table class="kbd"><tbody>
   <tr><td>Command name:</td><td><span>Context menu</span></td></tr>
   <tr><td>Keyboard shortcut:</td><td><span>Right-click or ALT+M</span></td></tr>
   <tr><td>When to use:</td><td><span>When caret blinks in doc</span></td></tr>
@@ -483,7 +511,7 @@ Instead of inserting one more name, MikoWord detects that there is a repetition 
   </table></span></span>
 </div>
   </div></div>
-As you hover over the memos, you'll see that it uses a single formula to display it: "<span class="doc">repeat(memo,items)</span>". If you double click on this memo (or press one second on mobile), you will be able to change this formula, as in any spreadsheet; but you can also change the value as you see it.
+As you hover over the cards (or double click on it, or long press), you'll see that it uses a single formula to display it: "<span class="doc">repeat(card,items)</span>". If you double click on this card (or press one second on mobile), you will be able to change this formula, as in any spreadsheet; but you can also change the value as you see it.
 <h3>Step 4: Intelligent abstractions</h3>
 Now let's write our tutorial content. In the sequel, we only display relevant abstractions at the top.
 <div class="docwrapper">
@@ -540,7 +568,7 @@ After any edit, remember to <span class="textvalue abstraction computed" title="
 </div>
   </div></div>
 Rename <span class="variable">save</span> to <span class="variable">command</span>, and <span class="variable">arg</span> to <span class="variable">name</span>. We now want the tooltip to be created depending on <span class="variable">name</span>'s content. Select "<span class="doc">CTRL+S</span>" in the remark next to <span class="variable">arg</span> and <abbr class="command" title="ALT+A, concrete elements being selected">abstract</abbr> it.
-Click on the little <img class="icon" src="FutureofProgramming-lightning.png"> and choose "infer". Instead of creating a new variable, it will try to infer its content from the context. In this case, it manages to find a formula:
+Click on the little <img class="icon" src="FutureofProgramming-lightning.png"> and choose "infer". Instead of creating a new name, it will try to infer its content from the context. In this case, it manages to find a formula:
 <div class="docwrapper">
   <div class="docblock doc">
   <div class="preamble"><div class="assignment">
@@ -558,11 +586,11 @@ Click on the little <img class="icon" src="FutureofProgramming-lightning.png"> a
 After any edit, remember to <span class="textvalue abstraction computed" title="command &quot;Save&quot;" formula="<span><span class=&quot;variable&quot;>command</span> <span>&quot;Save&quot;</span></span>"><span class="concretization computed" title="name" formula="<span><span class=&quot;variable&quot;>name</span></span>">Save</span><span class="remark"><span class="abstraction computed" title="vlookup(items,name,1,2)" formula="vlookup(items,name,1,2)"><span>CTRL+S</span></span></span></span> your document.
 </div>
   </div></div>
-<p>Once you will be more familiar with the language, you will be able to enter these formulas yourself (<abbr class="command" title="ALT+A, concrete elements being selected">abstract</abbr>, then choose "formula" from <img class="icon" src="FutureofProgramming-lightning.png">).</p>
+<p>The vlookup procedure takes a table, a value to look into, an two column numbers: the first column in which to search the value, the second column the value to return to return. Once you will be more familiar with the language, you will be able to enter these formulas yourself (<abbr class="command" title="ALT+A, concrete elements being selected">abstract</abbr>, then choose "formula" from <img class="icon" src="FutureofProgramming-lightning.png">).</p>
 <p>
 Let us add another command in the document similar to <span class="doc">Save</span>.
 Continue to write "<span class="doc">Open the </span>" in the document.
-Copy "<span class="doc">Save</span>" with its tooltip, paste it after what you just wrote, and replace the command name by <span class="doc">Context menu</span>. The tooltip is automatically updated:</p>
+Copy "<span class="doc">Save</span>" with its tooltip, paste it after what you just wrote, and replace the command name by <span class="doc">Context menu</span>. The tooltip is automatically updated. If you make a mistake (unknown command), you'll see a local error:</p>
 <div class="docwrapper">
   <div class="docblock doc">
   <div class="preamble"><div class="assignment">
@@ -577,7 +605,7 @@ Copy "<span class="doc">Save</span>" with its tooltip, paste it after what you j
   </div></div>
   <div>
 <h2><span class="textvalue abstraction computed" title="mysoft" formula="<span><span class=&quot;variable&quot;>mysoft</span></span>">MySoft 1.0</span>: Save actions</h2>
-After any edit, remember to <span class="textvalue abstraction computed" title="command &quot;Save&quot;" formula="<span><span class=&quot;variable&quot;>command</span> <span>&quot;Save&quot;</span></span>"><span class="concretization computed" title="name" formula="<span><span class=&quot;variable&quot;>name</span></span>">Save</span><span class="remark"><span class="abstraction computed" title="vlookup(items,name,1,2)" formula="vlookup(items,name,1,2)"><span>CTRL+S</span></span></span></span> your document. Open the <span class="textvalue abstraction computed" title="command &quot;Context menu&quot;" formula="<span><span class=&quot;variable&quot;>command</span> <span>&quot;Context menu&quot;</span></span>"><span class="concretization computed" title="name" formula="<span><span class=&quot;variable&quot;>name</span></span>">Context menu</span><span class="remark"><span class="abstraction computed" title="vlookup(items,name,1,2)" formula="vlookup(items,name,1,2)"><span>Right-click or ALT+M</span></span></span></span>
+After any edit, remember to <span class="textvalue abstraction computed" title="command &quot;Save&quot;" formula="<span><span class=&quot;variable&quot;>command</span> <span>&quot;Save&quot;</span></span>"><span class="concretization computed" title="name" formula="<span><span class=&quot;variable&quot;>name</span></span>">Save</span><span class="remark"><span class="abstraction computed" title="vlookup(items,name,1,2)" formula="vlookup(items,name,1,2)"><span>CTRL+S</span></span></span></span> your document. Open the <span class="textvalue abstraction computed" title="command &quot;Context menu&quot;" formula="<span><span class=&quot;variable&quot;>command</span> <span>&quot;Context menu&quot;</span></span>"><span class="concretization computed" title="name" formula="<span><span class=&quot;variable&quot;>name</span></span>">Context menu</span><span class="remark"><span class="abstraction computed" title="vlookup(items,name,1,2)" formula="vlookup(items,name,1,2)"><span>Right-click or ALT+M</span></span></span></span> with the <span class="textvalue abstraction computed" title="command &quot;magic one&quot;" formula="<span><span class=&quot;variable&quot;>command</span> <span>&quot;magic one&quot;</span></span>"><span class="concretization computed" title="name" formula="<span><span class=&quot;variable&quot;>name</span></span>">magic one</span><span class="remark"><span class="abstraction computed" title="vlookup(items,name,1,2)" formula="vlookup(items,name,1,2)"><span class="error">#Err: <span>magic one</span> not found</span></span></span></span>.
 </div>
   </div></div>
 You are now able to write a document with enriched content. Furthermore, when you will want to create a version for Mac, or localize the tutorial in another language, you will just have to further abstract over items, you won't have to do search and replace.<br>
@@ -720,7 +748,9 @@ Furthermore, do you prefer a dash instead of a colon in the title? Change it in 
 <h1>Epilogue</h1>
 
 <p>In case you wonder, I did not write this tutorial using even an alpha version of a "MikoWord".
-However, I used a tool that I am developing: <a href="https://github.com/MikaelMayer/Editor">Editor</a>. Editor is a local HTTP server that enables the viewer of the page to modify it, even if the page was dynamically generated. All screenshots have been dynamically generated based on a mix of document and formulas. I generated the html content of this document using <a href="https://github.com/MikaelMayer/hyde-build-tool">Hyde</a>, a reversible file-to-file converter that I also maintain. Together, Editor and Hyde made the development of this page straightforward.</p><p>Would MikoWord be possible? I think so. MikoWord features the idea of displaying the tree of a <em>program</em> as an HTML tree, after a partial and forgiving evaluator ran on it.
+However, I used a tool that I am developing: <a href="https://github.com/MikaelMayer/Editor">Editor</a>. Editor is a local HTTP server that enables the viewer of the page to modify it, even if the page was dynamically generated. All screenshots have been dynamically generated based on a mix of document and formulas.
+<br>I generated the html content of this document using <a href="https://github.com/MikaelMayer/hyde-build-tool">Hyde</a>, a reversible file-to-file converter that I also maintain.
+<br>Editor and Hyde are based on my <a href="https://dl.acm.org/citation.cfm?id=3276497">research on bidirectional programming</a>. Together, Editor and Hyde made the development of this page straightforward.</p><p>Would MikoWord be possible? I think so. MikoWord features the idea of displaying the tree of a <em>program</em> as an HTML tree, after a partial and forgiving evaluator ran on it.
 If you are interested by this project, follow me on <a href="https://twitter.com/MikaelMayer">Twitter</a>.
 If you are interested to contribute, <a list-ghost-attributes="href" prefix="mikael.mayer" onmouseover="this.setAttribute(&#39;href&#39;, &#39;mailto:&#39; + this.getAttribute(&#39;prefix&#39;)+ &#39;@polytechnique.org?subject=I+would+like+to+contribute+to+Future+of+Programming&#39;)">send me an email</a>.
 <script>
@@ -837,5 +867,5 @@ for(var i = 0; i < q.length; i++) {
 }
 
 </script>
-</p></div>
+</p></p></div>
 </body></html>
