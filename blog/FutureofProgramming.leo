@@ -231,6 +231,9 @@ formatDate = """(date) => {
 }"""
 
 <html><head><meta content="text/html; charset=UTF-8" http-equiv="content-type"><style>
+[ghost-visible=false] {
+  display: none;
+}
 .spacebeforeparam {
   min-width: 0.7em;
   display: inline-block;
@@ -445,7 +448,7 @@ We will create a rich and dynamic help page for an application named MySoft. In 
 >How to reuse partial pieces of informations (e.g. formatting)</li><li
 >How to repeat abstractions (e.g. introducing a list)</li><li
 >How to have MikoWord infer asbtractions for you.</li><li
->How to create custom User Interface elements (e.g. a button).</li></ul>
+>How to create custom user interface elements (e.g. a button).</li></ul>
 </p>
 
 <p>No coding skills are required. Let’s start!</p>
@@ -467,7 +470,7 @@ In a regular document, every time you update MySoft’s version, you would have 
 In MikoWord, it is easier. Select "<span class="doc">MySoft 1.0</span>", and @(command "abstract") it.
 </p>
 Abstracting is giving a name to something concrete.
-If you hover over the now dash-colored "<span class="doc abstraction">MySoft 1.0</span>" in the title, you will now see that it has been assigned the name <span class="variable">mysoft</span>. The portion to the right of <span class="variable">mysoft</span> is called its <em>content</em>. The content is actually a mini-document in itself that can be further modified:
+If you hover over the now dash-colored "<span class="doc abstraction">MySoft 1.0</span>" in the title, you will now see that it has been assigned the name <span class="variable">mysoft</span>. You can double-click to reveal the formula behind it. The portion to the right of <span class="variable">mysoft</span> is called its <em>content</em>. The content is actually a mini-document in itself that can be further modified:
 @(mkDoc [("mysoft", ([], <span class="textvalue">MySoft 1.0</span>))]
 <div>
 <h1><span class="variable">mysoft</span> Tutorial</h1>
