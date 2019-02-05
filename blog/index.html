@@ -1,8 +1,21 @@
 <html><head><meta content="text/html; charset=UTF-8" http-equiv="content-type"><style>
+.spacebeforeparam {
+  min-width: 0.7em;
+  display: inline-block;
+}
+.formulacell::before {
+  content: "=";
+}
 button.doc, .doc button {
   min-height: 48px;
   background: orangered;
   color: white;
+}
+span.application > :not(:first-child)::before {
+  content: " ";
+}
+span.application > :not(:first-child)::before {
+  content: " ";
 }
 span.remark {
   background: white;
@@ -245,7 +258,7 @@ If you hover over the now dash-colored "<span class="doc abstraction">MySoft 1.0
     <div class="content"><span class="textvalue">MySoft 1.0</span></div>
   </div></div>
   <div>
-<h1><span class="textvalue abstraction computed" title="mysoft">MySoft 1.0</span> Tutorial</h1>
+<h1><span class="textvalue abstraction computed" title="mysoft" formula="<span><span class=&quot;variable&quot;>mysoft</span></span>">MySoft 1.0</span> Tutorial</h1>
 Welcome to MySoft 1.0!
 </div>
   </div></div>
@@ -261,8 +274,8 @@ Now copy "<span class="doc abstraction">MySoft 1.0</span>" from the title, and p
     <div class="content"><span class="textvalue">MySoft 1.0</span></div>
   </div></div>
   <div>
-<h1><span class="textvalue abstraction computed" title="mysoft">MySoft 1.0</span> Tutorial</h1>
-Welcome to <span class="textvalue abstraction computed" title="mysoft">MySoft 1.0</span>!
+<h1><span class="textvalue abstraction computed" title="mysoft" formula="<span><span class=&quot;variable&quot;>mysoft</span></span>">MySoft 1.0</span> Tutorial</h1>
+Welcome to <span class="textvalue abstraction computed" title="mysoft" formula="<span><span class=&quot;variable&quot;>mysoft</span></span>">MySoft 1.0</span>!
 </div>
   </div></div>
 <p>Note that the second occurrence of "<span class="doc abstraction">MySoft 1.0</span>" is now highlighted with stripes as well. This means that this occurrence is linked. Now, rename "<span class="doc">1.0</span>" to "<span class="doc">1.1</span>". You can rename it in any of the three places, and you'll obtain:</p>
@@ -273,8 +286,8 @@ Welcome to <span class="textvalue abstraction computed" title="mysoft">MySoft 1.
     <div class="content"><span class="textvalue">MySoft 1.1</span></div>
   </div></div>
   <div>
-<h1><span class="textvalue abstraction computed" title="mysoft">MySoft 1.1</span> Tutorial</h1>
-Welcome to <span class="textvalue abstraction computed" title="mysoft">MySoft 1.1</span>!
+<h1><span class="textvalue abstraction computed" title="mysoft" formula="<span><span class=&quot;variable&quot;>mysoft</span></span>">MySoft 1.1</span> Tutorial</h1>
+Welcome to <span class="textvalue abstraction computed" title="mysoft" formula="<span><span class=&quot;variable&quot;>mysoft</span></span>">MySoft 1.1</span>!
 </div>
   </div></div>
 From now on, each time you will type "<span class="doc">=mysoft</span>" followed by a space, it will replace it with "<span class="doc abstraction">MySoft 1.1</span>".
@@ -331,13 +344,13 @@ Instead of just copy-pasting it, we will abstract it so that boxes are always us
   </table></div>
   </div></div>
   <div>
-  <table class="kbd abstraction computed" title="table"><tbody>
+  <table class="kbd abstraction computed" title="table" formula="<span><span class=&quot;variable&quot;>table</span></span>"><tbody>
   <tr><td>Command name:</td><td>Context menu</td></tr>
   <tr><td>Keyboard shortcut:</td><td>Right-click or ALT+M</td></tr>
   <tr><td>When to use:</td><td>When caret blinks in doc</td></tr>
   </tbody>
   </table>
-  <table class="kbd abstraction computed" title="table"><tbody>
+  <table class="kbd abstraction computed" title="table" formula="<span><span class=&quot;variable&quot;>table</span></span>"><tbody>
   <tr><td>Command name:</td><td>Context menu</td></tr>
   <tr><td>Keyboard shortcut:</td><td>Right-click or ALT+M</td></tr>
   <tr><td>When to use:</td><td>When caret blinks in doc</td></tr>
@@ -351,7 +364,7 @@ If you changed one of the values in any table, the change would be propagated to
 <div class="docwrapper">
   <div class="docblock doc">
   <div class="preamble"><div class="assignment">
-    <span class="variable">table</span> of <div class="params"><span class="variable"><span class="variable">B1</span></span></div> =
+    <span class="variable">table</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">B1</span></span></div> =
     <div class="content"><table class="kbd"><tbody>
   <tr><td>Command name:</td><td><span class="variable">B1</span></td></tr>
   <tr><td>Keyboard shortcut:</td><td>Right-click or ALT+M</td></tr>
@@ -360,14 +373,14 @@ If you changed one of the values in any table, the change would be propagated to
   </table></div>
   </div></div>
   <div>
-  <table class="kbd abstraction computed" title="table"><tbody>
-  <tr><td>Command name:</td><td><span class="concretization computed" title="B1">Context menu</span></td></tr>
+  <table class="kbd abstraction computed" title="table &quot;Context menu&quot;" formula="<span><span class=&quot;variable&quot;>table</span> <span>&quot;Context menu&quot;</span></span>"><tbody>
+  <tr><td>Command name:</td><td><span class="concretization computed" title="B1" formula="<span><span class=&quot;variable&quot;>B1</span></span>">Context menu</span></td></tr>
   <tr><td>Keyboard shortcut:</td><td>Right-click or ALT+M</td></tr>
   <tr><td>When to use:</td><td>When caret blinks in doc</td></tr>
   </tbody>
   </table>
-  <table class="kbd abstraction computed" title="table"><tbody>
-  <tr><td>Command name:</td><td><span class="concretization computed" title="B1">Context menu</span></td></tr>
+  <table class="kbd abstraction computed" title="table &quot;Context menu&quot;" formula="<span><span class=&quot;variable&quot;>table</span> <span>&quot;Context menu&quot;</span></span>"><tbody>
+  <tr><td>Command name:</td><td><span class="concretization computed" title="B1" formula="<span><span class=&quot;variable&quot;>B1</span></span>">Context menu</span></td></tr>
   <tr><td>Keyboard shortcut:</td><td>Right-click or ALT+M</td></tr>
   <tr><td>When to use:</td><td>When caret blinks in doc</td></tr>
   </tbody>
@@ -380,7 +393,7 @@ Rename "<span class="doc">Context Menu</span>" from the last table to "<span cla
 <div class="docwrapper">
   <div class="docblock doc">
   <div class="preamble"><div class="assignment">
-    <span class="variable">table</span> of <div class="params"><span class="variable"><span class="variable">B1</span></span></div> =
+    <span class="variable">table</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">B1</span></span></div> =
     <div class="content"><table class="kbd"><tbody>
   <tr><td>Command name:</td><td><span class="variable">B1</span></td></tr>
   <tr><td>Keyboard shortcut:</td><td>Right-click or ALT+M</td></tr>
@@ -389,14 +402,14 @@ Rename "<span class="doc">Context Menu</span>" from the last table to "<span cla
   </table></div>
   </div></div>
   <div>
-  <table class="kbd abstraction computed" title="table"><tbody>
-  <tr><td>Command name:</td><td><span class="concretization computed" title="B1">Context menu</span></td></tr>
+  <table class="kbd abstraction computed" title="table &quot;Context menu&quot;" formula="<span><span class=&quot;variable&quot;>table</span> <span>&quot;Context menu&quot;</span></span>"><tbody>
+  <tr><td>Command name:</td><td><span class="concretization computed" title="B1" formula="<span><span class=&quot;variable&quot;>B1</span></span>">Context menu</span></td></tr>
   <tr><td>Keyboard shortcut:</td><td>Right-click or ALT+M</td></tr>
   <tr><td>When to use:</td><td>When caret blinks in doc</td></tr>
   </tbody>
   </table>
-  <table class="kbd abstraction computed" title="table"><tbody>
-  <tr><td>Command name:</td><td><span class="concretization computed" title="B1">Save</span></td></tr>
+  <table class="kbd abstraction computed" title="table &quot;Save&quot;" formula="<span><span class=&quot;variable&quot;>table</span> <span>&quot;Save&quot;</span></span>"><tbody>
+  <tr><td>Command name:</td><td><span class="concretization computed" title="B1" formula="<span><span class=&quot;variable&quot;>B1</span></span>">Save</span></td></tr>
   <tr><td>Keyboard shortcut:</td><td>Right-click or ALT+M</td></tr>
   <tr><td>When to use:</td><td>When caret blinks in doc</td></tr>
   </tbody>
@@ -409,7 +422,7 @@ Continue and <abbr class="command" title="ALT+C, abstract elements being selecte
 <div class="docwrapper">
   <div class="docblock doc">
   <div class="preamble"><div class="assignment">
-    <span class="variable">table</span> of <div class="params"><span class="variable"><span class="variable">B1</span></span><span class="variable"><span class="variable">B2</span></span><span class="variable"><span class="variable">B3</span></span></div> =
+    <span class="variable">table</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">B1</span></span><span class="variable"><span class="variable">B2</span></span><span class="variable"><span class="variable">B3</span></span></div> =
     <div class="content"><table class="kbd"><tbody>
   <tr><td>Command name:</td><td><span class="variable">B1</span></td></tr>
   <tr><td>Keyboard shortcut:</td><td><span class="variable">B2</span></td></tr>
@@ -418,16 +431,16 @@ Continue and <abbr class="command" title="ALT+C, abstract elements being selecte
   </table></div>
   </div></div>
   <div>
-  <table class="kbd abstraction computed" title="table"><tbody>
-  <tr><td>Command name:</td><td><span class="concretization computed" title="B1">Context menu</span></td></tr>
-  <tr><td>Keyboard shortcut:</td><td><span class="concretization computed" title="B2">Right-click or ALT+M</span></td></tr>
-  <tr><td>When to use:</td><td><span class="concretization computed" title="B3">When caret blinks in doc</span></td></tr>
+  <table class="kbd abstraction computed" title="table &quot;Context menu&quot; &quot;Right-click or ALT+M&quot; &quot;When caret blinks in doc&quot;" formula="<span><span class=&quot;variable&quot;>table</span> <span>&quot;Context menu&quot;</span> <span>&quot;Right-click or ALT+M&quot;</span> <span>&quot;When caret blinks in doc&quot;</span></span>"><tbody>
+  <tr><td>Command name:</td><td><span class="concretization computed" title="B1" formula="<span><span class=&quot;variable&quot;>B1</span></span>">Context menu</span></td></tr>
+  <tr><td>Keyboard shortcut:</td><td><span class="concretization computed" title="B2" formula="<span><span class=&quot;variable&quot;>B2</span></span>">Right-click or ALT+M</span></td></tr>
+  <tr><td>When to use:</td><td><span class="concretization computed" title="B3" formula="<span><span class=&quot;variable&quot;>B3</span></span>">When caret blinks in doc</span></td></tr>
   </tbody>
   </table>
-  <table class="kbd abstraction computed" title="table"><tbody>
-  <tr><td>Command name:</td><td><span class="concretization computed" title="B1">Save</span></td></tr>
-  <tr><td>Keyboard shortcut:</td><td><span class="concretization computed" title="B2">CTRL+S</span></td></tr>
-  <tr><td>When to use:</td><td><span class="concretization computed" title="B3">When file is not saved yet</span></td></tr>
+  <table class="kbd abstraction computed" title="table &quot;Save&quot; &quot;CTRL+S&quot; &quot;When file is not saved yet&quot;" formula="<span><span class=&quot;variable&quot;>table</span> <span>&quot;Save&quot;</span> <span>&quot;CTRL+S&quot;</span> <span>&quot;When file is not saved yet&quot;</span></span>"><tbody>
+  <tr><td>Command name:</td><td><span class="concretization computed" title="B1" formula="<span><span class=&quot;variable&quot;>B1</span></span>">Save</span></td></tr>
+  <tr><td>Keyboard shortcut:</td><td><span class="concretization computed" title="B2" formula="<span><span class=&quot;variable&quot;>B2</span></span>">CTRL+S</span></td></tr>
+  <tr><td>When to use:</td><td><span class="concretization computed" title="B3" formula="<span><span class=&quot;variable&quot;>B3</span></span>">When file is not saved yet</span></td></tr>
   </tbody>
   </table>
 </div>
@@ -450,7 +463,7 @@ Instead of inserting one more name, MikoWord detects that there is a repetition 
     <span class="variable">items</span> =
     <div class="content"><span class="table"><span class="tuple"><span>Context menu</span><span>Right-click or ALT+M</span><span>When caret blinks in doc</span></span><span class="tuple"><span>Save</span><span>CTRL+S</span><span>When file is not saved yet</span></span></span></div>
   </div><div class="assignment">
-    <span class="variable">table</span> of <div class="params"><span class="variable"><span class="tuple"><span class="variable">command</span><span class="variable">shortcut</span><span class="variable">context</span></span></span></div> =
+    <span class="variable">table</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="tuple"><span class="variable">command</span><span class="variable">shortcut</span><span class="variable">context</span></span></span></div> =
     <div class="content"><table class="kbd"><tbody>
   <tr><td>Command name:</td><td><span class="variable">command</span></td></tr>
   <tr><td>Keyboard shortcut:</td><td><span class="variable">shortcut</span></td></tr>
@@ -459,7 +472,7 @@ Instead of inserting one more name, MikoWord detects that there is a repetition 
   </table></div>
   </div></div>
   <div>
-  <span class="abstraction" title="repeat(table,items)"><span class="repeat"><table class="kbd"><tbody>
+  <span class="abstraction computed" title="repeat(table,items)" formula="repeat(table,items)"><span class="repeat"><table class="kbd"><tbody>
   <tr><td>Command name:</td><td><span>Context menu</span></td></tr>
   <tr><td>Keyboard shortcut:</td><td><span>Right-click or ALT+M</span></td></tr>
   <tr><td>When to use:</td><td><span>When caret blinks in doc</span></td></tr>
@@ -485,7 +498,7 @@ Now let's write our tutorial content. In the sequel, we only display relevant ab
     <div class="content"><span class="textvalue">MySoft 1.0</span></div>
   </div></div>
   <div>
-<h2><span class="textvalue abstraction computed" title="mysoft">MySoft 1.0</span>: Save actions</h2>
+<h2><span class="textvalue abstraction computed" title="mysoft" formula="<span><span class=&quot;variable&quot;>mysoft</span></span>">MySoft 1.0</span>: Save actions</h2>
 After any edit, remember to Save your document.
 </div>
   </div></div>
@@ -505,8 +518,8 @@ Select it again, and add a <abbr class="command" title="CTRL+R, any element bein
     <div class="content"><span class="textvalue">Save<span class="remark">CTRL+S</span></span></div>
   </div></div>
   <div>
-<h2><span class="textvalue abstraction computed" title="mysoft">MySoft 1.0</span>: Save actions</h2>
-After any edit, remember to <span class="textvalue abstraction computed" title="save">Save<span class="remark">CTRL+S</span></span> your document.
+<h2><span class="textvalue abstraction computed" title="mysoft" formula="<span><span class=&quot;variable&quot;>mysoft</span></span>">MySoft 1.0</span>: Save actions</h2>
+After any edit, remember to <span class="textvalue abstraction computed" title="save" formula="<span><span class=&quot;variable&quot;>save</span></span>">Save<span class="remark">CTRL+S</span></span> your document.
 </div>
   </div></div>
 Note that the remark also appears next to <span class="variable">save</span>.
@@ -520,12 +533,12 @@ To the right of <span class="variable">save</span>, select "<span class="doc">Sa
     <span class="variable">mysoft</span> =
     <div class="content"><span class="textvalue">MySoft 1.0</span></div>
   </div><div class="assignment">
-    <span class="variable">save</span> of <div class="params"><span class="variable"><span class="variable">arg</span></span></div> =
+    <span class="variable">save</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">arg</span></span></div> =
     <div class="content"><span class="textvalue"><span class="variable">arg</span><span class="remark">CTRL+S</span></span></div>
   </div></div>
   <div>
-<h2><span class="textvalue abstraction computed" title="mysoft">MySoft 1.0</span>: Save actions</h2>
-After any edit, remember to <span class="textvalue abstraction computed" title="save"><span class="concretization computed" title="arg">Save</span><span class="remark">CTRL+S</span></span> your document.
+<h2><span class="textvalue abstraction computed" title="mysoft" formula="<span><span class=&quot;variable&quot;>mysoft</span></span>">MySoft 1.0</span>: Save actions</h2>
+After any edit, remember to <span class="textvalue abstraction computed" title="save &quot;Save&quot;" formula="<span><span class=&quot;variable&quot;>save</span> <span>&quot;Save&quot;</span></span>"><span class="concretization computed" title="arg" formula="<span><span class=&quot;variable&quot;>arg</span></span>">Save</span><span class="remark">CTRL+S</span></span> your document.
 </div>
   </div></div>
 Rename <span class="variable">save</span> to <span class="variable">command</span>, and <span class="variable">arg</span> to <span class="variable">name</span>. We now want the tooltip to be created depending on <span class="variable">name</span>'s content. Select "<span class="doc">CTRL+S</span>" in the remark next to <span class="variable">arg</span> and <abbr class="command" title="ALT+A, concrete elements being selected">abstract</abbr> it.
@@ -539,12 +552,12 @@ Click on the little <img class="icon" src="FutureofProgramming-lightning.png"> a
     <span class="variable">mysoft</span> =
     <div class="content"><span class="textvalue">MySoft 1.0</span></div>
   </div><div class="assignment">
-    <span class="variable">command</span> of <div class="params"><span class="variable"><span class="variable">name</span></span></div> =
+    <span class="variable">command</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">name</span></span></div> =
     <div class="content"><span class="textvalue"><span class="variable">name</span><span class="remark"><span class="formula">vlookup(items,name,1,2)</span></span></span></div>
   </div></div>
   <div>
-<h2><span class="textvalue abstraction computed" title="mysoft">MySoft 1.0</span>: Save actions</h2>
-After any edit, remember to <span class="textvalue abstraction computed" title="command"><span class="concretization computed" title="name">Save</span><span class="remark"><span class="abstraction" title="vlookup(items,name,1,2)"><span>CTRL+S</span></span></span></span> your document.
+<h2><span class="textvalue abstraction computed" title="mysoft" formula="<span><span class=&quot;variable&quot;>mysoft</span></span>">MySoft 1.0</span>: Save actions</h2>
+After any edit, remember to <span class="textvalue abstraction computed" title="command &quot;Save&quot;" formula="<span><span class=&quot;variable&quot;>command</span> <span>&quot;Save&quot;</span></span>"><span class="concretization computed" title="name" formula="<span><span class=&quot;variable&quot;>name</span></span>">Save</span><span class="remark"><span class="abstraction computed" title="vlookup(items,name,1,2)" formula="vlookup(items,name,1,2)"><span>CTRL+S</span></span></span></span> your document.
 </div>
   </div></div>
 <p>Once you will be more familiar with the language, you will be able to enter these formulas yourself (<abbr class="command" title="ALT+A, concrete elements being selected">abstract</abbr>, then choose "formula" from <img class="icon" src="FutureofProgramming-lightning.png">).</p>
@@ -561,12 +574,12 @@ Copy "<span class="doc">Save</span>" with its tooltip, paste it after what you j
     <span class="variable">mysoft</span> =
     <div class="content"><span class="textvalue">MySoft 1.0</span></div>
   </div><div class="assignment">
-    <span class="variable">command</span> of <div class="params"><span class="variable"><span class="variable">name</span></span></div> =
+    <span class="variable">command</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">name</span></span></div> =
     <div class="content"><span class="textvalue"><span class="variable">name</span><span class="remark"><span class="formula">vlookup(items,name,1,2)</span></span></span></div>
   </div></div>
   <div>
-<h2><span class="textvalue abstraction computed" title="mysoft">MySoft 1.0</span>: Save actions</h2>
-After any edit, remember to <span class="textvalue abstraction computed" title="command"><span class="concretization computed" title="name">Save</span><span class="remark"><span class="abstraction" title="vlookup(items,name,1,2)"><span>CTRL+S</span></span></span></span> your document. Open the <span class="textvalue abstraction computed" title="command"><span class="concretization computed" title="name">Context menu</span><span class="remark"><span class="abstraction" title="vlookup(items,name,1,2)"><span>Right-click or ALT+M</span></span></span></span>
+<h2><span class="textvalue abstraction computed" title="mysoft" formula="<span><span class=&quot;variable&quot;>mysoft</span></span>">MySoft 1.0</span>: Save actions</h2>
+After any edit, remember to <span class="textvalue abstraction computed" title="command &quot;Save&quot;" formula="<span><span class=&quot;variable&quot;>command</span> <span>&quot;Save&quot;</span></span>"><span class="concretization computed" title="name" formula="<span><span class=&quot;variable&quot;>name</span></span>">Save</span><span class="remark"><span class="abstraction computed" title="vlookup(items,name,1,2)" formula="vlookup(items,name,1,2)"><span>CTRL+S</span></span></span></span> your document. Open the <span class="textvalue abstraction computed" title="command &quot;Context menu&quot;" formula="<span><span class=&quot;variable&quot;>command</span> <span>&quot;Context menu&quot;</span></span>"><span class="concretization computed" title="name" formula="<span><span class=&quot;variable&quot;>name</span></span>">Context menu</span><span class="remark"><span class="abstraction computed" title="vlookup(items,name,1,2)" formula="vlookup(items,name,1,2)"><span>Right-click or ALT+M</span></span></span></span>
 </div>
   </div></div>
 You are now able to write a document with enriched content. Furthermore, when you will want to create a version for Mac, or localize the tutorial in another language, you will just have to further abstract over items, you won't have to do search and replace.<br>
@@ -587,11 +600,11 @@ Using the informations in step 2, add a title containing yesterday's date and a 
 <div class="docwrapper">
   <div class="docblock doc">
   <div class="preamble"><div class="assignment">
-    <span class="variable">mktitle</span> of <div class="params"><span class="variable"><span class="variable">date</span></span><span class="variable"><span class="variable">content</span></span></div> =
+    <span class="variable">mktitle</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">date</span></span><span class="variable"><span class="variable">content</span></span></div> =
     <div class="content"><span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span></div>
   </div></div>
   <div>
-<span class="h1 abstraction computed" title="mktitle"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date"></span>: <span class="concretization computed" title="content">Finished step 5</span></span>
+<span class="h1 abstraction computed" title="mktitle <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> &quot;Finished step 5&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> <span>&quot;Finished step 5&quot;</span></span>"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"></span>: <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
 </div>
   </div></div>
@@ -601,11 +614,11 @@ Now, add a button by clicking <button class="doc">New Button</button> on the too
 <div class="docwrapper">
   <div class="docblock doc">
   <div class="preamble"><div class="assignment">
-    <span class="variable">mktitle</span> of <div class="params"><span class="variable"><span class="variable">date</span></span><span class="variable"><span class="variable">content</span></span></div> =
+    <span class="variable">mktitle</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">date</span></span><span class="variable"><span class="variable">content</span></span></div> =
     <div class="content"><span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span></div>
   </div></div>
   <div>
-<span class="h1 abstraction computed" title="mktitle"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date"></span>: <span class="concretization computed" title="content">Finished step 5</span></span>
+<span class="h1 abstraction computed" title="mktitle <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> &quot;Finished step 5&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> <span>&quot;Finished step 5&quot;</span></span>"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"></span>: <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
 <br><button>New Day</button>
 </div>
@@ -618,16 +631,16 @@ title you just created and paste it next to insert. Inside the button's onclick 
 <div class="docwrapper">
   <div class="docblock doc">
   <div class="preamble"><div class="assignment">
-    <span class="variable">mktitle</span> of <div class="params"><span class="variable"><span class="variable">date</span></span><span class="variable"><span class="variable">content</span></span></div> =
+    <span class="variable">mktitle</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">date</span></span><span class="variable"><span class="variable">content</span></span></div> =
     <div class="content"><span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span></div>
   </div></div>
   <div>
 
-<span class="h1 abstraction computed" title="mktitle"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date"></span>: <span class="concretization computed" title="content">Finished step 5</span></span>
+<span class="h1 abstraction computed" title="mktitle <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> &quot;Finished step 5&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> <span>&quot;Finished step 5&quot;</span></span>"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"></span>: <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
 
 <br><button>New Day</button><span class="remark" style="display:inline-block"><table><tbody><tr><td>On click</td><td>
-<span>Insert under caret:</span><span class="h1 abstraction computed" title="mktitle"><span class="todaysdate concretization computed" children-are-ghosts="true" title="date"></span>: <span class="concretization computed" title="content">TODO</span></span></td></tr></tbody></table></span>
+<span>Insert under caret:</span><span class="h1 abstraction computed" title="mktitle <span class=&quot;todaysdate&quot; children-are-ghosts=&quot;true&quot;></span> &quot;TODO&quot; &#13;&#10;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span class=&quot;todaysdate&quot; children-are-ghosts=&quot;true&quot;></span> <span>&quot;TODO&quot;</span> &#13;&#10;</span>"><span class="todaysdate concretization computed" children-are-ghosts="true" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"></span>: <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">TODO</span></span></td></tr></tbody></table></span>
 </div>
   </div></div>
 
@@ -638,13 +651,13 @@ that it always displays the current date:
 <div class="docwrapper">
   <div class="docblock doc">
   <div class="preamble"><div class="assignment">
-    <span class="variable">mktitle</span> of <div class="params"><span class="variable"><span class="variable">date</span></span><span class="variable"><span class="variable">content</span></span></div> =
+    <span class="variable">mktitle</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">date</span></span><span class="variable"><span class="variable">content</span></span></div> =
     <div class="content"><span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span></div>
   </div></div>
   <div>
-<span class="h1 abstraction computed" title="mktitle"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date"></span>: <span class="concretization computed" title="content">Finished step 5</span></span>
+<span class="h1 abstraction computed" title="mktitle <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> &quot;Finished step 5&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> <span>&quot;Finished step 5&quot;</span></span>"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"></span>: <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
-<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tbody><tr><td>On click</td><td><span>Insert under caret</span><span class="h1 abstraction computed" title="mktitle"><span class="concretization computed" title="date"><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate(&#39;dddd, mmmm d-th-, yyyy&#39;, today())"></span></span>: <span class="concretization computed" title="content">TODO</span></span></td></tr></tbody></table></span>
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tbody><tr><td>On click</td><td><span>Insert under caret</span><span class="h1 abstraction computed" title="mktitle <span><span class=&quot;todaysdate abstraction level2&quot; children-are-ghosts=&quot;true&quot; title=&quot;formatDate(&amp;#39;dddd, mmmm d-th-, yyyy&amp;#39;, today())&quot;></span></span> &quot;TODO&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span><span class=&quot;todaysdate abstraction level2&quot; children-are-ghosts=&quot;true&quot; title=&quot;formatDate(&amp;#39;dddd, mmmm d-th-, yyyy&amp;#39;, today())&quot;></span></span> <span>&quot;TODO&quot;</span></span>"><span class="concretization computed" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate(&#39;dddd, mmmm d-th-, yyyy&#39;, today())"></span></span>: <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">TODO</span></span></td></tr></tbody></table></span>
 </div>
   </div></div>
 
@@ -653,14 +666,14 @@ If you click on the button, it inserts a title as you would expect. However, the
 <div class="docwrapper">
   <div class="docblock doc">
   <div class="preamble"><div class="assignment">
-    <span class="variable">mktitle</span> of <div class="params"><span class="variable"><span class="variable">date</span></span><span class="variable"><span class="variable">content</span></span></div> =
+    <span class="variable">mktitle</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">date</span></span><span class="variable"><span class="variable">content</span></span></div> =
     <div class="content"><span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span></div>
   </div></div>
   <div>
-<span class="h1 abstraction computed" title="mktitle"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date"></span>: <span class="concretization computed" title="content">Finished step 5</span></span>
+<span class="h1 abstraction computed" title="mktitle <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> &quot;Finished step 5&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> <span>&quot;Finished step 5&quot;</span></span>"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"></span>: <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
-<span class="h1 abstraction computed" title="mktitle"><span class="concretization computed" title="date"><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate(&#39;dddd, mmmm d-th-, yyyy&#39;, today())"></span></span>: <span class="concretization computed" title="content">TODO</span></span>
-<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tbody><tr><td>On click</td><td><span>Insert under caret</span><span class="h1 abstraction computed" title="mktitle"><span class="concretization computed" title="date"><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate(&#39;dddd, mmmm d-th-, yyyy&#39;, today())"></span></span>: <span class="concretization computed" title="content">TODO</span></span></td></tr></tbody></table></span>
+<span class="h1 abstraction computed" title="mktitle <span><span class=&quot;todaysdate abstraction level2&quot; children-are-ghosts=&quot;true&quot; title=&quot;formatDate(&amp;#39;dddd, mmmm d-th-, yyyy&amp;#39;, today())&quot;></span></span> &quot;TODO&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span><span class=&quot;todaysdate abstraction level2&quot; children-are-ghosts=&quot;true&quot; title=&quot;formatDate(&amp;#39;dddd, mmmm d-th-, yyyy&amp;#39;, today())&quot;></span></span> <span>&quot;TODO&quot;</span></span>"><span class="concretization computed" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate(&#39;dddd, mmmm d-th-, yyyy&#39;, today())"></span></span>: <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">TODO</span></span>
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tbody><tr><td>On click</td><td><span>Insert under caret</span><span class="h1 abstraction computed" title="mktitle <span><span class=&quot;todaysdate abstraction level2&quot; children-are-ghosts=&quot;true&quot; title=&quot;formatDate(&amp;#39;dddd, mmmm d-th-, yyyy&amp;#39;, today())&quot;></span></span> &quot;TODO&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span><span class=&quot;todaysdate abstraction level2&quot; children-are-ghosts=&quot;true&quot; title=&quot;formatDate(&amp;#39;dddd, mmmm d-th-, yyyy&amp;#39;, today())&quot;></span></span> <span>&quot;TODO&quot;</span></span>"><span class="concretization computed" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate(&#39;dddd, mmmm d-th-, yyyy&#39;, today())"></span></span>: <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">TODO</span></span></td></tr></tbody></table></span>
 </div>
   </div></div>
 
@@ -669,18 +682,18 @@ Let us fix that. Delete the newly inserted title. Select the date in the button 
 <div class="docwrapper">
   <div class="docblock doc">
   <div class="preamble"><div class="assignment">
-    <span class="variable">mktitle</span> of <div class="params"><span class="variable"><span class="variable">date</span></span><span class="variable"><span class="variable">content</span></span></div> =
+    <span class="variable">mktitle</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">date</span></span><span class="variable"><span class="variable">content</span></span></div> =
     <div class="content"><span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span></div>
   </div></div>
   <div>
-<span class="h1 abstraction computed" title="mktitle"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date"></span>: <span class="concretization computed" title="content">Finished step 5</span></span>
+<span class="h1 abstraction computed" title="mktitle <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> &quot;Finished step 5&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> <span>&quot;Finished step 5&quot;</span></span>"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"></span>: <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
 <br><button>New Day</button><span class="remark" style="display:inline-block"><table><tbody><tr><td>On click</td><td>
   <div class="preamble"><div class="assignment">
     <span class="variable notfound">currentdate</span> =
     <div class="content"><span><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate(&#39;dddd, mmmm d-th-, yyyy&#39;, today())"></span></span></div>
   </div></div>
-<span>Insert under caret</span><span class="h1 abstraction computed" title="mktitle"><span class="variable concretization computed" title="date">currentdate</span>: <span class="concretization computed" title="content">TODO</span></span></td></tr></tbody></table></span>
+<span>Insert under caret</span><span class="h1 abstraction computed" title="mktitle currentdate &quot;TODO&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span class=&quot;variable&quot;>currentdate</span> <span>&quot;TODO&quot;</span></span>"><span class="variable concretization computed" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>">currentdate</span>: <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">TODO</span></span></td></tr></tbody></table></span>
 </div>
   </div></div>
 
@@ -690,19 +703,19 @@ Furthermore, do you prefer a dash instead of a colon in the title? Change it in 
 <div class="docwrapper">
   <div class="docblock doc">
   <div class="preamble"><div class="assignment">
-    <span class="variable">mktitle</span> of <div class="params"><span class="variable"><span class="variable">date</span></span><span class="variable"><span class="variable">content</span></span></div> =
+    <span class="variable">mktitle</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">date</span></span><span class="variable"><span class="variable">content</span></span></div> =
     <div class="content"><span class="h1"><span class="variable">date</span> — <span class="variable">content</span></span></div>
   </div></div>
   <div>
-<span class="h1 abstraction computed" title="mktitle"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date"></span> — <span class="concretization computed" title="content">Finished step 5</span></span>
+<span class="h1 abstraction computed" title="mktitle <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> &quot;Finished step 5&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> <span>&quot;Finished step 5&quot;</span></span>"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"></span> — <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
-<span class="h1 abstraction computed" title="mktitle"><span class="todaysdate concretization computed" children-are-ghosts="true" title="date"></span> — <span class="concretization computed" title="content">TODO</span></span>
+<span class="h1 abstraction computed" title="mktitle <span class=&quot;todaysdate&quot; children-are-ghosts=&quot;true&quot;></span> &quot;TODO&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span class=&quot;todaysdate&quot; children-are-ghosts=&quot;true&quot;></span> <span>&quot;TODO&quot;</span></span>"><span class="todaysdate concretization computed" children-are-ghosts="true" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"></span> — <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">TODO</span></span>
 <br><button>New Day</button><span class="remark" style="display:inline-block"><table><tbody><tr><td>On click</td><td>
   <div class="preamble"><div class="assignment">
     <span class="variable notfound">currentdate</span> =
     <div class="content"><span><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate(&#39;dddd, mmmm d-th-, yyyy&#39;, today())"></span></span></div>
   </div></div>
-<span>Insert under caret</span><span class="h1 abstraction computed" title="mktitle"><span class="variable concretization computed" title="date">currentdate</span> — <span class="concretization computed" title="content">TODO</span></span></td></tr></tbody></table></span>
+<span>Insert under caret</span><span class="h1 abstraction computed" title="mktitle currentdate &quot;TODO&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span class=&quot;variable&quot;>currentdate</span> <span>&quot;TODO&quot;</span></span>"><span class="variable concretization computed" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>">currentdate</span> — <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">TODO</span></span></td></tr></tbody></table></span>
 </div>
   </div></div>
 
@@ -743,7 +756,7 @@ var onKeypress = e => {
               y = y.nextSibling;
               newPar.append(yy); // Moves yy
             }
-            x.parentNode.insertAdjacentElement(newPar);
+            x.parentNode.insertAdjacentElement("afterend", newPar);
           } else { // insert br
             range.insertNode(document.createElement("br"))
           }
@@ -771,16 +784,46 @@ for(var i = 0; i < q.length; i++) {
     }
   })(q[i]));
 }
-q = document.querySelectorAll(".todaysdate");
-for(var i = 0; i < q.length; i++) {
-  q[i].innerText = formatDate(new Date());
+function addDates(element, onbeforeinsert) {
+  onbeforeinsert = onbeforeinsert || ((i) => i);
+  q = element.querySelectorAll(".todaysdate");
+  for(var i = 0; i < q.length; i++) {
+    q[i].innerText = onbeforeinsert(formatDate(new Date()));
+  }
+  q = element.querySelectorAll(".yesterdaysdate");
+  var d = new Date();
+  d.setDate(d.getDate()-1);
+  for(var i = 0; i < q.length; i++) {
+    q[i].innerText = onbeforeinsert(formatDate(d));
+  }
 }
-q = document.querySelectorAll(".yesterdaysdate");
-var d = new Date();
-d.setDate(d.getDate()-1);
-for(var i = 0; i < q.length; i++) {
-  q[i].innerText = formatDate(d);
+addDates(document);
+
+
+formulaDisplay = function() {
+  var d = document.createElement("span");
+  d.classList.add("formulacell");
+  d.setAttribute("isghost", "true")
+  d.innerHTML = this.getAttribute("formula");
+  d.setAttribute("tabindex", "0");
+  d.style.display = getComputedStyle(this).display;
+  this.setAttribute("ghost-visible", "false");
+  d.onblur = ((d, e) => () => {
+    e.removeAttribute("ghost-visible");
+    d.remove();
+  })(d, this);
+  addDates(d, x => "\"" + x + "\"");
+  d.querySelector
+  this.insertAdjacentElement("afterend", d);
+  d.focus();
 }
+
+q = document.querySelectorAll(".computed[formula]")
+for(var i = 0; i < q.length; i++) {
+  var formula = q[i].getAttribute(formula);
+  q[i].addEventListener("dblclick", formulaDisplay);
+}
+
 </script>
 </p></div>
 </body></html>

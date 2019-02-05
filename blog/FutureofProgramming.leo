@@ -28,7 +28,7 @@ command =
 assignment varname params content =
   <div class="assignment">
     <span class="variable">@varname</span>@(if params == [] then [] else
-      [["TEXT", " of "], <div class="params">@(List.map (\p -> <span class="variable">@p</span>) params)</div>]) =
+      [<span class="spacebeforeparam"> </span>, <div class="params">@(List.map (\p -> <span class="variable">@p</span>) params)</div>]) =
     <div class="content">@content</div>
   </div>
 
@@ -56,10 +56,35 @@ Html = { Html |
 classFromProvenance provenance =
   if provenance == Abstract then "abstraction" else "concretization"
 
-markabstract provenance name =
-  Html.addClass (classFromProvenance provenance) >>
-  Html.addAttr "title" name >>
-  Html.addClass "computed"
+markabstract provenance node content =
+  let unparse node = case node of
+        ["span", ["class", "variable"]::_, [["TEXT", name]]] ->
+          name
+        ["span", ["class", "application"]::_, head :: tail] ->
+          unparse head + (List.map (unparse >> (+ " ")) tail |> String.join "")
+        ["span", [], [["TEXT", string]]] ->
+          jsCode.stringOf string
+        ["span", ["class", "formula"]::_, [["TEXT", formula]]] ->
+          formula
+        _ -> valToHTMLSource node
+      unparseFormula node = case node of
+        ["span", ["class", "variable"]::_, [["TEXT", name]]] ->
+          [node]
+        ["span", ["class", "application"]::_, head :: tail] ->
+          unparseFormula head ++ (
+            List.concatMap (unparseFormula >> (append [["TEXT", " "]])) tail)
+        ["span", [], [["TEXT", string]]] ->
+          [["span", [], [["TEXT", jsCode.stringOf string]]]]
+        ["span", ["class", "formula"]::_, [["TEXT", formula]]] ->
+          [["span", [], [["TEXT", formula]]]]
+        _ -> [node]
+  in
+  content
+  |> Html.addClass (classFromProvenance provenance)
+  |> Html.addAttr "title" (unparse node)
+  |> Html.addClass "computed"
+  |> Html.addAttr "formula" (valToHTMLSource <| <span>@(unparseFormula node)</span>)
+
 
 mkAssignments context params args =
   List.map2 (\pat a -> case (pat, a) of
@@ -151,32 +176,32 @@ mkDoc (assignments) body =
   @(htmlPreMap (Concrete, List.map (\(name, p) -> (name, (Abstract, p))) assignments)
     (\(context, assignments) n ->
       case n of
-      ["span", [["class","variable"]], [["TEXT", name]]] as v ->
+      ["span", ["class","variable"]::_, [["TEXT", name]]] ->
         listDict.get name assignments
         |> Maybe.map (\(provenance, (params, content)) ->
           (,) (provenance, assignments) <|
           if params == [] then
-            markabstract provenance name content
+            markabstract provenance n content
           else
-            markabstract provenance name content |> Html.addClass "partial"
+            markabstract provenance n content |> Html.addClass "partial"
           )
         |> Maybe.withDefault ((context, assignments), ["span",
              [["class","variable notfound"]], [["TEXT", name]]])
-      ["span", [["class", "application"]],
+      ["span", ["class", "application"]::attrs,
           ["span", [["class","variable"]], [["TEXT", name]]] :: args] ->
         listDict.get name assignments
         |> Maybe.map (\(provenance, (params, content)) ->
           let newAssignments = mkAssignments context params args ++
                   assignments
           in
-          ((provenance, newAssignments), markabstract provenance name content)
+          ((provenance, newAssignments), markabstract provenance n content)
         )
         |> Maybe.withDefault ((context, assignments), ["span", [["class","variable notfound"]], [["TEXT", name]]])
       ["span", [["class", "formula"]], [["TEXT", formula]]] ->
         (,) (context, assignments) <|
         case __evaluate__ (("repeat", repeatDef) :: ("vlookup", vlookupDef) :: (List.map abstractAssignment assignments) ++ preludeEnv) formula of
           Err msg -> <span class="error">@msg</span>
-          Ok v -> <span class=@(classFromProvenance Abstract) title=@(formula)>@v</span>
+          Ok v -> <span class=@(classFromProvenance Abstract ++ " computed") title=@(formula) formula=@(formula)>@v</span>
       _ -> ((context, assignments), n)
    ) body)
   </div></div>
@@ -206,10 +231,23 @@ formatDate = """(date) => {
 }"""
 
 <html><head><meta content="text/html; charset=UTF-8" http-equiv="content-type"><style>
+.spacebeforeparam {
+  min-width: 0.7em;
+  display: inline-block;
+}
+.formulacell::before {
+  content: "=";
+}
 button.doc, .doc button {
   min-height: 48px;
   background: orangered;
   color: white;
+}
+span.application > :not(:first-child)::before {
+  content: " ";
+}
+span.application > :not(:first-child)::before {
+  content: " ";
 }
 span.remark {
   background: white;
@@ -536,7 +574,7 @@ Continue and @(command "concretize") "<span class="doc">Right-click or ALT+M</sp
   </tbody>
   </table>))]
 <div>
-  <span class="application"><span class="variable">table</span><span
+  <span class="application" title="table &quot;Context menu&quot; &quot;Right-click or ALT+M&quot; &quot;When caret blinks in doc&quot;"><span class="variable">table</span><span
     >Context menu</span><span
     >Right-click or ALT+M</span><span
     >When caret blinks in doc</span></span>
@@ -799,7 +837,7 @@ var onKeypress = e => {
               y = y.nextSibling;
               newPar.append(yy); // Moves yy
             }
-            x.parentNode.insertAdjacentElement(newPar);
+            x.parentNode.insertAdjacentElement("afterend", newPar);
           } else { // insert br
             range.insertNode(document.createElement("br"))
           }
@@ -827,16 +865,46 @@ for(var i = 0; i < q.length; i++) {
     }
   })(q[i]));
 }
-q = document.querySelectorAll(".todaysdate");
-for(var i = 0; i < q.length; i++) {
-  q[i].innerText = formatDate(new Date());
+function addDates(element, onbeforeinsert) {
+  onbeforeinsert = onbeforeinsert || ((i) => i);
+  q = element.querySelectorAll(".todaysdate");
+  for(var i = 0; i < q.length; i++) {
+    q[i].innerText = onbeforeinsert(formatDate(new Date()));
+  }
+  q = element.querySelectorAll(".yesterdaysdate");
+  var d = new Date();
+  d.setDate(d.getDate()-1);
+  for(var i = 0; i < q.length; i++) {
+    q[i].innerText = onbeforeinsert(formatDate(d));
+  }
 }
-q = document.querySelectorAll(".yesterdaysdate");
-var d = new Date();
-d.setDate(d.getDate()-1);
-for(var i = 0; i < q.length; i++) {
-  q[i].innerText = formatDate(d);
+addDates(document);
+
+
+formulaDisplay = function() {
+  var d = document.createElement("span");
+  d.classList.add("formulacell");
+  d.setAttribute("isghost", "true")
+  d.innerHTML = this.getAttribute("formula");
+  d.setAttribute("tabindex", "0");
+  d.style.display = getComputedStyle(this).display;
+  this.setAttribute("ghost-visible", "false");
+  d.onblur = ((d, e) => () => {
+    e.removeAttribute("ghost-visible");
+    d.remove();
+  })(d, this);
+  addDates(d, x => "\"" + x + "\"");
+  d.querySelector
+  this.insertAdjacentElement("afterend", d);
+  d.focus();
 }
+
+q = document.querySelectorAll(".computed[formula]")
+for(var i = 0; i < q.length; i++) {
+  var formula = q[i].getAttribute(formula);
+  q[i].addEventListener("dblclick", formulaDisplay);
+}
+
 </script>
 </div>
 </body></html>
