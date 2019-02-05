@@ -627,7 +627,7 @@ Instead of inserting one more name, MikoWord detects that there is a repetition 
 <div>
   <span class="formula">repeat(table,items)</span>
 </div>)
-As you hover over the table, you'll see that it uses a single formula to display this table: "<span class="doc">repeat(table,items)</span>". If you double click on this table, you would be able to change this formula, as in any spreadsheet; but you can also change the value as you see it.
+As you hover over the table, you'll see that it uses a single formula to display this table: "<span class="doc">repeat(table,items)</span>". If you double click on this table (or press one second on mobile), you will be able to change this formula, as in any spreadsheet; but you can also change the value as you see it.
 <h3>Step 4: Intelligent abstractions</h3>
 Now let's write our tutorial content. In the sequel, we only display relevant abstractions at the top.
 @(mkDoc [("items", ([], <span class="table"><span class="tuple"><span
@@ -913,10 +913,22 @@ formulaDisplay = function() {
   d.focus();
 }
 
-q = document.querySelectorAll(".computed[formula]")
+q = document.querySelectorAll(".computed[formula]");
+var timermousedown = undefined;
 for(var i = 0; i < q.length; i++) {
   var formula = q[i].getAttribute(formula);
   q[i].addEventListener("dblclick", formulaDisplay);
+  q[i].addEventListener("mousedown", ((qi) => () => {
+    timermousedown = setTimeout(() => {
+      timermousedown = undefined;
+      formulaDisplay.bind(qi)();
+    }, 1000);
+  })(q[i]));
+  q[i].addEventListener("mouseup", () => {
+    if(typeof timermousedown != "undefined")
+      clearTimeout(timermousedown);
+  });
+  
 }
 
 </script>
