@@ -47,12 +47,21 @@ all =
   )
   |> Maybe.withDefault (Error "Could not open file")
 -}
- 
+
+convert filename =
+  case Regex.extract "^(.*)\\.leo$" filename of
+    Nothing -> [Error <| "File " + name + " not a valid leo file."]
+    Just [name] ->
+      do
+      read filename <|
+      Maybe.fold (Error "Could not open file") <|
+      evalContinue <|
+      Result.fold Error <| \content ->
+        valToHTMLSource content |>
+         Write (name + ".html")
+
 -- Pro: Conciseness, no nesting 
-all = do
-  read "FutureofProgramming.leo" <|
-  Maybe.fold (Error "Could not open file") <|
-  evalContinue <|
-  Result.fold Error <| \content ->
-    valToHTMLSource content |>
-    (\x -> [Write "index.html" x, Write "2019-02-05-future-of-programming.html" x])
+all = 
+  fs.listdir "."
+  |> List.filter (Regex.matchIn "\\.leo$")
+  |> List.map convert

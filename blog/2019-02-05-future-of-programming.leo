@@ -230,7 +230,22 @@ formatDate = """(date) => {
   return namedDay + ", " + monthNames[monthIndex] + ' ' + day + numPrefixes + ", " + year;
 }"""
 
-<html><head><meta content="text/html; charset=UTF-8" http-equiv="content-type"><style>
+<html><head><meta content="text/html; charset=UTF-8" http-equiv="content-type">
+<link rel="stylesheet" type="text/css" href="index.css">
+<style>
+@@media (orientation: landscape) {
+  body > div {
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 32em;
+  }
+}
+@@media (orientation: portrait) {
+  body > div {
+    margin-left: 5px;
+    margin-right: 5px;
+  }
+}
 [ghost-visible=false] {
   display: none;
 }
@@ -388,36 +403,6 @@ div.params > span.variable {
   outline: 1px solid #CCC;
   background: #F8F8F8;
   cursor: help;
-}
-body > div {
-  overflow-x: hidden;
-}
-@@media (orientation: landscape) {
-  body > div {
-    margin-left: auto;
-    margin-right: auto;
-    max-width: 32em;
-  }
-}
-@@media (orientation: portrait) {
-  body > div {
-    margin-left: 5px;
-    margin-right: 5px;
-  }
-}
-body a {
-  color: inherit;
-  cursor: pointer;
-  text-decoration: underline;
-}
-:root {
-  font-family: medium-content-serif-font,Georgia,Cambria,"Times New Roman",Times,serif;
-  letter-spacing: .01rem;
-  font-weight: 400;
-  font-style: normal;
-  font-size: 21px;
-  line-height: 1.58;
-  letter-spacing: -.003em;
 }
 img.icon {
   vertical-align: bottom;
