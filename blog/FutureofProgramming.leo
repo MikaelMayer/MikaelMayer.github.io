@@ -392,14 +392,14 @@ div.params > span.variable {
 body > div {
   overflow-x: hidden;
 }
-@@media (min-width: 700px) {
+@@media (orientation: landscape) {
   body > div {
     margin-left: auto;
     margin-right: auto;
     max-width: 32em;
   }
 }
-@@media (max-width: 699px) {
+@@media (orientation: portrait) {
   body > div {
     margin-left: 5px;
     margin-right: 5px;
@@ -917,13 +917,15 @@ var timermousedown = undefined;
 for(var i = 0; i < q.length; i++) {
   var formula = q[i].getAttribute(formula);
   q[i].addEventListener("dblclick", formulaDisplay);
-  q[i].addEventListener("mousedown", ((qi) => () => {
+  q[i].addEventListener("touchstart", ((qi) => () => {
+    console.log("started timer");
     timermousedown = setTimeout(() => {
+      console.log("finished timer");
       timermousedown = undefined;
       formulaDisplay.bind(qi)();
     }, 1000);
   })(q[i]));
-  q[i].addEventListener("mouseup", () => {
+  q[i].addEventListener("touchend", () => {
     if(typeof timermousedown != "undefined")
       clearTimeout(timermousedown);
   });
