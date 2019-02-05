@@ -1,0 +1,856 @@
+<html><head><meta content="text/html; charset=UTF-8" http-equiv="content-type"><style>
+[ghost-visible=false] {
+  display: none;
+}
+.spacebeforeparam {
+  min-width: 0.7em;
+  display: inline-block;
+}
+.formulacell::before {
+  content: "=";
+}
+button.doc, .doc button {
+  min-height: 48px;
+  background: orangered;
+  color: white;
+}
+span.application > :not(:first-child)::before {
+  content: " ";
+}
+span.application > :not(:first-child)::before {
+  content: " ";
+}
+span.remark {
+  background: white;
+  padding: 2px;
+  outline: solid black 1px;
+  -webkit-box-shadow: 5px 5px 0px 0px #989898; 
+  box-shadow: 5px 5px 0px 0px #989898;
+  position: relative;
+  top: -0.5em;
+}
+span.title {
+  padding: 2px;
+  outline: solid black 1px;
+  -webkit-box-shadow: 5px 5px 0px 0px #989898; 
+  box-shadow: 5px 5px 0px 0px #989898;
+  position: relative;
+  top: -0.5em;
+}
+span.error {
+  display: inline-block;
+  max-height: 10em;
+  overflow-y: scroll;
+  white-space: pre-wrap;
+}
+span.table {
+  display: table;
+  border-collapse: separate;
+}
+span.tuple {
+  display: table-row;
+}
+span.tuple:not(:first-child) {
+  border-top: 1px solid black;
+}
+span.tuple > * {
+  display: table-cell;
+  padding-left: 2px;
+  padding-right: 2px;
+  border-color: gray;
+  border-style: none;
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+  border-bottom: 1px solid gray;
+}
+.doc {
+  font-family: Calibri, serif;
+  font-size: 16px;
+}
+.preamble:not(:empty) {
+  border-bottom: 1px solid gray;
+  padding-bottom: 2px;
+}
+.assignment {
+}
+.assignment > .content {
+  display: inline-block;
+  border: 1px solid #DDD;
+  vertical-align: middle;
+  text-align: center;
+  min-height: 2em;
+  min-width: 2em;
+  padding: 2px;
+}
+div.params {
+  display: inline-block;
+  vertical-align: middle;
+}
+div.params > span.variable {
+  display: block;
+}
+.assignment > .variable {
+}
+.variable {
+  font-family: monospace;
+  color: blue;
+  font-weight: bold;
+}
+.abstraction {
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(0, 0, 255, 0.1),
+    rgba(0, 0, 255, 0.1) 2px,
+    white 2px,
+    white 4px);
+}
+.abstraction .level2 {
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(0, 0, 255, 0.1),
+    rgba(0, 0, 255, 0.1) 2px,
+    white 2px,
+    white 4px);
+}
+.concretization {
+  background: white;
+  outline: 1px solid rgba(0,0,0,0.2);
+}
+.docblock {
+  padding-left: 20px;
+  padding-top: 20px;
+  padding-bottom: 5px;
+  padding-right: 10px;
+  display: block;
+  border-style: solid;
+  border-color: transparent;
+  border-width: 4px;
+  background-color: #dadce0;
+  border-radius: 8px;
+  box-shadow: none;
+  background-color: #FFF;
+  background-clip: padding-box;
+  border: solid transparent;
+  border-width: 1px 1px 1px 6px;
+  min-height: 28px;
+  box-shadow: inset 2px 2px 0 rgba(0,0,0,.2), inset 0 -2px 0 rgba(0,0,0,.07);
+}
+.doc h1, .doc .h1 {
+  display: block;
+  color: rgb(46, 116, 181);
+  font-size: 1.6em;
+}
+.doc h2, .doc .h2 {
+  color: rgb(46, 116, 181);
+  font-size: 1.3em;
+}
+.docwrapper {
+  display: block;
+  padding-left: 1em;
+  padding-top: 1em;
+  background: #f8f9fa;
+  margin-left: 2em;
+  margin-bottom: 1em;
+}
+.command {
+  outline: 1px solid #CCC;
+  background: #F8F8F8;
+  cursor: help;
+}
+body > div {
+  overflow-x: hidden;
+}
+@media (orientation: landscape) {
+  body > div {
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 32em;
+  }
+}
+@media (orientation: portrait) {
+  body > div {
+    margin-left: 5px;
+    margin-right: 5px;
+  }
+}
+body a {
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+:root {
+  font-family: medium-content-serif-font,Georgia,Cambria,"Times New Roman",Times,serif;
+  letter-spacing: .01rem;
+  font-weight: 400;
+  font-style: normal;
+  font-size: 21px;
+  line-height: 1.58;
+  letter-spacing: -.003em;
+}
+img.icon {
+  vertical-align: bottom;
+}
+</style>
+<script>
+var formatDate = (date) => {
+  var dayNames = [
+    "Sunday", "Monday", "Tuesday",
+    "Wednesday", "Thursday", "Friday", "Saturday"
+  ];
+  var monthNames = [
+    "January", "February", "March",
+    "April", "May", "June", "July",
+    "August", "September", "October",
+    "November", "December"
+  ];
+
+  var day = date.getDate();
+  var numPrefixes =
+    day == 1 || day == 21 || day == 31 ? "st" :
+    day == 2 || day == 22 ? "nd" :
+    day == 3 || day == 23 ? "rd" : "th";
+  var namedDay = dayNames[date.getDay()];
+  var monthIndex = date.getMonth();
+  var year = date.getFullYear();
+
+  return namedDay + ", " + monthNames[monthIndex] + ' ' + day + numPrefixes + ", " + year;
+}
+</script>
+</head><body><div>
+
+<h1>Abstract and Concrete: Future of Programming</h1>
+<em>2019/02/05 — Mikaël Mayer</em>
+<p>I recently came across a <a href="https://hbr.org/2019/01/what-will-software-look-like-once-anyone-can-create-it">very interesting article</a> that highlighted that, until the invention of Arabic numbers, multiplication using roman numerals was difficult. The Arabic positional number system made it much easier. It was the same for software. Programming software is difficult. Until someone comes up with the equivalent of Arabic numbers for programming, it will remain so.</p><p>This made me think profoundly. What makes it that programming software is difficult? Is it that programming languages are cryptic? Too many <abbr title="Application Programming Interface">API</abbr>s? Complicated build tools? Not close enough to assembly language? Or too far away?</p>
+
+<p>I am a big fan of the idea of <a href="https://www.google.com/url?q=https://coda.io/welcome&amp;sa=D&amp;ust=1549033963249000">Coda</a> that mixes spreadsheets with word-like documents and makes it possible to create text that appears based on conditions, for example. It is very nice to have a domain-specific language for computing cells as in any spreadsheets, and to be able to insert cells into a document.<br>However, in many office-like tools, I still miss a way to create <a href="https://www.youtube.com/watch?v=ZfytHvgHybA">reusable abstractions</a>. Google Spreadsheet and Microsoft Excel give access to APIs and offer <a href="https://developers.google.com/apps-script/guides/sheets/functions">abstractions as macros</a>, but they are no longer part of the visible document, and cannot be edited with the same and nice visual interface.</p>
+
+<!--p>Programming is all about abstraction. Indeed, <a href="https://www.google.com/url?q=https://www.youtube.com/watch?v%3DV10hzjgoklA&amp;sa=D&amp;ust=1549033963250000">Lambda Calculus</a>&nbsp;is being discovered as the ancestor of all modern programming languages and is the same as logic itself. Moreover, Lambda Calculus features only two building blocks: abstraction and concretization. Isn&rsquo;t all software based on this idea? Starting concrete, and then abstracting away parts that become data inputs, or starting abstract, and then test using concrete values?</p-->
+
+<!--p>I recently created <a href= "https://github.com/MikaelMayer/Editor">Editor</a>, a local HTTP server to edit dynamic and static webpages in the browser, and have modifications back-propagated to the files themselves. It gave me the idea for this article.</p-->
+
+<p>Let us imagine what if, in a mocked word processor interface named MikoWord, we had access to a direct command to <em>abstract</em>.
+Since abstractions are for programs the equivalent of arabic positional symbols for numbers, can they also be a good candidate for visually developing software?</p>
+
+<h2>MikoWord Tutorial</h2>
+
+<p>Welcome to MikoWord!</p>
+
+<p>MikoWord is a word processor for webpages which will satisfy both programmers and non-programmers. MikoWord features a simple but powerful tool to <i>abstract</i>.
+In this tutorial aimed at beginners, we will explain how to use this tool by walking through several examples.
+We will create a rich and dynamic help page for an application named MySoft. In this tutorial, you will learn:</p>
+<ul><li>How to reuse relevant pieces of information (e.g. the name of a product)</li><li>How to reuse partial pieces of informations (e.g. formatting)</li><li>How to repeat abstractions (e.g. introducing a list)</li><li>How to have MikoWord infer asbtractions for you.</li><li>How to create custom user interface elements (e.g. a button).</li></ul>
+
+
+<p>No coding skills are required. Let’s start!</p>
+
+<h3>Step 1: Simple abstraction</h3>
+
+<p>
+MikoWord displays a blank page, in which you can immediately write something.
+Go ahead, write and apply styles to obtain:
+</p>
+<img style="margin-left:2em" src="FutureofProgramming-ribbon.png" alt="FutureofProgramming-ribbon.png">
+<div class="docwrapper">
+  <div class="docblock doc">
+  <div class="preamble"></div>
+  <div>
+<h1>MySoft 1.0 Tutorial</h1>
+Welcome to MySoft 1.0!
+</div>
+  </div></div>
+<p>
+In a regular document, every time you update MySoft’s version, you would have to update it manually everywhere.
+In MikoWord, it is easier. Select "<span class="doc">MySoft 1.0</span>", and <abbr class="command" title="ALT+A, concrete elements being selected">abstract</abbr> it.
+</p>
+Abstracting is giving a name to something concrete.
+If you hover over the now dash-colored "<span class="doc abstraction">MySoft 1.0</span>" in the title, you will now see that it has been assigned the name <span class="variable">mysoft</span>. Double-click it to reveal the formula behind it — or touch it for one second on mobile. The portion to the right of <span class="variable">mysoft</span> is called its <em>content</em> and is also like a document:
+<div class="docwrapper">
+  <div class="docblock doc">
+  <div class="preamble"><div class="assignment">
+    <span class="variable">mysoft</span> =
+    <div class="content"><span class="textvalue">MySoft 1.0</span></div>
+  </div></div>
+  <div>
+<h1><span class="textvalue abstraction computed" title="mysoft" formula="<span><span class=&quot;variable&quot;>mysoft</span></span>">MySoft 1.0</span> Tutorial</h1>
+Welcome to MySoft 1.0!
+</div>
+  </div></div>
+<p>
+Note that all <em>declarations</em> like <span class="variable">mysoft</span> will be hidden from the final document's version — when you print, publish or export it, and the background under "<span class="doc abstraction">MySoft 1.0</span>" will disappear. If you prefer a style other than stripes, go to Settings > Styles > Reused content and change the style.<br>
+
+By opening the <abbr class="command" title="Right-click or ALT+M, anywhere">context menu</abbr> over <span class="variable">mysoft</span>, you can also specify to display abstractions only when they are needed during editing, depending on where your caret is. For this tutorial, we will always display them.<br> 
+Now copy "<span class="doc abstraction">MySoft 1.0</span>" from the title, and paste it to replace "<span class="doc">MySoft 1.0</span>" in the document body. You obtain something like:</p>
+<div class="docwrapper">
+  <div class="docblock doc">
+  <div class="preamble"><div class="assignment">
+    <span class="variable">mysoft</span> =
+    <div class="content"><span class="textvalue">MySoft 1.0</span></div>
+  </div></div>
+  <div>
+<h1><span class="textvalue abstraction computed" title="mysoft" formula="<span><span class=&quot;variable&quot;>mysoft</span></span>">MySoft 1.0</span> Tutorial</h1>
+Welcome to <span class="textvalue abstraction computed" title="mysoft" formula="<span><span class=&quot;variable&quot;>mysoft</span></span>">MySoft 1.0</span>!
+</div>
+  </div></div>
+<p>Note that the second occurrence of "<span class="doc abstraction">MySoft 1.0</span>" is now highlighted with stripes as well. This means that this occurrence is linked. Now, rename "<span class="doc">1.0</span>" to "<span class="doc">1.1</span>". You can rename it in any of the three places, and you'll obtain:</p>
+<div class="docwrapper">
+  <div class="docblock doc">
+  <div class="preamble"><div class="assignment">
+    <span class="variable">mysoft</span> =
+    <div class="content"><span class="textvalue">MySoft 1.1</span></div>
+  </div></div>
+  <div>
+<h1><span class="textvalue abstraction computed" title="mysoft" formula="<span><span class=&quot;variable&quot;>mysoft</span></span>">MySoft 1.1</span> Tutorial</h1>
+Welcome to <span class="textvalue abstraction computed" title="mysoft" formula="<span><span class=&quot;variable&quot;>mysoft</span></span>">MySoft 1.1</span>!
+</div>
+  </div></div>
+From now on, each time you will type "<span class="doc">=mysoft</span>" followed by a space, it will replace it with "<span class="doc abstraction">MySoft 1.1</span>".
+<p>
+Similar to spreadsheets, you can double-click on "<span class="doc abstraction">MySoft 1.1</span>" to display and modify the underlying formula "<span class="doc">mysoft</span>".
+</p>
+<h3>Step 2: Abstract to concrete</h3>
+<p>Let us imagine that, in your document, you want to describe a set of keyboard shortcuts as memos, and then some sample scenarios on how to use them.
+Let us start by creating a sample shortcut table. Create a 3x2 table, remove the borders inside it, and fill it as follow:</p>
+
+<style>
+table.kbd {
+  border-collapse:collapse;
+  border-left:1px solid black;
+  border-right:1px solid black;
+  margin-top: 2px;
+  border-radius: 5px;
+}
+table.kbd td {
+  padding: 5px;
+}
+table.kbd tr:first-child {
+  border-top:1px solid black;
+}
+table.kbd tr:last-child {
+  border-bottom:1px solid black;
+}
+</style>
+<div class="docwrapper">
+  <div class="docblock doc">
+  <div class="preamble"></div>
+  <div>
+  <table class="kbd"><tbody>
+  <tr><td>Command name:</td><td>Context menu</td></tr>
+  <tr><td>Keyboard shortcut:</td><td>Right-click or ALT+M</td></tr>
+  <tr><td>When to use:</td><td>When caret blinks in doc</td></tr>
+  </tbody>
+  </table>
+</div>
+  </div></div>
+
+We want to reuse this box for the other memos.
+Instead of just copy-pasting it, we will abstract it so that boxes are always using the same style. Select the table, <abbr class="command" title="ALT+A, concrete elements being selected">abstract</abbr> it, and copy-paste it to duplicate it as in the previous section.
+
+<div class="docwrapper">
+  <div class="docblock doc">
+  <div class="preamble"><div class="assignment">
+    <span class="variable">table</span> =
+    <div class="content"><table class="kbd"><tbody>
+  <tr><td>Command name:</td><td>Context menu</td></tr>
+  <tr><td>Keyboard shortcut:</td><td>Right-click or ALT+M</td></tr>
+  <tr><td>When to use:</td><td>When caret blinks in doc</td></tr>
+  </tbody>
+  </table></div>
+  </div></div>
+  <div>
+  <table class="kbd abstraction computed" title="table" formula="<span><span class=&quot;variable&quot;>table</span></span>"><tbody>
+  <tr><td>Command name:</td><td>Context menu</td></tr>
+  <tr><td>Keyboard shortcut:</td><td>Right-click or ALT+M</td></tr>
+  <tr><td>When to use:</td><td>When caret blinks in doc</td></tr>
+  </tbody>
+  </table>
+  <table class="kbd abstraction computed" title="table" formula="<span><span class=&quot;variable&quot;>table</span></span>"><tbody>
+  <tr><td>Command name:</td><td>Context menu</td></tr>
+  <tr><td>Keyboard shortcut:</td><td>Right-click or ALT+M</td></tr>
+  <tr><td>When to use:</td><td>When caret blinks in doc</td></tr>
+  </tbody>
+  </table>
+</div>
+  </div></div>
+
+If you changed one of the values in any table, the change would be propagated to the other tables. We need to specify what values we should be able to change independently. Select "<span class="doc">Context menu</span>" in one of the last two tables and <abbr class="command" title="ALT+C, abstract elements being selected">concretize</abbr> it. Alternatively, you could have selected it from the first table and <abbr class="command" title="ALT+A, concrete elements being selected">abstract</abbr>ed it. The result looks like follows:
+
+<div class="docwrapper">
+  <div class="docblock doc">
+  <div class="preamble"><div class="assignment">
+    <span class="variable">table</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">B1</span></span></div> =
+    <div class="content"><table class="kbd"><tbody>
+  <tr><td>Command name:</td><td><span class="variable">B1</span></td></tr>
+  <tr><td>Keyboard shortcut:</td><td>Right-click or ALT+M</td></tr>
+  <tr><td>When to use:</td><td>When caret blinks in doc</td></tr>
+  </tbody>
+  </table></div>
+  </div></div>
+  <div>
+  <table class="kbd abstraction computed" title="table &quot;Context menu&quot;" formula="<span><span class=&quot;variable&quot;>table</span> <span>&quot;Context menu&quot;</span></span>"><tbody>
+  <tr><td>Command name:</td><td><span class="concretization computed" title="B1" formula="<span><span class=&quot;variable&quot;>B1</span></span>">Context menu</span></td></tr>
+  <tr><td>Keyboard shortcut:</td><td>Right-click or ALT+M</td></tr>
+  <tr><td>When to use:</td><td>When caret blinks in doc</td></tr>
+  </tbody>
+  </table>
+  <table class="kbd abstraction computed" title="table &quot;Context menu&quot;" formula="<span><span class=&quot;variable&quot;>table</span> <span>&quot;Context menu&quot;</span></span>"><tbody>
+  <tr><td>Command name:</td><td><span class="concretization computed" title="B1" formula="<span><span class=&quot;variable&quot;>B1</span></span>">Context menu</span></td></tr>
+  <tr><td>Keyboard shortcut:</td><td>Right-click or ALT+M</td></tr>
+  <tr><td>When to use:</td><td>When caret blinks in doc</td></tr>
+  </tbody>
+  </table>
+</div>
+  </div></div>
+
+Rename "<span class="doc">Context Menu</span>" from the last table to "<span class="doc">Save</span>". The change will stay on the modified table:
+
+<div class="docwrapper">
+  <div class="docblock doc">
+  <div class="preamble"><div class="assignment">
+    <span class="variable">table</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">B1</span></span></div> =
+    <div class="content"><table class="kbd"><tbody>
+  <tr><td>Command name:</td><td><span class="variable">B1</span></td></tr>
+  <tr><td>Keyboard shortcut:</td><td>Right-click or ALT+M</td></tr>
+  <tr><td>When to use:</td><td>When caret blinks in doc</td></tr>
+  </tbody>
+  </table></div>
+  </div></div>
+  <div>
+  <table class="kbd abstraction computed" title="table &quot;Context menu&quot;" formula="<span><span class=&quot;variable&quot;>table</span> <span>&quot;Context menu&quot;</span></span>"><tbody>
+  <tr><td>Command name:</td><td><span class="concretization computed" title="B1" formula="<span><span class=&quot;variable&quot;>B1</span></span>">Context menu</span></td></tr>
+  <tr><td>Keyboard shortcut:</td><td>Right-click or ALT+M</td></tr>
+  <tr><td>When to use:</td><td>When caret blinks in doc</td></tr>
+  </tbody>
+  </table>
+  <table class="kbd abstraction computed" title="table &quot;Save&quot;" formula="<span><span class=&quot;variable&quot;>table</span> <span>&quot;Save&quot;</span></span>"><tbody>
+  <tr><td>Command name:</td><td><span class="concretization computed" title="B1" formula="<span><span class=&quot;variable&quot;>B1</span></span>">Save</span></td></tr>
+  <tr><td>Keyboard shortcut:</td><td>Right-click or ALT+M</td></tr>
+  <tr><td>When to use:</td><td>When caret blinks in doc</td></tr>
+  </tbody>
+  </table>
+</div>
+  </div></div>
+
+Continue and <abbr class="command" title="ALT+C, abstract elements being selected">concretize</abbr> "<span class="doc">Right-click or ALT+M</span>" and "<span class="doc">When caret blinks in doc</span>", and rename them appropriately so that you obtain something like:
+
+<div class="docwrapper">
+  <div class="docblock doc">
+  <div class="preamble"><div class="assignment">
+    <span class="variable">table</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">B1</span></span><span class="variable"><span class="variable">B2</span></span><span class="variable"><span class="variable">B3</span></span></div> =
+    <div class="content"><table class="kbd"><tbody>
+  <tr><td>Command name:</td><td><span class="variable">B1</span></td></tr>
+  <tr><td>Keyboard shortcut:</td><td><span class="variable">B2</span></td></tr>
+  <tr><td>When to use:</td><td><span class="variable">B3</span></td></tr>
+  </tbody>
+  </table></div>
+  </div></div>
+  <div>
+  <table class="kbd abstraction computed" title="table &quot;Context menu&quot; &quot;Right-click or ALT+M&quot; &quot;When caret blinks in doc&quot;" formula="<span><span class=&quot;variable&quot;>table</span> <span>&quot;Context menu&quot;</span> <span>&quot;Right-click or ALT+M&quot;</span> <span>&quot;When caret blinks in doc&quot;</span></span>"><tbody>
+  <tr><td>Command name:</td><td><span class="concretization computed" title="B1" formula="<span><span class=&quot;variable&quot;>B1</span></span>">Context menu</span></td></tr>
+  <tr><td>Keyboard shortcut:</td><td><span class="concretization computed" title="B2" formula="<span><span class=&quot;variable&quot;>B2</span></span>">Right-click or ALT+M</span></td></tr>
+  <tr><td>When to use:</td><td><span class="concretization computed" title="B3" formula="<span><span class=&quot;variable&quot;>B3</span></span>">When caret blinks in doc</span></td></tr>
+  </tbody>
+  </table>
+  <table class="kbd abstraction computed" title="table &quot;Save&quot; &quot;CTRL+S&quot; &quot;When file is not saved yet&quot;" formula="<span><span class=&quot;variable&quot;>table</span> <span>&quot;Save&quot;</span> <span>&quot;CTRL+S&quot;</span> <span>&quot;When file is not saved yet&quot;</span></span>"><tbody>
+  <tr><td>Command name:</td><td><span class="concretization computed" title="B1" formula="<span><span class=&quot;variable&quot;>B1</span></span>">Save</span></td></tr>
+  <tr><td>Keyboard shortcut:</td><td><span class="concretization computed" title="B2" formula="<span><span class=&quot;variable&quot;>B2</span></span>">CTRL+S</span></td></tr>
+  <tr><td>When to use:</td><td><span class="concretization computed" title="B3" formula="<span><span class=&quot;variable&quot;>B3</span></span>">When file is not saved yet</span></td></tr>
+  </tbody>
+  </table>
+</div>
+  </div></div>
+Using this interface, if you rename "Keyboard shortcut" to "Shortcut", the renaming would appear in the other tables.
+Rename <span class="variable">table</span> to <span class="variable">memo</span>, <span class="variable">B1</span> to <span class="variable">name</span>, <span class="variable">B2</span> to <span class="variable">shortcut</span> and <span class="variable">B3</span> to <span class="variable">context</span>. It is good practice to give useful names.
+Alternatively, if you wanted to be able to use both names, instead of just renaming <span class="variable">B1</span>, double-click on it to the right of "<span class="doc">of </span>" and write "<span class="doc">B1 as name</span>" in the formula field.
+<br>
+Save your file. If you forget to save your file and your browser unexpectedly quits, a backup will always be available.
+<h3>Step 3: Advanced abstractions</h3>
+<p>In the previous section, we saw how to define memos for shortcuts.
+We want to use these shortcut definitions to augment simple tutorials, by displaying a hint on every command that a tutorial uses. That way, users would not have to remember all these commands or look them up themselves.</p>
+
+<p>Select the last two tables, and <abbr class="command" title="ALT+A, concrete elements being selected">abstract</abbr> them.
+Instead of inserting one more name, MikoWord detects that there is a repetition and instead suggest merging these calls (<img class="icon" src="FutureofProgramming-lightning.png">). Accept. You will then see the following result:
+</p>
+<div class="docwrapper">
+  <div class="docblock doc">
+  <div class="preamble"><div class="assignment">
+    <span class="variable">items</span> =
+    <div class="content"><span class="table"><span class="tuple"><span>Context menu</span><span>Right-click or ALT+M</span><span>When caret blinks in doc</span></span><span class="tuple"><span>Save</span><span>CTRL+S</span><span>When file is not saved yet</span></span></span></div>
+  </div><div class="assignment">
+    <span class="variable">memo</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="tuple"><span class="variable">command</span><span class="variable">shortcut</span><span class="variable">context</span></span></span></div> =
+    <div class="content"><table class="kbd"><tbody>
+  <tr><td>Command name:</td><td><span class="variable">command</span></td></tr>
+  <tr><td>Keyboard shortcut:</td><td><span class="variable">shortcut</span></td></tr>
+  <tr><td>When to use:</td><td><span class="variable">context</span></td></tr>
+  </tbody>
+  </table></div>
+  </div></div>
+  <div>
+  <span class="abstraction computed" title="repeat(memo,items)" formula="repeat(memo,items)"><span class="repeat"><table class="kbd"><tbody>
+  <tr><td>Command name:</td><td><span>Context menu</span></td></tr>
+  <tr><td>Keyboard shortcut:</td><td><span>Right-click or ALT+M</span></td></tr>
+  <tr><td>When to use:</td><td><span>When caret blinks in doc</span></td></tr>
+  </tbody>
+  </table><table class="kbd"><tbody>
+  <tr><td>Command name:</td><td><span>Save</span></td></tr>
+  <tr><td>Keyboard shortcut:</td><td><span>CTRL+S</span></td></tr>
+  <tr><td>When to use:</td><td><span>When file is not saved yet</span></td></tr>
+  </tbody>
+  </table></span></span>
+</div>
+  </div></div>
+As you hover over the memos, you'll see that it uses a single formula to display it: "<span class="doc">repeat(memo,items)</span>". If you double click on this memo (or press one second on mobile), you will be able to change this formula, as in any spreadsheet; but you can also change the value as you see it.
+<h3>Step 4: Intelligent abstractions</h3>
+Now let's write our tutorial content. In the sequel, we only display relevant abstractions at the top.
+<div class="docwrapper">
+  <div class="docblock doc">
+  <div class="preamble"><div class="assignment">
+    <span class="variable">items</span> =
+    <div class="content"><span class="table"><span class="tuple"><span>Context menu</span><span>Right-click or ALT+M</span><span>When caret blinks in doc</span></span><span class="tuple"><span>Save</span><span>CTRL+S</span><span>When file is not saved yet</span></span></span></div>
+  </div><div class="assignment">
+    <span class="variable">mysoft</span> =
+    <div class="content"><span class="textvalue">MySoft 1.0</span></div>
+  </div></div>
+  <div>
+<h2><span class="textvalue abstraction computed" title="mysoft" formula="<span><span class=&quot;variable&quot;>mysoft</span></span>">MySoft 1.0</span>: Save actions</h2>
+After any edit, remember to Save your document.
+</div>
+  </div></div>
+We want to display a tooltip when the user hovers "<span class="doc">Save</span>" that displays the keyboard shortcut.
+Let's add the tooltip. Select "<span class="doc">Save</span>" in the document, under the title, and <abbr class="command" title="ALT+A, concrete elements being selected">abstract</abbr> it.
+Select it again, and add a <abbr class="command" title="CTRL+R, any element being selected">remark</abbr> to it. As the inline pop-up for remarks appears, enter "<span class="doc">CTRL+S</span>" in it, as follows.
+<div class="docwrapper">
+  <div class="docblock doc">
+  <div class="preamble"><div class="assignment">
+    <span class="variable">items</span> =
+    <div class="content"><span class="table"><span class="tuple"><span>Context menu</span><span>Right-click or ALT+M</span><span>When caret blinks in doc</span></span><span class="tuple"><span>Save</span><span>CTRL+S</span><span>When file is not saved yet</span></span></span></div>
+  </div><div class="assignment">
+    <span class="variable">mysoft</span> =
+    <div class="content"><span class="textvalue">MySoft 1.0</span></div>
+  </div><div class="assignment">
+    <span class="variable">save</span> =
+    <div class="content"><span class="textvalue">Save<span class="remark">CTRL+S</span></span></div>
+  </div></div>
+  <div>
+<h2><span class="textvalue abstraction computed" title="mysoft" formula="<span><span class=&quot;variable&quot;>mysoft</span></span>">MySoft 1.0</span>: Save actions</h2>
+After any edit, remember to <span class="textvalue abstraction computed" title="save" formula="<span><span class=&quot;variable&quot;>save</span></span>">Save<span class="remark">CTRL+S</span></span> your document.
+</div>
+  </div></div>
+Note that the remark also appears next to <span class="variable">save</span>.
+To the right of <span class="variable">save</span>, select "<span class="doc">Save</span>" and <abbr class="command" title="ALT+A, concrete elements being selected">abstract</abbr> it.
+<div class="docwrapper">
+  <div class="docblock doc">
+  <div class="preamble"><div class="assignment">
+    <span class="variable">items</span> =
+    <div class="content"><span class="table"><span class="tuple"><span>Context menu</span><span>Right-click or ALT+M</span><span>When caret blinks in doc</span></span><span class="tuple"><span>Save</span><span>CTRL+S</span><span>When file is not saved yet</span></span></span></div>
+  </div><div class="assignment">
+    <span class="variable">mysoft</span> =
+    <div class="content"><span class="textvalue">MySoft 1.0</span></div>
+  </div><div class="assignment">
+    <span class="variable">save</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">arg</span></span></div> =
+    <div class="content"><span class="textvalue"><span class="variable">arg</span><span class="remark">CTRL+S</span></span></div>
+  </div></div>
+  <div>
+<h2><span class="textvalue abstraction computed" title="mysoft" formula="<span><span class=&quot;variable&quot;>mysoft</span></span>">MySoft 1.0</span>: Save actions</h2>
+After any edit, remember to <span class="textvalue abstraction computed" title="save &quot;Save&quot;" formula="<span><span class=&quot;variable&quot;>save</span> <span>&quot;Save&quot;</span></span>"><span class="concretization computed" title="arg" formula="<span><span class=&quot;variable&quot;>arg</span></span>">Save</span><span class="remark">CTRL+S</span></span> your document.
+</div>
+  </div></div>
+Rename <span class="variable">save</span> to <span class="variable">command</span>, and <span class="variable">arg</span> to <span class="variable">name</span>. We now want the tooltip to be created depending on <span class="variable">name</span>'s content. Select "<span class="doc">CTRL+S</span>" in the remark next to <span class="variable">arg</span> and <abbr class="command" title="ALT+A, concrete elements being selected">abstract</abbr> it.
+Click on the little <img class="icon" src="FutureofProgramming-lightning.png"> and choose "infer". Instead of creating a new variable, it will try to infer its content from the context. In this case, it manages to find a formula:
+<div class="docwrapper">
+  <div class="docblock doc">
+  <div class="preamble"><div class="assignment">
+    <span class="variable">items</span> =
+    <div class="content"><span class="table"><span class="tuple"><span>Context menu</span><span>Right-click or ALT+M</span><span>When caret blinks in doc</span></span><span class="tuple"><span>Save</span><span>CTRL+S</span><span>When file is not saved yet</span></span></span></div>
+  </div><div class="assignment">
+    <span class="variable">mysoft</span> =
+    <div class="content"><span class="textvalue">MySoft 1.0</span></div>
+  </div><div class="assignment">
+    <span class="variable">command</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">name</span></span></div> =
+    <div class="content"><span class="textvalue"><span class="variable">name</span><span class="remark"><span class="formula">vlookup(items,name,1,2)</span></span></span></div>
+  </div></div>
+  <div>
+<h2><span class="textvalue abstraction computed" title="mysoft" formula="<span><span class=&quot;variable&quot;>mysoft</span></span>">MySoft 1.0</span>: Save actions</h2>
+After any edit, remember to <span class="textvalue abstraction computed" title="command &quot;Save&quot;" formula="<span><span class=&quot;variable&quot;>command</span> <span>&quot;Save&quot;</span></span>"><span class="concretization computed" title="name" formula="<span><span class=&quot;variable&quot;>name</span></span>">Save</span><span class="remark"><span class="abstraction computed" title="vlookup(items,name,1,2)" formula="vlookup(items,name,1,2)"><span>CTRL+S</span></span></span></span> your document.
+</div>
+  </div></div>
+<p>Once you will be more familiar with the language, you will be able to enter these formulas yourself (<abbr class="command" title="ALT+A, concrete elements being selected">abstract</abbr>, then choose "formula" from <img class="icon" src="FutureofProgramming-lightning.png">).</p>
+<p>
+Let us add another command in the document similar to <span class="doc">Save</span>.
+Continue to write "<span class="doc">Open the </span>" in the document.
+Copy "<span class="doc">Save</span>" with its tooltip, paste it after what you just wrote, and replace the command name by <span class="doc">Context menu</span>. The tooltip is automatically updated:</p>
+<div class="docwrapper">
+  <div class="docblock doc">
+  <div class="preamble"><div class="assignment">
+    <span class="variable">items</span> =
+    <div class="content"><span class="table"><span class="tuple"><span>Context menu</span><span>Right-click or ALT+M</span><span>When caret blinks in doc</span></span><span class="tuple"><span>Save</span><span>CTRL+S</span><span>When file is not saved yet</span></span></span></div>
+  </div><div class="assignment">
+    <span class="variable">mysoft</span> =
+    <div class="content"><span class="textvalue">MySoft 1.0</span></div>
+  </div><div class="assignment">
+    <span class="variable">command</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">name</span></span></div> =
+    <div class="content"><span class="textvalue"><span class="variable">name</span><span class="remark"><span class="formula">vlookup(items,name,1,2)</span></span></span></div>
+  </div></div>
+  <div>
+<h2><span class="textvalue abstraction computed" title="mysoft" formula="<span><span class=&quot;variable&quot;>mysoft</span></span>">MySoft 1.0</span>: Save actions</h2>
+After any edit, remember to <span class="textvalue abstraction computed" title="command &quot;Save&quot;" formula="<span><span class=&quot;variable&quot;>command</span> <span>&quot;Save&quot;</span></span>"><span class="concretization computed" title="name" formula="<span><span class=&quot;variable&quot;>name</span></span>">Save</span><span class="remark"><span class="abstraction computed" title="vlookup(items,name,1,2)" formula="vlookup(items,name,1,2)"><span>CTRL+S</span></span></span></span> your document. Open the <span class="textvalue abstraction computed" title="command &quot;Context menu&quot;" formula="<span><span class=&quot;variable&quot;>command</span> <span>&quot;Context menu&quot;</span></span>"><span class="concretization computed" title="name" formula="<span><span class=&quot;variable&quot;>name</span></span>">Context menu</span><span class="remark"><span class="abstraction computed" title="vlookup(items,name,1,2)" formula="vlookup(items,name,1,2)"><span>Right-click or ALT+M</span></span></span></span>
+</div>
+  </div></div>
+You are now able to write a document with enriched content. Furthermore, when you will want to create a version for Mac, or localize the tutorial in another language, you will just have to further abstract over items, you won't have to do search and replace.<br>
+Moreover, if at some point you want to change a remark, such as removing <span class="doc">Right-click or</span> from the remark under <span class="doc">Context menu</span>, you can do it directly in the document; it will modify it in the source and in all other places.
+
+
+
+
+<h3>Step 5: Create a button</h3>
+
+MikoWord docs are not just regular docs, they are full apps. You can add buttons to perform some routine actions.
+<br>
+In a doc representing a daily notebook, we will add a button that, when clicked, inserts a title with the current date, formatted nicely.
+<br>
+Using the informations in step 2, add a title containing yesterday's date and a summary like below, abstract the title and name it <span class="variable">mktitle</span>, abstract the date and content, and name them accordingly to the screenshot:
+
+
+<div class="docwrapper">
+  <div class="docblock doc">
+  <div class="preamble"><div class="assignment">
+    <span class="variable">mktitle</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">date</span></span><span class="variable"><span class="variable">content</span></span></div> =
+    <div class="content"><span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span></div>
+  </div></div>
+  <div>
+<span class="h1 abstraction computed" title="mktitle <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> &quot;Finished step 5&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> <span>&quot;Finished step 5&quot;</span></span>"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"></span>: <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">Finished step 5</span></span>
+...Today I finished to add tooltips to commands...
+</div>
+  </div></div>
+
+Now, add a button by clicking <button class="doc">New Button</button> on the toolbar. Rename the button to <span class="doc">New Day</span> (after you assign a click action to the button, to rename it, you will have to open its properties):
+
+<div class="docwrapper">
+  <div class="docblock doc">
+  <div class="preamble"><div class="assignment">
+    <span class="variable">mktitle</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">date</span></span><span class="variable"><span class="variable">content</span></span></div> =
+    <div class="content"><span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span></div>
+  </div></div>
+  <div>
+<span class="h1 abstraction computed" title="mktitle <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> &quot;Finished step 5&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> <span>&quot;Finished step 5&quot;</span></span>"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"></span>: <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">Finished step 5</span></span>
+...Today I finished to add tooltips to commands...
+<br><button>New Day</button>
+</div>
+  </div></div>
+
+Open the <abbr class="command" title="Right-click or ALT+M, anywhere">context menu</abbr> on the button, and edit the onclick 
+attribute — the first attribute shown. Click on "insert", copy the 
+title you just created and paste it next to insert. Inside the button's onclick description, set today's date and rename the content "<span class="doc">TODO</span>".
+
+<div class="docwrapper">
+  <div class="docblock doc">
+  <div class="preamble"><div class="assignment">
+    <span class="variable">mktitle</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">date</span></span><span class="variable"><span class="variable">content</span></span></div> =
+    <div class="content"><span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span></div>
+  </div></div>
+  <div>
+
+<span class="h1 abstraction computed" title="mktitle <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> &quot;Finished step 5&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> <span>&quot;Finished step 5&quot;</span></span>"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"></span>: <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">Finished step 5</span></span>
+...Today I finished to add tooltips to commands...
+
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tbody><tr><td>On click</td><td>
+<span>Insert under caret:</span><span class="h1 abstraction computed" title="mktitle <span class=&quot;todaysdate&quot; children-are-ghosts=&quot;true&quot;></span> &quot;TODO&quot; &#13;&#10;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span class=&quot;todaysdate&quot; children-are-ghosts=&quot;true&quot;></span> <span>&quot;TODO&quot;</span> &#13;&#10;</span>"><span class="todaysdate concretization computed" children-are-ghosts="true" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"></span>: <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">TODO</span></span></td></tr></tbody></table></span>
+</div>
+  </div></div>
+
+Then, select the date right next to <span class="doc">On click</span>
+and <abbr class="command" title="ALT+A, concrete elements being selected">abstract</abbr> it. Click on <img class="icon" src="FutureofProgramming-lightning.png"> and choose the automatically inferred "formatted today's date" so 
+that it always displays the current date:
+
+<div class="docwrapper">
+  <div class="docblock doc">
+  <div class="preamble"><div class="assignment">
+    <span class="variable">mktitle</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">date</span></span><span class="variable"><span class="variable">content</span></span></div> =
+    <div class="content"><span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span></div>
+  </div></div>
+  <div>
+<span class="h1 abstraction computed" title="mktitle <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> &quot;Finished step 5&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> <span>&quot;Finished step 5&quot;</span></span>"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"></span>: <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">Finished step 5</span></span>
+...Today I finished to add tooltips to commands...
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tbody><tr><td>On click</td><td><span>Insert under caret</span><span class="h1 abstraction computed" title="mktitle <span><span class=&quot;todaysdate abstraction level2&quot; children-are-ghosts=&quot;true&quot; title=&quot;formatDate(&amp;#39;dddd, mmmm d-th-, yyyy&amp;#39;, today())&quot;></span></span> &quot;TODO&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span><span class=&quot;todaysdate abstraction level2&quot; children-are-ghosts=&quot;true&quot; title=&quot;formatDate(&amp;#39;dddd, mmmm d-th-, yyyy&amp;#39;, today())&quot;></span></span> <span>&quot;TODO&quot;</span></span>"><span class="concretization computed" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate(&#39;dddd, mmmm d-th-, yyyy&#39;, today())"></span></span>: <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">TODO</span></span></td></tr></tbody></table></span>
+</div>
+  </div></div>
+
+If you click on the button, it inserts a title as you would expect. However, the date in the new title will always be the present date:
+
+<div class="docwrapper">
+  <div class="docblock doc">
+  <div class="preamble"><div class="assignment">
+    <span class="variable">mktitle</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">date</span></span><span class="variable"><span class="variable">content</span></span></div> =
+    <div class="content"><span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span></div>
+  </div></div>
+  <div>
+<span class="h1 abstraction computed" title="mktitle <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> &quot;Finished step 5&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> <span>&quot;Finished step 5&quot;</span></span>"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"></span>: <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">Finished step 5</span></span>
+...Today I finished to add tooltips to commands...
+<span class="h1 abstraction computed" title="mktitle <span><span class=&quot;todaysdate abstraction level2&quot; children-are-ghosts=&quot;true&quot; title=&quot;formatDate(&amp;#39;dddd, mmmm d-th-, yyyy&amp;#39;, today())&quot;></span></span> &quot;TODO&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span><span class=&quot;todaysdate abstraction level2&quot; children-are-ghosts=&quot;true&quot; title=&quot;formatDate(&amp;#39;dddd, mmmm d-th-, yyyy&amp;#39;, today())&quot;></span></span> <span>&quot;TODO&quot;</span></span>"><span class="concretization computed" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate(&#39;dddd, mmmm d-th-, yyyy&#39;, today())"></span></span>: <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">TODO</span></span>
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tbody><tr><td>On click</td><td><span>Insert under caret</span><span class="h1 abstraction computed" title="mktitle <span><span class=&quot;todaysdate abstraction level2&quot; children-are-ghosts=&quot;true&quot; title=&quot;formatDate(&amp;#39;dddd, mmmm d-th-, yyyy&amp;#39;, today())&quot;></span></span> &quot;TODO&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span><span class=&quot;todaysdate abstraction level2&quot; children-are-ghosts=&quot;true&quot; title=&quot;formatDate(&amp;#39;dddd, mmmm d-th-, yyyy&amp;#39;, today())&quot;></span></span> <span>&quot;TODO&quot;</span></span>"><span class="concretization computed" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate(&#39;dddd, mmmm d-th-, yyyy&#39;, today())"></span></span>: <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">TODO</span></span></td></tr></tbody></table></span>
+</div>
+  </div></div>
+
+Let us fix that. Delete the newly inserted title. Select the date in the button and <abbr class="command" title="ALT+A, concrete elements being selected">abstract</abbr> it. Notice how the current date is now computed before:
+
+<div class="docwrapper">
+  <div class="docblock doc">
+  <div class="preamble"><div class="assignment">
+    <span class="variable">mktitle</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">date</span></span><span class="variable"><span class="variable">content</span></span></div> =
+    <div class="content"><span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span></div>
+  </div></div>
+  <div>
+<span class="h1 abstraction computed" title="mktitle <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> &quot;Finished step 5&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> <span>&quot;Finished step 5&quot;</span></span>"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"></span>: <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">Finished step 5</span></span>
+...Today I finished to add tooltips to commands...
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tbody><tr><td>On click</td><td>
+  <div class="preamble"><div class="assignment">
+    <span class="variable notfound">currentdate</span> =
+    <div class="content"><span><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate(&#39;dddd, mmmm d-th-, yyyy&#39;, today())"></span></span></div>
+  </div></div>
+<span>Insert under caret</span><span class="h1 abstraction computed" title="mktitle currentdate &quot;TODO&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span class=&quot;variable&quot;>currentdate</span> <span>&quot;TODO&quot;</span></span>"><span class="variable concretization computed" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>">currentdate</span>: <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">TODO</span></span></td></tr></tbody></table></span>
+</div>
+  </div></div>
+
+Now clicking the button inserts a title that will not change every day.
+Furthermore, do you prefer a dash instead of a colon in the title? Change it in one of the titles to change it everywhere:
+
+<div class="docwrapper">
+  <div class="docblock doc">
+  <div class="preamble"><div class="assignment">
+    <span class="variable">mktitle</span><span class="spacebeforeparam"> </span><div class="params"><span class="variable"><span class="variable">date</span></span><span class="variable"><span class="variable">content</span></span></div> =
+    <div class="content"><span class="h1"><span class="variable">date</span> — <span class="variable">content</span></span></div>
+  </div></div>
+  <div>
+<span class="h1 abstraction computed" title="mktitle <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> &quot;Finished step 5&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span class=&quot;yesterdaysdate&quot; children-are-ghosts=&quot;true&quot;></span> <span>&quot;Finished step 5&quot;</span></span>"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"></span> — <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">Finished step 5</span></span>
+...Today I finished to add tooltips to commands...
+<span class="h1 abstraction computed" title="mktitle <span class=&quot;todaysdate&quot; children-are-ghosts=&quot;true&quot;></span> &quot;TODO&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span class=&quot;todaysdate&quot; children-are-ghosts=&quot;true&quot;></span> <span>&quot;TODO&quot;</span></span>"><span class="todaysdate concretization computed" children-are-ghosts="true" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>"></span> — <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">TODO</span></span>
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tbody><tr><td>On click</td><td>
+  <div class="preamble"><div class="assignment">
+    <span class="variable notfound">currentdate</span> =
+    <div class="content"><span><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate(&#39;dddd, mmmm d-th-, yyyy&#39;, today())"></span></span></div>
+  </div></div>
+<span>Insert under caret</span><span class="h1 abstraction computed" title="mktitle currentdate &quot;TODO&quot;" formula="<span><span class=&quot;variable&quot;>mktitle</span> <span class=&quot;variable&quot;>currentdate</span> <span>&quot;TODO&quot;</span></span>"><span class="variable concretization computed" title="date" formula="<span><span class=&quot;variable&quot;>date</span></span>">currentdate</span> — <span class="concretization computed" title="content" formula="<span><span class=&quot;variable&quot;>content</span></span>">TODO</span></span></td></tr></tbody></table></span>
+</div>
+  </div></div>
+
+<h1>Epilogue</h1>
+
+<p>In case you wonder, I did not write this tutorial using even an alpha version of a "MikoWord".
+However, I used a tool that I am developing: <a href="https://github.com/MikaelMayer/Editor">Editor</a>. Editor is a local HTTP server that enables the viewer of the page to modify it, even if the page was dynamically generated. All screenshots have been dynamically generated based on a mix of document and formulas. I generated the html content of this document using <a href="https://github.com/MikaelMayer/hyde-build-tool">Hyde</a>, a reversible file-to-file converter that I also maintain. Together, Editor and Hyde made the development of this page straightforward.</p><p>Would MikoWord be possible? I think so. MikoWord features the idea of displaying the tree of a <em>program</em> as an HTML tree, after a partial and forgiving evaluator ran on it.
+If you are interested by this project, follow me on <a href="https://twitter.com/MikaelMayer">Twitter</a>.
+If you are interested to contribute, <a list-ghost-attributes="href" prefix="mikael.mayer" onmouseover="this.setAttribute(&#39;href&#39;, &#39;mailto:&#39; + this.getAttribute(&#39;prefix&#39;)+ &#39;@polytechnique.org?subject=I+would+like+to+contribute+to+Future+of+Programming&#39;)">send me an email</a>.
+<script>
+var editable = document.querySelector("[contenteditable=true]");
+var onKeypress = e => {
+  console.log("event", e);
+  if(e.keyCode==13 && !e.shiftKey){
+      // If we are inside a paragraph, we split the paragraph.
+      // If we are directly inside a div, we add a paragraph separator.
+      // We delete everything between anchorNode and focusNode
+      var caretSelection = document.getSelection();
+      var x = caretSelection.anchorNode;
+      if(x && x.nodeType == 1) {
+        if(x.parentNode && getComputedStyle(x.parentNode).display == "block") {
+          e.preventDefault(); //Prevent default browser
+          var range = caretSelection.getRangeAt(0);
+          range.deleteContents();
+          caretSelection = document.getSelection();
+          x = caretSelection.anchorNode;
+          if(x.parentNode.tagName == "p") { // Split the p
+            var newPar = document.createElement("p");
+            
+            var fo = caretSelection.anchorOffset;
+            if(fo < x.text.length) {
+              newPar.append(document.createTextNode(x.text.substring(fo)));
+              x.deleteData(fo,x.text.length - fo);
+            }
+            var y = x.nextSibling;
+            while(y) {
+              var yy = y;
+              y = y.nextSibling;
+              newPar.append(yy); // Moves yy
+            }
+            x.parentNode.insertAdjacentElement("afterend", newPar);
+          } else { // insert br
+            range.insertNode(document.createElement("br"))
+          }
+        }
+      }
+  }
+}
+if(editable && !editable.configured) {
+  editable.configured = true;
+  editable.addEventListener("keypress", onKeypress, true);
+}
+var q = document.querySelectorAll("abbr[title]");
+for(var i = 0; i < q.length; i++) {
+  q[i].addEventListener("click", (element => () => {
+    var title = element.querySelector(".title");
+    console.log("title", title);
+    if (!title) {
+      var t = document.createElement("span");
+      t.setAttribute("class", "title");
+      t.setAttribute("isghost", "true");
+      t.innerText = element.getAttribute("title");
+      element.append(t);
+    } else {
+      title.remove();
+    }
+  })(q[i]));
+}
+function addDates(element, onbeforeinsert) {
+  onbeforeinsert = onbeforeinsert || ((i) => i);
+  q = element.querySelectorAll(".todaysdate");
+  for(var i = 0; i < q.length; i++) {
+    q[i].innerText = onbeforeinsert(formatDate(new Date()));
+  }
+  q = element.querySelectorAll(".yesterdaysdate");
+  var d = new Date();
+  d.setDate(d.getDate()-1);
+  for(var i = 0; i < q.length; i++) {
+    q[i].innerText = onbeforeinsert(formatDate(d));
+  }
+}
+addDates(document);
+
+
+formulaDisplay = function() {
+  var d = document.createElement("span");
+  d.classList.add("formulacell");
+  d.setAttribute("isghost", "true")
+  d.innerHTML = this.getAttribute("formula");
+  d.setAttribute("tabindex", "0");
+  d.style.display = getComputedStyle(this).display;
+  this.setAttribute("ghost-visible", "false");
+  d.onblur = ((d, e) => () => {
+    e.removeAttribute("ghost-visible");
+    d.remove();
+  })(d, this);
+  addDates(d, x => "\"" + x + "\"");
+  d.querySelector
+  this.insertAdjacentElement("afterend", d);
+  d.focus();
+}
+
+q = document.querySelectorAll(".computed[formula]");
+var timermousedown = undefined;
+for(var i = 0; i < q.length; i++) {
+  var formula = q[i].getAttribute(formula);
+  q[i].addEventListener("dblclick", formulaDisplay);
+  q[i].addEventListener("touchstart", ((qi) => () => {
+    console.log("started timer");
+    timermousedown = setTimeout(() => {
+      console.log("finished timer");
+      timermousedown = undefined;
+      formulaDisplay.bind(qi)();
+    }, 1000);
+  })(q[i]));
+  q[i].addEventListener("touchend", () => {
+    if(typeof timermousedown != "undefined")
+      clearTimeout(timermousedown);
+  });
+  
+}
+
+</script>
+</p></div>
+</body></html>

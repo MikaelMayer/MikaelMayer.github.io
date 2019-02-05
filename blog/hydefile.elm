@@ -55,4 +55,4 @@ all = do
   evalContinue <|
   Result.fold Error <| \content ->
     valToHTMLSource content |>
-    Write "index.html"
+    (\x -> [Write "index.html" x, Write "2019-02-05-future-of-programming.html" x])
