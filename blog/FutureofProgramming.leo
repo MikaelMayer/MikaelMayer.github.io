@@ -179,8 +179,46 @@ mkDoc (assignments) body =
    ) body)
   </div></div>
 
+formatDate = """(date) => {
+  var dayNames = [
+    "Sunday", "Monday", "Tuesday",
+    "Wednesday", "Thursday", "Friday", "Saturday"
+  ];
+  var monthNames = [
+    "January", "February", "March",
+    "April", "May", "June", "July",
+    "August", "September", "October",
+    "November", "December"
+  ];
+
+  var day = date.getDate();
+  var numPrefixes =
+    day == 1 || day == 21 || day == 31 ? "st" :
+    day == 2 || day == 22 ? "nd" :
+    day == 3 || day == 23 ? "rd" : "th";
+  var namedDay = dayNames[date.getDay()];
+  var monthIndex = date.getMonth();
+  var year = date.getFullYear();
+
+  return namedDay + ", " + monthNames[monthIndex] + ' ' + day + numPrefixes + ", " + year;
+}"""
+  
 <html><head><meta content="text/html; charset=UTF-8" http-equiv="content-type"><style>
+button.doc, .doc button {
+  min-height: 48px;
+  background: orangered;
+  color: white;
+}
 span.remark {
+  background: white;
+  padding: 2px;
+  outline: solid black 1px;
+  -webkit-box-shadow: 5px 5px 0px 0px #989898; 
+  box-shadow: 5px 5px 0px 0px #989898;
+  position: relative;
+  top: -0.5em;
+}
+span.title {
   padding: 2px;
   outline: solid black 1px;
   -webkit-box-shadow: 5px 5px 0px 0px #989898; 
@@ -255,6 +293,14 @@ div.params > span.variable {
     white 2px,
     white 4px);
 }
+.abstraction .level2 {
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(0, 0, 255, 0.1),
+    rgba(0, 0, 255, 0.1) 2px,
+    white 2px,
+    white 4px);
+}
 .concretization {
   background: white;
   outline: 1px solid rgba(0,0,0,0.2);
@@ -278,11 +324,12 @@ div.params > span.variable {
   min-height: 28px;
   box-shadow: inset 2px 2px 0 rgba(0,0,0,.2), inset 0 -2px 0 rgba(0,0,0,.07);
 }
-.doc h1 {
+.doc h1, .doc .h1 {
+  display: block;
   color: rgb(46, 116, 181);
   font-size: 1.6em;
 }
-.doc h2 {
+.doc h2, .doc .h2 {
   color: rgb(46, 116, 181);
   font-size: 1.3em;
 }
@@ -322,7 +369,11 @@ body a {
 img.icon {
   vertical-align: bottom;
 }
-</style></head><body><div>
+</style>
+<script>
+var formatDate = @formatDate
+</script>
+</head><body><div>
 
 <h1>Abstract and Concrete: Future of Programming</h1>
 <em>2019/02/04 &mdash; Mikaël Mayer</em>
@@ -332,7 +383,7 @@ img.icon {
 
 <p>I am a big fan of the idea of <a href="https://www.google.com/url?q=https://coda.io/welcome&amp;sa=D&amp;ust=1549033963249000">Coda</a>&nbsp;that mixes spreadsheets with word-like documents and makes it possible to create text that appears based on conditions, for example. It is very nice to have a domain-specific language for computing cells as in any spreadsheets, and to be able to insert cells into a document.<br
 
->However, there is no way to create <a href="https://www.youtube.com/watch?v=ZfytHvgHybA">reusable abstractions</a> yet. If abstractions are some day user-definable, it is likely that Coda will end up copying Google Spreadsheet and Microsoft Excel by giving access to their APIs and offering <a href="https://developers.google.com/apps-script/guides/sheets/functions">abstractions as macros</a>&nbsp;that are no longer part of the visible document, and cannot be edited with the same and nice visual interface.</p>
+>However, in many office-like tools, I still miss a way to create <a href="https://www.youtube.com/watch?v=ZfytHvgHybA">reusable abstractions</a>. Google Spreadsheet and Microsoft Excel give access to APIs and offer <a href="https://developers.google.com/apps-script/guides/sheets/functions">abstractions as macros</a>, but they are no longer part of the visible document, and cannot be edited with the same and nice visual interface.</p>
 
 <!--p>Programming is all about abstraction. Indeed, <a href="https://www.google.com/url?q=https://www.youtube.com/watch?v%3DV10hzjgoklA&amp;sa=D&amp;ust=1549033963250000">Lambda Calculus</a>&nbsp;is being discovered as the ancestor of all modern programming languages and is the same as logic itself. Moreover, Lambda Calculus features only two building blocks: abstraction and concretization. Isn&rsquo;t all software based on this idea? Starting concrete, and then abstracting away parts that become data inputs, or starting abstract, and then test using concrete values?</p-->
 
@@ -354,6 +405,7 @@ We will create a rich and dynamic help page for an application named MySoft. In 
 >How to reuse partial pieces of informations (e.g. formatting)</li><li
 >How to repeat abstractions (e.g. introducing a list)</li><li
 >How to have MikoWord infer asbtractions for you.</li></ul>
+>How to create custom User Interface elements (e.g. a button).</li></ul>
 </p>
 
 <p>No coding skills are required. Let’s start!</p>
@@ -612,6 +664,99 @@ After any edit, remember to <span class="application"><span class="variable">com
 You are now able to write a document with enriched content. Furthermore, when you will want to create a version for Mac, or localize the tutorial in another language, you will just have to further abstract over items, you won't have to do search and replace.<br>
 Moreover, if at some point you want to change a remark, such as removing <span class="doc">Right-click or</span> from the remark under <span class="doc">Context menu</span>, you can do it directly in the document; it will modify it in the source and in all other places.
 
+<h3>Step 5: Create a button</h3>
+
+MikoWord docs are not just regular docs, they are full apps. You can add buttons to perform some routine actions.
+<br>
+In a doc representing a daily notebook, we will add a button that, when clicked, inserts a title with the current date, formatted nicely.
+<br>
+
+Using the informations in step 2, add a title containing yesterday's date and a summary like below, abstract the title and name it <span class="variable">mktitle</span>, abstract the date and content, and name them accordingly to the screenshot:
+
+@(mkDoc [("mktitle", ([<span class="variable">date</span>, <span class="variable">content</span>], <span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span>))] 
+<div>
+<span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghost="true"></span><span>Finished step 5</span></span>
+...Today I finished to add tooltips to commands...
+</div>)
+
+Now, add a button by clicking <button class= "doc">New Button</button> on the toolbar. Rename the button to <span class="doc">New Day</span> (after you assign a click action to the button, to rename it, you will have to open its properties):
+
+@(mkDoc [("mktitle", ([<span class="variable">date</span>, <span class="variable">content</span>], <span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span>))] 
+<div>
+<span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghost="true"></span><span>Finished step 5</span></span>
+...Today I finished to add tooltips to commands...
+<br><button>New Day</button>
+</div>)
+
+Open the @(command "context menu") on the button, and edit the onclick 
+attribute &mdash; the first attribute shown. Click on "insert", copy the 
+title you just created and paste it next to insert. Inside the button's onclick description, set today's date and rename the content "<span class="doc">TODO</span>".
+
+@(mkDoc [("mktitle", ([<span class="variable">date</span>, <span class="variable">content</span>], <span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span>))] 
+<div>
+<span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghost="true"></span><span>Finished step 5</span></span>
+...Today I finished to add tooltips to commands...
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td><span>Insert under caret<span><span class="application"><span class="variable">mktitle</span><span class="todaysdate"children-are-ghost="true"></span><span>TODO</span></td></tr></table></span>
+</div>)
+
+Then, select the date right next to <span class="doc">On click</span>
+and @(command "abstract") it. Click on <img class="icon"  src=
+"FutureofProgramming-lightning.png"> and choose the automatically inferred "formatted today's date" so 
+that it always displays the current date:
+
+@(mkDoc [("mktitle", ([<span class="variable">date</span>, <span class="variable">content</span>], <span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span>))] 
+<div>
+<span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghost="true"></span><span>Finished step 5</span></span>
+...Today I finished to add tooltips to commands...
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td><span>Insert under caret<span><span class="application"><span class="variable">mktitle</span><span><span class="todaysdate abstraction level2" children-are-ghost="true" title="formatDate('dddd, mmmm d-th-, yyyy', today())"></span></span><span>TODO</span></td></tr></table></span>
+</div>)
+
+If you click on the button, it inserts a title as you would expect. However, the date in the new title will always be the present date:
+
+@(mkDoc [("mktitle", ([<span class="variable">date</span>, <span class="variable">content</span>], <span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span>))] 
+<div>
+<span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghost="true"></span><span>Finished step 5</span></span>
+...Today I finished to add tooltips to commands...
+<span class="application"><span class="variable">mktitle</span><span><span class="todaysdate abstraction level2" children-are-ghost="true"title="formatDate('dddd, mmmm d-th-, yyyy', today())"></span></span><span>TODO</span></span>
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td><span>Insert under caret<span><span class="application"><span class="variable">mktitle</span><span><span class="todaysdate abstraction level2" children-are-ghost="true" title="formatDate('dddd, mmmm d-th-, yyyy', today())"></span></span><span>TODO</span></td></tr></table></span>
+</div>)
+
+Let us fix that. Delete the newly inserted title. Select the date in the button and @(command "abstract") it. Notice how the current date is now computed before:
+
+@(mkDoc [("mktitle", ([<span class="variable">date</span>, <span class="variable">content</span>], <span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span>))] 
+<div>
+<span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghost="true"></span><span>Finished step 5</span></span>
+...Today I finished to add tooltips to commands...
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td
+>
+  <div class="preamble"><div class="assignment">
+    <span class="variable">currentdate</span> =
+    <div class="content"><span><span class="todaysdate abstraction level2" children-are-ghost="true" title="formatDate('dddd, mmmm d-th-, yyyy', today())"></span></span></div>
+  </div></div>
+<span>Insert under caret<span><span class="application"><span class="variable">mktitle</span><span class="variable">currentdate</span><span>TODO</span></td></tr></table></span>
+</div>)
+
+Now clicking the button inserts a title that will not change every day.
+Furthermore, do you prefer a dash instead of a colon in the title? Change it in one of the titles to change it everywhere:
+
+@(mkDoc [("mktitle", ([<span class="variable">date</span>, <span class="variable">content</span>], <span class="h1"><span class="variable">date</span> &mdash; <span class="variable">content</span></span>))] 
+<div>
+<span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghost="true"></span><span>Finished step 5</span></span>
+...Today I finished to add tooltips to commands...
+<span class="application"><span class="variable">mktitle</span><span class="todaysdate"></span><span>TODO</span></span>
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td
+>
+  <div class="preamble"><div class="assignment">
+    <span class="variable">currentdate</span> =
+    <div class="content"><span><span class="todaysdate abstraction level2" children-are-ghost="true" title="formatDate('dddd, mmmm d-th-, yyyy', today())"></span></span></div>
+  </div></div>
+<span>Insert under caret<span><span class="application"><span class="variable">mktitle</span><span class="variable">currentdate</span><span>TODO</span></td></tr></table></span>
+</div>)
+
+
+
+
+
 <h1>Epilogue</h1>
 
 <p>In case you wonder, I did not write this tutorial using even an alpha version of a "MikoWord".
@@ -659,8 +804,33 @@ var onKeypress = e => {
 }
 if(editable && !editable.configured) {
   editable.configured = true;
-  console.log("configured editable");
   editable.addEventListener("keypress", onKeypress, true);
+}
+var q = document.querySelectorAll("abbr[title]");
+for(var i = 0; i < q.length; i++) {
+  q[i].addEventListener("click", (element => () => {
+    var title = element.querySelector(".title");
+    console.log("title", title);
+    if (!title) {
+      var t = document.createElement("span");
+      t.setAttribute("class", "title");
+      t.setAttribute("isghost", "true");
+      t.innerText = element.getAttribute("title");
+      element.append(t);
+    } else {
+      title.remove();
+    }
+  })(q[i]));
+}
+q = document.querySelectorAll(".todaysdate");
+for(var i = 0; i < q.length; i++) {
+  q[i].innerText = formatDate(new Date());
+}
+q = document.querySelectorAll(".yesterdaysdate");
+var d = new Date();
+d.setDate(d.getDate()-1);
+for(var i = 0; i < q.length; i++) {
+  q[i].innerText = formatDate(d);
 }
 </script>
 </div>
