@@ -480,7 +480,7 @@ In a regular document, every time you update MySoft’s version, you would have 
 In MikoWord, it is easier. Select "<span class="doc">MySoft 1.0</span>", and @(command "abstract") it.
 </p>
 Abstracting is giving a name to something concrete.
-If you hover over the now dash-colored "<span class="doc abstraction">MySoft 1.0</span>" in the title, you will now see that it has been assigned the name <span class="variable">mysoft</span>. You can double-click to reveal the formula behind it. The portion to the right of <span class="variable">mysoft</span> is called its <em>content</em>. The content is actually a mini-document in itself that can be further modified:
+If you hover over the now dash-colored "<span class="doc abstraction">MySoft 1.0</span>" in the title, you will now see that it has been assigned the name <span class="variable">mysoft</span>. Double-click it to reveal the formula behind it &mdash; or touch it for one second on mobile. The portion to the right of <span class="variable">mysoft</span> is called its <em>content</em> and is also like a document:
 @(mkDoc [("mysoft", ([], <span class="textvalue">MySoft 1.0</span>))]
 <div>
 <h1><span class="variable">mysoft</span> Tutorial</h1>
