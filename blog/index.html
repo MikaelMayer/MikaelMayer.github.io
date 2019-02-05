@@ -193,7 +193,7 @@ var formatDate = (date) => {
 </head><body><div>
 
 <h1>Abstract and Concrete: Future of Programming</h1>
-<em>2019/02/04 — Mikaël Mayer</em>
+<em>2019/02/05 — Mikaël Mayer</em>
 <p>I recently came across a <a href="https://hbr.org/2019/01/what-will-software-look-like-once-anyone-can-create-it">very interesting article</a> that highlighted that, until the invention of Arabic numbers, multiplication using roman numerals was difficult. The Arabic positional number system made it much easier. It was the same for software. Programming software is difficult. Until someone comes up with the equivalent of Arabic numbers for programming, it will remain so.</p><p>This made me think profoundly. What makes it that programming software is difficult? Is it that programming languages are cryptic? Too many <abbr title="Application Programming Interface">API</abbr>s? Complicated build tools? Not close enough to assembly language? Or too far away?</p>
 
 <p>I am a big fan of the idea of <a href="https://www.google.com/url?q=https://coda.io/welcome&amp;sa=D&amp;ust=1549033963249000">Coda</a> that mixes spreadsheets with word-like documents and makes it possible to create text that appears based on conditions, for example. It is very nice to have a domain-specific language for computing cells as in any spreadsheets, and to be able to insert cells into a document.<br>However, in many office-like tools, I still miss a way to create <a href="https://www.youtube.com/watch?v=ZfytHvgHybA">reusable abstractions</a>. Google Spreadsheet and Microsoft Excel give access to APIs and offer <a href="https://developers.google.com/apps-script/guides/sheets/functions">abstractions as macros</a>, but they are no longer part of the visible document, and cannot be edited with the same and nice visual interface.</p>
@@ -212,8 +212,7 @@ Since abstractions are for programs the equivalent of arabic positional symbols 
 <p>MikoWord is a word processor for webpages which will satisfy both programmers and non-programmers. MikoWord features a simple but powerful tool to <i>abstract</i>.
 In this tutorial aimed at beginners, we will explain how to use this tool by walking through several examples.
 We will create a rich and dynamic help page for an application named MySoft. In this tutorial, you will learn:</p>
-<ul><li>How to reuse relevant pieces of information (e.g. the name of a product)</li><li>How to reuse partial pieces of informations (e.g. formatting)</li><li>How to repeat abstractions (e.g. introducing a list)</li><li>How to have MikoWord infer asbtractions for you.</li><li>
->How to create custom User Interface elements (e.g. a button).</li></ul>
+<ul><li>How to reuse relevant pieces of information (e.g. the name of a product)</li><li>How to reuse partial pieces of informations (e.g. formatting)</li><li>How to repeat abstractions (e.g. introducing a list)</li><li>How to have MikoWord infer asbtractions for you.</li><li>How to create custom User Interface elements (e.g. a button).</li></ul>
 
 
 <p>No coding skills are required. Let’s start!</p>
@@ -573,14 +572,15 @@ After any edit, remember to <span class="textvalue abstraction computed" title="
 You are now able to write a document with enriched content. Furthermore, when you will want to create a version for Mac, or localize the tutorial in another language, you will just have to further abstract over items, you won't have to do search and replace.<br>
 Moreover, if at some point you want to change a remark, such as removing <span class="doc">Right-click or</span> from the remark under <span class="doc">Context menu</span>, you can do it directly in the document; it will modify it in the source and in all other places.
 
+
 <h3>Step 5: Create a button</h3>
 
 MikoWord docs are not just regular docs, they are full apps. You can add buttons to perform some routine actions.
 <br>
 In a doc representing a daily notebook, we will add a button that, when clicked, inserts a title with the current date, formatted nicely.
 <br>
-
 Using the informations in step 2, add a title containing yesterday's date and a summary like below, abstract the title and name it <span class="variable">mktitle</span>, abstract the date and content, and name them accordingly to the screenshot:
+
 
 <div class="docwrapper">
   <div class="docblock doc">
@@ -589,7 +589,7 @@ Using the informations in step 2, add a title containing yesterday's date and a 
     <div class="content"><span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span></div>
   </div></div>
   <div>
-<span class="h1 abstraction computed" title="mktitle"><span class="yesterdaysdate concretization computed" children-are-ghost="true" title="date"></span>: <span class="concretization computed" title="content">Finished step 5</span></span>
+<span class="h1 abstraction computed" title="mktitle"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date"></span>: <span class="concretization computed" title="content">Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
 </div>
   </div></div>
@@ -603,7 +603,7 @@ Now, add a button by clicking <button class="doc">New Button</button> on the too
     <div class="content"><span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span></div>
   </div></div>
   <div>
-<span class="h1 abstraction computed" title="mktitle"><span class="yesterdaysdate concretization computed" children-are-ghost="true" title="date"></span>: <span class="concretization computed" title="content">Finished step 5</span></span>
+<span class="h1 abstraction computed" title="mktitle"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date"></span>: <span class="concretization computed" title="content">Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
 <br><button>New Day</button>
 </div>
@@ -620,9 +620,9 @@ title you just created and paste it next to insert. Inside the button's onclick 
     <div class="content"><span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span></div>
   </div></div>
   <div>
-<span class="h1 abstraction computed" title="mktitle"><span class="yesterdaysdate concretization computed" children-are-ghost="true" title="date"></span>: <span class="concretization computed" title="content">Finished step 5</span></span>
+<span class="h1 abstraction computed" title="mktitle"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date"></span>: <span class="concretization computed" title="content">Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
-<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td><span>Insert under caret<span><span class="h1 abstraction computed" title="mktitle"><span class="todaysdate concretization computed" children-are-ghost="true" title="date"></span>: <span class="concretization computed" title="content">TODO</span></span></span></span></td></tr></table></span>
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td><span>Insert under caret<span><span class="h1 abstraction computed" title="mktitle"><span class="todaysdate concretization computed" children-are-ghosts="true" title="date"></span>: <span class="concretization computed" title="content">TODO</span></span></span></span></td></tr></table></span>
 </div>
   </div></div>
 
@@ -637,9 +637,9 @@ that it always displays the current date:
     <div class="content"><span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span></div>
   </div></div>
   <div>
-<span class="h1 abstraction computed" title="mktitle"><span class="yesterdaysdate concretization computed" children-are-ghost="true" title="date"></span>: <span class="concretization computed" title="content">Finished step 5</span></span>
+<span class="h1 abstraction computed" title="mktitle"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date"></span>: <span class="concretization computed" title="content">Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
-<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td><span>Insert under caret<span><span class="h1 abstraction computed" title="mktitle"><span class="concretization computed" title="date"><span class="todaysdate abstraction level2" children-are-ghost="true" title="formatDate(&#39;dddd, mmmm d-th-, yyyy&#39;, today())"></span></span>: <span class="concretization computed" title="content">TODO</span></span></span></span></td></tr></table></span>
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td><span>Insert under caret<span><span class="h1 abstraction computed" title="mktitle"><span class="concretization computed" title="date"><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate(&#39;dddd, mmmm d-th-, yyyy&#39;, today())"></span></span>: <span class="concretization computed" title="content">TODO</span></span></span></span></td></tr></table></span>
 </div>
   </div></div>
 
@@ -652,10 +652,10 @@ If you click on the button, it inserts a title as you would expect. However, the
     <div class="content"><span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span></div>
   </div></div>
   <div>
-<span class="h1 abstraction computed" title="mktitle"><span class="yesterdaysdate concretization computed" children-are-ghost="true" title="date"></span>: <span class="concretization computed" title="content">Finished step 5</span></span>
+<span class="h1 abstraction computed" title="mktitle"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date"></span>: <span class="concretization computed" title="content">Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
-<span class="h1 abstraction computed" title="mktitle"><span class="concretization computed" title="date"><span class="todaysdate abstraction level2" children-are-ghost="true" title="formatDate(&#39;dddd, mmmm d-th-, yyyy&#39;, today())"></span></span>: <span class="concretization computed" title="content">TODO</span></span>
-<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td><span>Insert under caret<span><span class="h1 abstraction computed" title="mktitle"><span class="concretization computed" title="date"><span class="todaysdate abstraction level2" children-are-ghost="true" title="formatDate(&#39;dddd, mmmm d-th-, yyyy&#39;, today())"></span></span>: <span class="concretization computed" title="content">TODO</span></span></span></span></td></tr></table></span>
+<span class="h1 abstraction computed" title="mktitle"><span class="concretization computed" title="date"><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate(&#39;dddd, mmmm d-th-, yyyy&#39;, today())"></span></span>: <span class="concretization computed" title="content">TODO</span></span>
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td><span>Insert under caret<span><span class="h1 abstraction computed" title="mktitle"><span class="concretization computed" title="date"><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate(&#39;dddd, mmmm d-th-, yyyy&#39;, today())"></span></span>: <span class="concretization computed" title="content">TODO</span></span></span></span></td></tr></table></span>
 </div>
   </div></div>
 
@@ -668,12 +668,12 @@ Let us fix that. Delete the newly inserted title. Select the date in the button 
     <div class="content"><span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span></div>
   </div></div>
   <div>
-<span class="h1 abstraction computed" title="mktitle"><span class="yesterdaysdate concretization computed" children-are-ghost="true" title="date"></span>: <span class="concretization computed" title="content">Finished step 5</span></span>
+<span class="h1 abstraction computed" title="mktitle"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date"></span>: <span class="concretization computed" title="content">Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
 <br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td>
   <div class="preamble"><div class="assignment">
     <span class="variable notfound">currentdate</span> =
-    <div class="content"><span><span class="todaysdate abstraction level2" children-are-ghost="true" title="formatDate(&#39;dddd, mmmm d-th-, yyyy&#39;, today())"></span></span></div>
+    <div class="content"><span><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate(&#39;dddd, mmmm d-th-, yyyy&#39;, today())"></span></span></div>
   </div></div>
 <span>Insert under caret<span><span class="h1 abstraction computed" title="mktitle"><span class="variable concretization computed" title="date">currentdate</span>: <span class="concretization computed" title="content">TODO</span></span></span></span></td></tr></table></span>
 </div>
@@ -689,18 +689,17 @@ Furthermore, do you prefer a dash instead of a colon in the title? Change it in 
     <div class="content"><span class="h1"><span class="variable">date</span> — <span class="variable">content</span></span></div>
   </div></div>
   <div>
-<span class="h1 abstraction computed" title="mktitle"><span class="yesterdaysdate concretization computed" children-are-ghost="true" title="date"></span> — <span class="concretization computed" title="content">Finished step 5</span></span>
+<span class="h1 abstraction computed" title="mktitle"><span class="yesterdaysdate concretization computed" children-are-ghosts="true" title="date"></span> — <span class="concretization computed" title="content">Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
-<span class="h1 abstraction computed" title="mktitle"><span class="todaysdate concretization computed" children-are-ghost="true" title="date"></span> — <span class="concretization computed" title="content">TODO</span></span>
+<span class="h1 abstraction computed" title="mktitle"><span class="todaysdate concretization computed" children-are-ghosts="true" title="date"></span> — <span class="concretization computed" title="content">TODO</span></span>
 <br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td>
   <div class="preamble"><div class="assignment">
     <span class="variable notfound">currentdate</span> =
-    <div class="content"><span><span class="todaysdate abstraction level2" children-are-ghost="true" title="formatDate(&#39;dddd, mmmm d-th-, yyyy&#39;, today())"></span></span></div>
+    <div class="content"><span><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate(&#39;dddd, mmmm d-th-, yyyy&#39;, today())"></span></span></div>
   </div></div>
 <span>Insert under caret<span><span class="h1 abstraction computed" title="mktitle"><span class="variable concretization computed" title="date">currentdate</span> — <span class="concretization computed" title="content">TODO</span></span></span></span></td></tr></table></span>
 </div>
   </div></div>
-
 
 
 

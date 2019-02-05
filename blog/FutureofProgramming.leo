@@ -378,7 +378,7 @@ var formatDate = @formatDate
 </head><body><div>
 
 <h1>Abstract and Concrete: Future of Programming</h1>
-<em>2019/02/04 &mdash; Mikaël Mayer</em>
+<em>2019/02/05 &mdash; Mikaël Mayer</em>
 <p>I recently came across a <a href="https://hbr.org/2019/01/what-will-software-look-like-once-anyone-can-create-it">very interesting article</a> that highlighted that, until the invention of Arabic numbers, multiplication using roman numerals was difficult. The Arabic positional number system made it much easier. It was the same for software. Programming software is difficult. Until someone comes up with the equivalent of Arabic numbers for programming, it will remain so.</p><p
 
 >This made me think profoundly. What makes it that programming software is difficult? Is it that programming languages are cryptic? Too many <abbr title="Application Programming Interface">API</abbr>s? Complicated build tools? Not close enough to assembly language? Or too far away?</p>
@@ -406,7 +406,7 @@ We will create a rich and dynamic help page for an application named MySoft. In 
 >How to reuse relevant pieces of information (e.g. the name of a product)</li><li
 >How to reuse partial pieces of informations (e.g. formatting)</li><li
 >How to repeat abstractions (e.g. introducing a list)</li><li
->How to have MikoWord infer asbtractions for you.</li><li>
+>How to have MikoWord infer asbtractions for you.</li><li
 >How to create custom User Interface elements (e.g. a button).</li></ul>
 </p>
 
@@ -666,18 +666,19 @@ After any edit, remember to <span class="application"><span class="variable">com
 You are now able to write a document with enriched content. Furthermore, when you will want to create a version for Mac, or localize the tutorial in another language, you will just have to further abstract over items, you won't have to do search and replace.<br>
 Moreover, if at some point you want to change a remark, such as removing <span class="doc">Right-click or</span> from the remark under <span class="doc">Context menu</span>, you can do it directly in the document; it will modify it in the source and in all other places.
 
+
 <h3>Step 5: Create a button</h3>
 
 MikoWord docs are not just regular docs, they are full apps. You can add buttons to perform some routine actions.
 <br>
 In a doc representing a daily notebook, we will add a button that, when clicked, inserts a title with the current date, formatted nicely.
 <br>
-
 Using the informations in step 2, add a title containing yesterday's date and a summary like below, abstract the title and name it <span class="variable">mktitle</span>, abstract the date and content, and name them accordingly to the screenshot:
+
 
 @(mkDoc [("mktitle", ([<span class="variable">date</span>, <span class="variable">content</span>], <span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span>))] 
 <div>
-<span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghost="true"></span><span>Finished step 5</span></span>
+<span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghosts="true"></span><span>Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
 </div>)
 
@@ -685,7 +686,7 @@ Now, add a button by clicking <button class= "doc">New Button</button> on the to
 
 @(mkDoc [("mktitle", ([<span class="variable">date</span>, <span class="variable">content</span>], <span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span>))] 
 <div>
-<span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghost="true"></span><span>Finished step 5</span></span>
+<span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghosts="true"></span><span>Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
 <br><button>New Day</button>
 </div>)
@@ -696,9 +697,9 @@ title you just created and paste it next to insert. Inside the button's onclick 
 
 @(mkDoc [("mktitle", ([<span class="variable">date</span>, <span class="variable">content</span>], <span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span>))] 
 <div>
-<span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghost="true"></span><span>Finished step 5</span></span>
+<span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghosts="true"></span><span>Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
-<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td><span>Insert under caret<span><span class="application"><span class="variable">mktitle</span><span class="todaysdate"children-are-ghost="true"></span><span>TODO</span></td></tr></table></span>
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td><span>Insert under caret<span><span class="application"><span class="variable">mktitle</span><span class="todaysdate"children-are-ghosts="true"></span><span>TODO</span></td></tr></table></span>
 </div>)
 
 Then, select the date right next to <span class="doc">On click</span>
@@ -708,32 +709,32 @@ that it always displays the current date:
 
 @(mkDoc [("mktitle", ([<span class="variable">date</span>, <span class="variable">content</span>], <span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span>))] 
 <div>
-<span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghost="true"></span><span>Finished step 5</span></span>
+<span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghosts="true"></span><span>Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
-<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td><span>Insert under caret<span><span class="application"><span class="variable">mktitle</span><span><span class="todaysdate abstraction level2" children-are-ghost="true" title="formatDate('dddd, mmmm d-th-, yyyy', today())"></span></span><span>TODO</span></td></tr></table></span>
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td><span>Insert under caret<span><span class="application"><span class="variable">mktitle</span><span><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate('dddd, mmmm d-th-, yyyy', today())"></span></span><span>TODO</span></td></tr></table></span>
 </div>)
 
 If you click on the button, it inserts a title as you would expect. However, the date in the new title will always be the present date:
 
 @(mkDoc [("mktitle", ([<span class="variable">date</span>, <span class="variable">content</span>], <span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span>))] 
 <div>
-<span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghost="true"></span><span>Finished step 5</span></span>
+<span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghosts="true"></span><span>Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
-<span class="application"><span class="variable">mktitle</span><span><span class="todaysdate abstraction level2" children-are-ghost="true"title="formatDate('dddd, mmmm d-th-, yyyy', today())"></span></span><span>TODO</span></span>
-<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td><span>Insert under caret<span><span class="application"><span class="variable">mktitle</span><span><span class="todaysdate abstraction level2" children-are-ghost="true" title="formatDate('dddd, mmmm d-th-, yyyy', today())"></span></span><span>TODO</span></td></tr></table></span>
+<span class="application"><span class="variable">mktitle</span><span><span class="todaysdate abstraction level2" children-are-ghosts="true"title="formatDate('dddd, mmmm d-th-, yyyy', today())"></span></span><span>TODO</span></span>
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td><span>Insert under caret<span><span class="application"><span class="variable">mktitle</span><span><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate('dddd, mmmm d-th-, yyyy', today())"></span></span><span>TODO</span></td></tr></table></span>
 </div>)
 
 Let us fix that. Delete the newly inserted title. Select the date in the button and @(command "abstract") it. Notice how the current date is now computed before:
 
 @(mkDoc [("mktitle", ([<span class="variable">date</span>, <span class="variable">content</span>], <span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span>))] 
 <div>
-<span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghost="true"></span><span>Finished step 5</span></span>
+<span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghosts="true"></span><span>Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
 <br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td
 >
   <div class="preamble"><div class="assignment">
     <span class="variable">currentdate</span> =
-    <div class="content"><span><span class="todaysdate abstraction level2" children-are-ghost="true" title="formatDate('dddd, mmmm d-th-, yyyy', today())"></span></span></div>
+    <div class="content"><span><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate('dddd, mmmm d-th-, yyyy', today())"></span></span></div>
   </div></div>
 <span>Insert under caret<span><span class="application"><span class="variable">mktitle</span><span class="variable">currentdate</span><span>TODO</span></td></tr></table></span>
 </div>)
@@ -743,18 +744,17 @@ Furthermore, do you prefer a dash instead of a colon in the title? Change it in 
 
 @(mkDoc [("mktitle", ([<span class="variable">date</span>, <span class="variable">content</span>], <span class="h1"><span class="variable">date</span> &mdash; <span class="variable">content</span></span>))] 
 <div>
-<span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghost="true"></span><span>Finished step 5</span></span>
+<span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghosts="true"></span><span>Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
-<span class="application"><span class="variable">mktitle</span><span class="todaysdate" children-are-ghost="true"></span><span>TODO</span></span>
+<span class="application"><span class="variable">mktitle</span><span class="todaysdate" children-are-ghosts="true"></span><span>TODO</span></span>
 <br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td
 >
   <div class="preamble"><div class="assignment">
     <span class="variable">currentdate</span> =
-    <div class="content"><span><span class="todaysdate abstraction level2" children-are-ghost="true" title="formatDate('dddd, mmmm d-th-, yyyy', today())"></span></span></div>
+    <div class="content"><span><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate('dddd, mmmm d-th-, yyyy', today())"></span></span></div>
   </div></div>
 <span>Insert under caret<span><span class="application"><span class="variable">mktitle</span><span class="variable">currentdate</span><span>TODO</span></td></tr></table></span>
 </div>)
-
 
 
 
