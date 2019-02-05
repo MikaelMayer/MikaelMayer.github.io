@@ -617,16 +617,16 @@ Instead of inserting one more name, MikoWord detects that there is a repetition 
     >CTRL+S</span><span
     >When file is not saved yet</span></span></span>
 )),
-("table", ([<span class="tuple"><span class="variable">command</span><span class="variable">shortcut</span><span class="variable">context</span></span>], <table class="kbd"><tbody>
+("memo", ([<span class="tuple"><span class="variable">command</span><span class="variable">shortcut</span><span class="variable">context</span></span>], <table class="kbd"><tbody>
   <tr><td>Command name:</td><td><span class="variable">command</span></td></tr>
   <tr><td>Keyboard shortcut:</td><td><span class="variable">shortcut</span></td></tr>
   <tr><td>When to use:</td><td><span class="variable">context</span></td></tr>
   </tbody>
   </table>))]
 <div>
-  <span class="formula">repeat(table,items)</span>
+  <span class="formula">repeat(memo,items)</span>
 </div>)
-As you hover over the table, you'll see that it uses a single formula to display this table: "<span class="doc">repeat(table,items)</span>". If you double click on this table (or press one second on mobile), you will be able to change this formula, as in any spreadsheet; but you can also change the value as you see it.
+As you hover over the memos, you'll see that it uses a single formula to display it: "<span class="doc">repeat(memo,items)</span>". If you double click on this memo (or press one second on mobile), you will be able to change this formula, as in any spreadsheet; but you can also change the value as you see it.
 <h3>Step 4: Intelligent abstractions</h3>
 Now let's write our tutorial content. In the sequel, we only display relevant abstractions at the top.
 @(mkDoc [("items", ([], <span class="table"><span class="tuple"><span
