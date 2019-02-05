@@ -57,7 +57,9 @@ classFromProvenance provenance =
   if provenance == Abstract then "abstraction" else "concretization"
 
 markabstract provenance name =
-  Html.addClass (classFromProvenance provenance) >> Html.addAttr "title" name
+  Html.addClass (classFromProvenance provenance) >>
+  Html.addAttr "title" name >>
+  Html.addClass "computed"
 
 mkAssignments context params args =
   List.map2 (\pat a -> case (pat, a) of
@@ -202,7 +204,7 @@ formatDate = """(date) => {
 
   return namedDay + ", " + monthNames[monthIndex] + ' ' + day + numPrefixes + ", " + year;
 }"""
-  
+
 <html><head><meta content="text/html; charset=UTF-8" http-equiv="content-type"><style>
 button.doc, .doc button {
   min-height: 48px;
@@ -743,7 +745,7 @@ Furthermore, do you prefer a dash instead of a colon in the title? Change it in 
 <div>
 <span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghost="true"></span><span>Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
-<span class="application"><span class="variable">mktitle</span><span class="todaysdate"></span><span>TODO</span></span>
+<span class="application"><span class="variable">mktitle</span><span class="todaysdate" children-are-ghost="true"></span><span>TODO</span></span>
 <br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td
 >
   <div class="preamble"><div class="assignment">
