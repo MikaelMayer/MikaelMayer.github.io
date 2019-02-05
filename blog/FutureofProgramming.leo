@@ -667,6 +667,8 @@ You are now able to write a document with enriched content. Furthermore, when yo
 Moreover, if at some point you want to change a remark, such as removing <span class="doc">Right-click or</span> from the remark under <span class="doc">Context menu</span>, you can do it directly in the document; it will modify it in the source and in all other places.
 
 
+
+
 <h3>Step 5: Create a button</h3>
 
 MikoWord docs are not just regular docs, they are full apps. You can add buttons to perform some routine actions.
@@ -697,9 +699,13 @@ title you just created and paste it next to insert. Inside the button's onclick 
 
 @(mkDoc [("mktitle", ([<span class="variable">date</span>, <span class="variable">content</span>], <span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span>))] 
 <div>
+
 <span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghosts="true"></span><span>Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
-<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td><span>Insert under caret<span><span class="application"><span class="variable">mktitle</span><span class="todaysdate"children-are-ghosts="true"></span><span>TODO</span></td></tr></table></span>
+
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tbody><tr><td>On click</td><td>
+<span>Insert under caret:</span><span class="application"><span class="variable">mktitle</span><span class="todaysdate" children-are-ghosts="true"></span><span>TODO</span>
+</td></tr></tbody></table></span>
 </div>)
 
 Then, select the date right next to <span class="doc">On click</span>
@@ -711,7 +717,7 @@ that it always displays the current date:
 <div>
 <span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghosts="true"></span><span>Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
-<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td><span>Insert under caret<span><span class="application"><span class="variable">mktitle</span><span><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate('dddd, mmmm d-th-, yyyy', today())"></span></span><span>TODO</span></td></tr></table></span>
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tbody><tr><td>On click</td><td><span>Insert under caret</span><span class="application"><span class="variable">mktitle</span><span><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate('dddd, mmmm d-th-, yyyy', today())"></span></span><span>TODO</span></td></tr></tbody></table></span>
 </div>)
 
 If you click on the button, it inserts a title as you would expect. However, the date in the new title will always be the present date:
@@ -721,7 +727,7 @@ If you click on the button, it inserts a title as you would expect. However, the
 <span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghosts="true"></span><span>Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
 <span class="application"><span class="variable">mktitle</span><span><span class="todaysdate abstraction level2" children-are-ghosts="true"title="formatDate('dddd, mmmm d-th-, yyyy', today())"></span></span><span>TODO</span></span>
-<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td><span>Insert under caret<span><span class="application"><span class="variable">mktitle</span><span><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate('dddd, mmmm d-th-, yyyy', today())"></span></span><span>TODO</span></td></tr></table></span>
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tbody><tr><td>On click</td><td><span>Insert under caret</span><span class="application"><span class="variable">mktitle</span><span><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate('dddd, mmmm d-th-, yyyy', today())"></span></span><span>TODO</span></td></tr></tbody></table></span>
 </div>)
 
 Let us fix that. Delete the newly inserted title. Select the date in the button and @(command "abstract") it. Notice how the current date is now computed before:
@@ -730,13 +736,13 @@ Let us fix that. Delete the newly inserted title. Select the date in the button 
 <div>
 <span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghosts="true"></span><span>Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
-<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tbody><tr><td>On click</td><td
 >
   <div class="preamble"><div class="assignment">
     <span class="variable">currentdate</span> =
     <div class="content"><span><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate('dddd, mmmm d-th-, yyyy', today())"></span></span></div>
   </div></div>
-<span>Insert under caret<span><span class="application"><span class="variable">mktitle</span><span class="variable">currentdate</span><span>TODO</span></td></tr></table></span>
+<span>Insert under caret</span><span class="application"><span class="variable">mktitle</span><span class="variable">currentdate</span><span>TODO</span></td></tr></tbody></table></span>
 </div>)
 
 Now clicking the button inserts a title that will not change every day.
@@ -747,17 +753,14 @@ Furthermore, do you prefer a dash instead of a colon in the title? Change it in 
 <span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghosts="true"></span><span>Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
 <span class="application"><span class="variable">mktitle</span><span class="todaysdate" children-are-ghosts="true"></span><span>TODO</span></span>
-<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tr><td>On click</td><td
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tbody><tr><td>On click</td><td
 >
   <div class="preamble"><div class="assignment">
     <span class="variable">currentdate</span> =
     <div class="content"><span><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate('dddd, mmmm d-th-, yyyy', today())"></span></span></div>
   </div></div>
-<span>Insert under caret<span><span class="application"><span class="variable">mktitle</span><span class="variable">currentdate</span><span>TODO</span></td></tr></table></span>
+<span>Insert under caret</span><span class="application"><span class="variable">mktitle</span><span class="variable">currentdate</span><span>TODO</span></td></tr></tbody></table></span>
 </div>)
-
-
-
 
 <h1>Epilogue</h1>
 
