@@ -406,7 +406,7 @@ We will create a rich and dynamic help page for an application named MySoft. In 
 >How to reuse relevant pieces of information (e.g. the name of a product)</li><li
 >How to reuse partial pieces of informations (e.g. formatting)</li><li
 >How to repeat abstractions (e.g. introducing a list)</li><li
->How to have MikoWord infer asbtractions for you.</li></ul>
+>How to have MikoWord infer asbtractions for you.</li><li>
 >How to create custom User Interface elements (e.g. a button).</li></ul>
 </p>
 
