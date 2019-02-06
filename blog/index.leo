@@ -26,7 +26,12 @@ dateOf name = Regex.extract """(\d\d\d\d-\d+-\d+)""" name
 <body>
 <div>
 <h1>Mikaël Mayer's blog</h1>
-@(["ul", [], flip List.map entries <| \(file, title) ->
+<button onclick="""
+  var ul = document.getElementById("entries");
+  
+
+"""></button>
+@(["ul", [["id", "entries"]], flip List.map entries <| \(file, title) ->
   <li><a href=@file>@(dateOf file) @title</a></li>
 ])
 </div>

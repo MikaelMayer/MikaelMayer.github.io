@@ -3,22 +3,6 @@ do = flip
 read: (Maybe String -> a) -> String -> a
 read callback name  =
   callback <| fs.read name
-  
-Maybe = { Maybe | 
-  fold : a -> (x -> a) -> Maybe x -> a
-  fold onNothing onJust content =
-    case content of
-      Nothing -> onNothing
-      Just c -> onJust c
-  }
-
-Result = { Result | 
-  fold : (err -> a) -> (x -> a) -> Result err x -> a
-  fold onErr onOk content =
-    case content of
-      Err msg -> onErr msg
-      Ok c -> onOk c
-  }
 
 evalContinue: (Result String value -> a) -> String -> a
 evalContinue callback source =
@@ -53,15 +37,19 @@ convert filename =
     Nothing -> [Error <| "File " + name + " not a valid leo file."]
     Just [name] ->
       do
-      read filename <|
-      Maybe.fold (Error "Could not open file") <|
-      evalContinue <|
+      read filename <|                            --Update.debugFold"read" <|
+      Maybe.fold (Error "Could not open file") <| --Update.debugFold "mb" <|
+      evalContinue <|                             --Update.debugFold "eval" <|
       Result.fold Error <| \content ->
-        valToHTMLSource content |>
+        valToHTMLSource content |>                --Update.debugFold "write" |>
          Write (name + ".html")
 
 -- Pro: Conciseness, no nesting 
+{--
 all = 
   fs.listdir "."
   |> List.filter (Regex.matchIn "\\.leo$")
   |> List.map convert
+--}
+
+all = convert "2019-02-05-future-of-programming.leo"

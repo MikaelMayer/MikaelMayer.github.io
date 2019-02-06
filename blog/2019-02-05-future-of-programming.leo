@@ -77,6 +77,10 @@ markabstract provenance node content =
           [["span", [], [["TEXT", jsCode.stringOf string]]]]
         ["span", ["class", "formula"]::_, [["TEXT", formula]]] ->
           [["span", [], [["TEXT", formula]]]]
+        ["span", attrs, _] ->
+          case attrDict.get "formula" attrs of
+            Nothing -> [node]
+            Just formula -> [["span", [], [["TEXT", formula]]]]
         _ -> [node]
   in
   content
@@ -197,11 +201,11 @@ mkDoc (assignments) body =
           ((provenance, newAssignments), markabstract provenance n content)
         )
         |> Maybe.withDefault ((context, assignments), ["span", [["class","variable notfound"]], [["TEXT", name]]])
-      ["span", [["class", "formula"]], [["TEXT", formula]]] ->
+      [tag, [["class", "formula"]], [["TEXT", formula]]] ->
         (,) (context, assignments) <|
         case __evaluate__ (("repeat", repeatDef) :: ("vlookup", vlookupDef) :: (List.map abstractAssignment assignments) ++ preludeEnv) formula of
           Err msg -> <span class="error">@msg</span>
-          Ok v -> <span class=@(classFromProvenance Abstract ++ " computed") title=@(formula) formula=@(formula)>@v</span>
+          Ok v -> <@tag class=@(classFromProvenance Abstract ++ " computed") title=@(formula) formula=@(formula)>@v</@>
       _ -> ((context, assignments), n)
    ) body)
   </div></div>
@@ -416,6 +420,24 @@ div.params > span.variable {
 img.icon {
   vertical-align: bottom;
 }
+[ghost-inviteInteraction], .inviteInteraction {
+  outline: #FCC 4px solid;
+  animation:spin 1s linear infinite;
+}
+@@keyframes spin{
+	from {
+    outline-color: #FAA;
+  }
+  33% {
+    outline-color: #AFA;
+  }
+  66% {
+    outline-color: #AAF;
+  }
+	to {
+    outline-color: #FAA;
+  }	
+}
 </style>
 <script>
 var formatDate = @formatDate
@@ -475,10 +497,10 @@ In a regular document, every time you update MySoft’s version, you would have 
 In MikoWord, it is easier. Select "<span class="doc">MySoft 1.0</span>", and @(command "abstract") it.
 </p>
 Abstracting is giving a name to something concrete.
-If you hover over the "<span class="doc abstraction">MySoft 1.0</span>" that has a stripes background, in the title, you will now see that it has been assigned the name <span class="variable">mysoft</span>. Double-click it to reveal the formula behind it &mdash; or touch it for one second on mobile. The portion to the right of <span class="variable">mysoft</span> is called its <em>content</em> and is also like a document, meaning you can further abstract inside, e.g. the name and the version.
+If you hover over the "<span class="doc abstraction">MySoft 1.0</span>" that has a stripes background, in the title, you will now see that it has been assigned the name <span class="variable">mysoft</span>. This <span class="inviteInteraction">special style</span> indicates that you can double-click it to reveal the formula behind it &mdash; or touch it for one second on mobile. The portion to the right of <span class="variable">mysoft</span> is called its <em>content</em> and is also like a document, meaning you can further abstract inside, e.g. the name and the version.
 @(mkDoc [("mysoft", ([], <span class="textvalue">MySoft 1.0</span>))]
 <div>
-<h1><span class="variable">mysoft</span> Tutorial</h1>
+<h1 class="multipleInviteInteraction"><span class="variable">mysoft</span> Tutorial</h1>
 Welcome to MySoft 1.0!
 </div>)
 <p>
@@ -550,7 +572,9 @@ Instead of just copy-pasting it, we will abstract it so that cards have the same
   </tbody>
   </table>))]
 <div>
+  <div class="multipleInviteInteraction">
   <span class="variable">table</span>
+  </div>
   <span class="variable">table</span>
 </div>)
 
@@ -563,7 +587,9 @@ If you changed one of the values in any table, the change would be propagated to
   </tbody>
   </table>))]
 <div>
+  <div  class="multipleInviteInteraction">
   <span class="application"><span class="variable">table</span><span>Context menu</span></span>
+  </div>
   <span class="application"><span class="variable">table</span><span>Context menu</span></span>
 </div>)
 
@@ -578,7 +604,9 @@ Rename "<span class="doc">Context Menu</span>" from the last table to "<span cla
   </table>))]
 <div>
   <span class="application"><span class="variable">table</span><span>Context menu</span></span>
+  <div class="multipleInviteInteraction">
   <span class="application"><span class="variable">table</span><span>Save</span></span>
+  </div>
 </div>)
 
 Continue and @(command "concretize") "<span class="doc">Right-click or ALT+M</span>" and "<span class="doc">When caret blinks in doc</span>", and rename them appropriately so that you obtain something like:
@@ -590,10 +618,12 @@ Continue and @(command "concretize") "<span class="doc">Right-click or ALT+M</sp
   </tbody>
   </table>))]
 <div>
+  <div class="multipleInviteInteraction">
   <span class="application" title="table &quot;Context menu&quot; &quot;Right-click or ALT+M&quot; &quot;When caret blinks in doc&quot;"><span class="variable">table</span><span
     >Context menu</span><span
     >Right-click or ALT+M</span><span
     >When caret blinks in doc</span></span>
+  </div>
   <span class="application"><span class="variable">table</span><span
     >Save</span><span
     >CTRL+S</span><span
@@ -627,8 +657,8 @@ Instead of inserting one more name, MikoWord detects that there is a repetition 
   <tr><td>When to use:</td><td><span class="variable">context</span></td></tr>
   </tbody>
   </table>))]
-<div>
-  <span class="formula">repeat(card,items)</span>
+<div class="multipleInviteInteraction">
+  <div class="formula">repeat(card,items)</div>
 </div>)
 As you hover over the cards (or double click on it, or long press), you'll see that it uses a single formula to display it: "<span class="doc">repeat(card,items)</span>". If you double click on this card (or press one second on mobile), you will be able to change this formula, as in any spreadsheet; but you can also change the value as you see it.
 <h3>Step 4: Intelligent abstractions</h3>
@@ -662,7 +692,7 @@ Select it again, and add a @(command "remark") to it. As the inline pop-up for r
 ("save", ([], <span class="textvalue">Save<span class="remark">CTRL+S</span></span>))] 
 <div>
 <h2><span class="variable">mysoft</span>: Save actions</h2>
-After any edit, remember to <span class="variable">save</span> your document.
+After any edit, remember to <span class="multipleInviteInteraction"><span class="application"><span class="variable">save</span></span> your document.
 </div>)
 Note that the remark also appears next to <span class="variable">save</span>.
 To the right of <span class="variable">save</span>, select "<span class="doc">Save</span>" and @(command "abstract") it.
@@ -679,7 +709,7 @@ To the right of <span class="variable">save</span>, select "<span class="doc">Sa
 ("save", ([<span class="variable">arg</span>], <span class="textvalue"><span class="variable">arg</span><span class="remark">CTRL+S</span></span>))] 
 <div>
 <h2><span class="variable">mysoft</span>: Save actions</h2>
-After any edit, remember to <span class="application"><span class="variable">save</span><span>Save</span></span> your document.
+After any edit, remember to <span class="multipleInviteInteraction"><span class="application"><span class="variable">save</span><span>Save</span></span></span> your document.
 </div>)
 Rename <span class="variable">save</span> to <span class="variable">command</span>, and <span class="variable">arg</span> to <span class="variable">name</span>. We now want the tooltip to be created depending on <span class="variable">name</span>'s content. Select "<span class="doc">CTRL+S</span>" in the remark next to <span class="variable">arg</span> and @(command "abstract") it.
 Click on the little <img class="icon" src="FutureofProgramming-lightning.png"> and choose "infer". Instead of creating a new name, it will try to infer its content from the context. In this case, it manages to find a formula:
@@ -696,7 +726,7 @@ Click on the little <img class="icon" src="FutureofProgramming-lightning.png"> a
 ("command", ([<span class="variable">name</span>], <span class="textvalue"><span class="variable">name</span><span class="remark"><span class="formula">vlookup(items,name,1,2)</span></span></span>))] 
 <div>
 <h2><span class="variable">mysoft</span>: Save actions</h2>
-After any edit, remember to <span class="application"><span class="variable">command</span><span>Save</span></span> your document.
+After any edit, remember to <span class="multipleInviteInteraction"><span class="application"><span class="variable">command</span><span>Save</span></span></span> your document.
 </div>)
 <p>The vlookup procedure takes a table, a value to look into, an two column numbers: the first column in which to search the value, the second column the value to return to return. Once you will be more familiar with the language, you will be able to enter these formulas yourself (@(command "abstract"), then choose "formula" from <img class="icon"  src="FutureofProgramming-lightning.png">).</p>
 <p>
@@ -735,7 +765,8 @@ Using the informations in step 2, add a title containing yesterday's date and a 
 
 @(mkDoc [("mktitle", ([<span class="variable">date</span>, <span class="variable">content</span>], <span class="h1"><span class="variable">date</span>: <span class="variable">content</span></span>))] 
 <div>
-<span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghosts="true"></span><span>Finished step 5</span></span>
+<span class="multipleInviteInteraction">
+<span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghosts="true"></span><span>Finished step 5</span></span></span>
 ...Today I finished to add tooltips to commands...
 </div>)
 
@@ -759,7 +790,7 @@ title you just created and paste it next to insert. Inside the button's onclick 
 ...Today I finished to add tooltips to commands...
 
 <br><button>New Day</button><span class="remark" style="display:inline-block"><table><tbody><tr><td>On click</td><td>
-<span>Insert under caret:</span><span class="application"><span class="variable">mktitle</span><span class="todaysdate" children-are-ghosts="true"></span><span>TODO</span>
+<span>Insert under caret:</span><span class="multipleInviteInteraction"><span class="application"><span class="variable">mktitle</span><span class="todaysdate" children-are-ghosts="true"></span><span>TODO</span></span>
 </td></tr></tbody></table></span>
 </div>)
 
@@ -772,7 +803,7 @@ that it always displays the current date:
 <div>
 <span class="application"><span class="variable">mktitle</span><span class="yesterdaysdate" children-are-ghosts="true"></span><span>Finished step 5</span></span>
 ...Today I finished to add tooltips to commands...
-<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tbody><tr><td>On click</td><td><span>Insert under caret</span><span class="application"><span class="variable">mktitle</span><span><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate('dddd, mmmm d-th-, yyyy', today())"></span></span><span>TODO</span></td></tr></tbody></table></span>
+<br><button>New Day</button><span class="remark" style="display:inline-block"><table><tbody><tr><td>On click</td><td><span>Insert under caret</span><span class="application"><span class="variable">mktitle</span><span><span class="todaysdate abstraction level2" children-are-ghosts="true" title="formatDate('dddd, mmmm d-th-, yyyy', today())" formula="<span class='formula'>today()</span>"></span></span><span>TODO</span></td></tr></tbody></table></span>
 </div>)
 
 If you click on the button, it inserts a title as you would expect. However, the date in the new title will always be the present date:
@@ -824,50 +855,8 @@ However, I used a tool that I am developing: <a href= "https://github.com/Mikael
 <br>I generated the html content of this document using <a href="https://github.com/MikaelMayer/hyde-build-tool">Hyde</a>, a reversible file-to-file converter that I also maintain.
 <br>Editor and Hyde are based on my <a href="https://dl.acm.org/citation.cfm?id=3276497">research on bidirectional programming</a>. Together, Editor and Hyde made the development of this page straightforward.</p><p>Would MikoWord be possible? I think so. MikoWord features the idea of displaying the tree of a <em>program</em> as an HTML tree, after a partial and forgiving evaluator ran on it.
 If you are interested by this project, follow me on <a href="https://twitter.com/MikaelMayer">Twitter</a>.
-If you are interested to contribute, <a list-ghost-attributes="href" prefix="mikael.mayer" onmouseover="this.setAttribute('href', 'mailto:' + this.getAttribute('prefix')+ '@polytechnique.org?subject=I+would+like+to+contribute+to+Future+of+Programming')">send me an email</a>.
+If you are interested to contribute, <a list-ghost-attributes="href" prefix="mikael.mayer" onmouseover="this.setAttribute('href', 'mailto:' + this.getAttribute('prefix')+ '@polytechnique.org?subject=I+would+like+to+contribute+to+Future+of+Programming')">send me an email</a>.</p>
 <script>
-var editable = document.querySelector("[contenteditable=true]");
-var onKeypress = e => {
-  console.log("event", e);
-  if(e.keyCode==13 && !e.shiftKey){
-      // If we are inside a paragraph, we split the paragraph.
-      // If we are directly inside a div, we add a paragraph separator.
-      // We delete everything between anchorNode and focusNode
-      var caretSelection = document.getSelection();
-      var x = caretSelection.anchorNode;
-      if(x && x.nodeType == 1) {
-        if(x.parentNode && getComputedStyle(x.parentNode).display == "block") {
-          e.preventDefault(); //Prevent default browser
-          var range = caretSelection.getRangeAt(0);
-          range.deleteContents();
-          caretSelection = document.getSelection();
-          x = caretSelection.anchorNode;
-          if(x.parentNode.tagName == "p") { // Split the p
-            var newPar = document.createElement("p");
-            
-            var fo = caretSelection.anchorOffset;
-            if(fo < x.text.length) {
-              newPar.append(document.createTextNode(x.text.substring(fo)));
-              x.deleteData(fo,x.text.length - fo);
-            }
-            var y = x.nextSibling;
-            while(y) {
-              var yy = y;
-              y = y.nextSibling;
-              newPar.append(yy); // Moves yy
-            }
-            x.parentNode.insertAdjacentElement("afterend", newPar);
-          } else { // insert br
-            range.insertNode(document.createElement("br"))
-          }
-        }
-      }
-  }
-}
-if(editable && !editable.configured) {
-  editable.configured = true;
-  editable.addEventListener("keypress", onKeypress, true);
-}
 var q = document.querySelectorAll("abbr[title]");
 for(var i = 0; i < q.length; i++) {
   q[i].addEventListener("click", (element => () => {
@@ -900,7 +889,7 @@ function addDates(element, onbeforeinsert) {
 addDates(document);
 
 
-formulaDisplay = function() {
+formulaDisplay = (i, q) => function() {
   var d = document.createElement("span");
   d.classList.add("formulacell");
   d.setAttribute("isghost", "true")
@@ -911,6 +900,9 @@ formulaDisplay = function() {
   d.onblur = ((d, e) => () => {
     e.removeAttribute("ghost-visible");
     d.remove();
+    if(q[i].getAttribute("ghost-inviteInteraction") == "true") {
+      q[i].removeAttribute("ghost-inviteInteraction");
+    }
   })(d, this);
   addDates(d, x => "\"" + x + "\"");
   d.querySelector
@@ -921,16 +913,17 @@ formulaDisplay = function() {
 q = document.querySelectorAll(".computed[formula]");
 var timermousedown = undefined;
 for(var i = 0; i < q.length; i++) {
+  if(q[i].matches(".multipleInviteInteraction  > .computed[formula]")) {
+    q[i].setAttribute("ghost-inviteInteraction", "true");
+  }
   var formula = q[i].getAttribute(formula);
-  q[i].addEventListener("dblclick", formulaDisplay);
-  q[i].addEventListener("touchstart", ((qi) => () => {
-    console.log("started timer");
+  q[i].addEventListener("dblclick", formulaDisplay(i, q));
+  q[i].addEventListener("touchstart", ((qi, i) => () => {
     timermousedown = setTimeout(() => {
-      console.log("finished timer");
       timermousedown = undefined;
-      formulaDisplay.bind(qi)();
+      formulaDisplay.bind(qi)(i, q);
     }, 1000);
-  })(q[i]));
+  })(q[i], i));
   q[i].addEventListener("touchend", () => {
     if(typeof timermousedown != "undefined")
       clearTimeout(timermousedown);
