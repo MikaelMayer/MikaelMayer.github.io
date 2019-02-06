@@ -260,7 +260,7 @@ del {
   }
 }
 [ghost-visible=false] {
-  display: none;
+  display: none !important;
 }
 .spacebeforeparam {
   min-width: 0.7em;
