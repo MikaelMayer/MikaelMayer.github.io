@@ -1,5 +1,7 @@
 preludeEnv = __CurrentEnv__
 
+ace language code = <div language=@language code=@code list-ghost-attributes="class draggable style" children-are-ghosts="true" save-ghost-attributes="style"></div>
+
 <html><head><meta content="text/html; charset=UTF-8" http-equiv="content-type">
 <link rel="stylesheet" type="text/css" href="index.css">
 <style>
@@ -31,19 +33,52 @@ Programming is an art. There are many ways to achieve the same purpose. In this 
 <p>
 Let us look at the following function in Javascript:
 </p>
-<pre><div code="""
-var convertData = function(input) {
+@(ace "javascript" """var convertData = (input) => {
   var intermediate = convert(input)
-  if(intermediate == null)
-    return {ctor: "Err", _0: input + " is not convertible"};
+  if(intermediate === null)
+    return {ctor: "Err", _0: "problem 1"};
   var intermediate2 = convert2(intermediate); // Always succeed
-  intermediate3 = convert2(intermediate2);
-  if(intermediate3 == null) return {ctor: "Err", _0: input + " is not convertible again"};
+  intermediate3 = convert3(intermediate2);
+  if(intermediate3 === null)
+    return {ctor: "Err", _0: "problem 2"};
   return {ctor: "Ok", _0: intermediate3}
-}
-""" list-ghost-attributes="class draggable style" children-are-ghosts="true" save-ghost-attributes="style"></div></pre>
+}""")
+<p>
+It's a no-brainer to convert it to a functional language such as Haskell or Elm:
+</p>
+@(ace "haskell" """convertData input =
+  case convert input of
+    Nothing -> Err "problem 1"
+    Just intermediate ->
+      let intermediate2 = convert2 intermediate in
+      case convert3 intermediate of
+        Nothing -> Err "problem 2"
+        Just intermediate3 ->
+          Ok intermediate3""")
+<p>However, this is not much more concise. Plus, we need indentation which looks ugly. Fortunately, we can re-write our function in a monadic style to avoid having to do pattern matching:</p>
+@(ace "haskell" """convertData input =
+  convert input
+  |> Maybe.map convert2
+  |> Maybe.andThen convert3
+  |> Result.fromMaybe  "problem" """)
+<p>
+The operator <code>|&gt;</code> passes the computation to the left as the last argument of the expression to the right. This formulation is nice, because now we don't need to name intermediate, we can just chain functions.
+However, we loose the possibility to report custom errors at step 1 and 3.
+Fortunately, there is another way to express the same chain, using the fold operator:</p>
+@(ace "haskell" """convertData input =
+  do (convert input)
+  <| Maybe.fold (Err "problem 1")
+  <| do convert3
+  <| Maybe.fold (Err "problem 2")
+  <| Ok
+  
+do argument callback =
+     callback argument
+""")
+</p>
 </div>
 <script>
+(setGhostOnInserted || []).push(insertedNode => insertedNode.tagName == "SCRIPT" && insertedNode.getAttribute("src") && insertedNode.getAttribute("src").startsWith("https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.2/mode-"));
 var script = document.createElement('script');
 script.src = 'https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.2/ace.js';
 script.async = false;
@@ -51,14 +86,15 @@ script.setAttribute("isghost", "true");
 document.head.appendChild(script);
 script = document.createElement('script');
 script.innerText = `
-  var q = document.querySelectorAll("pre > div[code]");
+  var q = document.querySelectorAll("div[code]");
   for(var i = 0; i < q.length; i++) {
+    var language = q[i].getAttribute("language") || "javascript";
     var aceeditor = ace.edit(q[i], {
-      mode: "ace/mode/javascript",
-      selectionStyle: "text",
+      mode: "ace/mode/" + language,
       maxLines: 30
     });
     aceeditor.setValue(q[i].getAttribute("code"));
+    aceeditor.selection.clearSelection();
     aceeditor.on("change", ((qi, aceeditor) => (e) => {
       qi.setAttribute("code", aceeditor.getValue());
       })(q[i], aceeditor))
