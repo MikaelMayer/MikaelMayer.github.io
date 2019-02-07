@@ -921,7 +921,7 @@ for(var i = 0; i < q.length; i++) {
   q[i].addEventListener("touchstart", ((qi, i) => () => {
     timermousedown = setTimeout(() => {
       timermousedown = undefined;
-      formulaDisplay.bind(qi)(i, q);
+      formulaDisplay(i, q).bind(qi)();
     }, 1000);
   })(q[i], i));
   q[i].addEventListener("touchend", () => {
