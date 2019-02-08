@@ -21,9 +21,10 @@ ace language code = <div language=@language code=@code list-ghost-attributes="cl
 markcodeghostactive step = """
 var q = @(step).querySelectorAll("div[code][ghost-active]");
 if(q.length == 0) {
-  q = @(step).querySelectorAll("div[code]")
+  var whichone = @(step).matches(".second") ? 1 : 0;
+  q = @(step).querySelectorAll("div[code]");
   for(var i = 0; i < q.length; i++) {
-    q[i].setAttribute("ghost-active", i == 0 ? "true" : "false");
+    q[i].setAttribute("ghost-active", i == whichone ? "true" : "false");
   }
 }"""
 
@@ -49,8 +50,8 @@ otherurl =
        buildFilename otherlanguage |> Result.toMaybe)
   |> Maybe.withDefault  ("2019-02-08-essense-of-functional-programming.leo?lang=" + otherlanguage)
   
-steps codeEditors =
-  <div class="step"><button class="previous" onclick="""
+steps otherclasses codeEditors =
+  <div class=@("step" + otherclasses)><button class="previous" onclick="""
 var step = this.parentNode;
 @(markcodeghostactive "step");
 var q = step.querySelector("div[code][ghost-active=true]");
@@ -100,8 +101,9 @@ if(q && qs.length > 0 && qs[qs.length - 1].matches("div[code][ghost-active=false
 <style>
 .step > button {
   min-height: 48px;
+  font-size: xx-large;
 }
-button.previous:not([ghost-active=true]) {
+div.step:not(.second) button.previous:not([ghost-active=true]), div.step button.previous[ghost-active=false] {
   opacity: 0.5;
   cursor: inherit;
 }
@@ -116,7 +118,10 @@ button.final[ghost-active=false] {
 div.step > div[code] {
   display: none;
 }
-div.step > div[code]:not([ghost-active=false]):first-of-type {
+div.step:not(.second) > div[code]:not([ghost-active=false]):first-of-type {
+  display: block;
+}
+div.step.second > div[code]:not([ghost-active=false]):nth-of-type(2) {
   display: block;
 }
 
@@ -191,7 +196,8 @@ convertData input =
 <h2>From pattern matching to monadic style</h2>
 However, besides type-checking, pattern matching does not provide that much benefit. For example, we still have intermediate names.
 To avoid intermediate names, we can re-write our function in a monadic style:
-@(steps [ace langkeyword """convertData@co a -> @result String d
+@(steps " second" [
+ace langkeyword """convertData@co a -> @result String d
 convertData input =
   case convert input of
     Nothing ->
@@ -292,11 +298,13 @@ Fortunately, there is another way to express the initial chain to catch early er
 """)
 
 Using <code>@maybefold</code>, we can now express <code>convertData</code> in the following way:
-@(steps [
+@(steps "" [
 ace langkeyword """convertData@co a -> @result String d
 convertData input =
   case convert input of
-    Nothing -> @err "problem 1"
+    Nothing ->
+      @err "problem 1"
+
     Just intermediate ->
       let intermediate2 = convert2 intermediate in
       case convert3 intermediate2 of
@@ -337,7 +345,8 @@ It seems that we are stuck, but fortunately, we can define <code>@with</code> th
 @with function callback value =
        callback (function value)""")
 so that now we can continue the transformation:
-@(steps [ace langkeyword """convertData@co a -> @result String d
+@(steps " second" [
+ace langkeyword """convertData@co a -> @result String d
 convertData input =
   convert input
   @fw @maybefold (@err "problem 1") (\intermediate ->
@@ -437,7 +446,23 @@ convertData =
 The operator <code>@bw</code> passes the expression at its right (in our case, always a callback) as the last argument of the expression to its left.<br> In general, callbacks have also the advantage of being immediately compatible with asynchronous computations.<br>
 Moreover, what if <code>convertData</code> also accepted a callback as the first argument? Then we would be able to express it even more concisely.
 
-@(steps [
+@(steps " second" [
+ace langkeyword """convertData@co a -> @result String d
+convertData =
+    @with convert 
+  @bw @maybefold (@err "problem 1")
+  @bw @with convert2
+  @bw @with convert3 
+  @bw @maybefold (@err "problem 2")
+  @bw @ok""",
+ace langkeyword """convertData@co a -> @result String d
+convertData input =
+  ( @with convert 
+  @bw @maybefold (@err "problem 1")
+  @bw @with convert2
+  @bw @with convert3 
+  @bw @maybefold (@err "problem 2")
+  @bw @ok ) input""",
 ace langkeyword """convertData@co (@result String d -> e) -> a -> e
 convertData callback input =
   ( @with convert
