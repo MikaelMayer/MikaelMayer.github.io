@@ -466,13 +466,17 @@ convertData =
   @bb @with @ok"""])
 The operator <code>@bb</code> composes functions naturally, meaning <code>(f @bb g) x</code> = <code>f (g x)</code>.<br><br>
 At this point, it's normal to pause and marvel a bit. We use the operator <code>@bb</code> which is normally used to chain functions from right to left, that is,<br><code>(f @bb g) x</code> = <code>f (g x)</code>. In our case, because they are callbacks, the chaining makes the callbacks to be executed left to right, because <br><code>(f @bb g) callback x</code> = <br><code>(f @bw g callback) x</code> = <br><code>f (g callback) x</code> = <br><code>f (\y -> g callback y) x</code><br>which guarantees that g is executed with the result of f, not the other way round.
+
+
 <h2>Epilogue: Towards Church encoding</h2>
 It is surprising that, using default operators such as <code>@bb</code>, we obtain a code as concise as the imperative style, with error catching in the correct order.<br><br>
-In his minimalistic functional language where only functions are values, Church (cite) naturally encodes datatypes <code>Maybe</code> and <code>@result</code> as continuation passing style.
+In his minimalistic functional language where only functions are values, Church (cite) naturally encodes datatypes <code>Maybe</code> and <code>@result</code> as continuation passing style.<br>
 
-Therefore, a <code>Just x</code> becomes a <code>(\onNothing onJust -> onJust x)</code>, whereas a <code>Nothing</code> becomes a <code>(\onNothing onJust -> onNothing)</code>.
+Therefore, a <code>Just x</code> becomes a <code>(\onNothing onJust -> onJust x)</code>, whereas a <code>Nothing</code> becomes a <code>(\onNothing onJust -> onNothing)</code>.<br>
 
-Continuation-passing style is therefore not something new, but the original way of writing functional code.
+Continuation-passing style is therefore not something new, but the original way of writing functional code.<br>
+
+The inspiration of this article came from the <a href="https://github.com/MikaelMayer/MikaelMayer.github.io/blob/master/blog/hydefile.elm#L47">build file</a> itself I use to build this blog.
 </div>
 <script>
 (typeof setGhostOnInserted != "undefined" ? setGhostOnInserted : []).push(insertedNode => insertedNode.tagName == "SCRIPT" && insertedNode.getAttribute("src") && insertedNode.getAttribute("src").startsWith("https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.2/mode-"));
