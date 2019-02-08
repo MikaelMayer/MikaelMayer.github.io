@@ -1,5 +1,5 @@
 entries = [
-  ("2019-02-07-essence-of-functional-programming.html", "Essence of functional programming")
+  ("2019-02-08-essence-of-functional-programming.html", "Essence of functional programming")
 , ("2019-02-05-future-of-programming.html", "Abstract and Concrete: Future of Programming")
 ]
 
