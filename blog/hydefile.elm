@@ -53,8 +53,9 @@ convert vars nameBuilder filename =
         <| raiseError
     <| curry Write)
 
+essenceFilename = "2019-02-08-essence-of-functional-programming.leo"
 essence () =
-  let filename = "2019-02-07-essence-of-functional-programming.leo" in
+  let filename = essenceFilename in
   let addSuffix language filename =
        case language of
          "Elm" -> name.html filename
@@ -65,7 +66,7 @@ essence () =
     convert [("buildFilename", flip addSuffix filename), ("lang", lang)] (addSuffix lang) filename
   )
 
-exceptions = ["2019-02-07-essence-of-functional-programming.leo"]
+exceptions = [essenceFilename]
 
 notexceptions () = 
   fs.listdir "."
