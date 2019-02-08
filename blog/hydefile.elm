@@ -1,55 +1,77 @@
-do = flip
+with: (a -> b) -> (b -> c) -> a -> c
+with function callback value =
+       callback (function value)
 
-read: (Maybe String -> a) -> String -> a
-read callback name  =
-  callback <| fs.read name
+Tuple = { Tuple |
+    fold function1 function2 callback (first, second) =
+      callback (function1 first, function2 second)
+    foldSecond function = fold identity function
+    foldFirst function = fold function identity
+    
+    flip (a, b) = (b, a)
+}
 
-evalContinue: (Result String value -> a) -> String -> a
-evalContinue callback source =
-  callback <| __evaluate__ (__CurrentEnv__) source
+Result = { Result |
+    with: (a -> b -> c) -> Result err b -> (Result err c -> d) -> a -> d
+    with combine result callback value =
+      callback <| Result.map (combine value) result
+}
 
-{- -- Cons: nesting. Pro: Catches errors in chronological order
-all = 
-  case fs.read "FutureofProgramming.leo" of
-    Nothing -> Error "Could not open file"
-    Just c ->
-      case __evaluate__ __CurrentEnv__ c of
-        Err msg -> Error msg
-        Ok x ->
-          Write "FutureofProgramming.html" <| valToHTMLSource x
--}
+Debug = { Debug |
+  fold msg callback value =
+    callback <| Debug.log msg value
+}
 
+curry f (a, b) = f a b
 
-{- -- Pro: better composition?. Cons: Catches errors only at the end; nested structure.
-all = 
-  fs.read "FutureofProgramming.leo"
-  |> Maybe.map (\c ->
-    __evaluate__ __CurrentEnv__ c
-    |> Result.map (\x ->
-      Write "FutureofProgramming.html" <| valToHTMLSource x)
-    |> Result.withDefaultMapError Error 
+-- Specific to this file
+
+eval vars = __evaluate__ (("vars", vars):: __CurrentEnv__)
+
+name = {
+  html filename =
+    case Regex.extract "^(.*)\\.leo$" filename of
+      Just [x] -> Ok <| x + ".html"
+      Nothing -> Err <| "Not a valid leo file: " + filename
+
+  htmlWithSuffix suffix filename =
+    case Regex.extract "^(.*)\\.leo$" filename of
+      Just [x] -> Ok <| x + suffix + ".html"
+      Nothing -> Err <| "Not a valid leo file: " + filename
+}
+
+raiseError = Result.fold Error
+
+convert vars nameBuilder filename =
+  filename |>
+  (    with fs.read
+        <| Maybe.fold (Error <| "Could not open file " + filename)
+    <| with (eval (("filename", filename)::vars))
+        <| raiseError
+    <| with valToHTMLSource
+    <| Result.with (flip (,)) (nameBuilder filename)
+        <| raiseError
+    <| curry Write)
+
+essence () =
+  let filename = "2019-02-07-essence-of-functional-programming.leo" in
+  let addSuffix language filename =
+       case language of
+         "Elm" -> name.html filename
+         x -> name.htmlWithSuffix ("-" + String.toLowerCase x) filename
+  in
+  ["Elm", "Haskell"]
+  |> List.map (\lang ->
+    convert [("buildFilename", flip addSuffix filename), ("lang", lang)] (addSuffix lang) filename
   )
-  |> Maybe.withDefault (Error "Could not open file")
--}
 
-convert filename =
-  case Regex.extract "^(.*)\\.leo$" filename of
-    Nothing -> [Error <| "File " + name + " not a valid leo file."]
-    Just [name] ->
-      do
-      read filename <|                            --Update.debugFold"read" <|
-      Maybe.fold (Error "Could not open file") <| --Update.debugFold "mb" <|
-      evalContinue <|                             --Update.debugFold "eval" <|
-      Result.fold Error <| \content ->
-        valToHTMLSource content |>                --Update.debugFold "write" |>
-         Write (name + ".html")
+exceptions = ["2019-02-07-essence-of-functional-programming.leo"]
 
--- Pro: Conciseness, no nesting 
-{--
-all = 
+notexceptions () = 
   fs.listdir "."
   |> List.filter (Regex.matchIn "\\.leo$")
-  |> List.map convert
---}
+  |> List.filter (not << flip List.contains exceptions)
+  |> List.map (convert [] name.html)
 
-all = convert "2019-02-05-future-of-programming.leo"
+all () =
+  notexceptions () ++ essence ()
