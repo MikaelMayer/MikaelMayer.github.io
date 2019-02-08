@@ -195,7 +195,7 @@ convertData input =
 
 <h2>From pattern matching to monadic style</h2>
 However, besides type-checking, pattern matching does not provide that much benefit. For example, we still have intermediate names.
-To avoid intermediate names, we can re-write our function in a monadic style:
+To avoid intermediate names, we can re-write our function in a monadic style (press Next&gt; to view the refactoring step by step):
 @(steps " second" [
 ace langkeyword """convertData@co a -> @result String d
 convertData input =
@@ -297,7 +297,7 @@ Fortunately, there is another way to express the initial chain to catch early er
       onJust x
 """)
 
-Using <code>@maybefold</code>, we can now express <code>convertData</code> in the following way:
+Using <code>@maybefold</code>, let's start over from pattern matching and express <code>convertData</code> in another way:
 @(steps "" [
 ace langkeyword """convertData@co a -> @result String d
 convertData input =
@@ -340,8 +340,8 @@ convertData input =
       @fw @maybefold (@err "problem 2") @ok
      )"""])
 
-It seems that we are stuck, but fortunately, we can define <code>@with</code> that transforms function application to callback style:
-@(ace langkeyword """@with@co (a -> b) -> (b -> c) -> a -> c)
+It might seem that we cannot refactor further. Fortunately, we can define <code>@with</code> that transforms function application to callback style:
+@(ace langkeyword """@with@co (a -> b) -> (b -> c) -> a -> c
 @with function callback value =
        callback (function value)""")
 so that now we can continue the transformation:
@@ -444,7 +444,7 @@ convertData =
   @bw @ok"""])
 
 The operator <code>@bw</code> passes the expression at its right (in our case, always a callback) as the last argument of the expression to its left.<br> In general, callbacks have also the advantage of being immediately compatible with asynchronous computations.<br>
-Moreover, what if <code>convertData</code> also accepted a callback as the first argument? Then we would be able to express it even more concisely.
+Moreover, what if <code>convertData</code> also accepted a callback as the first argument? Then we would be able to express it concisely as well.
 
 @(steps " second" [
 ace langkeyword """convertData@co a -> @result String d
@@ -497,11 +497,12 @@ At this point, it's normal to pause and marvel a bit. We use the operator <code>
 It is surprising that, using default operators such as <code>@bb</code>, we obtain a code as concise as the imperative style, with error catching in the correct order.<br><br>
 In his minimalistic functional language where only functions are values, Church (cite) naturally encodes datatypes <code>Maybe</code> and <code>@result</code> as continuation passing style.<br>
 
+
 Therefore, a <code>Just x</code> becomes a <code>(\onNothing onJust -> onJust x)</code>, whereas a <code>Nothing</code> becomes a <code>(\onNothing onJust -> onNothing)</code>.<br>
 
-Continuation-passing style is therefore not something new, but the original way of writing functional code.<br>
+Continuation-passing style is therefore not something new, but the ancestral way of writing functional code.<br><br>
 
-The inspiration of this article came from the <a href="https://github.com/MikaelMayer/MikaelMayer.github.io/blob/master/blog/hydefile.elm#L47">build file</a> itself I use to build this blog.
+The inspiration of this article came from the <a href="https://github.com/MikaelMayer/MikaelMayer.github.io/blob/master/blog/hydefile.elm#L47">build file</a> itself I used to build this blog.
 </div>
 <script>
 (typeof setGhostOnInserted != "undefined" ? setGhostOnInserted : []).push(insertedNode => insertedNode.tagName == "SCRIPT" && insertedNode.getAttribute("src") && insertedNode.getAttribute("src").startsWith("https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.2/mode-"));
@@ -521,6 +522,8 @@ script.innerText = `
     });
     aceeditor.setValue(q[i].getAttribute("code"));
     aceeditor.selection.clearSelection();
+    aceeditor.setOption("highlightActiveLine", false);
+    aceeditor.setOption("readOnly", true);
     aceeditor.on("change", ((qi, aceeditor) => (e) => {
       qi.setAttribute("code", aceeditor.getValue());
       })(q[i], aceeditor))
