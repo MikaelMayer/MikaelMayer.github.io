@@ -148,8 +148,8 @@ div[code] {
 </head><body><div>
 
 <h1>The essence of functional programming</h1>
-<em>2019/02/07 &mdash; Mikaël Mayer</em>.
-<i>This article requires readers to be familiar with the notion of functional programming. It is written in @language. If you prefer @otherlanguage, you can also <a href=@otherurl>read this version of the article</a>.</i>
+<em>2019/02/07 &mdash; Mikaël Mayer</em>.<br>
+<i>This article requires readers to be familiar with the notion of functional programming. It is written in @language. If you prefer @otherlanguage, you can also <a href=@otherurl>read the @otherlanguage version of the article</a>.</i>
 <br><br>
 Programming is an art. There are many ways to achieve the same purpose. In this article, I will informally review some of the common idioms when it comes to chaining operations on data.
 <br><br>

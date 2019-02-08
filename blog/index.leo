@@ -1,4 +1,7 @@
-entries = [("2019-02-05-future-of-programming.html", "Abstract and Concrete: Future of Programming")]
+entries = [
+  ("2019-02-07-essence-of-functional-programming.html", "Essence of functional programming")
+, ("2019-02-05-future-of-programming.html", "Abstract and Concrete: Future of Programming")
+]
 
 dateOf name = Regex.extract """(\d\d\d\d-\d+-\d+)""" name 
   |> Maybe.map (\[x] -> x + ": ")
@@ -26,7 +29,7 @@ dateOf name = Regex.extract """(\d\d\d\d-\d+-\d+)""" name
 <body>
 <div>
 <h1>Mikaël Mayer's blog</h1>
-<button onclick="""
+<button style="display:none" onclick="""
   var ul = document.getElementById("entries");
   
 
