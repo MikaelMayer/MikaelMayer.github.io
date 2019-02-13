@@ -101,7 +101,7 @@ if(q && qs.length > 0 && qs[qs.length - 1].matches("div[code][ghost-active=false
 <style>
 .step > button {
   min-height: 48px;
-  font-size: xx-large;
+  font-size: 0.5rem;
 }
 div.step:not(.second) button.previous:not([ghost-active=true]), div.step button.previous[ghost-active=false] {
   opacity: 0.5;

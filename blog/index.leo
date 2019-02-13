@@ -1,6 +1,11 @@
+extension = if listDict.get "filename" vars /= Nothing then
+  ".html" else
+  ".leo"
+
 entries = [
-  ("2019-02-08-essence-of-functional-programming.html", "Essence of functional programming")
-, ("2019-02-05-future-of-programming.html", "Abstract and Concrete: Future of Programming")
+  ("2019-02-13-google-docs-formulas", "Formulas for Google Docs"),
+  ("2019-02-08-essence-of-functional-programming", "Essence of functional programming"),
+  ("2019-02-05-future-of-programming", "Abstract and Concrete: Future of Programming")
 ]
 
 dateOf name = Regex.extract """(\d\d\d\d-\d+-\d+)""" name 
@@ -35,7 +40,7 @@ dateOf name = Regex.extract """(\d\d\d\d-\d+-\d+)""" name
 
 """></button>
 @(["ul", [["id", "entries"]], flip List.map entries <| \(file, title) ->
-  <li><a href=@file>@(dateOf file) @title</a></li>
+  <li><a href=@(file + extension)>@(dateOf file) @title</a></li>
 ])
 </div>
 </body>
