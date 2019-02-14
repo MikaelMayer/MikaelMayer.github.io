@@ -116,7 +116,7 @@ Once you're done, click on "Formulas" and then "Evaluate formulas" to replace th
 
 <h2>Availability</h2>
 
-This extension is available as a <a href="https://chrome.google.com/webstore/detail/kgjbgmonlnhglokmfnpnklegakfknbeh/publish-accepted-testers?authuser=0&hl=fr">Google docs add-on</a> that can be added to any document by opening it, open "Add-ons" and click "Add add-on", and look for "Formulas for Google Docs".
+This extension is available as a <a href="https://chrome.google.com/webstore/detail/kgjbgmonlnhglokmfnpnklegakfknbeh">Google docs add-on</a> that can be added to any document by opening it, open "Add-ons" and click "Add add-on", and look for "Formulas for Google Docs".
 
 <h2>Wish list</h2>
 
