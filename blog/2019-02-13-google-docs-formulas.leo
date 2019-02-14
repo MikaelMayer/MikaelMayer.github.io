@@ -114,6 +114,10 @@ Once you're done, click on "Formulas" and then "Evaluate formulas" to replace th
   <b>MySoft 1.0</b> is a niiiiiiiiiice software based on bidirectional evaluation <a href="https://dl.acm.org/citation.cfm?id=3276497">[mayer18]</a> that goes beyond the original ideas of prodirect manipulation <a href="https://dl.acm.org/citation.cfm?id=2908103">[chugh16]</a>
 </blockquote>
 
+<h2>Availability</h2>
+
+This extension is available as a <a href="https://chrome.google.com/webstore/detail/kgjbgmonlnhglokmfnpnklegakfknbeh/publish-accepted-testers?authuser=0&hl=fr">Google docs add-on</a> that can be added to any document by opening it, open "Add-ons" and click "Add add-on", and look for "Formulas for Google Docs".
+
 <h2>Wish list</h2>
 
 There are many features one would like from this extension:
@@ -122,7 +126,7 @@ There are many features one would like from this extension:
 <li>Give a name to some portion of the text within the document</li>
 <li>Automatically find the formula that would generate some text prefixed with @@</li>
 </ul>
-They will be coming soon, stay tuned!
+They will be coming soon, stay tuned!<br><br>
 
 Copy-and paste is unfortunately cannot be supported due to how formulas are stored. However, you can reveal a particular formula to duplicate it.
 </div>
