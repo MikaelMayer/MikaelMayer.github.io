@@ -24,9 +24,16 @@ Debug = { Debug |
 
 curry f (a, b) = f a b
 
+include vars filename = filename |>
+  (with fs.read
+   <| Maybe.foldLazy (\_ -> <span class="error">File @filename could not be found</span>)
+   <| with (\x -> __evaluate__ (("vars", vars)::("include", include vars)::__CurrentEnv__) x)
+   <| Result.fold (\msg -> <span class="error">Error: @msg</span>)
+   <| identity)
+
 -- Specific to this file
 
-eval vars = __evaluate__ (("vars", vars):: __CurrentEnv__)
+eval vars = __evaluate__ (("vars", listDict.insert "include" "true" vars)::("include", include vars)::__CurrentEnv__)
 
 name = {
   html filename =

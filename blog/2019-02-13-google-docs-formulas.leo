@@ -1,3 +1,5 @@
+include = if listDict.get "include" vars == Just "true" then include else (always [])
+
 preludeEnv = __CurrentEnv__
 
 booleandesc = <span>boolean (<code>true</code> or <code>false</code>).</span>
@@ -35,7 +37,7 @@ span.formula {
   background: #FFAA22;
 }
 </style>
-</head><body><div>
+</head><body>@(include "menu.elm")<div>
 
 <h1>Formulas for Google Docs</h1>
 <em>2019/02/13 &mdash; Mikaël Mayer</em>.<br>
@@ -128,6 +130,6 @@ There are many features one would like from this extension:
 </ul>
 They will be coming soon, stay tuned!<br><br>
 
-Copy-and paste is unfortunately cannot be supported due to how formulas are stored. However, you can reveal a particular formula to duplicate it.
+Copy-and paste unfortunately cannot be supported due to how formulas are stored. However, you can reveal a particular formula to duplicate it.
 </div>
 </body></html>

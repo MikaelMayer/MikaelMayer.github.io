@@ -15,3 +15,7 @@ body a {
   line-height: 1.58;
   letter-spacing: -.003em;
 }
+div.menu > a {
+  position: fixed;
+  right: 1em;
+}

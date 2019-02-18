@@ -9,13 +9,35 @@ entries = [
 ]
 
 dateOf name = Regex.extract """(\d\d\d\d-\d+-\d+)""" name 
-  |> Maybe.map (\[x] -> x + ": ")
+  |> Maybe.map (\[x] -> x)
   |> Maybe.withDefault ""
 
 <html>
 <head>
 <link rel="stylesheet" type="text/css" href="index.css">
 <style>
+img.mini {
+  width: 15em;
+}
+ul {
+  list-style-type: none;
+}
+a.entry {
+  text-decoration: none;
+  display: inline-block;
+  vertical-align: top;
+}
+div.entry {
+  display: inline-block;
+  width: 15.1em;
+  height: 9em;
+  margin-right: 0.4em;
+  margin-bottom: 1em;
+}
+div.subtitle {
+  height: 3em;
+  width: 15.1em;
+}
 @@media (orientation: landscape) {
   body > div {
     margin-left: auto;
@@ -28,6 +50,28 @@ dateOf name = Regex.extract """(\d\d\d\d-\d+-\d+)""" name
     margin-left: 5px;
     margin-right: 5px;
   }
+  a.entry {
+    width: 100%;
+    display: block;
+  }
+  img.mini {
+    width: 98%;
+    margin-top: 1%;
+    margin-left: 1%;
+  }
+  div.entry {
+    width: 100%;
+    display: block;
+    height: auto;
+    font-size: 5vh;
+  }
+  div.subtitle {
+    height: auto;
+    width: 100%;
+  }
+  a.entry:nth-child(even) {
+    background: #DDD;
+  }
 }
 </style>
 </head>
@@ -39,9 +83,9 @@ dateOf name = Regex.extract """(\d\d\d\d-\d+-\d+)""" name
   
 
 """></button>
-@(["ul", [["id", "entries"]], flip List.map entries <| \(file, title) ->
-  <li><a href=@(file + extension)>@(dateOf file) @title</a></li>
-])
+@(flip List.map entries <| \(file, title) ->
+  let mini = "miniatures/" + file + ".png" in
+  <a class="entry" href=@(file + extension)><div class="entry">@(if fs.isfile mini then [<img class="mini" src=@mini>] else [])<div class="subtitle" title=@(dateOf file)>@title</div></div></a>)
 </div>
 </body>
 </html>

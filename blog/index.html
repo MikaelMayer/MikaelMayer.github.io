@@ -2,6 +2,28 @@
 <head>
 <link rel="stylesheet" type="text/css" href="index.css">
 <style>
+img.mini {
+  width: 15em;
+}
+ul {
+  list-style-type: none;
+}
+a.entry {
+  text-decoration: none;
+  display: inline-block;
+  vertical-align: top;
+}
+div.entry {
+  display: inline-block;
+  width: 15.1em;
+  height: 9em;
+  margin-right: 0.4em;
+  margin-bottom: 1em;
+}
+div.subtitle {
+  height: 3em;
+  width: 15.1em;
+}
 @media (orientation: landscape) {
   body > div {
     margin-left: auto;
@@ -14,6 +36,28 @@
     margin-left: 5px;
     margin-right: 5px;
   }
+  a.entry {
+    width: 100%;
+    display: block;
+  }
+  img.mini {
+    width: 98%;
+    margin-top: 1%;
+    margin-left: 1%;
+  }
+  div.entry {
+    width: 100%;
+    display: block;
+    height: auto;
+    font-size: 5vh;
+  }
+  div.subtitle {
+    height: auto;
+    width: 100%;
+  }
+  a.entry:nth-child(even) {
+    background: #DDD;
+  }
 }
 </style>
 </head>
@@ -21,7 +65,7 @@
 <div>
 <h1>Mikaël Mayer's blog</h1>
 <button style="display:none" onclick="&#13;&#10;  var ul = document.getElementById(&quot;entries&quot;);&#13;&#10;  &#13;&#10;&#13;&#10;"></button>
-<ul id="entries"><li><a href="2019-02-13-google-docs-formulas.html">2019-02-13:  Formulas for Google Docs</a></li><li><a href="2019-02-08-essence-of-functional-programming.html">2019-02-08:  Essence of functional programming</a></li><li><a href="2019-02-05-future-of-programming.html">2019-02-05:  Abstract and Concrete: Future of Programming</a></li></ul>
+<a class="entry" href="2019-02-13-google-docs-formulas.html"><div class="entry"><img class="mini" src="miniatures/2019-02-13-google-docs-formulas.png"><div class="subtitle" title="2019-02-13">Formulas for Google Docs</div></div></a><a class="entry" href="2019-02-08-essence-of-functional-programming.html"><div class="entry"><img class="mini" src="miniatures/2019-02-08-essence-of-functional-programming.png"><div class="subtitle" title="2019-02-08">Essence of functional programming</div></div></a><a class="entry" href="2019-02-05-future-of-programming.html"><div class="entry"><img class="mini" src="miniatures/2019-02-05-future-of-programming.png"><div class="subtitle" title="2019-02-05">Abstract and Concrete: Future of Programming</div></div></a>
 </div>
 </body>
 </html>

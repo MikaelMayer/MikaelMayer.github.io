@@ -1,3 +1,6 @@
+-- Until there is a built-in include
+include = if listDict.get "include" vars == Just "true" then include else (always [])
+
 preludeEnv = __CurrentEnv__
 
 {- @render selector elem = case __closure_unapply__ selector of
@@ -442,7 +445,7 @@ img.icon {
 <script>
 var formatDate = @formatDate
 </script>
-</head><body><div>
+</head><body>@(include "menu.elm")<div>
 
 <h1>Abstract and Concrete: Future of Programming</h1>
 <em>2019/02/05 &mdash; Mikaël Mayer</em>

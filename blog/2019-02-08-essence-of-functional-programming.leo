@@ -1,3 +1,5 @@
+include = if listDict.get "include" vars == Just "true" then include else (always [])
+
 preludeEnv = __CurrentEnv__
 
 Maybe = { Maybe |
@@ -150,7 +152,7 @@ div[code] {
   margin-bottom: 5px;
 }
 </style>
-</head><body><div>
+</head><body>@(include "menu.elm")<div>
 
 <h1>The essence of functional programming</h1>
 <em>2019/02/08 &mdash; Mikaël Mayer</em>.<br>
