@@ -37,7 +37,12 @@ span.formula {
   background: #FFAA22;
 }
 </style>
-</head><body>@(include "menu.elm")<div>
+</head><body><script>
+(setGhostOnInserted || []).push(i => i.tagName == "IFRAME" && (i.classList.contains("twitter-tweet-button") || i.classList.contains("twitter-mention-button") ||
+i.getAttribute("src") && i.getAttribute("src").indexOf("platform.twitter.com") >= 0));
+(setGhostOnInserted || []).push(i => i.tagName == "SCRIPT" && i.getAttribute("charset") == "utf-8");
+(setGhostOnInserted || []).push(i => i.tagName == "STYLE" && i.getAttribute("type") == "text/css");
+</script>@(include "menu.elm")<div>
 
 <h1>Formulas for Google Docs</h1>
 <em>2019/02/13 &mdash; Mikaël Mayer</em>.<br>
@@ -58,12 +63,11 @@ Anywhere in the document, write = followed by either
 <ul>
 <li>a name</li>
 <li>a name followed by a JavaScript expression in parentheses</li>
-<li>a JavaScript expression inside parentheses or square brackets</li>
-</ul>
-For example, in a document, you would write raw
+<li>a JavaScript expression inside parentheses or square brackets.<br>If, right after the first parentheses, there is a comment such as /*name=*/, name will be defined with the result of the expression.</li>
+</ul>For example, in a document, you would write raw
 <blockquote>
   <span class="h1">=name is out!</span>
-  =[name, {bold: true}] is a n=(function() { var x = ""; var i = 10; while(i-- > 0) x = x + "i"; return x} ())ce software based on bidirectional evaluation =cite("mayer18") that goes beyond the original ideas of prodirect manipulation =cite("chugh16")
+  =[name, {bold: true}] is a n=(function() { var x = ""; var i = 10; while(i-- > 0) x = x + "i"; return x} ())ce =(/*s=*/"software") based on bidirectional evaluation =cite("mayer18") that goes beyond the original ideas of prodirect manipulation =s =cite("chugh16")
 </blockquote>
 
 <h2>Render formulas</h2>
@@ -71,7 +75,7 @@ Open the menu "Formulas" and click on "Evaluate formulas". The document above wo
 
 <blockquote>
   <span class="h1">MySoft 1.0 beta is out!</span>
-  <b>MySoft 1.0 beta</b> is a niiiiiiiiiice software based on bidirectional evaluation <a href="https://dl.acm.org/citation.cfm?id=3276497">[mayer18]</a> that goes beyond the original ideas of prodirect manipulation <a href="https://dl.acm.org/citation.cfm?id=2908103">[chugh16]</a>
+  <b>MySoft 1.0 beta</b> is a niiiiiiiiiice software based on bidirectional evaluation <a href="https://dl.acm.org/citation.cfm?id=3276497">[mayer18]</a> that goes beyond the original ideas of prodirect manipulation software <a href="https://dl.acm.org/citation.cfm?id=2908103">[chugh16]</a>
 </blockquote>
 
 Formulas used in the document should either return raw text, or a 2-element array where the first element is the text, and the second is a Javascript object containing styling material. If the method <code>setThing</code> exists in <a href="https://developers.google.com/apps-script/reference/document/text">this page</a>, then <code>thing : value</code> is a valid style attribute. Here is a list of supported attributes and shortcuts
@@ -95,7 +99,7 @@ To make sure a field is computed and not just text, open "Formulas" and then cli
 
 <blockquote>
   <span class="h1"><span class="highlight">MySoft 1.0 beta</span> is out!</span>
-  <span class="highlight"><b>MySoft 1.0 beta</b></span> is a n<span class="highlight">iiiiiiiiii</span>ce software based on bidirectional evaluation <span class="highlight"><a href="https://dl.acm.org/citation.cfm?id=3276497">[mayer18]</a></span> that goes beyond the original ideas of prodirect manipulation <span class="highlight"><a href="https://dl.acm.org/citation.cfm?id=2908103">[chugh16]</a></span>
+  <span class="highlight"><b>MySoft 1.0 beta</b></span> is a n<span class="highlight">iiiiiiiiii</span>ce <span class="highlight">software</span> based on bidirectional evaluation <span class="highlight"><a href="https://dl.acm.org/citation.cfm?id=3276497">[mayer18]</a></span> that goes beyond the original ideas of prodirect manipulation <span class="highlight">software</span> <span class="highlight"><a href="https://dl.acm.org/citation.cfm?id=2908103">[chugh16]</a></span>
 </blockquote>
 
 You can hide these highlights by opening "Formulas" and click on "Remove highlights".
@@ -106,14 +110,14 @@ It can be useful to change formulas. To do so, open "Formulas" and click on "Rev
 
 <blockquote>
   <span class="h1"><span class="formula">=name</span> is out!</span>
-  <span class="formula">=name</span> is a n<span class="formula">=(function() { var x = ""; var i = 10; while(i-- > 0) x = x + "i"; return x} ())</span>ce software based on bidirectional evaluation <span class="formula">=cite("mayer18")</span> that goes beyond the original ideas of prodirect manipulation <span class="formula">=cite("chugh16")</span>
+  <span class="formula">=name</span> is a n<span class="formula">=(function() { var x = ""; var i = 10; while(i-- > 0) x = x + "i"; return x} ())</span>ce <span class="formula">=(/*s=*/"software")</span> based on bidirectional evaluation <span class="formula">=cite("mayer18")</span> that goes beyond the original ideas of prodirect manipulation <span class="formula">=s</span> <span class="formula">=cite("chugh16")</span>
 </blockquote>
 
 Once you're done, click on "Formulas" and then "Evaluate formulas" to replace the formulas by their values.<br>If you click on "Reveal formula under cursor", and the cursor touches a formula, it will let you edit only this formula, for example
 
 <blockquote>
   <span class="h1"><span class="formula">=name</span> is out!</span>
-  <b>MySoft 1.0</b> is a niiiiiiiiiice software based on bidirectional evaluation <a href="https://dl.acm.org/citation.cfm?id=3276497">[mayer18]</a> that goes beyond the original ideas of prodirect manipulation <a href="https://dl.acm.org/citation.cfm?id=2908103">[chugh16]</a>
+  <b>MySoft 1.0</b> is a niiiiiiiiiice software based on bidirectional evaluation <a href="https://dl.acm.org/citation.cfm?id=3276497">[mayer18]</a> that goes beyond the original ideas of prodirect manipulation software <a href="https://dl.acm.org/citation.cfm?id=2908103">[chugh16]</a>
 </blockquote>
 
 <h2>Availability</h2>
@@ -124,11 +128,19 @@ This extension is available as a <a href="https://chrome.google.com/webstore/det
 
 There are many features one would like from this extension:
 <ul>
-<li>Modify a formula's value from anywhere in the document</li>
-<li>Give a name to some portion of the text within the document</li>
-<li>Automatically find the formula that would generate some text prefixed with @@</li>
+<li>Modify a formula or a name's value by modifying its output anywhere.</li>
+<li>Convert selected text to a formula (and possibly assign it a name).</li>
+<li>Reading data from spreadsheet or other APIs</li>
+<li>Generate elements other than text, e.g. tables, headings, equations, etc.</li>
+<li>Keyboard shortcuts</li>
 </ul>
-They will be coming soon, stay tuned!<br><br>
+They might be coming soon. If you want them sooner, 
+<span children-are-ghosts="true" id="twitterlink"></span>
+<script>
+var t = document.querySelector("#twitterlink");
+t.innerHTML = `<a href="https://twitter.com/intent/tweet?screen_name=MikaelMayer&ref_src=twsrc%5Etfw" class="twitter-mention-button" data-size="large" data-text="Simple but amazing idea: add formulas to google docs. I can&#39;t wait for ..." data-show-count="false">Tweet to @@MikaelMayer</a>`
+</script>
+<script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script><br><br>
 
 Copy-and paste unfortunately cannot be supported due to how formulas are stored. However, you can reveal a particular formula to duplicate it.
 </div>
