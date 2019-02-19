@@ -83,3 +83,13 @@ notexceptions () =
 
 all () =
   notexceptions () ++ essence ()
+
+last () =
+  fs.listdir "."
+  |> List.filter (Regex.matchIn "\\.leo$")
+  |> List.filter (not << (== "index.leo"))
+  |> List.reverse
+  |> List.head
+  |> Maybe.map (convert [] name.html)
+  |> Maybe.withDefault []
+  
