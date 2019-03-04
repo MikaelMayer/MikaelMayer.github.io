@@ -504,7 +504,7 @@ Therefore, a <code>Just x</code> becomes a <code>(\onNothing onJust -> onJust x)
 
 Continuation-passing style is therefore not something new, but the ancestral way of writing functional code.<br><br>
 
-The inspiration of this article came from the <a href="https://github.com/MikaelMayer/MikaelMayer.github.io/blob/master/blog/hydefile.elm#L47">build file</a> itself I used to build this blog.
+The inspiration of this article came from the <a href="https://github.com/MikaelMayer/MikaelMayer.github.io/blob/master/blog/hydefile.elm#L54">build file</a> itself I used to build this blog.
 </div>
 <script>
 (typeof setGhostOnInserted != "undefined" ? setGhostOnInserted : []).push(insertedNode => insertedNode.tagName == "SCRIPT" && insertedNode.getAttribute("src") && insertedNode.getAttribute("src").startsWith("https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.2/mode-"));
