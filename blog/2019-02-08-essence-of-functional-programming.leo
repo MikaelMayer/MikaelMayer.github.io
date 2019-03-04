@@ -497,7 +497,7 @@ At this point, it's normal to pause and marvel a bit. We use the operator <code>
 
 <h2>Epilogue: Towards Church encoding</h2>
 It is surprising that, using default operators such as <code>@bb</code>, we obtain a code as concise as the imperative style, with error catching in the correct order.<br><br>
-In his minimalistic functional language where only functions are values, Church (cite) naturally encodes datatypes <code>Maybe</code> and <code>@result</code> as continuation passing style.<br>
+In his minimalistic functional language where only functions are values, Church <a href="https://en.wikipedia.org/wiki/Church_encoding">naturally encodes</a> datatypes <code>Maybe</code> and <code>@result</code> as continuation passing style.<br>
 
 
 Therefore, a <code>Just x</code> becomes a <code>(\onNothing onJust -> onJust x)</code>, whereas a <code>Nothing</code> becomes a <code>(\onNothing onJust -> onNothing)</code>.<br>
