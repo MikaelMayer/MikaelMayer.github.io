@@ -5,7 +5,16 @@ with function callback value =
 startWith: a -> (a -> b) -> b
 startWith initValue callback =
   callback initValue
-       
+{-
+nameLast: (b -> c) -> (b -> c)
+nameLast nameToCallback value =
+  nameToCallback value 
+-- Can be skipped. It's the same as writing <| \name -> startWith ...
+-}
+nameIt: (a -> a -> b) -> a -> b
+nameIt nameToCallback value =
+  nameToCallback value value
+  
 Tuple = { Tuple |
     fold function1 function2 callback (first, second) =
       callback (function1 first, function2 second)
@@ -29,9 +38,9 @@ Debug = { Debug |
 curry f (a, b) = f a b
 
 -- #1 Use of CPS
-include vars filename =
-      startWith filename
-   <| with fs.read
+include vars {-filename-} =
+   nameIt <| \filename ->
+   with fs.read
    <| Maybe.foldLazy (\_ -> <span class="error">File @filename could not be found</span>)
    <| with (\x -> __evaluate__ (("vars", vars)::("include", include vars)::__CurrentEnv__) x)
    <| Result.fold (\msg -> <span class="error">Error: @msg</span>)
@@ -56,9 +65,9 @@ name = {
 errToError = Result.fold Error
 
 -- #2 Use of CPS
-convert vars nameBuilder filename =
-       startWith filename
-    <| with fs.read
+convert vars nameBuilder {-filename-} =
+    nameIt <| \filename ->
+    with fs.read
         <| Maybe.fold (Error <| "Could not open file " + filename)
     <| with (eval (("filename", filename)::vars))
         <| errToError
@@ -75,10 +84,9 @@ essence () =
          "Elm" -> name.html filename
          x -> name.htmlWithSuffix ("-" + String.toLowerCase x) filename
   in
-  ["Elm", "Haskell"]
-  |> List.map (\lang ->
-    convert [("buildFilename", flip addSuffix filename), ("lang", lang)] (addSuffix lang) filename
-  )
+  flip List.map ["Elm", "Haskell"] <|
+    \lang ->
+      convert [("buildFilename", flip addSuffix filename), ("lang", lang)] (addSuffix lang) filename
 
 exceptions = [essenceFilename]
 
