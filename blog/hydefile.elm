@@ -2,6 +2,10 @@ with: (a -> b) -> (b -> c) -> a -> c
 with function callback value =
        callback (function value)
 
+startWith: a -> (a -> b) -> b
+startWith initValue callback =
+  callback initValue
+       
 Tuple = { Tuple |
     fold function1 function2 callback (first, second) =
       callback (function1 first, function2 second)
@@ -24,12 +28,14 @@ Debug = { Debug |
 
 curry f (a, b) = f a b
 
-include vars filename = filename |>
-  (with fs.read
+-- #1 Use of CPS
+include vars filename =
+      startWith filename
+   <| with fs.read
    <| Maybe.foldLazy (\_ -> <span class="error">File @filename could not be found</span>)
    <| with (\x -> __evaluate__ (("vars", vars)::("include", include vars)::__CurrentEnv__) x)
    <| Result.fold (\msg -> <span class="error">Error: @msg</span>)
-   <| identity)
+   <| identity
 
 -- Specific to this file
 
@@ -47,18 +53,19 @@ name = {
       Nothing -> Err <| "Not a valid leo file: " + filename
 }
 
-raiseError = Result.fold Error
+errToError = Result.fold Error
 
+-- #2 Use of CPS
 convert vars nameBuilder filename =
-  filename |>
-  (    with fs.read
+       startWith filename
+    <| with fs.read
         <| Maybe.fold (Error <| "Could not open file " + filename)
     <| with (eval (("filename", filename)::vars))
-        <| raiseError
+        <| errToError
     <| with valToHTMLSource
     <| Result.with (flip (,)) (nameBuilder filename)
-        <| raiseError
-    <| curry Write)
+        <| errToError
+    <| curry Write
 
 essenceFilename = "2019-02-08-essence-of-functional-programming.leo"
 essence () =
