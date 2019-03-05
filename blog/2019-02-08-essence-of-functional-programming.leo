@@ -45,7 +45,7 @@ with = "with"
      [],
      "Elm", "Haskell")
   "Haskell" ->
-    (" ::", "|>", ".>", "$", ".", "Right", "Left", "maybe", "fmap", "fromMaybe", "Either",
+    (" ::", "|>", ".>", "$ ", ". ", "Right", "Left", "maybe", "fmap", "fromMaybe", "Either",
      <span> (assuming the <a href="http://hackage.haskell.org/package/flow-1.0.17/docs/Flow.html">Flow operators for forward composition)</span>,
      "Haskell", "Elm")
 
@@ -56,7 +56,16 @@ otherurl =
   |> Maybe.andThen (\buildFilename ->
        buildFilename otherlanguage |> Result.toMaybe)
   |> Maybe.withDefault  ("2019-02-08-essense-of-functional-programming.leo?lang=" + otherlanguage)
-  
+
+syncbuttons step = """
+var first = @(step).querySelector("div[code]").getAttribute("ghost-active") == "true";
+@(step).querySelector("button.previous").setAttribute("ghost-active", first ? "false" : "true");
+
+var final = @(step).querySelector("div[code]:last-of-type").getAttribute("ghost-active") == "true";
+@(step).querySelector("button.next").setAttribute("ghost-active", final ? "false" : "true");
+@(step).querySelector("button.final").setAttribute("ghost-active", final ? "false" : "true");
+"""
+
 steps otherclasses codeEditors =
   <div class=@("step" + otherclasses)><button class="previous" onclick="""
 var step = this.parentNode;
@@ -65,15 +74,8 @@ var q = step.querySelector("div[code][ghost-active=true]");
 if(q && q.previousElementSibling && q.previousElementSibling.matches("div[code]")) {
   q.setAttribute("ghost-active", "false");
   q.previousElementSibling.setAttribute("ghost-active", "true");
-  step.querySelector("button.next").setAttribute("ghost-active", "true");
-  step.querySelector("button.final").setAttribute("ghost-active", "true");
 }
-if(q.previousElementSibling.previousElementSibling &&
-   q.previousElementSibling.previousElementSibling.matches("div[code]")) {
-} else {
-  step.querySelector("button.previous").setAttribute("ghost-active", "false");
-}
-""">&lt;Previous</button>&mdash;<button class="next" onclick="""
+@(syncbuttons "step")""">&lt;Previous</button>&mdash;<button class="next" onclick="""
 var step = this.parentNode;
 @(markcodeghostactive "step");
 var q = step.querySelector("div[code][ghost-active=true]");
@@ -82,13 +84,7 @@ if(q && q.nextElementSibling && q.nextElementSibling.matches("div[code]")) {
   q.nextElementSibling.setAttribute("ghost-active", "true");
   step.querySelector("button.previous").setAttribute("ghost-active", "true");
 }
-if(q.nextElementSibling.nextElementSibling &&
-   q.nextElementSibling.nextElementSibling.matches("div[code]")) {
-} else {
-  step.querySelector("button.next").setAttribute("ghost-active", "false");
-  step.querySelector("button.final").setAttribute("ghost-active", "false");
-}
-""">Next&gt;</button><button class="final" onclick="""
+@(syncbuttons "step")""">Next&gt;</button><button class="final" onclick="""
 var step = this.parentNode;
 @(markcodeghostactive "step");
 var qs = step.querySelectorAll("div[code][ghost-active]");
@@ -97,11 +93,11 @@ if(q && qs.length > 0 && qs[qs.length - 1].matches("div[code][ghost-active=false
   var last = qs[qs.length - 1];
   q.setAttribute("ghost-active", "false");
   last.setAttribute("ghost-active", "true");
-  step.querySelector("button.final").setAttribute("ghost-active", "false");
-  step.querySelector("button.next").setAttribute("ghost-active", "false");
-  step.querySelector("button.previous").setAttribute("ghost-active", "true");
 }
-""">Last&gt;&gt;</button>@codeEditors</div>
+@(syncbuttons "step")""">Last&gt;&gt;</button>@codeEditors<script>
+var step = document.currentScript.parentElement;
+@(markcodeghostactive "step")
+@(syncbuttons "step")</script></div>
 
 <html><head><meta content="text/html; charset=UTF-8" http-equiv="content-type">
 <link rel="stylesheet" type="text/css" href="index.css">
@@ -499,6 +495,111 @@ convertData =
 The operator <code>@bb</code> composes functions naturally, meaning <code>(f @bb g) x</code> = <code>f (g x)</code>.<br><br>
 At this point, it's normal to pause and marvel a bit. We use the operator <code>@bb</code> which is normally used to chain functions from right to left, that is,<br><code>(f @bb g) x</code> = <code>f (g x)</code>. In our case, because they are callbacks, the chaining makes the callbacks to be executed left to right, because <br><code>(f @bb g) callback x</code> = <br><code>(f @bw g callback) x</code> = <br><code>f (g callback) x</code> = <br><code>f (\y -> g callback y) x</code><br>which guarantees that g is executed with the result of f, not the other way round.
 
+<h2 id="non-linear-workflows">Non-linear workflows</h2>
+
+The previous style is great, but what if we need to refer to some of the intermediate results to parametrize a further computation?
+Although named disappeared, it's possible to reintroduce them.<br>
+Suppose that the new signature for <code>convert3</code> is the following:
+@(steps " second"  [
+ace langkeyword """convert@co a -> Maybe b
+convert2@co b -> c
+convert3@co c -> Maybe d""",
+ace langkeyword """convert@co a -> Maybe b
+convert2@co b -> c
+convert3@co b -> c -> Maybe d"""])
+
+Because of the callback-style workflow, it would be natural to write:
+@(steps " second" [
+ace langkeyword """convertData@co (@result String d -> e) -> a -> e
+convertData callback =
+     @with convert
+  @bw @maybefold (@err "problem 1")
+
+  @bw @with convert2
+  @bw @with convert3
+  @bw @maybefold (@err "problem 2")
+  @bw @with @ok
+  @bw callback""",
+ace langkeyword """convertData@co (@result String d -> e) -> a -> e
+convertData callback =
+     @with convert
+  @bw @maybefold (@err "problem 1")
+  @bw \b ->
+  (  @with convert2
+  @bw @with (convert3 b)
+  @bw @maybefold (@err "problem 2")
+  @bw @with @ok
+  @bw callback) b"""
+])
+However, it is hard to see how to reduce that further, and remove the <code>b</code> after parentheses.
+Looking closely, we see that the callback is in any case applying <code>b</code> to some function.
+This means we can give a name to this construct.
+Let us introduce the <code>nameIt</code> operator that builds a callback by applying the value twice to it:
+@(ace langkeyword """nameIt@co (a -> a -> b) -> a -> b
+nameIt nameToCallback value =
+  (nameToCallback value) value""")
+Now, the workflow can be rewritten:
+@(steps " second" [
+ace langkeyword """convertData@co (@result String d -> e) -> a -> e
+convertData callback =
+     @with convert
+  @bw @maybefold (@err "problem 1")
+  @bw \b ->
+  (  @with convert2
+  @bw @with (convert3 b)
+  @bw @maybefold (@err "problem 2")
+  @bw @with @ok
+  @bw callback) b""",
+ace langkeyword """convertData@co (@result String d -> e) -> a -> e
+convertData callback =
+     @with convert
+  @bw @maybefold (@err "problem 1")
+  @bw nameIt <| \b ->
+     @with convert2
+  @bw @with (convert3 b)
+  @bw @maybefold (@err "problem 2")
+  @bw @with @ok
+  @bw callback"""
+])
+To fully get rid of the <code>callback</code> argument, we would have to make <code>nameIt</code> accept it as second argument:
+@(ace langkeyword """withName@co (a -> a -> b) -> (b -> e) -> a -> e
+withName nameToCallback callback value =
+  (nameToCallback value callback) value""")
+Thus the final function becomes:
+@(steps " second" [
+ace langkeyword """convertData@co (@result String d -> e) -> a -> e
+convertData callback =
+     @with convert
+  @bw @maybefold (@err "problem 1")
+  @bw nameIt <| \b ->
+     @with convert2
+  @bw @with (convert3 b)
+  @bw @maybefold (@err "problem 2")
+  @bw @with @ok
+  @bw callback""",
+ace langkeyword """convertData@co (@result String d -> e) -> a -> e
+convertData callback =
+     @with convert
+  @bw @maybefold (@err "problem 1")
+  @bw withName (\b ->
+     @with convert2
+  @bb @with (convert3 b)
+  @bb @maybefold (@err "problem 2")
+  @bb @with @ok )
+  @bw callback""",
+ace langkeyword """convertData@co (@result String d -> e) -> a -> e
+convertData =
+    @with convert
+  @bb @maybefold (@err "problem 1")
+  @bb withName (\b ->
+     @with convert2
+  @bb @with (convert3 b)
+  @bb @maybefold (@err "problem 2")
+  @bb @with @ok )"""
+])
+
+Because @bb has higher precedence over @bw, we cannot remove the final parentheses.
+So choosing the earlier "@bw" version vs. the "@bb" version just above is a matter of taste.
 
 <h2>Epilogue: Towards Church encoding</h2>
 It is surprising that, using default operators such as <code>@bb</code>, we obtain a code as concise as the imperative style, with error catching in the correct order.<br><br>
