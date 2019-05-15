@@ -859,6 +859,10 @@ However, I used a tool that I am developing: <a href= "https://github.com/Mikael
 <br>Editor and Hyde are based on my <a href="https://dl.acm.org/citation.cfm?id=3276497">research on bidirectional programming</a>. Together, Editor and Hyde made the development of this page straightforward.</p><p>Would MikoWord be possible? I think so. MikoWord features the idea of displaying the tree of a <em>program</em> as an HTML tree, after a partial and forgiving evaluator ran on it.
 If you are interested by this project, follow me on <a href="https://twitter.com/MikaelMayer">Twitter</a>.
 If you are interested to contribute, <a list-ghost-attributes="href" prefix="mikael.mayer" onmouseover="this.setAttribute('href', 'mailto:' + this.getAttribute('prefix')+ '@polytechnique.org?subject=I+would+like+to+contribute+to+Future+of+Programming')">send me an email</a>.</p>
+<hr>
+<p>
+This work was supported by Swiss National Science Foundation Early Postdoc.Mobility Fellowship No. 175041
+</p>
 <script>
 var q = document.querySelectorAll("abbr[title]");
 for(var i = 0; i < q.length; i++) {

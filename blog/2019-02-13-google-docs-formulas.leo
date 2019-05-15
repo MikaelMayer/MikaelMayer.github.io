@@ -148,5 +148,8 @@ t.innerHTML = `<a href="https://twitter.com/intent/tweet?screen_name=MikaelMayer
 <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script><br><br>
 
 Copy-and paste unfortunately cannot be supported due to how formulas are stored. However, you can reveal a particular formula to duplicate it.
+
+<hr>
+This work was supported by Swiss National Science Foundation Early Postdoc.Mobility Fellowship No. 175041
 </div>
 </body></html>
