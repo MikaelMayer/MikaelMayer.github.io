@@ -32305,7 +32305,7 @@ var _user$project$LeoLang$isSymbol = function ($char) {
 	return A2(_elm_lang$core$Set$member, $char, _user$project$LeoLang$symbols);
 };
 
-var _user$project$PreludeGenerated$preludeLeo = '\n-- This standard prelude library is accessible by every program.\n--------------------------------------------------------------------------------\n-- Debug --\n\nDebug = {\n  log msg value =\n    -- Call Debug.log \"msg\" value\n    let _ = debug (msg + \": \" + toString value) in\n    value\n  start msg value =\n    -- Call Debug.start \"msg\" <| \\_ -> (remaining)\n    let _ = debug msg in\n    value []\n  crash msg = error msg\n  time msg callback =\n    let start = getCurrentTime () in\n    let res = callback () in\n    let end = getCurrentTime () in\n    let _ = debug (msg + \" took \" + toString (end - start) + \"ms\") in\n    res\n}\n\n -- Much simpler version, does not handle @ symbols wells.\nhtmlViaEval string =\n  case __evaluate__ [(\"append\", append)] <| Update.freezeExcept (always \"Cannot modify raw template\") string <| \\string -> \"\"\"<raw>@string</raw>\"\"\" of\n    Ok [_, _, children] -> children\n    Err msg -> error msg\n    _ -> error \"Parsing HTML failed:\"\n\n-- building block for updating\nfreeze x = x\nexpressionFreeze x = Debug.log \"expressionFreeze is deprecated. Please use Update.freezeExcept instead\" x\n-----------------------------------------\n-- Building blocks functions\n\n-- The following functions should be removed if they are not used (they are redundant)\n\n--; The identity function - given a value, returns exactly that value\n-- id: (forall a (-> a a))\nid x = x\n--; Composes two functions together\n--compose: (forall (a b c) (-> (-> b c) (-> a b) (-> a c)))\ncompose f g = \\x -> f (g x)\n--fst: (forall (a b) (-> [a b] a))\n--snd: (forall (a b) (-> [a b] b))\nfst [a, _] = a\nsnd [_, b] = b\n--or:  (-> Bool Bool Bool)\n--and: (-> Bool Bool Bool)\nor p q = if p then True else q\nand p q = if p then q else False\n--lt: (-> Num Num Bool)\n--eq: (-> Num Num Bool)\n--le: (-> Num Num Bool)\n--gt: (-> Num Num Bool)\n--ge: (-> Num Num Bool)\nlt x y = x < y\neq x y = x == y\nle x y = or (lt x y) (eq x y)\ngt x y = x > y\nge x y = or (gt x y) (eq x y)\nnil = []\ncons x xs = x :: xs\n\n-- The following functions could be kept but could migrate (e.g. len to List.length)\n\n--; Given two bools, returns a bool regarding if the first argument is true, then the second argument is as well\n--implies: (-> Bool Bool Bool)\nimplies p q = if p then q else True\n\n--; Returns the length of a given list\n--len: (forall a (-> (List a) Num))\nlen xs = case xs of [] -> 0; (_ :: xs1) -> 1 + len xs1\n\nzip xs ys =\n  case (xs, ys) of\n    (x::xsRest, y::ysRest) -> (x, y) :: zip xsRest ysRest\n    _                      -> []\n\nzipOld xs ys =\n  case (xs, ys) of\n    (x::xsRest, y::ysRest) -> [x, y] :: zipOld xsRest ysRest\n    _                      -> []\n\nrange i j =\n  if i < j + 1\n    then cons i (range (i + 1) j)\n    else nil\n\n-----------------------------------------\n--Basics = {\n-- TODO: Once we have types, wrap these basics into a module.\n\n--(==) is an Op\n--(/=) is in builtinEnv\n--(<) is an Op\n--(>) is in builtinEnv\n--(<=) is in builtinEnv\n--(>=) is in builtinEnv\n\n--max: (-> Num Num Num)\nmax i j = if i >= j then i else j\n\n--min: (-> Num Num Num)\nmin i j = if i < j then i else j\n\ntype Order = LT | EQ | GT\n\ncompare a b = if a < b then LT else if a == b then EQ else GT\n\n--- Booleans\n\n--; Given a bool, returns the opposite boolean value\n--not: (-> Bool Bool)\nnot b =  {\n    apply b = if b then False else True\n    unapply b = Just (if b then False else True)\n  }.apply b\n\n--(&&) is built-in\n--(||) is built-in\n\nxor a b = if a then not b else b\n\n-- Mathematics\n\n-- (+) is an Op\n-- (-) is an Op\n-- (*) is an Op\n-- (/) is an Op\n-- (^) is an Op\n-- TODO: (//)\n-- TODO: rem\n\nnegate x = 0 - x\n\n--; Absolute value\n--abs: (-> Num Num)\nabs x = if x < 0 then neg x else x\n\n-- sqrt is an Op\n\n--; Given an upper bound, lower bound, and a number, restricts that number between those bounds (inclusive)\n--; Ex. clamp 1 5 4 = 4\n--; Ex. clamp 1 5 6 = 5\n--clamp: (-> Num Num Num Num)\nclamp i j n = if n < i then i else if j < n then j else n\n\n-- TODO: logBase base num\n\ne = 2.718281828459045\n\n-- pi is an Op\n\ntau = 2 * pi\n\n-- cos is an op\n-- sin is an op\n\ntan x = cos x / sin x\n\nacos = arccos\n\nasin = arcsin\n\n-- TODO: atan\n\natan2 = arctan2\n\n-- round is an op\n-- floor is an op\n-- ceiling is an op\ntruncate x = if x > 0 then floor x else ceiling x\n\ntoFloat x = x\n\n-- Convert radians to degrees\n-- radToDeg: (-> Num Num)\nradToDeg rad = rad / tau * 360!\n\n-- Convert degrees to radians\n-- degToRad: (-> Num Num)\ndegToRad deg = deg / 360! * tau\n\ndegrees = degToRad\n\nradians x = x\n\nturns x = x * tau\n\n-- Polar coordinates\n\ntoPolar (x, y) = (sqrt (x * x + y * y), atan2 y x)\nfromPolar (r, t) = (r * cos t, r * sin t)\n\n-- Floating point check\n\n-- TODO: isNaN\n-- TODO: isInfinite\n\n-- Strings and lists\n\n-- toString is an op\n-- (++) is interpreted as append\n\n-- Higher-order helpers\n\nidentity x = x\n  --; A function that always returns the same value a, regardless of b\n  -- always: (forall (a b) (-> a b a))\nalways x _ = x\n\n-- <| is defined as a left application\n-- |> is defined as a right application\n-- (<<) is defined in builtinEnv\n-- (>>) is defined in builtinEnv\n\n--flip: (forall (a b c) (-> (-> a b c) (-> b a c)))\nflip f = \\x y -> f y x\n\nflips = {\n  moveArg n m f =\n    if n == 1 && m == 1 then f\n    else if n > 1 && m > 1 then\n       \\x -> moveArg (n-1) (m-1) (f x)\n    else if n == 1 then   -- Here m > 1\n      moveArg 2 m (\\x y -> f y x)\n    else -- m == 1 && n > 1\n      \\x y -> (moveArg n 2 f) y x\n\n  ab_ba = moveArg 1 2 -- same as flip\n  abc_bca = moveArg 1 3\n  abcd_bcda = moveArg 1 4\n}\n\ncurry f a b = f (a,b)\nuncurry f (a,b) = f a b\n\n-- type Never\n\nnever x = Debug.crash \"Never can never be called\"\n\n--------------------------------------------------------------------------------\n-- LensLess modules (List, Results, String) for definitions without lenses\n\nLensLess =\n  let reverse l =\n    let r acc l = case l of [] -> acc; head::tail -> r (head::acc) tail in\n    r [] l\n  in\n  let map f l =\n     case l of\n       []    -> []\n       x::xs -> f x :: map f xs\n  in\n  let append xs ys =\n     case xs of\n       [] -> ys\n       x::xs1 -> x :: append xs1 ys\n  in\n  let split n l =\n    let aux acc n l =\n      if n == 0 then (reverse acc, l) else\n      case l of\n        [] -> (reverse acc, l)\n        head::tail -> aux (head::acc) (n - 1) tail\n    in aux [] n l in\n  let take =\n    let aux n l = if n == 0 then [] else\n      case l of\n        [] -> []\n        head::tail -> head :: (aux (n - 1) tail)\n    in aux in\n  let drop =\n    let aux n l = if n == 0 then l else\n      case l of\n        [] -> []\n        head::tail -> aux (n - 1) tail\n    in aux in\n  let reverse_move n stack from = if n <= 0 then (stack, from) else case from of\n    [] -> (stack, from)\n    head::tail -> reverse_move (n - 1) (head::stack) tail\n  in\n  let filterMap f l = case l of\n    [] -> []\n    (head :: tail) -> case f head of\n      Nothing -> filterMap f tail\n      Just newHead -> newHead :: filterMap f tail\n  in\n  let concatMap f l = case l of\n    [] -> []\n    head :: tail -> f head ++ concatMap f tail\n  in\n  let last l = case l of\n    [head] -> Just head\n    _ :: tail -> last tail\n    _ -> Nothing\n  in\n  let map2 f xs ys =\n    case [xs, ys] of\n      [x::xs1, y::ys1] -> f x y :: map2 f xs1 ys1\n      _                -> []\n  in\n  let zip = map2 (,) in\n  { appendStrDef = \"\"\"let append a b = case a of [] -> b; (h::t) -> h :: append t b in \"\"\"\n    Maybe = {\n      map f a = case a of\n        Nothing -> Nothing\n        Just x -> Just (f x)\n    }\n    List = {\n      append = append\n      split = split\n      take = take\n      drop = drop\n      reverse = reverse\n      reverse_move = reverse_move\n      filterMap = filterMap\n      map = map\n      last = last\n      map2 = map2\n      concatMap = concatMap\n      zip = zip\n    },\n    Result =\n      let map f res = case res of\n        Err msg -> res\n        Ok x -> Ok (f x)\n      in\n      let andThen f res = case res of\n        Err msg -> res\n        Ok x -> f x\n      in\n      {\n        map = map\n        andThen = andThen\n    },\n    Results =\n      let keepOks l =\n        case l of\n          [] -> []\n          (Err _) ::tail -> keepOks tail\n          (Ok ll) :: tail -> ll ++ keepOks tail\n      in\n      let projOks l =\n        case l of\n          [] -> Ok []\n          (Ok []) :: tail -> projOks tail\n          (Ok (vhead :: vtail)) ::tail -> Ok (vhead::(vtail ++ keepOks tail))\n          (Err msg) :: tail ->\n            case projOks tail of\n              Err msgTail -> Err msg\n              Ok []-> Err msg\n              result -> result\n      in\n      let andThen callback results =\n        --andThen : (a -> Results x b) -> Results x a -> Results x b\n        case results of\n          Ok ll -> ll |> map callback |> projOks\n          Err msg -> results\n      in\n      let resultMap callback results =\n        case results of\n          Ok ll -> Ok (ll |> map callback)\n          Err msg -> results\n      in\n      let andAlso otherResults results =\n        case (results, otherResults) of\n          (Ok ll, Ok otherLl) -> Ok (ll ++ otherLl)\n          (Err msg, Err msg2) -> Err (msg + \"\\n\" + msg2)\n          (Err msg, _) -> Err msg\n          (_, Err msg2) -> Err msg2\n      in\n      {\n        keepOks = keepOks\n        projOks = projOks\n        andThen = andThen\n        andAlso = andAlso\n        map = resultMap\n      }\n    String = {\n      toInt =\n        let d = __DictFromList__ [(\"0\", 0), (\"1\", 1), (\"2\", 2), (\"3\", 3), (\"4\", 4), (\"5\", 5), (\"6\", 6), (\"7\", 7), (\"8\", 8), (\"9\", 9)] in\n        let aux x =\n          case extractFirstIn \"^([0-9]*)([0-9])$\" x of\n            Just [init, last] -> (aux init)*10 + case __DictGet__ last d of\n              Just x -> x\n              Nothing -> 0\n            Nothing -> 0\n        in\n        \\x ->\n          case extractFirstIn \"^-(.*)$\" x of\n            Just part -> 0 - aux part\n            Nothing -> aux x\n\n      join delimiter list =\n        let aux acc list = case list of\n          [] -> acc\n          [head] -> acc + head\n          (head::tail) -> aux (acc + head + freeze delimiter) tail\n        in aux \"\" list\n\n      substring start end x =\n        case extractFirstIn (\"^[\\\\s\\\\S]{0,\" + toString start + \"}([\\\\s\\\\S]{0,\" + toString (end - start) + \"})\") x of\n          Just [substr] -> substr\n          Nothing -> Debug.crash <| \"bad arguments to String.substring \" + toString start + \" \" + toString end + \" \" + toString x\n\n      take length x =\n          case extractFirstIn (\"^([\\\\s\\\\S]{0,\" + toString length + \"})\") x of\n            Just [substr] -> substr\n            Nothing -> Debug.crash <| \"bad arguments to String.take \" + toString length + \" \" + toString x\n\n      drop length x =\n        case extractFirstIn (\"^[\\\\s\\\\S]{0,\" + toString length + \"}([\\\\s\\\\S]*)\") x of\n                Just [substr] -> substr\n                Nothing -> Debug.crash <| \"bad arguments to String.drop \" + toString length + \" \" + toString x\n\n      dropLeft = drop\n      dropRight length x =\n                  case extractFirstIn \"\"\"^([\\s\\S]*?)[\\s\\S]{0,@length}$\"\"\" x of\n                          Just [substr] -> substr\n                          Nothing -> Debug.crash <| \"bad arguments to String.drop \" + toString length + \" \" + toString x\n\n      length x = __strLength__ x\n\n      slice = substring\n\n      toFloat s =\n        case extractFirstIn \"\"\"((-?)\\d+)\\.(\\d+)\"\"\" s of\n           Just [intPart, negative, floatPart] ->\n             let combine y = if negative == \"-\" then 0 - y else y in\n             toInt intPart + (combine <| toInt floatPart / (10 ^ length floatPart))\n           Nothing ->\n        case extractFirstIn \"\"\"((-?)\\d)(?:\\.(\\d*))?(?:e|E)\\+?(-?\\d+)\"\"\" s of -- Scientific notation\n           Just [beforeComma, negative, afterComma, exponent] ->\n             toInt beforeComma + (combine <| toInt afterComma  / (10 ^ length afterComma)) * 10 ^ (toInt exponent)\n           Nothing ->\n             toInt s\n\n      sprintf str inline = case inline of\n          a::tail -> sprintf (replaceFirstIn \"%s\" a str) tail\n          [] -> str\n          a -> replaceFirstIn \"%s\" a str\n    }\n  }\n\nResult = {\n  type Result err ok = Err err | Ok ok\n\n  map: (a -> b) -> Result err a -> Result err b\n  map f res = case res of\n    Err msg -> res\n    Ok x -> Ok (f x)\n\n  mapError err err2: (err -> err2) -> forall a. Result err a -> Result err2 a\n  mapError f res = case res of\n    Err msg -> res\n    Ok x -> Ok (f x)\n\n  andThen: (a -> Result err b) -> Result err a -> Result err b\n  andThen f res = case res of\n    Err msg -> res\n    Ok x -> f x\n\n  toMaybe: Result err ok -> Maybe ok\n  toMaybe res = case res of\n    Err msg -> Nothing\n    Ok x -> Just x\n\n  fromMaybe: err -> Maybe ok -> Result err ok\n  fromMaybe err res = case res of\n    Nothing -> Err err\n    Just x -> Ok x\n\n  fromMaybeLazy: (() -> err) -> Maybe ok -> Result err ok\n  fromMaybeLazy msgBuilder = case of\n    Just x -> Ok x\n    Nothing -> Err (msgBuilder ())\n\n  withDefault: ok -> Result err ok -> ok\n  withDefault defaultValue res = case res of\n    Err x -> defaultValue\n    Ok x -> x\n\n  (errn) n msg = if n == 1 then Err msg else \\_ -> errn (n - 1) msg\n\n  --Variable arity function. mapn 1 == map, mapn 2 == map2, etc.\n  --Dependently typed.\n  mapn n = if n == 1 then map else\n    \\f res -> case res of\n      Err msg -> errn n msg\n      Ok r -> mapn (n - 1) (f r)\n\n  map2 = mapn 2\n  map3 = mapn 3\n  map4 = mapn 4\n\n  andThenn n = if n == 1 then andThen else\n    \\f res -> case res of\n      Err msg -> errn n msg\n      Ok r -> andThenn (n - 1) (f r)\n\n  andThen2 = andThenn 2\n  andThen3 = andThenn 3\n  andThen4 = andThenn 4\n\n  withDefaultMapError: (b -> a) -> Result a b -> a\n  withDefaultMapError f = case of\n    Ok x -> x\n    Err msg -> f msg\n\n  fold : (err -> a) -> (x -> a) -> Result err x -> a\n  fold onErr onOk content =\n    case content of\n      Err msg -> onErr msg\n      Ok c -> onOk c\n}\n\n--------------------------------------------------------------------------------\n-- Update --\n\n--type ListElemDiff a = ListElemUpdate a | ListElemInsert Int | ListElemDelete Int\n--type VDictElemDiff = VDictElemDelete | VDictElemInsert | VDictElemUpdate VDiffs\n--type alias EnvDiffs = TupleDiffs VDiffs\n-- The environment of a closure if it was modified, the modifications of an environment else.\n--type VDiffs = VClosureDiffs EnvDiffs (Maybe EDiffs)\n--            | VListDiffs (ListDiffs VDiffs)\n--            | VDictDiffs (Dict (String, String) VDictElemDiff)\n--            | VRecordDiffs (Dict String VDiffs)\n--            | VConstDiffs\n\n--type EDiffs = EConstDiffs EWhitespaceDiffs\n--            | EListDiffs (ListDiffs EDiffs)\n--            | EChildDiffs (TupleDiffs EDiffs) -- Also for records\n\n--type EWhitespaceDiffs = EOnlyWhitespaceDiffs | EAnyDiffs\n  \n-- The diff primitive is:\n--\n--   type alias DiffOp : Value -> Value -> Result String (Maybe VDiffs)\n--   diff : DiffOp\n--   diff ~= SnS.Update.defaultVDiffs\n--\n\nUpdate =\n  let {String, List} = LensLess in\n  let {reverse} = List in\n  let freeze x =\n    x\n  in\n  let applyLens lens x =\n    lens.apply x\n  in\n  let softFreeze x =\n    -- Update.freeze x prevents changes to x (resulting in failure),\n    -- Update.softFreeze x ignores changes to x\n    let constantInputLens =\n      { apply x = x, update {input} = Ok (Inputs [input]) }\n    in\n    applyLens constantInputLens x\n  in\n  -- TODO: Replace this by enabling the return of Result String (Values [values...] | ValuesDiffs [(values, diffs)])\n  let valuesWithDiffs valuesDiffs = Ok (InputsWithDiffs valuesDiffs) in\n  let resultValuesWithDiffs valuesDiffs = case valuesDiffs of\n     [] -> Ok (InputsWithDiffs [])\n     (Ok vd)::tail -> case resultValuesWithDiffs tail of\n       Err msg -> Ok (InputsWithDiffs [vd])\n       Ok (InputsWithDiffs vds) -> Ok (InputsWithDiffs (vd :: vds))\n     (Err msg)::tail -> if tail == [] then Err msg else\n       case resultValuesWithDiffs tail of\n       Err error-> Err (msg + \"\\n\" + error)\n       x -> x\n  in\n  let addDiff f mbDiff (d, changed) =\n        case mbDiff of\n          Nothing -> (d, changed)\n          Just x -> (f d x, True)\n  in\n  let pairDiff2 mbDiff1 mbDiff2 =\n        ({}, False)\n        |> addDiff (\\d x -> {d | _1 = x}) mbDiff1\n        |> addDiff (\\d x -> {d | _2 = x}) mbDiff2\n        |> (\\(d, changed) -> if changed then Just (VRecordDiffs d) else Nothing)\n  in\n  let pairDiff3 mbDiff1 mbDiff2 mbDiff3 =\n        ({}, False)\n        |> addDiff (\\d x -> {d | _1 = x}) mbDiff1\n        |> addDiff (\\d x -> {d | _2 = x}) mbDiff2\n        |> addDiff (\\d x -> {d | _3 = x}) mbDiff3\n        |> (\\(d, changed) -> if changed then Just (VRecordDiffs d) else Nothing)\n  in\n  let pairDiff4 mbDiff1 mbDiff2 mbDiff3 mbDiff4 =\n        ({}, False)\n        |> addDiff (\\d x -> {d | _1 = x}) mbDiff1\n        |> addDiff (\\d x -> {d | _2 = x}) mbDiff2\n        |> addDiff (\\d x -> {d | _3 = x}) mbDiff3\n        |> addDiff (\\d x -> {d | _4 = x}) mbDiff4\n        |> (\\(d, changed) -> if changed then Just (VRecordDiffs d) else Nothing)\n  in\n  let\n    type SimpleListDiffOp = KeepValue | DeleteValue | InsertValue Value | UpdateValue Value\n  in\n  let listDiffOp diffOp oldValues newValues =\n   -- listDiffOp : DiffOp -> List Value -> List Value -> List SimpleListDiffOp\n\n    -- let {Keep, Delete, Insert, Update} = SimpleListDiffOp in\n     let {append} = List in\n     case diffOp oldValues newValues of\n        Ok (Just (VListDiffs listDiffs)) ->\n          let aux i revAcc oldValues newValues listDiffs =\n            case listDiffs of\n              [] ->\n                reverse (map1 (\\_ -> KeepValue) oldValues ++ revAcc)\n              (j, listDiff)::diffTail ->\n                if j > i then\n                  case [oldValues, newValues] of\n                    [_::oldTail, _::newTail] ->\n                      aux (i + 1) (KeepValue::revAcc) oldTail newTail listDiffs\n                    _ -> Debug.crash <| \"[Internal error] Expected two non-empty tails, got  \" + toString [oldValues, newValues]\n                else if j == i then\n                  case listDiff of\n                    ListElemUpdate _ ->\n                      case [oldValues, newValues] of\n                        [oldHead::oldTail, newHead::newTail] ->\n                          aux (i + 1) (UpdateValue newHead :: revAcc) oldTail newTail diffTail\n                        _ -> Debug.crash <| \"[Internal error] update but missing element\"\n                    ListElemInsert count ->\n                      case newValues of\n                        newHead::newTail ->\n                          aux i (InsertValue newHead::revAcc) oldValues newTail (if count == 1 then diffTail else (i, ListElemInsert (count - 1))::diffTail)\n                        _ -> Debug.crash <| \"[Internal error] insert but missing element\"\n                    ListElemDelete count ->\n                      case oldValues of\n                        oldHead::oldTail ->\n                          aux (i + 1) (DeleteValue::revAcc) oldTail newValues (if count == 1 then diffTail else (i + 1, ListElemDelete (count - 1))::diffTail)\n                        _ -> Debug.crash <| \"[Internal error] insert but missing element\"\n                else Debug.crash <| \"[Internal error] Differences not in order, got index \" + toString j + \" but already at index \" + toString i\n          in aux 0 [] oldValues newValues listDiffs\n\n        result -> Debug.crash (\"Expected Ok (Just (VListDiffs listDiffs)), got \" + toString result)\n  in\n  let\n    type StringDiffs = StringUpdate Int Int Int\n    type ConcStringDiffs = ConcStringUpdate Int Int String\n  in\n  -- Converts a VStringDiffs -> List ConcStringDiffs\n  let strDiffToConcreteDiff newString diffs =\n    case diffs of\n      VStringDiffs d ->\n        let aux offset d revAcc = case d of\n          [] -> List.reverse revAcc\n          ((StringUpdate start end replaced) :: tail) ->\n             ConcStringUpdate start end (String.slice (start + offset) (start + replaced + offset) newString) :: revAcc |>\n             aux (offset + replaced - (end - start)) tail\n        in aux 0 d []\n  in\n  let affinity a b = if a == \"\" || b == \"\" then 10 else\n     case extractFirstIn \"\\\\d$\" a of\n       Just _ -> case extractFirstIn \"^\\\\d\" b of\n         Just _ -> 8\n         _ -> 5\n       _ -> 5\n  in\n  let preferStringInsertionToLeft s1 inserted s2 = affinity s1 inserted > affinity inserted s2 in\n  let offsetStr n list = case list of\n      (StringUpdate start end replaced) :: tail -> StringUpdate (start + n) (end + n) replaced :: offsetStr n tail\n      [] -> []\n  in\n  let mbConsStringUpdate start end replaced tail =\n    if start == end && replaced == 0 then tail else (StringUpdate start end replaced) :: tail\n  in\n  let\n    -- Returns all the possible ways of splitting the string differences at a particular index,\n    -- at which the oldString used to be concatenated.\n    -- Returns the new strings for left and for right.\n    -- The old strings would simply be computed by (String.take n oldString) (String.drop n oldString)\n    splitStringDiffsAt n offset oldString newString stringDiffs = case stringDiffs of\n      [] -> [(String.take (n + offset) newString, [],\n             String.drop (n + offset) newString, [])]\n      ((StringUpdate start end replaced) as head) :: tail ->\n        if end < n then\n          splitStringDiffsAt n (offset + replaced - (end - start)) oldString newString tail\n          |> List.map (\\(left, leftDiffs, right, rightDiffs) -> (left, head::leftDiffs, right, rightDiffs))\n        else if n < start then\n          [(String.take (n + offset) newString, [],\n            String.drop (n + offset) newString, offsetStr (0 - n - offset) stringDiffs)]\n        else if replaced == 0 then\n          [(String.take (start + offset) newString, mbConsStringUpdate start n 0 [],\n            String.drop (start + offset) newString, offsetStr (0 - n) <| mbConsStringUpdate n end 0 tail)]\n        else\n          let insertionToLeft =\n           (String.take (start + offset + replaced) newString, mbConsStringUpdate start n replaced [],\n            String.drop (start + offset + replaced) newString, offsetStr (0 - n) <| mbConsStringUpdate n end 0 tail)\n          in\n          let insertionToRight =\n           (String.take (start + offset) newString, mbConsStringUpdate start n 0 [],\n             String.drop (start + offset) newString, offsetStr (0 - n) <| mbConsStringUpdate n end replaced tail)\n          in\n          if preferStringInsertionToLeft\n            (String.substring 0 start oldString)\n            (String.substring (start + offset)\n              (start + offset + replaced) newString)\n            (String.drop end oldString)\n          then [insertionToLeft, insertionToRight]\n          else [insertionToRight, insertionToLeft]\n  in\n  let\n    offsetList n list = case list of\n      (i, d)::tail -> (i + n, d)::offsetList n tail\n      [] -> []\n  in\n  -- Given a split index n (offset is zero at the beginning), split the newList that is being\n  -- pushed back at the index n (n should be the original length of the left list being concatenated)\n  -- Returns the new list to the left and its differences, and the new list on the right and its differences.\n  let\n    splitListDiffsAt n offset newList listDiffs = case listDiffs of\n      [] ->\n        let (left, right) = List.split (n + offset) newList in\n        [(left, [], right, [])]\n      (i, d) :: tail ->\n        let newOffset = case d of\n          ListElemInsert count -> offset + count\n          ListElemDelete count -> offset - count\n          ListElemUpdate _ -> offset\n        in\n        if i < n then\n          if i + (offset - newOffset) > n then -- a deletion spanning until after the split point\n            let (left, right) = List.split (n + offset) newList in\n            [(left, (i, ListElemDelete (n - i))::[],\n              right, offsetList (0 - n) <| (n, ListElemDelete (i + (offset - newOffset) - n))::tail)]\n          else\n          splitListDiffsAt n newOffset newList tail\n          |> List.map (\\(left, leftDiffs, right, rightDiffs) ->\n            (left, (i, d)::leftDiffs, right, rightDiffs))\n        else if i > n || i == n && (case d of ListElemInsert _ -> False; _ -> True) then\n          let (left, right) = List.split (n + offset) newList in\n          [(left, [], right, offsetList (0 - n) listDiffs)]\n        else -- i == n now, everything happens at the intersection.\n          let insertionToLeft =\n            let (left, right) = List.split (i + newOffset) newList in\n            (left, (i, d)::[],\n             right, tail)\n          in\n          let insertionToRight =\n            let (left, right) = List.split (i + offset) newList in\n            (left, [],\n             right, offsetList (0 - i) <| (i, d)::tail)\n          in\n          [insertionToLeft, insertionToRight]\n  in\n  let --------------------------------------------------------------------------------\n      -- Update.foldDiff\n\n      -- type Results err ok = Result err (List ok)\n\n      -- every onFunction should either return a Ok (List a) or an Err msg\n      -- start    : a\n      -- onUpdate : a -> {oldOutput: b, newOutput: b, index: Int, diffs: VDiffs} -> Results String a\n      -- onInsert : a -> {newOutput: b, index: Int, diffs: VDiffs}  -> Results String a\n      -- onRemove : a -> {oldOutput: b, index: Int, diffs! VDoffs}  -> Results String a\n      -- onSkip   : a -> {count: Int, index: Int, oldOutputs: List b, newOutputs: List b}  -> Results String a\n      -- onFinish : a -> Results String c\n      -- onGather : c -> (InputWithDiff (d, Maybe VDiffs) | Input d)\n      -- oldOutput: List b\n      -- newOutput: List b\n      -- diffs    : ListDiffs\n      -- Returns  : Err String | Ok (Inputs (List d} | InputsWithDiffs (List (d, Maybe VDiffs)))\n      foldDiff =\n        let {List, Results} = LensLess in\n        let {append, split, reverse} = List in\n        \\{start, onSkip, onUpdate, onRemove, onInsert, onFinish, onGather} oldOutput newOutput diffs ->\n        let listDiffs = case diffs of\n          VListDiffs l -> l\n          _ -> Debug.crash <| \"Expected VListDiffs, got \" + toString diffs\n        in\n        -- Returns either Err msg or Ok (list of values)\n        --     fold: Int -> List b -> List b -> List (Int, ListElemDiff) -> a -> Results String c\n        let fold  j      oldOutput  newOutput  listDiffs                    acc =\n            let next i      oldOutput_ newOutput_ d newAcc =\n              newAcc |> Results.andThen (\\accCase ->\n                fold i oldOutput_ newOutput_ d accCase\n              )\n            in\n            case listDiffs of\n            [] ->\n              let count = len newOutput in\n              if count == 0 then\n                onFinish acc\n              else\n               onSkip acc {count = count, index = j, oldOutputs = oldOutput, newOutputs = newOutput}\n               |> next (j + count) [] [] listDiffs\n\n            (i, diff)::dtail  ->\n              if i > j then\n                let count = i - j in\n                let (previous, remainingOld) = split count oldOutput in\n                let (current,  remainingNew) = split count newOutput in\n                onSkip acc {count = count, index = j, oldOutputs = previous, newOutputs = current}\n                |> next i remainingOld remainingNew listDiffs\n              else case diff of\n                ListElemUpdate d->\n                  let previous::remainingOld = oldOutput in\n                  let current::remainingNew = newOutput in\n                  onUpdate acc {oldOutput = previous, index = i, output = current, newOutput = current, diffs = d}\n                  |> next (i + 1) remainingOld remainingNew dtail\n                ListElemInsert count ->\n                  if count >= 1 then\n                    let current::remainingNew = newOutput in\n                    onInsert acc {newOutput = current, index = i}\n                    |> next i oldOutput remainingNew (if count == 1 then dtail else (i, ListElemInsert (count - 1))::dtail)\n                  else Debug.crash <| \"insertion count should be >= 1, got \" + toString count\n                ListElemDelete count ->\n                  if count >= 1 then\n                    let dropped::remainingOld = oldOutput in\n                    onRemove acc {oldOutput =dropped, index = i} |>\n                    next (i + count) remainingOld newOutput (if count == 1 then dtail else (i + 1, ListElemDelete (count - 1))::dtail)\n                  else Debug.crash <| \"deletion count should be >= 1, got \" ++ toString count\n            _ -> Debug.crash <| \"Expected a list of diffs, got \" + toString diffs\n        in\n        case fold 0 oldOutput newOutput listDiffs start of\n          Err msg -> Err msg\n          Ok values -> -- values might be a pair of value and diffs. We use onGather to do the split.\n            let aux revAccValues revAccDiffs values = case values of\n              [] -> case revAccDiffs of\n                Nothing -> Ok (Inputs (reverse revAccValues))\n                Just revDiffs -> Ok (InputsWithDiffs (LensLess.List.zip (reverse revAccValues) (reverse revDiffs)))\n              head::tail -> case onGather head of\n                Ok (InputWithDiff (value, diff)) -> case revAccDiffs of\n                  Nothing -> if len revAccValues > 0 then Err (\"Diffs not specified for all values, e.g.\" + toString value) else\n                    aux [value] (Just [diff]) tail\n                  Just revDiffs ->\n                    aux (value :: revAccValues) (Just (diff::revDiffs)) tail\n                Ok (Input value) -> case revAccDiffs of\n                  Nothing -> aux (value :: revAccValues) revAccDiffs tail\n                  Just revDiffs -> Err (\"Diffs not specified until \" + toString value)\n            in aux [] Nothing values\n  in\n  let sizeFreeze l = {\n         apply l = l\n         update {outputNew=newL, diffs=d} =\n           let lengthNotModified = case d of\n             VListDiffs ds -> let aux ds = case ds of\n               (_, ListElemDelete _)::tail -> False\n               (_, ListElemInsert _)::tail -> False\n               _::tail -> aux tail\n               [] -> True\n              in aux ds\n             _ -> False\n           in\n           if lengthNotModified then Ok (InputsWithDiffs [(newL, Just d)]) else Ok (InputsWithDiffs [])\n       }.apply l\n  in\n  let mbPairDiffs mbDiffsPair = case mbDiffsPair of\n        (Nothing, Nothing) -> Nothing\n        (Just d, Nothing) -> Just (VRecordDiffs {_1=d})\n        (Just d, Just d2) -> Just (VRecordDiffs {_1=d, _2=d2})\n        (Nothing, Just d2) -> Just (VRecordDiffs {_2=d2})\n  in\n  let bijection forward backward elem =\n    {apply elem = forward elem\n     update {outputNew} = Ok (Inputs [backward outputNew])\n    }.apply elem\n  in\n  -- exports from Update module\n  { freeze x = x\n    expressionFreeze x = Debug.log \"Update.expressionFreeze is deprecated. Please use Update.freezeExcept instead\" x\n    sizeFreeze = sizeFreeze\n    conditionalFreeze cond = if cond then (\\x -> freeze x) else identity\n\n    freezeWhen: Bool -> ((new_a, Diffs) -> String) -> a -> a\n    freezeWhen notPermission lazyMessage x = {\n      apply x = x\n      update {outputNew, diffs} =\n        if notPermission then\n          Err (lazyMessage (outputNew, diffs))\n        else\n          Ok (InputsWithDiffs [(outputNew, Just diffs)])\n    }.apply x\n\n    -- Alternative to expressionFreeze. Provides a cleaner error message and enables to specify which variables to freeze on\n    -- expressionFreeze F[x] <=> freezeExcept (always \"impossible\") x <| \\x -> F[x]\n    freezeExcept: (Diffs -> String) -> a -> (a -> b) -> b\n    freezeExcept lazyMessage arg fun = freezeWhenExcept True lazyMessage arg fun\n\n    -- More precise version of freezeExcept that accepts a condition operator\n    freezeWhenExcept: Bool -> (Diffs -> String) -> a -> (a -> b) -> b\n    freezeWhenExcept notPermission lazyMessage arg fun = (freezeWhen notPermission (\\(newA, newDiffs) -> lazyMessage newDiffs) fun) arg\n\n    foldDiff = foldDiff\n    applyLens = applyLens\n    lens l x = l.apply x\n    lens1 = lens\n    lens2 l x y = l.apply (x, y)\n    lens3 l x y z = l.apply (x, y, z)\n    lens4 l x y z w = l.apply (x, y, z, w)\n    bijection = bijection\n    vTupleDiffs_1 d = VRecordDiffs {_1=d}\n    vTupleDiffs_2 d = VRecordDiffs {_2=d}\n    vTupleDiffs_3 d = VRecordDiffs {_3=d}\n    vTupleDiffs_4 d = VRecordDiffs {_4=d}\n    vTupleDiffs_1_2 d1 d2 = VRecordDiffs {_1=d1, _2=d2}\n    default apply uInput =\n        __updateApp__ {uInput | fun = apply }\n    -- Instead of returning a result of a lens, just returns the list or empty if there is an error.\n    defaultAsListWithDiffs apply uInput =\n      case default apply uInput of\n        Err msg -> []\n        Ok (InputsWithDiffs l) -> l\n      -- \"f.apply x\" is a syntactic form for U-Lens, but eta-expanded anyway\n\n    softFreeze = softFreeze\n    splitStringDiffsAt = splitStringDiffsAt\n    listDiffOp = listDiffOp\n    updateApp  = __updateApp__\n    diff: a -> b -> Result (Maybe VDiffs)\n    diff = __diff__\n    -- Instead of returning Ok (Maybe VDiffs) or error, raises the error if there is one or returns the Maybe VDiffs\n    diffs: a -> b -> Maybe VDiffs\n    diffs a b = case __diff__ a b of\n        Err msg -> error msg\n        Ok d -> d\n    merge = __merge__\n    listDiff = listDiffOp __diff__\n    strDiffToConcreteDiff = strDiffToConcreteDiff\n    splitListDiffsAt = splitListDiffsAt\n    valuesWithDiffs = valuesWithDiffs\n    resultValuesWithDiffs = resultValuesWithDiffs\n    pairDiff2 = pairDiff2\n    pairDiff3 = pairDiff3\n    pairDiff4 = pairDiff4\n    mbPairDiffs = mbPairDiffs\n    Regex = {\n        -- Performs replacements on a string with differences but also return those differences along with the old ones.\n        replace: String -> (Match -> String) -> String -> Diffs -> (String, Diffs)\n        replace regex replacement string diffs = updateReplace regex replacement string diffs\n      }\n    mapInserted fun modifiedStr diffs =\n       let aux offset d strAcc = case d of\n       [] -> strAcc\n       ((ConcStringUpdate start end inserted) :: dtail) ->\n         let left = String.take (start + offset) strAcc in\n         let right =  String.dropLeft (start + offset + String.length inserted) strAcc in\n         let newInserted = fun inserted in\n         (if newInserted /= inserted then left + newInserted + right else strAcc) |>\n         aux (offset + String.length newInserted - (end - start)) dtail\n       in\n       aux 0 (strDiffToConcreteDiff modifiedStr diffs) modifiedStr\n\n    onUpdate callback = lens {\n        apply = identity\n        update {outputNew} = Ok (Inputs [callback outputNew])\n    }\n\n    debug msg x =\n         { apply x = x, update { input, newOutput, oldOutput, diffs} =\n           let _ = Debug.log (\"\"\"@msg:\noldOutput:@oldOutput\nnewOutput:@newOutput\ndiffs:@(if typeof oldOutput == \"string\" then strDiffToConcreteDiff newOutput diffs else diffs)\"\"\") \"end\" in\n           Ok (InputsWithDiffs [(newOutput, Just diffs)])\n         }.apply x\n    debugstr msg x = Debug.log \"Update.debugstr is deprecated. Use Update.debug instead\" <| debug msg x\n\n    debugFold msg callback value =\n      callback (debug msg value)\n\n    replaceInstead y x = {\n       apply y = x\n       update {outputNew,diffs} =\n         Ok (InputsWithDiffs [(outputNew, Just diffs)])\n     }.apply y\n  }\n\nevaluate program =\n  case __evaluate__ [] program of\n    Ok x -> x\n    Err msg -> Debug.crash msg\n\n--------------------------------------------------------------------------------\n-- ListLenses --\n\n-- append is defined here because it is used when we want x ++ y to be reversible.\n-- Note that because this is not syntactically a lambda, the function is not recursive.\nappend =\n  let {append,split} = LensLess.List in\n  \\aas bs -> {\n    apply [aas, bs] = append aas bs\n    update {input = [aas, bs], outputNew, outputOld, diffs} =\n      let asLength = len aas in\n      Update.foldDiff {\n        start = [[], [], [], [], len aas, len bs]\n        onSkip [nas, nbs, diffas, diffbs, numA, numB] {count = n, newOutputs = outs} =\n          if n <= numA then\n            Ok [[nas ++ outs, nbs, diffas, diffbs, numA - n, numB]]\n          else\n            let (forA, forB) = split numA outs in\n            Ok [[nas ++ forA, nbs ++ forB, diffas, diffbs, 0, numB - (n - numA)]]\n        onUpdate [nas, nbs, diffas, diffbs, numA, numB] {newOutput = out, diffs, index} =\n          Ok [if numA >= 1\n           then [nas ++ [out],                                      nbs,\n                 diffas ++ [(index, ListElemUpdate diffs)], diffbs,\n                 numA - 1,                                          numB]\n           else [nas,    nbs ++ [out],\n                 diffas, diffbs ++ [(index - asLength, ListElemUpdate diffs)],\n                 0,      numB - 1]]\n        onRemove  [nas, nbs, diffas, diffbs, numA, numB] {oldOutput, index} =\n          if 1 <= numA then\n            Ok [[nas, nbs, diffas ++ [(index, ListElemDelete 1)], diffbs, numA - 1, numB]]\n          else\n            Ok [[nas, nbs, diffas, diffbs ++ [(index - asLength, ListElemDelete 1)], numA, numB - 1]]\n        onInsert [nas, nbs, diffas, diffbs, numA, numB] {newOutput, index} =\n          Ok (\n            (if numA > 0 || len nbs == 0 then\n              [[nas ++ [newOutput], nbs,\n                diffas ++ [(index, ListElemInsert 1)], diffbs,\n                numA, numB]]\n            else []) ++\n              (if len nbs > 0 || numA == 0 then\n                [[nas,    nbs ++ [newOutput],\n                  diffas, diffbs ++ [(index - asLength, ListElemInsert 1)],\n                  numA, numB]]\n              else [])\n            )\n\n        onFinish [nas, nbs, diffas, diffbs, _, _] = Ok [[[nas, nbs], (if len diffas == 0 then [] else\n             [(0, ListElemUpdate (VListDiffs diffas))]) ++\n                   (if len diffbs == 0 then [] else\n             [(1, ListElemUpdate (VListDiffs diffbs))])]]\n        onGather [[nas, nbs], diffs] = Ok (InputWithDiff ([nas, nbs],\n          if len diffs == 0 then Nothing else Just (VListDiffs diffs)))\n      } outputOld outputNew diffs\n    }.apply [aas, bs]\n\n--; Maps a function, f, over a list of values and returns the resulting list\n\n--; Maps a function, f, over a list of values and returns the resulting list\n--map a b: (a -> b) -> List a -> List b\nmap f l = {\n  apply [f, l] = LensLess.List.map f l\n  update {input=[f, l], oldOutput, outputNew, diffs} =\n    Update.foldDiff {\n      start =\n        --Start: the collected functions and diffs,\n        -- the collected inputs,\n        -- The collected input diffs,\n        -- the inputs yet to process.\n        [[], [], [], l]\n\n\n      onSkip [fs, insA, diffInsA, insB] {count} =\n        --\'outs\' was the same in oldOutput and outputNew\n        let (skipped, remaining) = LensLess.List.split count insB in\n        Ok [[fs, insA ++ skipped, diffInsA, remaining]]\n\n      onUpdate [fs, insA, diffInsA, insB] {oldOutput, newOutput, diffs, index} =\n        let input::remaining = insB in\n        case Update.updateApp {fun (f,x) = f x, input = (f, input), output = newOutput, oldOutput = oldOutput, diffs = diffs} of\n          Err msg -> Err msg\n          Ok (InputsWithDiffs vsds) -> Ok (\n              LensLess.List.map (\\((newF, newA), d) ->\n                let newFs = case d of\n                  Just (VRecordDiffs {_1 = d}) -> (newF, Just d)::fs\n                  _ -> fs\n                in\n                let newDiffsInsA = case d of\n                  Just (VRecordDiffs {_2 = d}) -> diffInsA ++ [(index, ListElemUpdate d)]\n                  _ -> diffInsA\n                in\n                [newFs, insA ++ [newA], newDiffsInsA, remaining]) vsds)\n\n      onRemove [fs, insA, diffInsA, insB] {oldOutput, index} =\n        let _::remaining = insB in\n        Ok [[fs, insA, diffInsA ++ [(index, ListElemDelete 1)], remaining]]\n\n      onInsert [fs, insA, diffInsA, insB] {newOutput, index} =\n        let input =\n          case insB of h::_ -> h; _ ->\n          case LensLess.List.last insA of Just h -> h; Nothing -> Debug.crash \"Empty list for map, cannot insert\" in\n        case Update.updateApp {fun (f,x) = f x, input = (f, input), output = newOutput} of\n          Err msg -> Err msg\n          Ok (InputsWithDiffs vsds) -> Ok (\n              -- We disable the modification of f itself in the insertion (to prevent programmatic styling to change unexpectedly) newF::\n              let aprioriResult = LensLess.List.concatMap (\\((newF, newA), diff) ->\n                case diff of\n                  Just (VRecordDiffs {_1}) -> []\n                  _ -> [[fs, insA++[newA], diffInsA ++ [(index, ListElemInsert 1)], insB]]) <| vsds\n              in -- If one of the result does not change f, that\'s good. Else, we take all the results.\n              if aprioriResult == [] then -- Here we return all possibilities, ignoring changes to the function\n                LensLess.List.concatMap (\\((newF, newA), _) ->\n                   [[fs, insA++[newA], diffInsA ++ [(index, ListElemInsert 1)], insB]]) vsds\n              else\n                aprioriResult)\n\n      onFinish [newFs, newIns, diffInsA, _] =\n       --after we finish, we need to return the new function\n       --as a merge of original functions with all other modifications\n       -- and the collected new inputs\n       Ok [[Update.merge f newFs, newIns, diffInsA]]\n\n      onGather [(newF, fdiff), newIns, diffInsA] =\n        let fdiffPart = case fdiff of\n          Nothing -> []\n          Just d -> [(0, ListElemUpdate d)]\n        in\n        let inPart = case diffInsA of\n          [] -> []\n          d -> [(1, ListElemUpdate (VListDiffs d))]\n        in\n        let finalDiff = case fdiffPart ++ inPart of\n          [] -> Nothing\n          d -> Just (VListDiffs d)\n        in\n        Ok (InputWithDiff ([newF, newIns], finalDiff))\n    } oldOutput outputNew diffs\n  }.apply [f, l]\n\nmapWithDefault default f l = {\n  apply [f, l] = LensLess.List.map f l\n  update {input=[f, l], oldOutput, outputNew, diffs} =\n    Update.foldDiff {\n      start =\n        --Start: the collected functions and diffs,\n        -- the collected inputs,\n        -- The collected input diffs,\n        -- the inputs yet to process.\n        [[], [], [], l]\n\n\n      onSkip [fs, insA, diffInsA, insB] {count} =\n        --\'outs\' was the same in oldOutput and outputNew\n        let (skipped, remaining) = LensLess.List.split count insB in\n        Ok [[fs, insA ++ skipped, diffInsA, remaining]]\n\n      onUpdate [fs, insA, diffInsA, insB] {oldOutput, newOutput, diffs, index} =\n        let input::remaining = insB in\n        case Update.updateApp {fun (f,x) = f x, input = (f, input), output = newOutput, oldOutput = oldOutput, diffs = diffs} of\n          Err msg -> Err msg\n          Ok (InputsWithDiffs vsds) -> Ok (\n              LensLess.List.map (\\((newF, newA), d) ->\n                let newFs = case d of\n                  Just (VRecordDiffs {_1 = d}) -> (newF, Just d)::fs\n                  _ -> fs\n                in\n                let newDiffsInsA = case d of\n                  Just (VRecordDiffs {_2 = d}) -> diffInsA ++ [(index, ListElemUpdate d)]\n                  _ -> diffInsA\n                in\n                [newFs, insA ++ [newA], newDiffsInsA, remaining]) vsds)\n\n      onRemove [fs, insA, diffInsA, insB] {oldOutput, index} =\n        let _::remaining = insB in\n        Ok [[fs, insA, diffInsA ++ [(index, ListElemDelete 1)], remaining]]\n\n      onInsert [fs, insA, diffInsA, insB] {newOutput, index} =\n        let input = default in\n        case Update.updateApp {fun (f,x) = f x, input = (f, input), output = newOutput} of\n          Err msg -> Err msg\n          Ok (InputsWithDiffs vsds) -> Ok (\n              -- We disable the modification of f itself in the insertion (to prevent programmatic styling to change unexpectedly) newF::\n              let aprioriResult = LensLess.List.concatMap (\\((newF, newA), diff) ->\n                case diff of\n                  Just (VRecordDiffs {_1}) -> []\n                  _ -> [[fs, insA++[newA], diffInsA ++ [(index, ListElemInsert 1)], insB]]) <| vsds\n              in -- If one of the result does not change f, that\'s good. Else, we take all the results.\n              if aprioriResult == [] then -- Here we return all possibilities, ignoring changes to the function\n                LensLess.List.concatMap (\\((newF, newA), _) ->\n                   [[fs, insA++[newA], diffInsA ++ [(index, ListElemInsert 1)], insB]]) vsds\n              else\n                aprioriResult)\n\n      onFinish [newFs, newIns, diffInsA, _] =\n       --after we finish, we need to return the new function\n       --as a merge of original functions with all other modifications\n       -- and the collected new inputs\n       Ok [[Update.merge f newFs, newIns, diffInsA]]\n\n      onGather [(newF, fdiff), newIns, diffInsA] =\n        let fdiffPart = case fdiff of\n          Nothing -> []\n          Just d -> [(0, ListElemUpdate d)]\n        in\n        let inPart = case diffInsA of\n          [] -> []\n          d -> [(1, ListElemUpdate (VListDiffs d))]\n        in\n        let finalDiff = case fdiffPart ++ inPart of\n          [] -> Nothing\n          d -> Just (VListDiffs d)\n        in\n        Ok (InputWithDiff ([newF, newIns], finalDiff))\n    } oldOutput outputNew diffs\n  }.apply [f, l]\n\nmapWithReverse reverse f l = {\n  apply [f, l] = LensLess.List.map f l\n  update {input=[f, l], oldOutput, outputNew, diffs} =\n    Update.foldDiff {\n      start =\n        --Start: the collected functions and diffs,\n        -- the collected inputs,\n        -- The collected input diffs,\n        -- the inputs yet to process.\n        [[], [], [], l]\n\n\n      onSkip [fs, insA, diffInsA, insB] {count} =\n        --\'outs\' was the same in oldOutput and outputNew\n        let (skipped, remaining) = LensLess.List.split count insB in\n        Ok [[fs, insA ++ skipped, diffInsA, remaining]]\n\n      onUpdate [fs, insA, diffInsA, insB] {oldOutput, newOutput, diffs, index} =\n        let input::remaining = insB in\n        case Update.updateApp {fun (f,x) = f x, input = (f, input), output = newOutput, oldOutput = oldOutput, diffs = diffs} of\n          Err msg -> Err msg\n          Ok (InputsWithDiffs vsds) -> Ok (\n              LensLess.List.map (\\((newF, newA), d) ->\n                let newFs = case d of\n                  Just (VRecordDiffs {_1 = d}) -> (newF, Just d)::fs\n                  _ -> fs\n                in\n                let newDiffsInsA = case d of\n                  Just (VRecordDiffs {_2 = d}) -> diffInsA ++ [(index, ListElemUpdate d)]\n                  _ -> diffInsA\n                in\n                [newFs, insA ++ [newA], newDiffsInsA, remaining]) vsds)\n\n      onRemove [fs, insA, diffInsA, insB] {oldOutput, index} =\n        let _::remaining = insB in\n        Ok [[fs, insA, diffInsA ++ [(index, ListElemDelete 1)], remaining]]\n\n      onInsert [fs, insA, diffInsA, insB] {newOutput, index} =\n        let newA  = reverse newOutput in\n        Ok [[fs, insA ++ [newA], diffInsA ++ [(index, ListElemInsert 1)], insB]]\n\n      onFinish [newFs, newIns, diffInsA, _] =\n       --after we finish, we need to return the new function\n       --as a merge of original functions with all other modifications\n       -- and the collected new inputs\n       Ok [[Update.merge f newFs, newIns, diffInsA]]\n\n      onGather [(newF, fdiff), newIns, diffInsA] =\n        let fdiffPart = case fdiff of\n          Nothing -> []\n          Just d -> [(0, ListElemUpdate d)]\n        in\n        let inPart = case diffInsA of\n          [] -> []\n          d -> [(1, ListElemUpdate (VListDiffs d))]\n        in\n        let finalDiff = case fdiffPart ++ inPart of\n          [] -> Nothing\n          d -> Just (VListDiffs d)\n        in\n        Ok (InputWithDiff ([newF, newIns], finalDiff))\n    } oldOutput outputNew diffs\n  }.apply [f, l]\n\nzipWithIndex xs =\n  { apply x = zip (range 0 (len xs - 1)) xs\n    update {output} = Ok (Inputs [map (\\(i, x) -> x) output])}.apply xs\n\nindexedMap f l =\n  map (\\(i, x) -> f i x) (zipWithIndex l)\n\n-- TODO: Remove list lenses (lenses should be part of List)\nListLenses =\n  { map = map\n    append = append\n    zipWithIndex = zipWithIndex\n    indexedMap = indexedMap\n  }\n\n--------------------------------------------------------------------------------\n-- TODO (re-)organize this section into modules\n-- HEREHEREHERE\n\n--; Combines two lists with a given function, extra elements are dropped\n--map2: (forall (a b c) (-> (-> a b c) (List a) (List b) (List c)))\nmap2 f xs ys =\n  case [xs, ys] of\n    [x::xs1, y::ys1] -> f x y :: map2 f xs1 ys1\n    _                -> []\n\n--; Combines three lists with a given function, extra elements are dropped\n--map3: (forall (a b c d) (-> (-> a b c d) (List a) (List b) (List c) (List d)))\nmap3 f xs ys zs =\n  case [xs, ys, zs] of\n    [x::xs1, y::ys1, z::zs1] -> f x y z :: map3 f xs1 ys1 zs1\n    _                        -> []\n\n--; Combines four lists with a given function, extra elements are dropped\n--map4: (forall (a b c d e) (-> (-> a b c d e) (List a) (List b) (List c) (List d) (List e)))\nmap4 f ws xs ys zs =\n  case [ws, xs, ys, zs]of\n    [w::ws1, x::xs1, y::ys1, z::zs1] -> f w x y z :: map4 f ws1 xs1 ys1 zs1\n    _                                -> []\n\n--; Takes a function, an accumulator, and a list as input and reduces using the function from the left\n--foldl: (forall (a b) (-> (-> a b b) b (List a) b))\nfoldl f acc xs =\n  case xs of [] -> acc; x::xs1 -> foldl f (f x acc) xs1\n\n--; Takes a function, an accumulator, and a list as input and reduces using the function from the right\n--foldr: (forall (a b) (-> (-> a b b) b (List a) b))\nfoldr f acc xs =\n  case xs of []-> acc; x::xs1 -> f x (foldr f acc xs1)\n\n--; Given two lists, append the second list to the end of the first\n--append: (forall a (-> (List a) (List a) (List a)))\n-- append xs ys =\n--   case xs of [] -> ys; x::xs1 -> x :: append xs1 ys\n\n--; concatenate a list of lists into a single list\n--concat: (forall a (-> (List (List a)) (List a)))\nconcat xss = foldr append [] xss\n-- TODO eta-reduced version:\n-- (def concat (foldr append []))\n\n--; Map a given function over a list and concatenate the resulting list of lists\n--concatMap: (forall (a b) (-> (-> a (List b)) (List a) (List b)))\nconcatMap f xs = concat (map f xs)\n\n--; Takes two lists and returns a list that is their cartesian product\n--cartProd: (forall (a b) (-> (List a) (List b) (List [a b])))\ncartProd xs ys =\n  concatMap (\\x -> map (\\y -> [x, y]) ys) xs\n\n--; Takes elements at the same position from two input lists and returns a list of pairs of these elements\n--zip: (forall (a b) (-> (List a) (List b) (List [a b])))\n-- zip xs ys = map2 (\\x y -> [x, y]) xs ys\n-- TODO eta-reduced version:\n-- (def zip (map2 (\\(x y) [x y])))\n\n--; The empty list\n--; (typ nil (forall a (List a)))\n--nil: []\n-- nil = []\n\n--; attaches an element to the front of a list\n--cons: (forall a (-> a (List a) (List a)))\n-- cons x xs = x :: xs\n\n--; attaches an element to the end of a list\n--snoc: (forall a (-> a (List a) (List a)))\nsnoc x ys = append ys [x]\n\n--; Returns the first element of a given list\n--hd: (forall a (-> (List a) a))\n--tl: (forall a (-> (List a) (List a)))\nhd (x::xs) = x\ntl (x::xs) = xs\n\n--; Returns the last element of a given list\n--last: (forall a (-> (List a) a))\nlast xs =\n  case xs of\n    [x]   -> x\n    _::xs -> last xs\n\n--; Given a list, reverse its order\n--reverse: (forall a (-> (List a) (List a)))\nreverse xs = foldl cons nil xs\n-- TODO eta-reduced version:\n-- (def reverse (foldl cons nil))\n\nadjacentPairs xs = zipOld xs (tl xs)\n\n--; Given two numbers, creates the list between them (inclusive)\n--range: (-> Num Num (List Num))\n-- range i j =\n--   if i < j + 1\n--     then cons i (range (i + 1) j)\n--     else nil\n\n--; Given a number, create the list of 0 to that number inclusive (number must be > 0)\n--list0N: (-> Num (List Num))\nlist0N n = range 0 n\n\n--; Given a number, create the list of 1 to that number inclusive\n--list1N: (-> Num (List Num))\nlist1N n = range 1 n\n\n--zeroTo: (-> Num (List Num))\nzeroTo n = range 0 (n - 1)\n\n--; Given a number n and some value x, return a list with x repeated n times\n--repeat: (forall a (-> Num a (List a)))\nrepeat n x = map (always x) (range 1 n)\n\n--; Given two lists, return a single list that alternates between their values (first element is from first list)\n--intermingle: (forall a (-> (List a) (List a) (List a)))\nintermingle xs ys =\n  case [xs, ys] of\n    [x::xs1, y::ys1] -> cons x (cons y (intermingle xs1 ys1))\n    [[], []]         -> nil\n    _                -> append xs ys\n\nintersperse sep xs =\n  case xs of\n    []    -> xs\n    x::xs -> reverse (foldl (\\y acc -> y :: sep :: acc) [x] xs)\n\n--mapi: (forall (a b) (-> (-> [Num a] b) (List a) (List b)))\nmapi f xs = map f (zipWithIndex xs)\n\n--nth: (forall a (-> (List a) Num (union Null a)))\nnth xs n =\n  if n < 0 then error \"index out of range. Use List.nthMaybe instead of nth to avoid this\"\n  else\n    case [n, xs] of\n      [_, []]     -> error \"index out of range. Use List.nthMaybe instead of nth to avoid this\"\n      [0, x::xs1] -> x\n      [_, x::xs1] -> nth xs1 (n - 1)\n\n-- (defrec nth (\\(xs n)\n--   (if (< n 0)   \"ERROR: nth\"\n--     (case xs\n--       ([]       \"ERROR: nth\")\n--       ([x|xs1]  (if (= n 0) x (nth xs1 (- n 1))))))))\n\n-- TODO change typ/def\n-- (typ take (forall a (-> (List a) Num (union Null (List a)))))\n--take: (forall a (-> (List a) Num (List (union Null a))))\ntake xs n =\n  if n == 0 then []\n  else\n    case xs of\n      []     -> [null]\n      x::xs1 -> x :: take xs1 (n - 1)\n\n-- (def take\n--   (let take_ (\\(n xs)\n--     (case [n xs]\n--       ([0 _]       [])\n--       ([_ []]      [])\n--       ([_ [x|xs1]] [x | (take_ (- n 1) xs1)])))\n--   (compose take_ (max 0))))\n--drop: (forall a (-> (List a) Num (union Null (List a))))\ndrop xs n =\n  if le n 0 then xs\n  else\n    case xs of\n      []     -> null\n      x::xs1 -> drop xs1 (n - 1)\n\n--; Drop n elements from the end of a list\n-- dropEnd: (forall a (-> (List a) Num (union Null (List a))))\n-- dropEnd xs n =\n--   let tryDrop = drop (reverse xs) n in\n--     Err \"typecase not yet implemented for Elm syntax\"\n\n--elem: (forall a (-> a (List a) Bool))\nelem x ys =\n  case ys of\n    []     -> False\n    y::ys1 -> or (x == y) (elem x ys1)\n\nsortBy f xs =\n  let ins x ys =   -- insert is a keyword...\n    case ys of\n      []    -> [x]\n      y::ys -> if f x y then x :: y :: ys else y :: ins x ys\n  in\n  foldl ins [] xs\n\nsortAscending = sortBy lt\nsortDescending = sortBy gt\n\n\n--; multiply two numbers and return the result\n--mult: (-> Num Num Num)\nmult m n =\n  if m < 1 then 0 else n + mult (m + -1) n\n\n--; Given two numbers, subtract the second from the first\n--minus: (-> Num Num Num)\nminus x y = x + mult y -1\n\n--; Given two numbers, divide the first by the second\n--div: (-> Num Num Num)\ndiv m n =\n  if m < n then 0 else\n  if n < 2 then m else 1 + div (minus m n) n\n\n--; Given a number, returns the negative of that number\n--neg: (-> Num Num)\nneg x = 0 - x\n\n--; Sign function; -1, 0, or 1 based on sign of given number\n--sgn: (-> Num Num)\nsgn x = if 0 == x then 0 else x / abs x\n\n--some: (forall a (-> (-> a Bool) (List a) Bool))\nsome p xs =\n  case xs of\n    []     -> False\n    x::xs1 -> or (p x) (some p xs1)\n\n--all: (forall a (-> (-> a Bool) (List a) Bool))\nall p xs =\n  case xs of\n    []     -> True\n    x::xs1 -> and (p x) (all p xs1)\n\n--between: (-> Num Num Num Bool)\nbetween i j n = n == clamp i j n\n\n--plus: (-> Num Num Num)\nplus x y = x + y\n\n--minimum: (-> (List Num) Num)\nminimum (hd::tl) = foldl min hd tl\n\n--maximum: (-> (List Num) Num)\nmaximum (hd::tl) = foldl max hd tl\n\n--average: (-> (List Num) Num)\naverage nums =\n  let sum = foldl plus 0 nums in\n  let n = len nums in sum / n\n\n--; Combine a list of strings with a given separator\n--; Ex. joinStrings \", \" [\"hello\" \"world\"] = \"hello, world\"\n--joinStrings: (-> String (List String) String)\njoinStrings sep ss =\n  foldr (\\str acc -> if acc == \"\" then str else str + sep + acc) \"\" ss\n\n--; Concatenate a list of strings and return the resulting string\n--concatStrings: (-> (List String) String)\nconcatStrings = joinStrings \"\"\n\n--; Concatenates a list of strings, interspersing a single space in between each string\n--spaces: (-> (List String) String)\nspaces = joinStrings \" \"\n\n--; First two arguments are appended at the front and then end of the third argument correspondingly\n--; Ex. delimit \"+\" \"+\" \"plus\" = \"+plus+\"\n--delimit: (-> String String String String)\ndelimit a b s = concatStrings [a, s, b]\n\n--; delimit a string with parentheses\n--parens: (-> String String)\nparens = delimit \"(\" \")\"\n\n--;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;\n\n-- (def columnsToRows (\\columns\n--   (let numColumns (len columns)\n--   (let numRows ; maxColumnSize\n--     (if (= numColumns 0) 0 (maximum (map len columns)))\n--   (foldr\n--     (\\(col rows)\n--       (let paddedCol (append col (repeat (- numRows (len col)) \".\"))\n--       (map\n--         (\\[datum row] [ datum | row ])\n--         (zipOld paddedCol rows))))\n--     (repeat numRows [])\n--     columns)\n-- ))))\n--\n-- (def addColToRows (\\(col rows)\n--   (let width (maximum (map len rows))\n--   (let foo (\\(col rows)\n--     (case [col rows]\n--       ([ []     []     ] [                                          ])\n--       ([ [x|xs] [r|rs] ] [ (snoc x r)                 | (foo xs rs) ])\n--       ([ []     [r|rs] ] [ (snoc \"\" r)                | (foo [] rs) ])\n--       ([ [x|xs] []     ] [ (snoc x (repeat width \"\")) | (foo xs []) ])\n--     ))\n--   (foo col rows)))))\n\n-- (def border [\"border\" \"1px solid black\"])\n-- (def padding [\"padding\" \"5px\"])\n-- (def center [\"align\" \"center\"])\n-- (def style (\\list [\"style\" list]))\n-- (def onlyStyle (\\list [(style list)]))\n--\n-- (def td (\\text\n--   [\"td\" (onlyStyle [border padding])\n--         [[\"TEXT\" text]]]))\n--\n-- (def th (\\text\n--   [\"th\" (onlyStyle [border padding center])\n--         [[\"TEXT\" text]]]))\n--\n-- (def tr (\\children\n--   [\"tr\" (onlyStyle [border])\n--         children]))\n--\n-- ; TODO div name is already taken...\n--\n-- (def div_ (\\children [\"div\" [] children]))\n-- (def h1 (\\text [\"h1\" [] [[\"TEXT\" text]]]))\n-- (def h2 (\\text [\"h2\" [] [[\"TEXT\" text]]]))\n-- (def h3 (\\text [\"h3\" [] [[\"TEXT\" text]]]))\n--\n-- (def table (\\children\n--   [\"table\" (onlyStyle [border padding]) children]))\n\n-- (def table (\\children\n--   (let [x y] [100 100]\n--   [\"table\" (onlyStyle [border padding\n--                       [\"position\" \"relative\"]\n--                       [\"left\" (toString x)]\n--                       [\"top\" (toString y)]]) children])))\n\n-- (def tableOfData (\\data\n--   (let letters (explode \" ABCDEFGHIJKLMNOPQRSTUVWXYZ\")\n--   (let data (mapi (\\[i row] [(+ i 1) | row]) data)\n--   (let tableWidth (maximum (map len data))\n--   (let headers\n--     (tr (map (\\letter (th letter)) (take letters tableWidth)))\n--   (let rows\n--     (map (\\row (tr (map (\\col (td (toString col))) row))) data)\n--   (table\n--     [ headers | rows ]\n-- ))))))))\n\n\n\n-- absolutePositionStyles x y = let _ = [x, y] : Point in\n--   [ [\"position\", \"absolute\"]\n--   , [\"left\", toString x + \"px\"]\n--   , [\"top\", toString y + \"px\"]\n--   ]\n\n--------------------------------------------------------------------------------\n-- Regex --\n\nRegex =\n  let split regex = Update.lens {\n    apply s =\n      case extractFirstIn (\"^([\\\\s\\\\S]*?)(\" + regex + \")([\\\\s\\\\S]*)$\") s of\n        Just [before, removed, after] ->\n          if before == \"\" && removed == \"\" then\n            case extractFirstIn \"^([\\\\s\\\\S])([\\\\s\\\\S]*)$\" after of\n              Nothing -> [after]\n              Just [x, remaining] ->\n                let head::tail = split regex remaining in\n                (x + head) :: tail\n\n          else before :: split regex after\n        _ -> [s]\n    update {input=s, outputNew} =\n      case extractFirstIn (\"^([\\\\s\\\\S]*?)(\" + regex + \")([\\\\s\\\\S]*)$\") s of\n        Just [before, removed, after] ->\n          Ok (Inputs [outputNew |> LensLess.String.join removed])\n        _ -> case outputNew of\n          [x] -> Ok (Inputs [x])\n          _ -> Err \"Regex.split resulted in 1 element or less, cannot update with more elements. Use Regex.splitReverse if you know the join string\"\n    }\n  in\n  let splitReverse joinStr regex = Update.lens {\n    apply s = split regex s\n    update {input=s, outputNew} =\n      Ok (Inputs [outputNew |> LensLess.String.join joinStr])\n    }\n  in\n  let find regex s =\n    case extractFirstIn (\"(\" + regex + \")([\\\\s\\\\S]*)\") s of\n      Nothing -> []\n      Just matchremaining ->\n        case LensLess.List.split (len matchremaining - 1) matchremaining of\n          (init, [last]) ->\n            init::find regex last\n  in\n  {\n  replace regex replacement string = replaceAllIn regex replacement string\n  replaceFirst regex replacement string = replaceFirstIn regex replacement string\n  extract regex string = extractFirstIn regex string\n  matchIn r x = case extractFirstIn r x of\n    Nothing -> False\n    _ -> True\n  split = split\n  splitReverse = splitReverse\n  find = find\n  escape = replace \"\"\"\\||\\\\|\\{|\\}|\\[|\\]|\\$|\\.|\\?|\\+|\\(|\\)\"\"\" (\\m -> \"\\\\\" + m.match)\n}\n\n--------------------------------------------------------------------------------\n-- Dict --\n\n-- Interface\ndictLike = {\n  apply this d x = case this.get x d of\n    Just x -> x\n    _ -> Debug.crash (\"Expected element \" + toString x + \" in dict, got nothing\")\n  member this key list = this.get key list /= Nothing\n  contains this = this.member\n  delete this = this.remove\n  update this k f d = case f <| this.get k d of\n    Nothing -> this.delete k d\n    Just v -> this.insert k v d\n}\n\n-- Dictionary implementation\nDict = { dictLike |\n  empty = __DictEmpty__\n  fromList l = __DictFromList__ l\n  get x d = __DictGet__ x d\n  remove x d = __DictRemove__ x d\n  insert k v d = __DictInsert__ k v d\n}\n\n-- List of pairs implementation\nlistDict = { dictLike |\n  empty = []\n  fromList = identity\n  get key = Update.lens {\n    apply list = case list of\n      [] -> Nothing\n      (k, v) :: tail -> if k == key then Just v else get key tail\n    update = case of\n      {input, outputOld = Nothing, outputNew = Just v} ->\n        Ok (Inputs [insert key v input])\n      {input, outputOld = Just _, outputNew = Nothing} ->\n        Ok (Inputs [remove key input])\n      uInput -> Update.default apply uInput\n    }\n  remove key list = case list of\n    [] -> []\n    ((k, v) as head) :: tail -> if k == key then tail else head :: remove key tail\n  insert key value list = case list of\n    [] -> [(key, value)]\n    ((k, v) as head) :: tail -> if k == key then (k, value)::tail else head :: insert key value tail\n\n  -- Enables the deletion of the key-value in reverse\n  insert2 ([(key, value)] as keyValue) list = case list of\n    [] -> keyValue\n    _ ->\n      let (([(k, v)] as head), tail)  = List.split 1 list in\n      if k == key then keyValue ++ tail else head ++ insert2 keyValue tail\n}\n\n\n-- List of 2-element list implementation\nattrDict = { dictLike |\n  empty = []\n  fromList = identity\n  get key = Update.lens {\n    apply list = case list of\n      [] -> Nothing\n      [k, v] :: tail -> if k == key then Just v else get key tail\n    update = case of\n      {input, outputOld = Nothing, outputNew = Just v} ->\n        Ok (Inputs [insert key v input])\n      {input, outputOld = Just _, outputNew = Nothing} ->\n        Ok (Inputs [remove key input])\n      uInput -> Update.default apply uInput\n    }\n  remove key list = case list of\n    [] -> []\n    ([k, v] as head) :: tail -> if k == key then tail else head :: remove key tail\n  insert key value list = case list of\n    [] -> [[key, value]]\n    ([k, v] as head) :: tail -> if k == key then [k, value]::tail else head :: insert key value tail\n}\n\nSet = {\n  empty = __DictEmpty__\n  fromList l = __DictFromList__ (zip l l)\n  insert k d = __DictInsert__ k k d\n  remove x d = __Dict.remove__ x d\n  member x d = case __DictGet__ x d of\n      Just _ -> True\n      _ -> False\n}\n\n\n--------------------------------------------------------------------------------\n-- List (all operations should be lenses) --\n\nList = {\n  reverse =\n    let r = LensLess.List.reverse in\n    -- TODO: reverse the differences as well !\n    \\l -> { apply l = r l, update {output}= Ok (Inputs [r output])}.apply l\n\n  simpleMap = LensLess.List.map\n\n  {-\n  filterMap f l = case l of\n    [] -> []\n    _ ->\n      let ([head] as headList, tail) = split 1 l in\n      case f head of\n        Nothing -> filterMap f tail\n        Just newHead -> -- TODO: Correct for deletion, but not insertions!\n          (List.map (always newHead) headList) ++ filterMap f tail\n  -}\n  filterMap f l = map f l |> filter (\\x -> x /= Nothing) |> map (\\(Just x) -> x)\n\n  length x = len x\n\n  nth = nth\n  nthMaybe n list = case list of\n    head :: tail -> if n == 0 then Just head else nthMaybe (n - 1) tail\n    [] -> Nothing\n\n  (mapi) f xs = map f (zipWithIndex xs)\n  (mapiWithDefault) default f xs = mapWithDefault (0, default) f (zipWithIndex xs)\n  (mapiWithReverse) reverse f xs = mapWithReverse (\\x -> (0, reverse x)) f (zipWithIndex xs)\n\n  indexedMap f xs =\n    mapi (\\(i,x) -> f i x) xs\n\n  indexedMapWithDefault default f xs =\n    mapiWithDefault default (\\(i,x) -> f i x) xs\n\n  indexedMapWithReverse reverse f xs =\n    mapiWithReverse reverse (\\(i, x) -> f i x) xs\n\n  concatMap f l = case l of\n    [] -> []\n    head :: tail -> f head ++ concatMap f tail\n\n  indexedConcatMap f l =\n    let aux i l = case l of\n      [] -> []\n      head :: tail -> f i head ++ aux (i + 1) tail\n    in aux 0 l\n\n  cartesianProductWith f xs ys =\n    concatMap (\\x -> map (\\y -> f x y) ys) xs\n\n  unzip xys =\n    case xys of\n      []          -> ([], [])\n      (x,y)::rest -> let (xs,ys) = unzip rest in\n                     (x::xs, y::ys)\n\n  split n l = Update.lens {\n      apply l = LensLess.List.split n l\n      update {output = (l1, l2), diffs} =\n        let finalDiffs = case diffs of\n          VRecordDiffs {_1 = VListDiffs l1, _2 = VListDiffs l2} ->\n            Just (VListDiffs (l1 ++ simpleMap (\\(i, d) -> (i + n, d)) l2))\n          VRecordDiffs {_1 = VListDiffs l1} ->  Just (VListDiffs l1)\n          VRecordDiffs {_2 = VListDiffs l2} -> Just (VListDiffs (simpleMap (\\(i, d) -> (i + n, d)) l2))\n          _ -> Nothing\n        in\n        Ok (InputsWithDiffs [(l1 ++ l2, finalDiffs)])\n    } l\n\n  -- This filter lens supports insertions and deletions in output\n  filter f l =\n        case l of\n          [] -> l\n          _ ->\n             let ([head] as head1, tail) = split 1 l in\n             let cond = f head in\n             if cond then head1 ++ filter f tail\n             else filter f tail\n\n  -- In this version of foldl, the function f accepts a 1-element list instead of just the element.\n  -- This enable programmers to insert or delete values from the accumulator.\n  foldl2 f b l =\n    let aux b l = case l of\n      [] -> b\n      _ ->\n        let (h1, t1) = split 1 l in\n        aux (f h1 b) t1\n    in aux b l\n\n  -- Pushes the elements to the head of the reverse accumulator revAcc in O(elements) time\n  reverseInsert elements revAcc =\n    case elements of\n      [] -> revAcc\n      head::tail -> reverseInsert tail (head::revAcc)\n\n  sum l = foldl (\\x y -> x + y) 0 l\n  product l = foldl (\\x y -> x * y) 1 l\n\n  maximum l = case l of\n    [] -> Nothing\n    h :: t -> Just (foldl (\\x y -> if x > y then x else y) h t)\n\n  minimum l = case l of\n    [] -> Nothing\n    h :: t -> Just (foldl (\\x y -> if x < y then x else y) h t)\n\n  range min max = if min > max then [] else min :: range (min + 1) max\n\n  mapFirstSuccess f l = case l of\n    [] -> Nothing\n    head :: tail -> case f head of\n      Nothing -> mapFirstSuccess f tail\n      x -> x\n\n  contains n =\n    let aux l = case l of\n      [] -> False\n      head::tail -> if head == n then True else aux tail\n    in aux\n\n  -- Contrary to concatMap, concatMap_ supports insertion and deletions of elements.\n  -- It requires a function to indicate what to do when inserting in empty lists.\n  -- f takes a 1-element list but can push back many elements or remove them\n  concatMap_ insert_in_empty f l =\n        case l of -- Insertion to an emptylist.\n          [] -> { apply l = []\n                  update {input=l, outputNew=lp} = Ok (Inputs [insert_in_empty lp])\n                }.apply l\n          _ -> Update.applyLens { -- Back-propagating a ghost boolean indicating if the next element in the computation had its first element deleted.\n          apply (x, y) = x\n          update {output, diffs} = Ok (InputsWithDiffs [\n            ((output, True),\n             Just (VRecordDiffs { _1 = diffs, _2 = VConstDiffs}))])\n        } <| foldl2 (\\headList (oldAcc, dummyBool) ->\n          let lengthAcc = length oldAcc in\n          {apply (f, oldAcc, headList, dummyBool) = (oldAcc ++ f headList, dummyBool)\n           update {input=(f, oldAcc, headList, _) as input, outputNew=(newAccFHeadList, prevDeletedOrLast), diffs=ds} =\n             let handleDiffs = case ds of\n                VRecordDiffs {_1=VListDiffs diffs} -> \\continuation -> continuation diffs\n                _ -> \\continuation -> Ok (InputsWithDiffs [(input, Nothing)])\n             in handleDiffs <| \\diffs ->\n             Update.splitListDiffsAt lengthAcc 0 newAccFHeadList diffs\n             |> concatMap (\\(newAcc, newAccDiffs, newFHeadList, newFHeadListDiffs) ->\n               let finalAccDiffs = if newAccDiffs == [] then Nothing else Just (VListDiffs newAccDiffs) in\n               let finalAccDeletedRight =\n                 let aux diffs = case diffs of\n                   [] -> False\n                   (i, d)::tail -> case d of\n                     ListElemDelete count -> if count + i == lengthAcc then True else\n                       aux tail\n                     _ -> aux tail\n                 in aux newAccDiffs\n               in\n               let firstElementDeleted = case newFHeadListDiffs of\n                 (0, ListElemDelete x) :: tail -> True\n                 _ -> False\n               in\n               let deleteBoolUpdate = if firstElementDeleted then Just VConstDiffs else Nothing in\n               let surroundingElementsDeleted = finalAccDeletedRight && prevDeletedOrLast in\n               let headListDeletable = newFHeadList == []  && (firstElementDeleted || surroundingElementsDeleted) in\n               let atLeastOneSurroundingElementDeleted = finalAccDeletedRight || prevDeletedOrLast in\n               (if atLeastOneSurroundingElementDeleted && headListDeletable then [] else\n               case newFHeadListDiffs of\n                 [] -> [Ok ((f, newAcc, headList, firstElementDeleted),\n                            Update.pairDiff4 Nothing finalAccDiffs Nothing deleteBoolUpdate)]\n                 _ ->\n               case Update.updateApp{fun (f, x) = f x, input=(f, headList), output=newFHeadList, diffs=VListDiffs newFHeadListDiffs} of\n                 Ok (InputsWithDiffs fAndNewHeadListsWithDiffs) ->\n                    LensLess.List.map (\\((newF, newHeadList), diff) ->\n                      case diff of\n                        Nothing ->  Ok ((f, newAcc, headList, firstElementDeleted),\n                          Update.pairDiff4 Nothing finalAccDiffs Nothing deleteBoolUpdate)\n                        Just (VRecordDiffs d) ->\n                          let newFDiff = case d of {_1} -> Just _1; _ -> Nothing in\n                          let newHeadListDiffs = case d of {_2} -> Just _2; _ -> Nothing in\n                          Ok ((newF, newAcc, newHeadList, firstElementDeleted), Update.pairDiff4 newFDiff finalAccDiffs newHeadListDiffs deleteBoolUpdate)\n                    ) fAndNewHeadListsWithDiffs\n                 Err msg -> [Err msg]\n               ) ++ (\n                 if headListDeletable then\n                   [Ok ((f, newAcc, [], True),\n                        Update.pairDiff4 Nothing finalAccDiffs (Just (VListDiffs [(0, ListElemDelete 1)])) (Just VConstDiffs))]\n                 else\n                   [])\n              ) |> Update.resultValuesWithDiffs\n          }.apply (f, oldAcc, headList, dummyBool)) (Update.freeze [], Update.softFreeze False) l\n\n  indices l = range 0 (length l - 1)\n  isEmpty l = l == []\n  head = Update.lens {\n    apply l = case l of\n      h :: l -> Just h\n      _ -> Nothing\n    update {input, outputNew, diffs} = case (input, outputNew, diffs) of\n      (h :: tail, Nothing, _) ->\n        Ok (InputsWithDiffs [(tail, Just (VListDiffs [(0, ListElemDelete 1)]))])\n      (h :: tail, Just newH, VRecordDiffs {args= VRecordDiffs {_1=d}}) ->\n        Ok (InputsWithDiffs [(newH :: tail, Just (VListDiffs [(0, ListElemUpdate d)]))])\n      ([], Nothing, _) -> Ok (Inputs [input])\n      ([], Just newH, _) ->\n        Ok (InputsWithDiffs [([newH], Just (VListDiffs [(0, ListElemInsert 1)]))])\n      (_, _, _) -> Err (\"Inconsistent diffs in List.head\" ++ toString diffs)\n    }\n\n  tail =  Update.lens {\n    apply l = case l of\n      h :: l -> Just l\n      _ -> Nothing\n    update {input, outputNew, diffs} = case (input, outputNew, diffs) of\n      (h :: tail, Nothing, _) ->\n        Ok (InputsWithDiffs [([], Just (VListDiffs [(0, ListElemDelete (List.length input))]))])\n      (h :: tail, Just newTail, VRecordDiffs {args= VRecordDiffs {_1=VListDiffs tailDiffs}}) ->\n        Ok (InputsWithDiffs [(h :: newTail, Just (VListDiffs (List.map (\\(i, d) -> (i+1, d)) tailDiffs)))])\n      ([], Nothing, _) -> Ok (Inputs [input])\n      ([], Just newTail, _) ->\n        Err \"I don\'t know how to insert a new tail where there was none originally.\"\n      (_, _, _) -> Err (\"Inconsistent diffs in List.head\" ++ toString diffs)\n    }\n\n  take n l =\n    let (taken, remaining) = split n l in\n    taken\n\n  drop n l =\n    let (taken, remaining) = split n l in\n    remaining\n\n  singleton elem = [elem]\n\n  repeat n a =\n    {apply (n, a) =\n      let aux i = if i == 0 then [] else a :: aux (i - 1)\n      in aux n\n     update {input, outputNew, diffs = VListDiffs ds} =\n       let nNew = length outputNew in\n       let nNewDiffs = if nNew == n then Nothing else Just (VConstDiffs) in\n       let mergeEnabled =\n         let aux i diffs outputNew = case diffs of\n           [] -> []\n           (j, diff)::tailDiffs ->\n             if i == j then\n               case diff of\n                 ListElemUpdate d ->\n                   case outputNew of\n                     o :: t -> (o, Just d) :: aux (i + 1) tailDiffs t\n                 ListElemInsert count ->\n                   let (inserted, remOutputNew) = split count outputNew in\n                   concatMap (\\newA ->\n                     case __diff__ a newA of\n                       Err msg -> []\n                       Ok mbDiff -> [(newA, mbDiff)]) inserted ++ aux i tailDiffs remOutputNew\n                 ListElemDelete count ->\n                   aux (i + count) tailDiffs outputNew\n             else\n               let (_, remOutputNew) = split (j - i) outputNew in\n               aux j diffs remOutputNew\n           k::tailDiffs -> aux i tailDiffs outputNew\n         in aux 0 ds outputNew\n       in\n       let (nA, nDiffsA) = __merge__ a mergeEnabled in\n       Ok (InputsWithDiffs [((nNew, nA), Update.mbPairDiffs (nNewDiffs, nDiffsA))])\n    }.apply (n, a)\n\n  insertAt index newElem elements =\n    let (before, after) = split index elements in\n    before ++ [newElem] ++ after\n\n  removeAt index elements =\n    let (before, after) = split index elements in\n    case after of\n      [] -> Nothing\n      elem::afterTail ->\n        Just (elem, before ++ afterTail)\n\n  -- Given two converters cA and cB, a list and a target, finds an element\n  -- of the list that, converted using cA, equals target. Returns cB of this element.\n  -- In the reverse direction, it finds the cB of the new output and returns the cA.\n  findByAReturnB: (a -> b) -> (a -> c) -> b -> List a -> Maybe c\n  findByAReturnB =\n        Update.lens4 {\n          apply (cA, cB, target, l) =\n            let aux l = case l of\n              [] -> Nothing\n              h :: t -> if cA h == target then Just (cB h) else aux t\n            in aux l\n          update {input=(converterA, converterB, target, list) as input, outputNew} as uInput =\n            case outputNew of\n              Nothing -> Ok (InputsWithDiffs [(input, Nothing)])\n              Just outputNewTarget ->\n            case apply (converterB, converterA, outputNewTarget, list) of\n              Just x -> -- No rename here.\n                Ok (InputsWithDiffs [\n                  ((converterA, converterB, x, list),\n                    Update.diffs target x |> LensLess.Maybe.map Update.vTupleDiffs_3)])\n              Nothing ->\n                Update.default apply uInput\n            -- To ways to update: Either find the new B in the list and return A\n            -- Or just regular update (to change the name)\n        }\n\n  find pred list = case list of\n    [] -> Nothing\n    head :: tail -> if pred head then Just head else find pred tail\n\n  indexWhere pred list =\n    let aux n list = case list of\n      head :: tail -> if pred head then n else aux (n + 1) tail\n      _ -> -1\n    in\n    aux 0 list\n\n  indexOf value list = Update.lens {\n    apply value =  indexWhere ((==) value) list\n    update {input=value, outputNew=newIndex} as uInput =\n      case nthMaybe newIndex list of\n        Just newValue -> Ok (Inputs [newValue])\n        Nothing -> Err <| \"\"\"Index @newIndex not found in @list\"\"\"\n  } value\n\n  -- TODO: Continue to insert List functions from Elm (http://package.elm-lang.org/packages/elm-lang/core/latest/List#range)\n  map = map\n\n  append = append\n\n  concat = concatMap identity\n\n  intersperse elem list = drop 1 (concatMap_ identity (\\headAsList -> elem :: headAsList)) list\n\n  partition pred list = case list of\n    [] -> (list, list)\n    _ ->\n     let ([head] as headList, tail) = split 1 list in\n     let (ok, notok) = partition pred tail in\n     if pred head then\n       (headList ++ ok, notok)\n     else\n       (ok, headList ++ notok)\n\n  mapWithDefault = mapWithDefault\n  mapWithReverse = mapWithReverse\n  map2 = map2 -- TOOD: Make it a lens that supports insertion?\n  nil = nil\n  cons = cons\n  foldl = foldl\n  foldr = foldr\n\n  scanl : (a -> b -> b) -> b -> List a -> List b\n  scanl f acc list = case list of\n    [] -> [acc]\n    head :: tail -> acc :: scanl f (f head acc) tail\n\n  scanr : (a -> b -> b) -> b -> List a -> List b\n  scanr f acc list = case list of\n    [] -> [acc]\n    head :: tail ->\n      let headAcc::tailAcc = scanr f acc tail in\n      f head headAcc :: headAcc :: tailAcc\n\n  sort : List comparable -> List comparable\n  sort = sortBy identity\n\n  sortBy : (a -> comparable) -> List a -> List a\n  sortBy f xs =\n    let ins x ys =\n      case ys of\n        []    -> [x]\n        y::ys -> if f x < f y then x :: y :: ys else y :: ins x ys\n    in\n    foldl ins [] xs\n\n  sortWith : (a -> a -> Order) -> List a -> List a\n  sortWith f xs =\n    let ins x ys =\n      case ys of\n        []    -> [x]\n        y::ys -> if f x y == LT then x :: y :: ys else y :: ins x ys\n    in\n    foldl ins [] xs\n\n  zipWithIndex = zipWithIndex\n  member = contains\n  last = LensLess.List.last\n\n  all pred list = case list of\n    [] -> True\n    hd :: tl -> if pred hd then all pred tl else False\n\n  any pred list = case list of\n    [] -> False\n    hd :: tl -> if pred hd then True else any pred tl\n\n  projOks list = case list of\n    [] -> Ok []\n    head :: tail ->\n      Result.andThen2 (\\x y -> Ok (x :: y)) head (projOks tail)\n}\n\n\n--------------------------------------------------------------------------------\n-- String --\nString = {\n  ({toInt=strToInt, toFloat=strToFloat, join=join__}) = LensLess.String\n  (length) = LensLess.String.length -- We redefine length as a lens later in this module\n\n  (join_) x =\n    -- An example of using reversible foldl to join strings without separators\n    -- Here no insertion of element is possible, but we can remove elements.\n    -- We use a trick to propagate a value that is never computed, in order to know if, during update,\n    -- the last string had its first char deleted\n    case x of\n        [] -> {apply x = \"\", update {outputNew} = Ok (Inputs [[outputNew]])}.apply x\n        _ -> Update.applyLens {\n        apply (x, y) = x\n        update {output, diffs} = Ok (InputsWithDiffs\n          [((output, True), Just (VRecordDiffs { _1 = diffs, _2 = VConstDiffs}))])\n        } <| List.foldl2 (\\oldHeadList (oldAcc, dummyBool) ->\n      { apply (oldAcc, [head], dummyBool) = (oldAcc + head, dummyBool)\n        update {input=(oldAcc, [head], _) as input,outputNew=(newAcc, prevDeletedOrLast),diffs=ds} =\n          let handleDiffs = case ds of\n            VRecordDiffs {_1=VStringDiffs diffs} -> \\continuation -> continuation diffs\n            _ -> \\continuation -> Ok (InputsWithDiffs [(input, Nothing)])\n          in handleDiffs <| \\diffs ->\n          Update.splitStringDiffsAt (length oldAcc) 0 (oldAcc + head) newAcc diffs\n          |> List.concatMap (\\(leftValue, leftDiffs, rightValue, rightDiffs) ->\n            let lastCharLeftDeleted =\n              let aux leftDiffs = case leftDiffs of\n                [StringUpdate _ end 0] -> end == length oldAcc\n                head::tail -> aux tail\n                _ -> leftValue == \"\"\n              in aux leftDiffs\n            in\n            let firstCharDeleted = case rightDiffs of (StringUpdate 0 i 0) :: tail -> i > 0; _ -> False in\n            let surroundingElementsDeleted = lastCharLeftDeleted && prevDeletedOrLast in\n            let atLeastOneSurroundingElementDeleted = lastCharLeftDeleted || prevDeletedOrLast in\n            let elemDeleted = rightValue == \"\" && (firstCharDeleted || surroundingElementsDeleted) in\n            (if atLeastOneSurroundingElementDeleted && elemDeleted then [] else\n              [((leftValue, [rightValue], firstCharDeleted),\n                Update.pairDiff3\n                  (if leftDiffs == [] then Nothing else Just (VStringDiffs leftDiffs))\n                  (if rightDiffs == [] then Nothing else\n                   Just (VListDiffs [(0, ListElemUpdate (VStringDiffs rightDiffs))]))\n                  (if firstCharDeleted then Just VConstDiffs else Nothing)\n              )]) ++\n            (if elemDeleted then -- The string was deleted, one solution is to remove it.\n              [((leftValue, [], True),\n                Update.pairDiff3\n                  (if leftDiffs == [] then Nothing else Just (VStringDiffs leftDiffs))\n                  (Just (VListDiffs [(0, ListElemDelete 1)]))\n                  (Just VConstDiffs)\n                  )]\n            else [])\n          ) |> Update.valuesWithDiffs\n      }.apply (oldAcc, oldHeadList, dummyBool)\n      ) (freeze \"\", Update.softFreeze False) x\n\n  {substring,\n   take,\n   drop,\n   dropLeft,\n   dropRight,\n   sprintf} = LensLess.String\n\n  -- Repeats or shrinks s until it makes the given target length\n  (makeSize) s targetLength =\n    let n = length s in\n    if n < targetLength then makeSize (s + s) targetLength\n    else if n == targetLength then s\n    else take targetLength s\n\n  repeat n s = if n <= 0 then \"\" else if n == 1 then s else s + repeat (n - 1) s\n  slice = substring\n  left = take\n  right n x = dropLeft (max 0 ((length x) - n)) x\n\n  uncons s = case extractFirstIn \"^([\\\\s\\\\S])([\\\\s\\\\S]*)$\" s of\n    Just [x, y] -> Just (x, y)\n    Nothing -> Nothing\n\n  padLeft n c = Update.lens {\n    apply s = (List.range 1 (n - length s) |> List.map (always c) |> join \"\") + s\n    update {outputNew} =\n       case extractFirstIn (\"^(\" + c + \")*([\\\\s\\\\S]*)$\") outputNew of\n         Just [padding, str] -> Ok (Inputs [str])\n         Nothing -> Err \"String.pad could not complete\"\n  }\n\n  toInt = Update.lens\n    { apply x = strToInt x\n      unapply output = Just (toString output) }\n\n  toFloat = Update.lens\n      { apply x = strToFloat x -- TODO: Recognize strange floats (e.g. NaN, infinity)\n        unapply output = Just (toString output) }\n\n  join delimiter x =\n    if delimiter == \"\" then join_ x\n    else join__ delimiter x\n\n  -- In the forward direction, it joins the string.\n  -- In the backwards direction, if the delimiter is not empty, it splits the output string with it.\n  joinAndSplitBack regexSplit delimiter x = if delimiter == \"\" then join_ x else {\n        apply x = join__ delimiter x\n        update {output, oldOutput, diffs} =\n          Ok (Inputs [Regex.split regexSplit output])\n      }.apply x\n\n  length = Update.lens {\n    apply = length\n    update {input, oldOutput, newOutput} =\n      if newOutput < oldOutput then\n        Ok (InputsWithDiffs [(take newOutput input, Just (VStringDiffs [StringUpdate newOutput oldOutput 0]))])\n      else if newOutput == oldOutput then\n        Ok (InputsWithDiffs [(input, Nothing)])\n      else\n        let increment = newOutput - oldOutput in\n        let addition = makeSize (if input == \"\" then \"#\" else input) increment in\n        Ok (InputsWithDiffs [(input + addition, Just (VStringDiffs [StringUpdate oldOutput oldOutput increment]))])\n    }\n\n  trim s =\n    case extractFirstIn \"^\\\\s*([\\\\s\\\\S]*?)\\\\s*$\" s of\n      Just [trimmed] -> trimmed\n      _ -> s\n\n  update = {\n      freezeRight = Update.lens {\n        apply x = x\n        update {input, outputNew} =\n          if take (length input) outputNew == input then\n            Err <| \"Cannot add anything to the right of \'\" + input + \"\'\"\n          else\n            Ok <| Inputs [outputNew]\n      }\n\n      freezeLeft x = Update.lens {\n        apply x = x\n        update {input, outputNew} =\n          if drop (length outputNew - input) outputNew == input then\n            Err <| \"Cannot add anything to the left of \'\" + input + \"\'\"\n          else\n            Ok <| Inputs [outputNew]\n      }\n\n      debug tag text = onDeleteInsertLeftRight (\\l d i r ->\n        Debug.log (tag + \" deleted: \" + toString d + \", left: \" + toString (drop (max 0 (length l - 100)) l) + \", right: \" + toString (take 100 r) + \", inserted:\") i) text\n\n      onInsert callbackOnInserted string =\n        onDeleteInsertLeftRight (\\left deleted inserted right -> callbackOnInserted inserted) string\n\n      onDeleteInsertLeftRight callbackOnLeftDeletedInsertedRight string = Update.lens {\n        apply string = string\n        update {outputOld, outputNew, diffs=(VStringDiffs sDiffs)} =\n          let aux offset outputNewUpdated revDiffsUpdated oldDiffs = case oldDiffs of\n            [] -> Ok (InputsWithDiffs [\n              (outputNewUpdated, Just (VStringDiffs (List.reverse revDiffsUpdated)))])\n            ((StringUpdate start end replaced) as headDiff) :: tailOldDiffs ->\n              let inserted = substring (start + offset) (start + offset + replaced) outputNewUpdated in\n              let left = take (start+offset) outputNewUpdated in\n              let right = drop (start+offset+replaced) outputNewUpdated in\n              let deleted = substring start end outputOld in\n              let newInserted = callbackOnLeftDeletedInsertedRight left deleted inserted right in\n              let lengthNewInserted = length newInserted in\n              let newOffset = offset + lengthNewInserted - (end - start) in\n              let (newOutputNewUpdated, newDiff) = if inserted /= newInserted then\n                 ( take (start + offset) outputNewUpdated +\n                   newInserted + drop (start + offset + replaced) outputNewUpdated\n                 , StringUpdate start end lengthNewInserted)\n                 else (outputNewUpdated, headDiff)\n              in\n              aux newOffset newOutputNewUpdated (newDiff::revDiffsUpdated) tailOldDiffs\n           in aux 0 outputNew [] sDiffs\n       } string\n\n      fixTagUpdates string = Update.lens {\n         apply string = string\n         update {outputOld, outputNew, diffs=(VStringDiffs sDiffs)} =\n           let aux offset revDiffsUpdated oldDiffs = case oldDiffs of\n             [] -> Ok (InputsWithDiffs [\n               (outputNew, Just (VStringDiffs (List.reverse revDiffsUpdated)))])\n             ((StringUpdate start end replaced) as headDiff) :: tailOldDiffs ->\n               let continueWith callback = case tailOldDiffs of\n                 StringUpdate start2 end2 replaced2 :: tailTailOldDiffs->\n                   if start2 <= end + 2 && start2 /= end then -- Second condition necessary to not merge immediate deletion/insertions\n                     if not <| Regex.matchIn \"[<>]\" (substring end start2 outputOld) then\n                       aux offset revDiffsUpdated (StringUpdate start end2 (replaced + replaced2 + start2 - end) :: tailTailOldDiffs)\n                     else\n                       callback ()\n                   else\n                     callback ()\n                 _ ->\n                 callback ()\n               in\n               continueWith <| \\_ ->\n               let inserted = substring (start + offset) (start + offset + replaced) outputNew in\n               let deleted = substring start end outputOld in\n               let right = drop (start + offset + replaced) outputNew in\n               let rightOld = drop end outputOld in\n               let left = take (start + offset) outputNew in\n               let newOffset = offset + replaced - (end - start) in\n               if Regex.matchIn \"\"\"^<[\\s\\S]*>$\"\"\" inserted && Regex.matchIn \"\"\"^<[\\s\\S]*>$\"\"\" deleted then\n                 -- <img> --> <br> It should be a true replacement instead, else we\'ll back-propagate the transformation inside the <>\n                 aux offset revDiffsUpdated (StringUpdate start end 0 :: StringUpdate end end replaced :: tailOldDiffs)\n               else\n               let newDiff =\n                    if Regex.matchIn \"^><\" inserted  && Regex.matchIn \"^>\" right then\n                      StringUpdate (start + 1) (end + 1) replaced\n                    else if Regex.matchIn \"<$\" left && Regex.matchIn \"><$\" inserted then\n                      StringUpdate (start - 1) (end - 1) replaced\n                    else if Regex.matchIn \"</$\" left && Regex.matchIn \"></$\" inserted then\n                      StringUpdate (start - 2) (end - 2) replaced\n                    else if Regex.matchIn \"<$\" left && Regex.matchIn \"<$\" deleted then\n                      StringUpdate (start - 1) (end - 1) replaced\n                    else if Regex.matchIn \"^>\" deleted && Regex.matchIn \"^>\" right then\n                      StringUpdate (start + 1) (end + 1) replaced\n                    else if Regex.matchIn \"<$\" left && Regex.matchIn \"^>\" right && Regex.matchIn \"^>\" rightOld then -- We expand the replacement\n                      StringUpdate (start - 1) (end + 1) (replaced + 2)\n                    else\n                      headDiff\n               in\n               aux newOffset (newDiff::revDiffsUpdated) tailOldDiffs\n            in aux 0 [] sDiffs\n        } string\n  }\n\n  newlines = {\n    isCRLF = Regex.matchIn \"\\r\\n\"\n    toUnix string =\n      if isCRLF string then\n        Regex.replace \"\\r\" (\\_ -> freeze \"\") string\n        |> update.onInsert (Regex.replace \"\\n\" (\\_ -> \"\\r\\n\"))\n      else\n        string\n  }\n\n  toLowerCase string =\n    Regex.replace \"[A-Z]\" (\\m ->\n      Update.replaceInstead m.match <|\n      case m.match of\n        \"A\" -> \"a\"; \"B\" -> \"b\"; \"C\" -> \"c\"; \"D\" -> \"d\"; \"E\" -> \"e\"; \"F\" -> \"f\"; \"G\" -> \"g\"; \"H\" -> \"h\"; \"I\" -> \"i\";\n        \"J\" -> \"j\"; \"K\" -> \"k\"; \"L\" -> \"l\"; \"M\" -> \"m\"; \"N\" -> \"n\"; \"O\" -> \"o\"; \"P\" -> \"p\"; \"Q\" -> \"q\"; \"R\" -> \"r\";\n        \"S\" -> \"s\"; \"T\" -> \"t\"; \"U\" -> \"u\"; \"V\" -> \"v\"; \"W\" -> \"w\"; \"X\" -> \"x\"; \"Y\" -> \"y\"; \"Z\" -> \"z\"; _ -> m.match\n      ) string\n\n  toUpperCase string =\n    Regex.replace \"[a-z]\" (\\m ->\n      Update.replaceInstead m.match <|\n      case m.match of\n        \"a\" -> \"A\"; \"b\" -> \"B\"; \"c\" -> \"C\"; \"d\" -> \"D\"; \"e\" -> \"E\"; \"f\" -> \"F\"; \"g\" -> \"G\"; \"h\" -> \"H\"; \"i\" -> \"I\";\n        \"j\" -> \"J\"; \"k\" -> \"K\"; \"l\" -> \"L\"; \"m\" -> \"M\"; \"n\" -> \"N\"; \"o\" -> \"O\"; \"p\" -> \"P\"; \"q\" -> \"Q\"; \"r\" -> \"R\";\n        \"s\" -> \"S\"; \"t\" -> \"T\"; \"u\" -> \"U\"; \"v\" -> \"V\"; \"w\" -> \"W\"; \"x\" -> \"X\"; \"y\" -> \"Y\"; \"z\" -> \"Z\"; _ -> m.match\n      ) string\n\n  markdown text =\n    let escapeHtml = Regex.replace \"[<>&]\" (case of\n          {match = \"<\"} -> freeze \"&lt;\"\n          {match = \">\"} -> freeze \"&gt;\"\n          {match = \"&\"} -> freeze \"&amp;\")\n        escapeAttribute = Regex.replace \"\\r?\\n|\\\"\" (case of\n          \"\\\"\" -> \"\\\\\\\"\"\n          _ -> \"\")\n        notincode = \"\"\"(?!(?:(?!<code>)[\\s\\S])*</code>)\"\"\"\n        notinulol = \"\"\"(?!(?:(?!<[uo]l>)[\\s\\S])*</[uo]l>)\"\"\"\n        notinattr = \"\"\"(?!(?:(?!<)[\\s\\S])*>)\"\"\"\n        regexFootnotes = \"\"\"\\r?\\n\\[\\^@notincode([^\\]]+)\\]:\\s*@notincode((?:(?!\\r?\\n\\r?\\n)[\\s\\S])+)@notincode\"\"\"\n        regexReferences = \"\"\"\\r?\\n\\[(?!\\^)([^\\]\\\\]+)\\]:\\s*@notincode(\\S+)@notincode\"\"\"\n        footnotes = Regex.find regexFootnotes text\n                     |> List.map (\\m -> (nth m 1, nth m 2))\n                     |> List.indexedMap (\\i (name, value) -> (name, (i + 1, value)))\n        references = Regex.find regexReferences text\n                     |> List.map (\\m -> (nth m 1, nth m 2))\n        r  = Regex.replace\n        lregex = \"\"\"(?:\\r?\\n|^)((?:(?![\\r\\n])\\s)*)(\\*|-|\\d+\\.)(\\s+)((?:@notincode.*)(?:\\r?\\n\\1  ?\\3(?:@notincode.*))*(?:\\r?\\n\\1(?:\\*|-|\\d+\\.)\\3(?:@notincode.*)(?:\\r?\\n\\1 \\3(?:@notincode.*))*)*)@notincode\"\"\"\n        handleLists text  =\n          flip (r lregex) text <|\n            \\m -> let indent = nth m.group 1\n                      afterindent = nth m.group 3\n                      symbol = nth m.group 2\n                      ul_ol = Update.bijection\n                               (case of \"*\" -> \"ul\"; \"-\" -> \"ul\"; _ -> \"ol\")\n                               (case of\n                                 \"ul\" -> if symbol == \"*\" || symbol == \"-\" then symbol else \"*\"\n                                 \"ol\" -> if symbol == \"*\" || symbol == \"-\" then \"1.\" else symbol\n                                 x -> error \"\"\"tag name \'@x\' not compatible with ul or ol\"\"\")\n                               symbol\n                      elements =\n                        Regex.split \"\"\"\\r?\\n@indent(?:\\*|-|\\d+\\.)@afterindent\"\"\" (nth m.group 4)\n                      insertionPoint callback = Update.lens {\n                        apply elements = \"\"\n                        update {input=elements, output} =\n                          case Regex.extract \"\"\"^<li>([\\s\\S]*)</li>$\"\"\" output of\n                            Just [content] ->\n                              Ok (Inputs [callback elements (Regex.split \"\"\"</li><li>\"\"\" content)]) -- TODO: Precompute diffs (insertions)\n                            _->\n                              Err (\"Can only insert <li> elements to lists, got \" + output)\n                      } elements\n                      insertAfter = insertionPoint (append)\n                      insertBefore = insertionPoint (flip append)\n                  in\n                  Update.freezeExcept (\\_ ->  \"ul template\")  [ul_ol, insertBefore, handleLists, elements, notinulol, insertAfter] <|\n                                                             \\[ul_ol, insertBefore, handleLists, elements, notinulol, insertAfter] ->\n                  \"\"\"<@ul_ol>@insertBefore<li>@(\n                    List.map handleLists elements\n                    |> joinAndSplitBack \"\"\"</li><li>@notinulol\"\"\" \"</li><li>\")</li>@insertAfter</@ul_ol>\"\"\"\n\n        handleblockquotes text =\n          Regex.replace \"\"\"(?:(?:\\r?\\n|^)>(?!.*</.*).*)+@notincode\"\"\" (\\m ->\n           Regex.extract \"\"\"(\\r?\\n|^)>([\\s\\S]*)\"\"\" m.match\n           |> Maybe.map (\\[newline, content] ->\n             let quoteContent =\n                  Regex.replace \"\"\"(\\r?\\n)> *\"\"\" (\\m -> nth m.group 1) content\n             in\n             let recursivecontent = quoteContent |> handleblockquotes in\n             Update.freezeExcept (\\_ -> \"blockquote template\") [newline, recursivecontent] <|\n                                                              \\[newline, recursivecontent] ->\n             \"\"\"@newline<blockquote>@recursivecontent</blockquote>\"\"\"\n           ) |> Maybe.withDefault m.match\n          ) text\n    in let\n    text =\n      r \"\"\"(```)([\\s\\S]*?)\\1(?!`)|(\\r?\\n *|^ *)((?:\\r?\\n    .*)+)\"\"\" (\\m ->\n      if nth m.group 1 == \"\" then\n        nth m.group 4 |>\n        Regex.extract \"\"\"^\\r?\\n    ([\\s\\S]*)$\"\"\" |>\n        Maybe.map (\\[code] ->\n                nth m.group 3 + \"\"\"<pre><code>@(Regex.split \"\"\"\\r?\\n    \"\"\" code |> join \"\\n\" |> trim |> escapeHtml)</code></pre>\"\"\")\n        |> Maybe.withDefault m.match\n      else\n      \"\"\"<pre><code>@(nth m.group 2 |> trim |> escapeHtml)</code></pre>\"\"\") text\n    text =  handleblockquotes text\n    text =  r \"\"\"(`)(?=[^\\s`])(@notincode.*?)\\1@notincode\"\"\" (\\m -> \"\"\"<code>@(nth m.group 2 |> escapeHtml)</code>\"\"\") text\n    text =  r \"\"\"(?:@regexReferences|@regexFootnotes)@notincode\"\"\" (\\m -> \"\") text\n    text = -- Expand footnotes\n      if List.length footnotes == 0 then text\n      else text + \"\"\"\n  <div class=\"footnotes\"><hr><ol>@(footnotes |>\n              List.map (\\(name, (n, value)) ->\n                \"\"\"<li id=\"fn@n\"><p>@value<a href=\"#fnref@n\">↩</a></p></li>\"\"\"\n              ) |> join \"\")</ol></div>\"\"\"\n    text = r \"\"\"(^|\\r?\\n)(#+)\\s*(@notincode[^\\r\\n]*)@notincode\"\"\" (\\m ->\n      let hlevel = \"\"\"h@(length (nth m.group 2))\"\"\" in\n      Update.freezeExcept (always \"h-template\") [m, hlevel] <| \\[m, hlevel] -> \"\"\"@(nth m.group 1)<@hlevel>@(nth m.group 3)</@hlevel>\"\"\") text\n    text = handleLists text\n    text = r \"\"\"(?:(\\r?\\n *\\r?\\n)(?:\\\\noindent\\r?\\n)?|^)((?=\\s*\\w|\\S)@notincode[\\s\\S]*?)(?=(\\r?\\n *\\r?\\n|\\r?\\n$|$))@notincode\"\"\" (\n      \\m ->\n        if nth m.group 1 == \"\" && nth m.group 3 == \"\" -- titles and images should not be paragraphs.\n         || Regex.matchIn \"\"\"</?(?:h\\d|ul|ol|p|pre|center)>\"\"\" (nth m.group 2) then m.match else Update.freezeExcept (always \"p template\") m <| \\m -> \"\"\"@(nth m.group 1)<p>@(nth m.group 2)</p>\"\"\") text\n    text = r \"\"\"(!?)\\[([^\\]\\[\\\\]+)\\](\\^?)(\\(|\\[)([^\\[\\)\\]\\s]+)\\s?\"?([^\\)\\]\"]+)?\"?(?:\\)|\\])|(?:http|ftp|https):\\/\\/(?:[\\w_-]+(?:(?:\\.[\\w_-]+)+))(?:[\\w.,@@?^=%&:/~+#-]*[\\w@@?^=%&/~+#-])?@notincode@notinattr\"\"\" (\n      \\{group=[match, picPrefix, text, targetblank, parensStyle, url, title]} ->  -- Direct and indirect References + syntax ^ to open in external page.\n      let a = if picPrefix == \"!\" then \"img\" else \"a\"\n          aclose = if picPrefix == \"!\" then \"\" else text + \"</a>\"\n          href = if picPrefix == \"!\" then \"src\" else \"href\"\n          t = if title == \"\" then \"\" else \" title=\'\" + title + \"\'\"\n          targetblank = if targetblank == \"^\" then \"\"\" target=\'_blank\'\"\"\" else \"\"\n          alt = if picPrefix == \"!\" then \"\"\" alt=\'@text\'\"\"\" else \"\"\n      in\n      case parensStyle of\n        \"(\" -> (Update.freezeWhen True toString (\\a t href url targetblank alt aclose -> \"\"\"<@a @t @href=\"@url\"@targetblank@alt>@aclose\"\"\"))\n                  a t href url targetblank alt aclose\n        \"[\" -> listDict.get url references |> case of\n              Just link ->\n                Update.freezeExcept (always \"a or img relative template\")\n                  [a, t, href, link, targetblank, alt, aclose] <|\n                 \\[a, t, href, link, targetblank, alt, aclose] ->\n               \"\"\"<@a @t @href=\"@link\"@targetblank@alt>@aclose\"\"\"\n              Nothing -> match\n        _ -> Update.freezeExcept (always \"full URL template\") match <| \\match -> \"\"\"<a href=\"@match\">@(escapeHtml match)</a>\"\"\"\n        ) text\n    text = r \"\"\"\\[\\^(@notincode[^\\]]+)\\]@notincode\"\"\" (\\m ->  -- Footnotes\n      listDict.get (nth m.group 1) footnotes |> case of\n        Just (n, key) ->\n          Update.freezeExcept (always \"footnote template\") [n, key] <| \\[n, key] ->\n          \"\"\"<a href=\"#fn@n\" title=\"@(escapeAttribute key)\" class=\"footnoteRef\" id=\"fnref@n\"><sup>@n</sup></a>\"\"\"\n        Nothing -> m.match) text\n    text = r \"\"\"(\\*{1,3}|_{1,3})(?=[^\\s\\*_])(@notincode(?:(?!\\\\\\*|\\_).)*?)(\\1)@notincode@notinattr\"\"\" (\\m ->\n      let content = nth m.group 2 in\n      let n = nth m.group 1 |> length in\n      let m = nth m.group 3 |> length in\n      let (start, end)= Update.lens2 {\n        apply (n, m) = case n of\n          1 -> (\"<em>\", \"</em>\")\n          2 -> (\"<strong>\", \"</strong>\")\n          3 -> (\"<em><strong>\", \"</strong></em>\")\n        update {outputNew=(start,end)} = case (start, end) of\n          (\"\", \"\") -> Ok (Inputs [(0, 0)])\n          (\"<span>\", \"</span>\") -> Ok (Inputs [(0, 0)])\n          (\"<em>\", \"</em>\") -> Ok (Inputs [(1, 1)])\n          (\"<strong>\", \"</strong>\") -> Ok (Inputs [(2, 2)])\n          _ -> Err \"Cannot touch em and strong tags directly. For now, just delete and replace the text without italics/bold\"\n      } n m\n      in start + content + end) text\n    text = r \"\"\"(&mdash;|\\\\\\*|\\\\_|\\\\\\[|\\\\\\]|  \\r?\\n)@notincode\"\"\" (\\m -> case m.match of\n      \"&mdash;\" -> \"—\"\n      \"\\\\*\" -> drop 1 m.match\n      \"\\\\_\" -> drop 1 m.match\n      \"\\\\[\" -> drop 1 m.match\n      \"\\\\]\" -> drop 1 m.match\n      \"  \\r\\n\" -> \"<br>\"\n      \"  \\n\" -> \"<br>\"\n      ) text\n    text = update.onDeleteInsertLeftRight (\\left deleted inserted right ->\n      let\n        inserted =\n          Regex.replace \"\"\"<(b|i|em|strong)>(?=\\S)((?:(?!</\\1\\s*>).)*\\S)</\\1\\s*>\"\"\" (\\m ->\n            let tag = nth m.group 1\n                content = nth m.group 2\n            in if tag == \"b\" || tag == \"strong\" then\n              \"**\" + content + \"**\"\n            else\n              \"*\" + content + \"*\"\n          ) inserted\n        inserted = case Regex.extract \"\"\"^([\\s\\S]*)</p>\\s*<p>([\\s\\S]*)$\"\"\" inserted of\n          Just [before, after] -> before + \"\\n\\n\" + after\n          _ -> inserted\n        inserted = case Regex.extract \"\"\"^([\\s\\S]*)<div>([\\s\\S]*)</div>([\\s\\S]*)$\"\"\" inserted of\n          Just [before, paragraph, after] ->\n             before + \"\\n\\n\" + paragraph + after\n          _ -> inserted\n        inserted = case Regex.extract \"\"\"^([\\s\\S]*)<(/?)(b|i|strong|em)\\s*>([\\s\\S]*)$\"\"\" inserted of\n          Just [before, mbSlash, bi, after] ->\n            let mdtag = if bi == \"b\" || bi == \"strong\" then \"**\" else \"*\" in\n            let mdtagregex = if bi == \"b\" then \"\\\\*\\\\*\" else \"\\\\*\" in\n            if mbSlash == \"\" && Regex.matchIn \"\"\"^\\S(?:(?!</@bi\\s*>).)*?\\S</@bi\\s*>\"\"\" (after + right) then\n              before + mdtag + after\n            else if mbSlash == \"/\" && Regex.matchIn \"\"\"@mdtagregex\\S(?:(?!@mdtagregex).)*?$\"\"\" (left + before) then\n              before + mdtag + after\n            else inserted\n          _ -> inserted\n        inserted = Regex.replace \"\"\"<a href=\"((?:(?!</a>).)*)\">((?:(?!</a>).)*)</a>\"\"\" (\\{submatches=[url, text]} ->\n             \"[\" + text + \"](\"+ url +\")\"\n          ) inserted\n        inserted = Regex.replace \"\"\"<img[^>]+\\bsrc=[^>]+>\"\"\" (\\match ->\n           case htmlViaEval match.match of\n              [[\"img\", attrs, _]] ->\n                let title = attrDict.get \"title\" attrs |> Maybe.map (\\x -> \" \\\"\" + x + \"\\\"\") |> Maybe.withDefault \"\"\n                    alt = attrDict.get \"alt\" attrs |> Maybe.map (\\x -> if x == \"\" then \"Image\" else x) |> Maybe.withDefault \"Image\"\n                    url = attrDict.get \"src\" attrs |> Maybe.withDefault \"url\"\n                in\n                \"![\" + alt + \"](\"+ url + title + \")\"\n              _ -> match.match) inserted\n      in inserted\n      ) text\n    text = update.fixTagUpdates text\n    in text\n\n  q3 = \"\\\"\\\"\\\"\" -- To interpolate triple quotes into strings\n}\n\n\n--------------------------------------------------------------------------------\n-- Maybe --\n\nMaybe =\n  { type Maybe a = Nothing | Just a\n\n    -- Returns the first argument if the second is Nothing. If the second is Just x returns x\n    withDefault d mb =\n      case mb of\n        Nothing -> d\n        Just j -> j\n\n    -- Like withDefault, but if the default was used and we push a new value,\n    -- it will push it back as a \"Just\" before trying the usual behavior. Ideal for displaying placeholders.\n    withDefaultReplace = Update.lens2 {\n      apply (d, mb) = case mb of\n        Nothing -> d\n        Just j -> j\n      update {input=(d,mb) as input,outputNew} as uInput =\n        Ok (InputsWithDiffs ([((d, Just outputNew),\n              Update.diffs mb (Just outputNew) |> LensLess.Maybe.map Update.vTupleDiffs_2)] ++ (\n              if mb /= Nothing then [] else Update.defaultAsListWithDiffs apply uInput)))\n    }\n\n    -- Like withDefault, but the default value is a callback that is called if mb is empty.\n    withDefaultLazy df mb =\n      case mb of\n        Nothing -> df ()\n        Just j -> j\n\n    -- Like withDefault, but if the default was used and we push a new value,\n    -- it will push it back as a \"Just\" before trying the usual behavior. Ideal for displaying placeholders.\n    withDefaultReplaceLazy = Update.lens2 {\n      apply (df, mb) = case mb of\n        Nothing -> df ()\n        Just j -> j\n      update {input=(df,mb) as input,outputNew} as uInput =\n        Ok (InputsWithDiffs ([((df, Just outputNew),\n              Update.diffs mb (Just outputNew) |> LensLess.Maybe.map Update.vTupleDiffs_2)] ++ (\n              if mb /= Nothing then [] else Update.defaultAsListWithDiffs apply uInput)))\n    }\n\n    map = Update.lens2 {\n      apply (f, a) = case a of\n        Nothing -> Nothing\n        Just x -> Just (f x)\n      update = case of\n        {outputOld=Just x, outputNew=Nothing} ->\n          Ok (InputsWithDiffs [((f, Nothing), Update.mbPairDiffs (Nothing, Just VConstDiffs))])\n        uInput -> Update.default apply uInput\n    }\n\n    -- Like map, but does not fail if the input was NOthing and the new output is Just, because it knows a default element.\n    mapWithDefault = Update.lens2 {\n      apply (default, f, a) = case a of\n        Nothing -> Nothing\n        Just x -> Just (f x)\n      update = case of\n        {outputOld=Just x, outputNew=Nothing} ->\n           Ok (InputsWithDiffs [((f, Nothing), Update.mbPairDiffs (Nothing, Just VConstDiffs))])\n        {outputOld=Nothing, outputNew=Just x} ->\n           case Update.updateApp {fun (_, f, x) = f x, input = (default, f, default), outputNew = x} of\n             Err msg -> Err msg\n             Ok (InputsWithDiffs inputsWithDiffs) ->\n               Ok (InputsWithDiffs (inputsWithDiffs |> List.map (\\((default, f, newX), newDiff) ->\n                 ((default, f, Just newX), case newDiff of\n                   Just _ -> Just (VRecordDiffs { _3=VConstDiffs})\n                   Nothing -> Nothing)\n               )))\n        uInput -> Update.default apply uInput\n    }\n\n    andThen f a = case a of\n      Nothing -> Nothing\n      Just x -> f x\n\n    orElse mb2 mb1 = case mb1 of\n      Just _ -> mb1\n      Nothing -> mb2\n\n    -- like orElse, but in the reverse direction, will try to push Nothing to mb1\n    orElseReplace = Update.lens2 {\n      apply (mb2, mb1) = case mb1 of\n        Nothing -> mb2\n        Just x -> mb1\n      update {input=(mb2, mb1), outputOld, outputNew} =\n        case outputNew of\n          Just _ -> case mb1 of\n            Nothing -> Ok (Inputs [(mb2, outputNew), (outputNew, mb1)])\n            Just _ -> Ok (Inputs [(mb2, outputNew)])\n          Nothing -> Ok (Inputs [(mb2, Nothing)])\n    }\n\n    -- Given emptyCondition and Just x, returns x.\n    -- On the reverse direction, if the new x passes the emptyCondition, propagates back Nothing\n    getUnless emptyCondition = Update.lens {\n      apply (Just x) = x\n      update {outputNew} as uInput =\n        if emptyCondition outputNew then\n          Ok (Inputs [Nothing])\n        else\n          Update.default apply uInput\n    }\n\n    fold : a -> (x -> a) -> Maybe x -> a\n    fold onNothing onJust content =\n      case content of\n        Nothing -> onNothing\n        Just c -> onJust c\n\n    foldLazy : (() -> a) -> (x -> a) -> Maybe x -> a\n    foldLazy onNothing onJust content =\n      case content of\n        Nothing -> onNothing ()\n        Just c -> onJust c\n  }\n\n-- if we decide to allow types to be defined within (and exported from) modules\n--\n-- {Nothing, Just} = Maybe\n--\n-- might look something more like\n--\n-- {Maybe(Nothing,Just)} = Maybe\n-- {Maybe(..)} = Maybe\n--\n-- -- Sample deconstructors once generalized pattern matching works.\n-- Nothing$ = {\n--   unapplySeq exp = case exp of\n--     {$d_ctor=\"Nothing\", args=[]} -> Just []\n--     _ -> Nothing\n-- }\n-- Just$ = {\n--   unapplySeq exp = case exp of\n--     {$d_ctor=\"Just\", args=[x]} -> Just [x]\n--     _ -> Nothing\n-- }\n\n--------------------------------------------------------------------------------\n-- Tuple --\n\nTuple =\n  { mapFirst f (x, y) = (f x, y)\n    mapSecond f (x, y) = (x, f y)\n    first (x, y) = x\n    second (x, y) = y\n  }\n\n--------------------------------------------------------------------------------\n-- Editor --\n\nEditor = {}\n\n-- TODO remove this; add as imports as needed in examples\n{freeze, applyLens} = Update\n\n-- Custom Update: List Map, List Append, ...\n\n-- TODO\n\n-- HTML\n\n--------------------------------------------------------------------------------\n-- Html.html\n\n--type HTMLAttributeValue = HTMLAttributeUnquoted WS WS String | HTMLAttributeString WS WS String {-Delimiter char-}  String | HTMLAttributeNoValue\n--type HTMLAttribute = HTMLAttribute WS String HTMLAttributeValue\n--type HTMLCommentStyle = Less_Greater String {- The string should start with a ? -}\n--                      | LessSlash_Greater {- The string should start with a space -} String\n--                      | LessBang_Greater String\n--                      | LessBangDashDash_DashDashGreater String\n\n--type HTMLClosingStyle = RegularClosing WS | VoidClosing | AutoClosing | ForgotClosing\n--type HTMLEndOpeningStyle = RegularEndOpening {- usually > -} | SlashEndOpening {- add a slash before the \'>\' of the opening, does not mark the element as ended in non-void HTML elements -}\n-- HTMLInner may have unmatched closing tags inside it. You have to remove them to create a real innerHTML\n-- HTMLInner may have unescaped chars (e.g. <, >, & etc.)\n--type HTMLNode = HTMLInner String\n--              | HTMLElement String (List HTMLAttribute) WS HTMLEndOpeningStyle (List HTMLNode) HTMLClosingStyle\n--              | HTMLComment HTMLCommentStyle\n\nupdateOutputToResults c = case c of\n  Ok (Inputs i) -> Ok i\n  Ok (InputsWithDiffs id) -> Ok (List.unzip id |> Tuple.first)\n  Err msg -> Err msg\n\n-- Returns a list of HTML nodes parsed from a string. It uses the API for loosely parsing HTML\n-- Example: html \"Hello<b>world</b>\" returns [[\"TEXT\",\"Hello\"],[\"b\",[], [[\"TEXT\", \"world\"]]]]\nhtml string = {\n  apply trees =\n    let unwrapcontent elems = List.map (case of\n      HTMLAttributeStringRaw raw -> raw\n      HTMLAttributeEntity rendered _ -> rendered) elems |> String.join \"\" in\n    let domap tree = case tree of\n      HTMLInner v -> [\"TEXT\",\n        replaceAllIn \"</[^>]*>\" (\\{match} -> \"\") v]\n      HTMLEntity entityRendered entity -> [\"TEXT\", entityRendered]\n      HTMLElement tagName attrs ws1 endOp children closing ->\n        [ tagName\n        , map (case of\n          HTMLAttribute ws0 name value ->\n            let (name, content) = case value of\n              HTMLAttributeUnquoted _ _ content -> (name, unwrapcontent content)\n              HTMLAttributeString _ _ _ content -> (name, unwrapcontent content)\n              HTMLAttributeNoValue -> (name, \"\")\n            in\n            if name == \"style\" then\n              let styleContent = Regex.split \"(?=;\\\\s*\\\\S)\" content |> LensLess.List.filterMap (\n                  Regex.extract \"^;?([\\\\s\\\\S]*):([\\\\s\\\\S]*);?\\\\s*$\"\n                )\n              in\n              [name, styleContent]\n            else [name, content]\n            ) attrs\n        , map domap children]\n      HTMLComment {args = {_1=content}} -> [\"comment\", [[\"display\", \"none\"]], [[\"TEXT\", content]]]\n    in map domap trees\n\n  update {input, oldOutput, newOutput, diffs} =\n    let toHTMLAttribute [name, mbStyleValue] =\n      let value =\n        if name == \"style\" then\n          LensLess.String.join \"; \" (LensLess.List.map (\\[styleName, styleValue] ->\n            styleName + \":\" + styleValue\n          ) mbStyleValue)\n        else mbStyleValue\n      in\n      HTMLAttribute \" \" name (HTMLAttributeString \"\" \"\" \"\\\"\" value) in\n    let toHTMLInner text = HTMLInner (replaceAllIn \"<|>|&\" (\\{match} -> case match of \"&\" -> \"&amp;\"; \"<\" -> \"&lt;\"; \">\" -> \"&gt;\"; _ -> \"\") text) in\n    let toHTMLNode e = case e of\n      [\"TEXT\",v2] -> toHTMLInner v2\n      [tag, attrs, children] -> HTMLElement tag (map toHTMLAttribute attrs) \"\"\n           RegularEndOpening (map toHTMLNode children) (RegularClosing \"\")\n    in\n    let reconcile oldAttrElems newString = [HTMLAttributeStringRaw newString] in\n    let mergeAttrs input oldOutput newOutput diffs =\n      Update.foldDiff {\n        start =\n          -- Accumulator of HTMLAttributes, accumulator of differences, original list of HTMLAttributes\n          ([], [], input)\n        onSkip (revAcc, revDiffs, input) {count} =\n          --\'outs\' was the same in oldOutput and outputNew\n          let (newRevAcc, remainingInput) = LensLess.List.reverse_move count revAcc input in\n          Ok [(newRevAcc, revDiffs, remainingInput)]\n\n        onUpdate (revAcc, revDiffs, input) {oldOutput, newOutput, diffs, index} =\n          let inputElem::inputRemaining = input in\n          let newInputElem = case (inputElem, newOutput) of\n            (HTMLAttribute sp0 name value, [name2, value2 ]) ->\n             let realValue2 =\n               if name == \"style\" then -- value2\n                 String.join \"\" (List.map (\\[styleName, styleValue] ->\n                   styleName + \":\" + styleValue + \";\"\n                 ) value2)\n               else value2\n             in\n             case value of\n               HTMLAttributeUnquoted sp1 sp2 v ->\n                 case extractFirstIn \"\\\\s\" realValue2 of\n                   Nothing ->\n                     HTMLAttribute sp0 name2 (HTMLAttributeUnquoted sp1 sp2 (reconcile v realValue2))\n                   _ ->\n                     HTMLAttribute sp0 name2 (HTMLAttributeString sp1 sp2 \"\\\"\" (reconcile v realValue2))\n               HTMLAttributeString sp1 sp2 delim v ->\n                     HTMLAttribute sp0 name2 (HTMLAttributeString sp1 sp2 delim (reconcile v realValue2))\n               HTMLAttributeNoValue ->\n                  if value2 == \"\" then HTMLAttribute sp0 name2 (HTMLAttributeNoValue)\n                  else toHTMLAttribute [name2, value2]\n               _ -> Debug.crash <| \"expected HTMLAttributeUnquoted, HTMLAttributeString, HTMLAttributeNoValue, got \" ++ toString (inputElem, newOutput)\n            _ -> Debug.crash \"Expected HTMLAttribute, got \" ++ toString (inputElem, newOutput)\n          in\n          let newRevDiffs = case Update.diff inputElem newInputElem of\n            Ok (Just d) -> (index, ListElemUpdate d)::revDiffs\n            Ok (Nothing) ->  revDiffs\n            Err msg -> Debug.crash msg\n          in\n          Ok [(newInputElem::revAcc, newRevDiffs, inputRemaining)]\n\n        onRemove (revAcc, revDiffs, input) {oldOutput, index} =\n          let _::remainingInput = input in\n          Ok [(revAcc, (index, ListElemDelete 1)::revDiffs, remainingInput)]\n\n        onInsert (revAcc, revDiffs, input) {newOutput, index} =\n          Ok [(toHTMLAttribute newOutput :: revAcc, (index, ListElemInsert 1)::revDiffs, input)]\n\n        onFinish (revAcc, revDiffs, _) =\n          Ok [(reverse revAcc, reverse revDiffs)]\n\n        onGather (acc, diffs) =\n          Ok (InputWithDiff (acc,\n               (if len diffs == 0 then Nothing else Just (VListDiffs diffs))))\n      } oldOutput newOutput diffs\n    in\n    -- Returns Ok (List (List HTMLNode)., diffs = List (Maybe ListDiff)} or Err msg\n    let mergeNodes input oldOutput newOutput diffs =\n      Update.foldDiff {\n        start =\n          -- Accumulator of values, accumulator of differences, original input\n          ([], [], input)\n\n        onSkip (revAcc, revDiffs, input) {count} =\n          --\'outs\' was the same in oldOutput and outputNew\n          let (newRevAcc, remainingInput) = LensLess.List.reverse_move count revAcc input in\n          Ok [(newRevAcc, revDiffs, remainingInput)]\n\n        onUpdate (revAcc, revDiffs, input) {oldOutput, newOutput, diffs, index} =\n          let inputElem::inputRemaining = input in\n          --Debug.start (\"onUpdate\" + toString (oldOutput, newOutput, diffs, index)) <| \\_ ->\n          let newInputElems = case (inputElem, oldOutput, newOutput) of\n            ( HTMLInner v, _, [\"TEXT\",v2]) -> Ok [toHTMLInner v2]\n            ( HTMLEntity entityRendered entity, _, [\"TEXT\", v2]) -> Ok [HTMLEntity v2 v2]\n            ( HTMLElement tagName attrs ws1 endOp children closing,\n              [tag1, attrs1, children1], [tag2, attrs2, children2] ) ->\n               if tag2 == tagName || attrs1 == attrs2 || children2 == children1  then\n                 case diffs of\n                   VListDiffs listDiffs ->\n                     let (newAttrsMerged, otherDiffs) = case listDiffs of\n                       (1, ListElemUpdate diffAttrs)::tailDiff ->\n                         (mergeAttrs attrs attrs1 attrs2 diffAttrs, tailDiff)\n                       _ -> (Ok (Inputs [attrs]), listDiffs)\n                     in\n                     let newChildrenMerged = case otherDiffs of\n                       (2, ListElemUpdate diffNodes)::_ ->\n                         case mergeNodes children children1 children2 diffNodes of\n                           Ok (InputsWithDiffs vds) -> Ok (List.map Tuple.first vds)\n                           Err msg -> Err msg\n                       _ -> Ok [children]\n                     in\n                     newAttrsMerged |> updateOutputToResults |> LensLess.Results.andThen (\\newAttrs ->\n                       newChildrenMerged |>LensLess.Results.andThen (\\newChildren ->\n                         Ok [HTMLElement tag2 newAttrs ws1 endOp newChildren closing]\n                       )\n                     )\n               else Ok [toHTMLNode newOutput]\n            _ -> Ok [toHTMLNode newOutput]\n          in\n          newInputElems |>LensLess.Results.andThen (\\newInputElem ->\n            --Debug.start (\"newInputElem:\" + toString newInputElem) <| \\_ ->\n            case Update.diff inputElem newInputElem of\n              Err msg -> Err msg\n              Ok maybeDiff ->\n                let newRevDiffs = case maybeDiff of\n                  Nothing -> revDiffs\n                  Just v -> (index, ListElemUpdate v)::revDiffs in\n                Ok [ (newInputElem::revAcc, newRevDiffs, inputRemaining) ]\n          )\n\n        onRemove (revAcc, revDiffs, input) {oldOutput, index} =\n          let _::remainingInput = input in\n          Ok [(revAcc, (index, ListElemDelete 1)::revDiffs, remainingInput)]\n\n        onInsert (revAcc, revDiffs, input) {newOutput, index} =\n          Ok [(toHTMLNode newOutput :: revAcc, (index, ListElemInsert 1)::revDiffs, input)]\n\n        onFinish (revAcc, revDiffs, _) =\n          Ok [(reverse revAcc, reverse revDiffs)]\n\n        onGather (acc, diffs) =\n          Ok (InputWithDiff (acc, if len diffs == 0 then Nothing else Just (VListDiffs diffs)))\n      } oldOutput newOutput diffs\n    in mergeNodes input oldOutput newOutput diffs\n}.apply (parseHTML string)\n\n\n--------------------------------------------------------------------------------\n-- Html module\n\nHtml = {\n  -- Returns a list of one text element from a string, and updates by taking all the pasted text.\n  text = Update.lens {\n    apply s = [[\"TEXT\", s]]\n    update {output} =\n      let textOf = case of\n        [\"TEXT\", s]::tail -> s + textOf tail\n        [tag, attrs, children]::tail ->\n          textOf children + textOf tail\n        _ -> \"\"\n      in\n      Ok (Inputs [textOf output])\n  }\n\n  textNode text = [\"TEXT\", text]\n\n  (textElementHelper) tag styles attrs textContent =\n    [ tag,  [\"style\", styles] :: attrs , text textContent ]\n\n  p = textElementHelper \"p\"\n  th = textElementHelper \"th\"\n  td = textElementHelper \"td\"\n  h1 = textElementHelper \"h1\"\n  h2 = textElementHelper \"h2\"\n  h3 = textElementHelper \"h3\"\n  h4 = textElementHelper \"h4\"\n  h5 = textElementHelper \"h5\"\n  h6 = textElementHelper \"h6\"\n\n  (elementHelper) tag styles attrs children =\n    [ tag,  [\"style\", styles] :: attrs , children ]\n\n  div = elementHelper \"div\"\n  tr = elementHelper \"tr\"\n  table = elementHelper \"table\"\n  span = elementHelper \"span\"\n  b= elementHelper \"b\"\n  i= elementHelper \"i\"\n  li = elementHelper \"li\"\n  ul = elementHelper \"ul\"\n  br = [\"br\", [], []]\n\n  element = elementHelper\n\n  parse = html\n  parseViaEval = htmlViaEval\n\n  freshTag = Update.lens {\n    apply x = \"dummy\" + toString (getCurrentTime x)\n    update {input} = Ok (InputsWithDiffs [(input, Nothing)]) }\n\n  integerRefresh i node = [\"\"\"span@i\"\"\", [], [node]]\n\n  forceRefresh node = [freshTag True, [], [node]]\n\n  (option) value selected content =\n    <option v=value @(\n      Update.bijection\n        (\\selected -> if selected then [[\"selected\",\"selected\"]] else [])\n        ((==) []) selected\n    )>@content</option>\n\n  select attributes strArray index =\n    let options = List.indexedMap (\\i opt ->\n        option (toString i) (i == index) [[\"TEXT\", opt]]\n      ) strArray\n    in\n    <select selected-index=(toString index)\n      onchange=\"this.setAttribute(\'selected-index\', this.selectedIndex)\" @attributes>@options</select>\n\n  checkbox text title isChecked =\n      let id = \"checkbox-\"+Regex.replace \"[^\\\\w]\" \"\" text in\n      [\"span\", [], [\n        [\"label\", [[\"class\",\"switch\"],[\"title\", title]], [\n          [\"input\", [\"type\",\"checkbox\"] :: [\"id\", id] :: [\"onclick\",\"if(this.checked) { this.setAttribute(\'checked\', \'\'); } else { this.removeAttribute(\'checked\') }\"]::\n            { apply checked =\n                if checked then [[\"checked\", \"\"]] else []\n              update {newOutput} = case newOutput of\n                [] -> Ok (Inputs [ False ])\n                _ ->  Ok (Inputs [ True ])\n            }.apply isChecked,\n            [[\"span\", [[\"class\", \"slider round\"]], []]]\n          ]\n        ]],\n        [\"label\", [[\"for\",id], [\"title\", title]], [[\"TEXT\", text]]]\n      ]]\n\n  -- Do not use if the view DOM is not totally re-rendered.\n  onChangeAttribute model controller =\n    Update.lens {\n      apply model = \"\"\n      update {input, outputNew} = Ok (Inputs [controller input outputNew])\n    } model\n\n  onClickCallback model controller =  Update.lens {\n    apply model = \"\"\"/*@getCurrentTime*/this.setAttribute(\'onclick\', \" \" + this.getAttribute(\'onclick\'))\"\"\"\n    update {input, outputNew} =\n      if String.take 1 outputNew == \" \" then\n      Ok (Inputs [controller model])\n      else\n      Ok (InputsWithDiffs [(input, Nothing)])\n    } model\n  \n  do = onClickCallback\n\n  button name title model controller =\n    <button title=title onclick=(onClickCallback model controller)>@name</button>\n\n  input tpe value =\n    <input type=tpe value=value v=value onchange=\"this.setAttribute(\'v\', this.value)\">\n\n  observeCopyValueToAttribute query attribute =\n    <script>\n      function handleMutation(mutations) {\n        mutations.forEach(function(mutation) {\n          mutation.target.value = mutation.target.getAttribute(\"@attribute\");\n        }) }\n      var textAreasObserver = new MutationObserver(handleMutation);\n      var textAreas = document.querySelectorAll(@query);\n      for (i = 0; i &lt; textAreas.length; i++)\n        textAreasObserver.observe(textAreas[i], {attributes: true});\n    </script>\n\n  -- Takes a 1-element node list, and whatever this element is replaced by.\n  -- In the reverse direction, modifies the element but also propagates its deletion to the list\n  -- or insertions of new elements.\n  mergeMatch: String -> Diffs -> Match -> String\n  (mergeMatch) originalMatch mDiffs m =\n     case mDiffs of\n       VRecordDiffs dDiffs ->\n         let matchLength = String.length originalMatch in\n         let gatherDiffs groups starts groupDiffs =\n           let combineDiffs i groupDiffs accDiffs =\n             case groupDiffs of\n               [] -> accDiffs\n               (j, d)::tdgd ->\n                 if i < j then combineDiffs (i + 1) groupDiffs accDiffs\n                 else case d of\n                     ListElemUpdate ud ->\n                       let startInMatch = nth starts i - m.index in\n                       case ud of\n                         VStringDiffs sds ->\n                           let (_, concreteUpdates) =  List.foldl (\\(StringUpdate start end replacement) (offset, accDiffs) ->\n                               (offset + replacement - (end - start),\n                                accDiffs ++ [ConcreteUpdate\n                                               (start + startInMatch)\n                                               (end + startInMatch)\n                                               (String.substring (start + offset) (start + replacement + offset) (nth groups i))\n                                            ])\n                             ) (0, []) sds\n                           in combineDiffs (i + 1) tdgd (accDiffs ++ concreteUpdates)\n                         _ -> error (\"Expected string diffs, got \" + toString ud)\n                     ListElemInsert _ -> error \"Not possible ot insert match groups\"\n                     ListElemDelete _ -> error \"Not possible to delete match groups\"\n           in\n           combineDiffs 0 groupDiffs []\n         in\n         let totalUpdates = (case dDiffs of\n           { group = VListDiffs groupDiffs} ->\n             gatherDiffs m.group m.start groupDiffs\n           _ -> []) ++ (case dDiffs of\n           { submatches = VListDiffs groupDiffs} ->\n             gatherDiffs m.submatches (List.drop 1 m.start) groupDiffs\n           _ -> []) ++ (case dDiffs of\n           {match = matchDiffs} ->\n             gatherDiffs [m.match] [m.index] [(0, ListElemUpdate matchDiffs)]\n           _ -> [])\n         in\n         let concreteUpdates = totalUpdates |>\n              sortBy (\\(ConcreteUpdate s1 _ _) (ConcreteUpdate s2 _ _) -> s1 <= s2) |>\n              List.foldl (\\((ConcreteUpdate start end replacement) as a) (accConcreteUpdates, minStartIndex) ->\n                if start >= minStartIndex && end <= matchLength then\n                  (a::accConcreteUpdates, end)\n                else\n                  (accConcreteUpdates, minStartIndex)\n                ) ([], 0) |>\n              Tuple.first\n         in\n         List.foldl (\\(ConcreteUpdate start end replacement) match ->\n           String.take start match + replacement + String.drop end match)\n             originalMatch concreteUpdates\n\n  -- Split the text into Text [[\"TEXT\", unchanged text]] and Match (match)\n  -- On the other direction, recombines the nodes of Text and Match\n  -- Allows to back-propagate insertions and deletions of nodes\n  findAugmentedInterleavings number regex ([[\"TEXT\", text]] as tNodes) =\n    let interleavings = findInterleavings number regex text in\n    let rev = List.foldl (\\elem acc -> case elem of\n        Left text -> Text [[\"TEXT\", text]] :: acc\n        Right match -> Match match :: acc\n      ) [] interleavings\n    in\n    let augmentedInterleavings = List.reverse rev in\n    let allMatches: List (Int, Match)\n        allMatches = List.concatMap (case of Match match -> [(match.number, match)]; _ -> []) augmentedInterleavings in\n    Update.lens {\n      apply tNodes = augmentedInterleavings\n      update ({outputNew, diffs} as uInput) = -- We should extract all the new matches\n        case diffs of\n          VListDiffs ds ->\n            let rebuild i outputNew ds newInput =\n               case ds of\n                 [] ->\n                   case outputNew of\n                     [] ->\n                       Ok (Inputs [__mergeHtmlText__ newInput])\n                     Text nodes :: outputNewTail ->\n                       newInput ++ nodes |>\n                       rebuild (i + 1) outputNewTail ds\n                     Match m :: outputNewTail ->\n                       newInput ++ [[\"TEXT\", m.match]] |>\n                       rebuild (i + 1) outputNewTail ds\n                 (j, ld)::tds ->\n                   if i < j then\n                     case outputNew of\n                     Text nodes :: outputNewTail ->\n                       newInput ++ nodes |>\n                       rebuild (i + 1) outputNewTail ds\n                     Match m :: outputNewTail ->\n                       newInput ++ [[\"TEXT\", m.match]] |>\n                       rebuild (i + 1) outputNewTail ds\n                     [] ->\n                       Err (\"Unexpected end of findAugmentedInterleavings.outputNew\" + toString uInput)\n                   else case ld of\n                     ListElemUpdate u  ->\n                       case outputNew of\n                         Text nodes :: outputNewTail ->\n                           newInput ++ nodes |>\n                           rebuild (i + 1) outputNewTail tds\n                         Match m :: outputNewTail ->\n                           case u of\n                             VRecordDiffs {args = VRecordDiffs { _1 = mDiffs } } ->\n                               let originalMatch = (listDict.get m.number allMatches |> Maybe.withDefault m).match in\n                               newInput ++ [[\"TEXT\", mergeMatch originalMatch mDiffs m]] |>\n                               rebuild (i + 1) outputNewTail tds\n                             _ -> Err (\"Unexpected findAugmentedInterleavings diffs: \" + toString u)\n                         [] ->\n                           Err (\"Unexpected end of findAugmentedInterleavings.outputNew\" + toString uInput)\n\n                     ListElemInsert n  ->\n                       let tailDiffs = if n == 1 then tds else (j, ListElemInsert (n - 1)) :: tds in\n                       case outputNew of\n                         [] ->\n                           Err (\"Expected inserted elements, got nothing\")\n                         Text nodes :: outputNewTail ->\n                           newInput ++ nodes |>\n                           rebuild i outputNewTail tailDiffs\n                         Match m :: outputNewTail ->\n                           newInput ++ [[\"TEXT\", m.match]] |>\n                           rebuild i outputNewTail tailDiffs\n\n                     ListElemDelete n  ->\n                       rebuild (i + n) outputNew tds newInput\n            in\n              rebuild 0 outputNew ds []\n          _ -> Err (\"Expected VListDiffs, got \" + toString diffs)\n    } tNodes\n\n  -- given a 1-element list and an element, returns the element wrapped\n  -- On the way back, back-propagates insertions and deletions to the list after applying the inverse\n  -- convertInserted,\n  -- and changes to element itself on the other side\n  insertionDeletionUpdatesTo: (b -> a) -> (List a, b) -> List b\n  insertionDeletionUpdatesTo convertInserted = Update.lens2 {\n      apply (node1List, node1) = [node1]\n      update {input=(node1List, node1), outputNew=newNodes, diffs} =\n        case diffs of\n          VListDiffs listDiffs ->\n            let aux i newNodes listDiffs newNode1List newNode1ListDiffs newNode1 mbNode1Diffs =\n              case listDiffs of\n                [] ->\n                  Ok (InputsWithDiffs [(\n                    (newNode1List, newNode1),\n                    Update.pairDiff2\n                      (if newNode1ListDiffs == [] then\n                        Nothing\n                       else Just (VListDiffs newNode1ListDiffs))\n                      mbNode1Diffs\n                  )])\n                (j, d)::diffTail ->\n                  if i < j then -- i == 0 and j == 1\n                    let (skipped, remainingNodes) = List.split 1 newNodes in\n                    aux j remainingNodes listDiffs (newNode1List ++ skipped) newNode1ListDiffs newNode1 mbNode1Diffs\n                  else\n                    case d of\n                      ListElemInsert x ->\n                        let (inserted, remainingNodes) = List.split x newNodes in\n                        let insertionDiffs = newNode1ListDiffs ++ [(j, ListElemInsert x)] in\n                        aux j remainingNodes diffTail\n                          (newNode1List ++ convertInserted inserted) insertionDiffs newNode1 mbNode1Diffs\n\n                      ListElemUpdate x ->\n                        let newNode1_ :: remainingNodes = newNodes in\n                        aux (j + 1) remainingNodes diffTail\n                          (newNode1List ++ node1List) newNode1ListDiffs newNode1_ (Just x)\n\n                      ListElemDelete 1 -> -- Only the element can be deleted.\n                        let deletionDiffs = newNode1ListDiffs ++ [(0, ListElemDelete 1)] in\n                        aux (j + 1) newNodes diffTail\n                          newNode1List deletionDiffs node1 Nothing\n\n                      _ -> Err <| \"Unexpected diff for insertionDeletionUpdatesTo:\" ++ toString d\n            in aux 0 newNodes listDiffs [] [] node1 Nothing\n          _ -> Err <| \"Expected VListDiffs for insertionDeletionUpdatesTo, got \" ++ toString diffs\n      }\n\n  -- Takes a list of nodes, returns a list of nodes.\n  replaceNodesIf nodePred regex replacement nodes =\n      List.concatMap_ identity (\\[node] as node1List ->\n        if not (nodePred node) then node1List else\n        case node of\n          [\"TEXT\", text] ->\n            findAugmentedInterleavings 0 regex node1List\n              |> List.concatMap_ identity (\\[head] as headList ->\n              case head of\n                Text nodes -> nodes\n                Match match -> replacement match\n            ) |> __mergeHtmlText__ |> List.filter (/= [\"TEXT\", \"\"])\n          [tag, attrs, children] ->\n            insertionDeletionUpdatesTo identity node1List <|\n              [tag, attrs, replaceNodesIf nodePred regex replacement children]\n      ) nodes\n\n  -- Takes a list of nodes, returns a list of nodes.\n  replaceNodes = replaceNodesIf (\\_ -> True)\n\n  {- Given\n     * a regex\n     * a replacement function that takes a string match and returns a list of Html nodes\n     * a node\n     This functions returns a node, (excepted if the top-level node is a [\"TEXT\", _] and is splitted.\n  -}\n  replaceIf nodePred regex replacement node = case replaceNodesIf nodePred regex replacement [node] of\n       [x] -> x\n       y -> y\n\n  replace  = replaceIf (\\_ -> True)\n\n  replaceNodesAsTextIf nodePred regex replacement nodes =\n       if nodes == [] then nodes else\n       let nodesAsText = nodes |> List.indexedMapWithReverse identity (\\i n -> case n of\n         [\"TEXT\", t] -> n\n         [tag, _, _] -> [\"TEXT\", \"\"\"<|#@i#@tag#|>\"\"\"]) |> __mergeHtmlText__\n       in\n       -- Takes a list of nodes, and replaces each <|(number)|> by the matching node in the top-level text nodes.\n       -- Calls replaceNodesAsTextIf on the result.\n       let reinsertNodes insideNodes = replaceNodesIf (\\_ -> True) \"\"\"<\\|#(\\d+)#\\w+#\\|>\"\"\" (\\m ->\n          Update.sizeFreeze [nth nodes (String.toInt (nth m.group 1))]) insideNodes in\n       let reinsertNodesInText text = reinsertNodes [[\"TEXT\", text]] in\n       -- Takes a string and replaces  each <|(number)|> by the matching node in the top-level text nodes.\n       let reinsertNodesInText text = reinsertNodes [[\"TEXT\", text]] in\n       -- Takes a string and replace each <|(number)|> by the node in raw format (i.e. printed as HTML)\n       let reinsertNodesRaw insideNodes = replaceNodesIf (\\_ -> True) \"\"\"<\\|#(\\d+)#\\w+#\\|>\"\"\" (\\m ->\n         let oldNode = nth nodes (String.toInt (nth m.group 1)) in\n         [[\"TEXT\", valToHTMLSource oldNode]]\n       ) insideNodes in\n       let reinsertNodesRawInText text = reinsertNodesRaw [[\"TEXT\", text]] in\n       nodesAsText |>\n       findAugmentedInterleavings 0 regex |>\n       List.concatMap (\\head ->\n         case head of\n           Text nodes -> reinsertNodes nodes\n           Match m ->  reinsertNodes (replacement { m | reinsertNodesRawInText = reinsertNodesRawInText})\n       ) |> __mergeHtmlText__ |>\n       List.filter (\\a -> a /= [\"TEXT\", \"\"]) |>\n       List.mapWithReverse identity (\\node -> case node of\n         [\"TEXT\", _] -> node\n         [tag, attrs, children] ->\n           if nodePred node then [tag, attrs,\n             replaceNodesAsTextIf nodePred regex replacement children] else node)\n\n  replaceNodesAsText regex replacement nodes = replaceNodesAsTextIf (\\_ -> True) regex replacement nodes\n\n  replaceAsTextIf nodePred regex replacement node = case replaceNodesAsTextIf nodePred regex replacement [node] of\n        [x] -> x\n        y -> y\n\n  replaceAsText = replaceAsTextIf (\\_ -> True)\n\n  find regex node =\n    let aux node = case node of\n       [\"TEXT\", text] ->\n         findInterleavings 0 regex text\n         |> List.concatMap (case of\n            Left _ -> []\n            Right match -> [match]\n          )\n       [tag, attrs, children] ->\n         List.concatMap aux children\n    in aux node\n\n  -- Takes a regex, a function that accepts a match and an accumulator and returns a list of nodes and the new accumulator\'s value.\n  -- a starting accumulator and a starting node. Returns the final accumulator and the final node.\n  foldAndReplace regex matchAccToNewNodesNewAcc startAcc node =\n          let aux acc node = case node of\n             [\"TEXT\", text] ->\n               findInterleavings 0 regex text\n               |> List.foldl (\\interleaving (nodes, acc) ->\n                 case interleaving of\n                  Left str -> (nodes ++ [[\"TEXT\", str]], acc)\n                  Right match -> let (newNodes, newAcc) = matchAccToNewNodesNewAcc match acc in\n                    (nodes ++ newNodes, newAcc)\n                ) ([], acc) |> Tuple.mapFirst (__mergeHtmlText__ >> List.filter (/= [\"TEXT\", \"\"]))\n             [tag, attrs, children] ->\n               let (newChildren, newAcc) =\n                 List.foldl (\\child (buildingChildren, acc) ->\n                   let (nChildren, nAcc) = aux acc child in\n                   (buildingChildren ++ nChildren, nAcc)\n                 ) ([], acc) children in\n               ([[tag, attrs, newChildren]], newAcc)\n          in case aux startAcc node of\n            ([node], acc)-> (node, acc)\n            r -> r\n\n  isEmptyText = case of\n        [\"TEXT\", x] -> Regex.matchIn \"^\\\\s*$\" x\n        _ -> False\n\n  filter pred elemList =\n        List.concatMap (case of\n          [tagName, attrs, children] as elem ->\n            if pred elem then [[tagName, attrs, filter pred children]]\n            else []\n          elem -> if pred elem then [elem] else []) elemList\n\n  translate =\n    let freshVarName name i dictionary =\n      if name == \"\" then freshVarName \"translation\" i dictionary else\n      let suffix = if i == 0 then \"\" else toString i in\n      let potentialName = name + suffix in\n      if Dict.member potentialName dictionary then freshVarName name (i + 1) dictionary else potentialName\n    in\n    \\translations indexLangue node ->\n    let currentTranslation = nth translations indexLangue |> Tuple.second |> Dict.fromList in\n    replace \"\"\"\\$(\\w+|\\$)\"\"\" (\\m ->\n      if m.match == \"$\" then [[\"TEXT\", m.match]] else\n        let key = nth m.group 1 in\n        case Dict.get key currentTranslation of\n          Nothing -> [[\"TEXT\", m.match]]\n          Just definition -> [[\"TEXT\", definition]]\n      ) node |>\n    \\htmlNode ->\n      Update.lens2 {\n        apply (htmlNode, _) = htmlNode\n        update {input = (_, translations), outputNew=newHtmlNode} =\n          find \"\"\"\\{:([^\\}]*(?!\\})\\S[^\\}]*):\\}\"\"\" newHtmlNode\n          |> List.foldl (\\matchToTranslate (updatedHtmlNode, currentTranslation, translations) ->\n              let definition = nth matchToTranslate.group 1\n                  name = freshVarName (Regex.replace \"[^a-zA-Z]\" \"\" definition |> String.take 16) 0 currentTranslation\n                  textToFind = \"\"\"\\{:@(Regex.escape definition):\\}\"\"\"\n              in\n              (replace textToFind (\\_ -> [[\"TEXT\", \"$\" + name]]) updatedHtmlNode,\n               Dict.insert name definition currentTranslation,\n               List.map (\\(lang, d) -> (lang, d ++ [(name, definition)])) translations)\n            ) (newHtmlNode, currentTranslation, translations)\n          |> \\(finalHtmlNode, _, newTranslations) ->\n            Ok (Inputs [(finalHtmlNode, newTranslations)])\n      } htmlNode translations\n\n  markdown node =\n      let\n          regexFootnotes = \"\"\"\\r?\\n\\[\\^([^\\]]+)\\]:\\s*((?:(?!\\r?\\n\\r?\\n)[\\s\\S])+)\"\"\"\n          regexReferences = \"\"\"\\r?\\n\\[(?!\\^)([^\\]\\\\]+)\\]:\\s*(\\S+)\"\"\"\n          footnotes = find regexFootnotes node\n                       |> List.map (\\m -> (nth m.group 1, nth m.group 2))\n                       |> List.indexedMap (\\i (name, value) -> (name, (i + 1, value)))\n          references = find regexReferences node\n                       |> List.map (\\m -> (nth m.group 1, nth m.group 2))\n          notCode = case of [\"code\", _, _] -> False; _ -> True\n          notTitle = case of [tag, _, _] -> not (Regex.matchIn \"\"\"h\\d\"\"\" tag); _ -> True\n          notList = case of [tag, _, _] -> tag /= \"ul\" && tag /= \"ol\"; _ -> True\n          notPara = case of [\"p\", _, _] -> False; _ -> True\n          notA = case of [\"a\", _, _] -> False; _ -> True\n          r: String -> (Match -> List HtmlNode) -> HtmlNode -> HtmlNode\n          r  = replaceAsTextIf notCode\n          r2 = replaceAsTextIf (\\x -> notCode x && notTitle x && notList x && notPara x)\n          ra = replaceAsTextIf (\\x -> notCode x && notA x)\n          lregex = \"\"\"(?:\\r?\\n|^)((?:(?![\\r\\n])\\s)*)(\\*|-|\\d+\\.)(\\s+)((?:.*)(?:\\r?\\n\\1  ?\\3(?:.*))*(?:\\r?\\n\\1(?:\\*|-|\\d+\\.)\\3(?:.*)(?:\\r?\\n\\1 \\3(?:.*))*)*)\"\"\"\n          handleLists node  =\n            r lregex (\n              \\m -> let indent = nth m.group 1\n                        afterindent = nth m.group 3\n                        ul_ol = case nth m.group 2 of \"*\" -> \"ul\"; \"-\" -> \"ul\"; _ -> \"ol\"\n                        elements =\n                          Regex.split \"\"\"\\r?\\n@indent(?:\\*|-|\\d+\\.)@afterindent\"\"\" (nth m.group 4)\n                    in\n                    [<@ul_ol>@(List.map (\\elem -> <li>@elem</li>) elements)</@>]) node\n      in (\n      node\n      |> r \"\"\"@regexReferences|@regexFootnotes\"\"\" (\\m -> [])\n      |> (\\result -> -- Expand footnotes\n        if List.length footnotes == 0 then result\n        else case result of\n          [tag, attrs, children] ->\n            [tag, attrs, children ++ Update.sizeFreeze [\n              <div class=\"footnotes\"><hr><ol>@(footnotes |>\n                List.map (\\(name, (n, value)) ->\n                  <li id=\"\"\"fn@n\"\"\"><p>@value<a href=\"\"\"#fnref@n\"\"\">↩</a></p></li>\n                ))</ol></div>]\n            ])\n      |> r \"\"\"(```)([\\s\\S]*?)\\1(?!`)|((?:\\r?\\n    .*)+)\"\"\" (\\m ->\n        if nth m.group 1 == \"\" then\n          nth m.group 3 |>\n          Regex.extract \"\"\"\\r?\\n    ([\\s\\S]*)\"\"\" |>\n          Maybe.map (\\[code] ->\n                  [<pre><code>@(Regex.split \"\"\"\\r?\\n    \"\"\" code |> String.join \"\\n\" |> String.trim |> m.reinsertNodesRawInText)</code></pre>])\n          |> Maybe.withDefault [[\"TEXT\", m.match]]\n        else [\n        <pre><code>@(nth m.group 2 |> String.trim |> m.reinsertNodesRawInText)</code></pre>])\n      |> r \"\"\"(^|\\r?\\n)(#+)\\s*([^\\r\\n]*)\"\"\" (\\m -> [[\"TEXT\", nth m.group 1], <@(\"\"\"h@(String.length (nth m.group 2))\"\"\")>@(nth m.group 3)</@>])\n      |> handleLists --|> (\\x -> let _ = Debug.log (\"Paragraph phase\") () in x)\n      |> r2 \"\"\"(\\r?\\n *\\r?\\n(?:\\\\noindent\\r?\\n)?|^)((?=\\s*\\w|\\S)[\\s\\S]*?)(?=(\\r?\\n *\\r?\\n|\\r?\\n$|$))\"\"\" (\n        \\m ->\n          --let _ = Debug.log m.match () in\n          if nth m.group 1 == \"\" && nth m.group 3 == \"\" -- titles and images should not be paragraphs.\n           || Regex.matchIn \"\"\"^\\s*<\\|#\\d+#(?:h\\d|ul|ol|p|pre|center)#\\|>\\s*$\"\"\" (nth m.group 2) then [[\"TEXT\", m.match]] else  [<p>@(nth m.group 2)</p>]) --|> (\\x -> let _ = Debug.log (\"End of paragraph phase:\" + valToHTMLSource x) () in x)\n      |> ra \"\"\"\\[([^\\]\\\\]+)\\](\\^?)(\\(|\\[)([^\\)\\]]+)(\\)|\\])|(?:http|ftp|https)://(?:[\\w_-]+(?:(?:\\.[\\w_-]+)+))(?:[\\w.,@@?^=%&:/~+#-]*[\\w@@?^=%&/~+#-])?\"\"\" (\\m -> [ -- Direct and indirect References + syntax ^ to open in external page.\n        case nth m.group 3 of\n          \"(\" -> <a href=(nth m.group 4) @(if nth m.group 2 == \"^\" then [[\"target\", \"_blank\"]] else [])>@(nth m.group 1)</a>\n          \"[\" -> listDict.get (nth m.group 4) references |> case of\n                Just link -> <a href=link>@(nth m.group 1)</a>\n                Nothing -> [\"TEXT\", m.match]\n          _ -> <a href=m.match>@(m.match)</a>\n          ])\n      |> r \"\"\"\\[\\^([^\\]]+)\\]\"\"\" (\\m ->  -- Footnotes\n        listDict.get (nth m.group 1) footnotes |> case of\n          Just (n, key) -> [ <a href=\"\"\"#fn@n\"\"\" class=\"footnoteRef\" id=\"\"\"fnref@n\"\"\"><sup>@n</sup></a>]\n          Nothing -> [[\"TEXT\", m.match]])\n      |> r \"(`)(?=[^\\\\s`])(.*?)\\\\1\" (\\m -> [<code>@(nth m.group 2 |> m.reinsertNodesRawInText)</code>])\n      |> r \"\"\"(\\*{1,3}|_{1,3})(?=[^\\s\\*_])((?:(?!\\\\\\*|\\_).)*?)\\1\"\"\" (\\m -> [\n        case nth m.group 1 |> String.length of\n          1 -> <em>@(nth m.group 2)</em>\n          2 -> <strong>@(nth m.group 2)</strong>\n          _ -> <em><strong>@(nth m.group 2)</strong></em>])\n      |> r \"\"\"&mdash;|\\\\\\*|\\\\_|\\\\\\[|\\\\\\]\"\"\" (\\m -> [[\"TEXT\", case m.match of\n        \"&mdash;\" -> \"—\"\n        \"\\\\*\" -> String.drop 1 m.match\n        \"\\\\_\" -> String.drop 1 m.match\n        \"\\\\[\" -> String.drop 1 m.match\n        \"\\\\]\" -> String.drop 1 m.match\n        ]])\n      )\n\n  scriptFindEnclosing tagName varnameWhatToDo = \"\"\"\n      var elem = this\n      while(elem != null && elem.tagName.toLowerCase() != \"@tagName\")\n        elem = elem.parentElement;\n      if(elem == null) {\n        console.log(\'Error: duplicate button could not find enclosing target @tagName\');\n      } else {\n        @(varnameWhatToDo \"elem\")\n      }\"\"\"\n\n  buttonToDuplicateEnclosing tagNameToDuplicate attrs children =\n      <button onclick=(scriptFindEnclosing(tagNameToDuplicate)(\\v ->\n          \"\"\"@(v).parentElement.insertBefore(@(v).cloneNode(true), @(v))\"\"\"))\n      @attrs>@children</button>\n\n  buttonToDeleteEnclosing tagNameToDelete attrs children=\n      <button onclick=(scriptFindEnclosing(tagNameToDelete)(\\v ->\n          \"\"\"@(v).remove()\"\"\"))\n      @attrs>@children</button>\n\n  addClass name [t, attrs, c] =\n    [ t\n    , attrDict.update \"class\" (case of\n        Just classes -> if Regex.matchIn (\"\\\\b\" + name + \"\\\\b\") classes then Just classes else Just (classes + \" \" + name)\n        Nothing -> Just name) attrs\n    , c]\n}\n\n--------------------------------------------------------------------------------\n-- Javascript\n\njsCode = {\n  -- Create a tuple of a list of strings. Uses v as intermediate variable.\n  -- calling __jsEval__ (\"var a = 1\\n\" ++ tupleOf \"x\" [\"a\", \"2\", \"a\"]) == (1, 2, 1)\n  tupleOf: String -> List String -> String\n  tupleOf v list =\n    \"\"\"(function() { var @v = {@(List.indexedMap (\\i x -> \"\"\"_@(i+1): @x\"\"\") list |> String.join \",\")}; @v[\'$t_ctor\']=\'Tuple@(List.length list)\'; return @v})()\"\"\"\n\n  -- Creates a datatype of a list of strings. Uses v as intermediate variable.\n  datatypeOf: String -> String -> List String -> String\n  datatypeOf v kind args =\n    \"\"\"(function() { var @v = {args: {@(List.indexedMap (\\i x -> \"\"\"_@(i+1): @x\"\"\") args |> String.join \",\")}}; @v[\'$d_ctor\']=\'@kind\'; return @v})()\"\"\"\n\n  -- JS representation of a given string\n  stringOf: String -> String\n  stringOf content =\n    \"\\\"\" + Regex.replace \"\\\\\\\\|\\\"|\\r|\\n|\\t\" (\\m -> case m.match of\n      \"\\r\" -> \"\\\\r\"\n      \"\\n\" -> \"\\\\n\"\n      \"\\t\" -> \"\\\\t\"\n      x -> \"\\\\\" + x) content + \"\\\"\"\n}\n\n\nnodejs = {\n  (nothingJs) = jsCode.datatypeOf \"x\" \"Nothing\" []\n  (justJs) arg = jsCode.datatypeOf \"x\" \"Just\" [arg]\n  (fsjs) defaultValue prog = __jsEval__ \"\"\"\n    (function() {\n      if(!require) return @defaultValue;\n      const fs = require(\"fs\");\n      if(!fs) return @defaultValue;\n      @prog\n    })()\"\"\"\n\n  type alias BasicFileSystemUtils = {\n    read: String -> Maybe String,\n    listdir: String -> List String,\n    isdir: String -> Bool,\n    isfile: String -> Bool\n  }\n  -- Reads the file system directly without instrumentation.\n  nodeFS: BasicFileSystemUtils\n  nodeFS = {\n    read  name = fsjs nothingJs \"\"\"\n      const name = @(jsCode.stringOf name);\n      if(!fs) return @nothingJs;\n      if(fs.existsSync(name)) { // TODO: Atomic read\n        if(fs.lstatSync(name).isDirectory()) {\n          return @nothingJs;\n        } else {\n          return @(justJs \"fs.readFileSync(name, \'utf-8\')\");\n        }\n      } else return @nothingJs;\"\"\"\n    listdir foldername = fsjs \"[]\" \"\"\"\n      var name = @(jsCode.stringOf foldername);\n      if(name == \"\") name = \".\";\n      if(fs.existsSync(name) && fs.lstatSync(name).isDirectory()) {\n        var filesfolders =\n          fs.readdirSync(name);\n        return filesfolders;\n      } else {\n        return []\n      }\"\"\"\n    isdir name =\n      fsjs \"false\" \"\"\"\n       const name = @(jsCode.stringOf name);\n       return name == \"\" || fs.existsSync(name) && fs.lstatSync(@(jsCode.stringOf name)).isDirectory();\"\"\"\n    isfile name =\n      fsjs \"false\" \"\"\"\n       return fs.existsSync(@(jsCode.stringOf name)) && fs.lstatSync(@(jsCode.stringOf name)).isFile();\"\"\"\n  }\n\n\n  type FileOperation = Write {-old-} String {-new-} String Diffs |\n                       Rename {-newName-} String |\n                       Create {-content-} String |\n                       Delete |\n                       CreateFolder (List String {- file names in this folder -})\n  type alias ListFileOperations = List ({-filename-}String, FileOperation)\n\n  -- Consumes all update values by writing to the file system. Use this only if you don\'t need to display ambiguity.\n  nodeFSWrite: ListFileOperations\n  nodeFSWrite = Update.lens {\n    apply = identity\n    update {outputNew} =\n     List.foldl (\\(name, action) b ->\n      let write name contentOld content =\n        let mbCreateDir = case contentOld of\n             Nothing -> fsjs \"0\" \"\"\"\n               var pathToFile = @(jsCode.stringOf name);\n               var filePathSplit = pathToFile.split(\'/\');\n               var dirName = \"\";\n               for (var index = 0; index < filePathSplit.length - 1; index++) {\n                  dirName += filePathSplit[index]+\'/\';\n                  if (!fs.existsSync(dirName))\n                      fs.mkdirSync(dirName);\n               }\n               return 1;\"\"\" -- Create the file\'s directory structure.\n             Just oldContent -> \"\"\n            written = fsjs \"0\" \"\"\"\n              fs.writeFileSync(@(jsCode.stringOf name), @(jsCode.stringOf content), \"utf-8\");\n              return 1;\"\"\"\n        in ()\n      in\n      let _ = case action of\n        Write oldContent newContent diffs -> write name (Just oldcontent) newContent\n        Create content -> write name Nothing content\n        Delete -> fsjs \"0\" \"\"\"\n            fs.unlinkSync(@(jsCode.stringOf name));\n            return 1;\"\"\"\n        Rename newName -> fsjs \"0\" \"\"\"\n            fs.renameSync(@(jsCode.stringOf name), @(jsCode.stringOf newName));\n            return 1;\"\"\"\n      in b) (Ok <| InputsWithDiffs [([], Nothing)]) outputNew\n  } []\n\n  type alias InlineFS = List ({-path-}String, File content | Folder (List String)) -> BasicFileSystemUtils\n\n  inlineFS: InlineFS -> BasicFileSystemUtils\n  inlineFS content = {\n    read name = case listDict.get name content of\n       Just (File content) -> Just content\n       _ -> Nothing\n    listdir foldername = case listDict.get foldername content of\n       Just (Folder files) -> files\n       _ -> Nothing\n    isdir name = case listDict.get name content of\n      Just (Folder _) -> True\n      _ -> False\n    isfile name = case listDict.get name content of\n      Just (File _) -> True\n      _ -> False\n  }\n\n  inlineFSWrite: InlineFS -> ListFileOperations\n  inlineFSWrite = Update.lens {\n    apply inlineFS = []\n    update {input=inlineFS, outputNew} =\n      List.foldl (\\(name, action) resInlineFS ->\n        resInlineFS\n        |> Result.andThen (\\inlineFS ->\n          let prev = listDict.get name inlineFS in\n          case (prev, action) of\n             (Just (Folder _), Write oldContent newContent diffs) -> Err <| \"Can\'t write a folder as if it was a file\"\n             (_,               Write oldContent newContent diffs) -> Ok <| listDict.insert name (File newContent) inlineFS\n             (Nothing, Delete) -> Err <| \"Can\'t delete \" + name + \" from file system because it did not exist\"\n             (_, Delete) -> listDict.delete name inlineFS |>\n                List.map (\\(oname, ocontent) ->\n                  case ocontent of\n                  Folder subfiles ->\n                      (oname, Folder (List.filter (\\subfile -> oname + \"/\" + subfile /= name) subfiles))\n                  _ -> (oname, ocontent)\n                  ) |> Ok\n             (Just x, Create content) ->  Err <| \"Can\'t create \" + name + \" in file system because it did exist\"\n             (_, Create newContent) ->  listDict.insert name (File newContent) inlineFS |>\n               List.map (\\(oname, ocontent) ->\n                  case ocontent of\n                  Folder subfiles ->\n                      if String.left (String.length oname) name == oname then -- Starts with the folder\'s name\n                        let remaining = String.drop (String.length oname) name in\n                        if not (Regex.matchIn \"./\" remaining) && String.take 1 remaining == \"/\"  then\n                          (oname, Folder (subfiles ++ [String.drop 1 remaining]))\n                        else\n                          (oname, Folder subfiles)\n                      else\n                        (oname, Folder subfiles)\n                  _ -> (oname, ocontent)\n                  ) |> Ok\n             (Just x, Rename newName) -> case listDict.get newName inlineFS of\n               Just _ -> Err <| \"Can\'t rename \" + name + \" to \" + newName + \" because it already exists\"\n               _ -> inlineFS |> listDict.remove name |> listDict.insert newName x |>\n                    List.map (\\(oname, ocontent) ->\n                      case ocontent of\n                      Folder subfiles ->\n                          (oname, Folder (List.map (\\subfile -> if oname + \"/\" + subfile == name then\n                            String.drop (String.length (oname + \"/\")) newName else subfile)\n                          subfiles))\n                      _ -> (oname, ocontent)\n                      ) |> Ok\n             (_, Rename _) -> Err <| \"Can\'t rename \" + name + \" because it did not exist\"))  (Ok inlineFS) outputNew\n      |> Result.map (\\x -> Inputs [x])\n  }\n\n  type alias FileSystemUtils =  {\n    read: String -> Maybe String,\n    listdir: String -> List String,\n    listdircontent: String -> List (String, String),\n    isdir: String -> Bool,\n    isfile: String -> Bool\n  }\n\n  {- nodejs.delayedFS basicFS fileOperations   provides a file system utility that, on update,\n     does not change the files on disk, but fills an array of fileOperations (create, write, delete, rename)\n\n     basicFS:         To read files from disk using node.js, use `nodejs.nodeFS`\n                      To simply read an inline content, which is a\n                        list of (path, File content | Folder (list of filenames)),\n                        use `(nodjs.inlineFS content)`\n     fileOperations:  Pass `[]` to recover file operations on update.\n                        If not empty, its operations will overwrite the content of basicFS.\n                      Pass `nodejs.nodeFSWrite` if writes do not have ambiguity\n                        and should be performed immediately on disk\n                      Pass `nodejs.inlineFSWrite content` if the first argument is `nodejs.inlineFS content` and\n                        you want the content to be immediately overriden.\n\n     -- Sample call (put fileOperations: [] in the environment)\n     fs = nodejs.delayedFS nodejs.nodeFS fileOperations\n\n     -- Sample mock call (to locally test a file system\n     fsContent = [(\"test/a.txt\", File \"Hello\"), (\"test/b.txt\", File \"World\"), (\"test\", Folder [\"a.txt\", \"b.txt\"])]\n     fs = nodejs.delayedFS (nodejs.inlineFS fsContent) (nodejs.inlineFSWrite fsContent)\n     fs.read \"test/a.txt\"\n     ...\n     -}\n  delayedFS: BasicFileSystemUtils -> ListFileOperations -> FileSystemUtils\n  delayedFS  basicFS                 fileOperations = {\n    (fileOperationsRaw) = Update.lens {\n      apply = identity\n      (remove) name = List.filter (\\(otherName, _) -> otherName /= name)\n      update {input=fileOperations, outputNew} =\n        let process outputNew revAcc = case outputNew of\n          [] -> Ok <| Inputs [List.reverse revAcc]\n          (name, action) :: tail ->\n            case action of\n              Delete -> process (remove name tail) ((name, action) :: remove name revAcc)\n              Create content -> process (remove name tail) ((name, action) :: remove name revAcc)\n              Write oldContent newContent diffs ->\n                let (sameName, otherNames) = List.partition (\\(otherName, _) -> name == otherName) tail in\n                let extractedWrites = List.concatMap (\\(_, action) -> case action of\n                     Write oldContent newContent diffs -> [(newContent, Just diffs)]\n                     _ -> []) sameName in\n                let (finalContent, finalDiffs) =\n                      Update.merge oldContent ((newContent, Just diffs) :: extractedWrites)\n                in\n                let finalAction =\n                  case listDict.get name fileOperations of\n                    Just (Create content) -> Create finalContent\n                    _ -> Write oldContent finalContent finalDiffs\n                in\n                process otherNames ((name, finalAction) :: revAcc)\n              Rename newName ->\n                if List.all (\\(_, action) -> case action of Rename _ -> True) tail then\n                  process tail ((name, action)::revAcc)\n                else\n                  process (tail ++ [(name, action)]) revAcc\n              CreateFolder content ->\n                process tail ((name, action)::revAcc)\n        in process outputNew []\n    } fileOperations\n\n    read: String -> Maybe String\n    read filename = Update.lens {\n      apply fileOperations =\n        case listDict.get filename fileOperations of\n          Just (Write oldContent newContent diffs) -> Just newContent\n          Just (Create content) -> Just content\n          Just (Delete) -> Nothing\n          Just (Rename _) -> Nothing\n          Just (CreateFolder _) -> Nothing\n          _ -> basicFS.read filename\n      update  = case of\n        {input=fileOperations, outputOld = Just x , outputNew = Nothing} ->\n          Ok <| InputsWithDiffs [((filename, Delete) :: fileOperations, Just <| VListDiffs [(0, ListElemInsert 1)])]\n        {input=fileOperations, outputOld = Just oldContent, outputNew = Just newContent, diffs} ->\n          let contentDiffs = case diffs of\n            VRecordDiffs { args = VRecordDiffs { _1 = d } } -> d\n            _ -> VStringDiffs []\n          in\n           Ok <| InputsWithDiffs [((filename, Write oldContent newContent contentDiffs) :: fileOperations, Just <| VListDiffs [(0, ListElemInsert 1)])]\n        {input=fileOperations, outputOld = Nothing, outputNew = Just newContent} ->\n           Ok <| InputsWithDiffs [((filename, Create newContent) :: fileOperations, Just <| VListDiffs [(0, ListElemInsert 1)])]\n        {input=fileOperations} ->\n          Ok (InputsWithDiffs [(fileOperations, Nothing)])\n      } fileOperationsRaw\n\n    listdir: String -> List String\n    listdir foldername = Update.lens {\n      apply fileOperations = case listDict.get foldername fileOperations of\n        Just (CreateFolder content) -> content -- We can mock the file system by creating a folder in initial fileOperations\n        _ -> basicFS.listdir foldername |>\n          (if fileOperations == [] then identity else\n          List.filterMap (\\name -> case listDict.get (foldername + \"/\" + name) fileOperations of\n            Just Delete -> Nothing\n            Just (Rename newName) ->\n              let fn = foldername + \"/\" in\n              let fnLenth = String.length fn in\n              let possibleFolder = String.take fnLenth newName in\n              let possibleName = String.drop fnLenth newName in\n              if possibleFolder == fn then\n                if Regex.matchIn \"/\" possibleName then Nothing\n                else if possibleName == \"\" then Nothing\n                else Just possibleName\n              else Nothing\n            _ -> Just name\n          ))\n      update {outputOld, outputNew, diffs} =\n        let aux i outputOld outputNew diffs fo = case diffs of\n          [] -> Ok (Inputs [fo])\n          (j, d)::diffTail ->\n            if i < j then\n              aux j (List.drop (j - i) outputOld) (List.drop (j - i) outputNew) diffs fo\n            else case d of\n              ListElemInsert count -> Err <| \"fs.listdir cannot insert in reverse because it does not know if it should insert files or folders. Use fs.read instead\"\n\n              ListElemDelete count ->\n                let (deleted, remaining) = List.split count outputOld in\n                fo ++ (List.map (\\nameDeleted -> (foldername + \"/\" + nameDeleted, Delete)) deleted) |>\n                aux (i + count) remaining outputNew diffTail\n\n              ListElemUpdate nameChange ->\n                case (outputOld, outputNew) of\n                  (oldName :: outputOldTail, newName :: outputNewTail) ->\n                    fo ++ [(foldername + \"/\" + oldName, Rename (foldername + \"/\" + newName))] |>\n                    aux (i + 1) outputOldTail outputNewTail diffTail\n              _ -> Err <| \"\"\"Unknown diff for listdir @d\"\"\"\n        in case diffs of\n          VListDiffs diffs -> aux 0 outputOld outputNew diffs []\n          _ -> Err <| \"\"\"Don\'t know how to handle these list differences for listdircontent : @diffs\"\"\"\n    } fileOperations\n\n    listdircontent: String -> List (String, String)\n    listdircontent foldername = Update.lens {\n      apply fileOperations = listdir foldername |>\n          List.filter (\\name -> isfile \"\"\"@foldername/@name\"\"\") |>\n          List.map (\\name ->\n          let fullname = \"\"\"@foldername/@name\"\"\" in\n          (name, read fullname |> Maybe.withDefault (freeze \"\"\"Unknown file @fullname\"\"\")))\n      update {outputOld, outputNew, diffs} =\n        -- Insertions can be treated as Create, and deletions as Delete.\n        -- Changing the first component can be viewed as a Rename, whereas chaging the second component as a Write.\n        let aux i outputOld outputNew diffs fo = case diffs of\n          [] -> Ok (Inputs [fo])\n          (j, d)::diffTail ->\n            if i < j then\n              aux j (List.drop (j - i) outputOld) (List.drop (j - i) outputNew) diffs fo\n            else case d of\n              ListElemInsert count ->\n                let (inserted, remaining) = List.split count outputNew in\n                fo ++ (List.map (\\(nameInserted, contentInserted) -> (foldername + \"/\" + nameInserted, Create contentInserted)) inserted) |>\n                aux i outputOld remaining diffTail\n\n              ListElemDelete count ->\n                let (deleted, remaining) = List.split count outputOld in\n                fo ++ (List.map (\\(nameDeleted, contentInserted) -> (foldername + \"/\" + nameDeleted, Delete)) deleted) |>\n                aux (i + count) remaining outputNew diffTail\n\n              ListElemUpdate (VRecordDiffs subd) ->\n                case (outputOld, outputNew) of\n                  ((oldName, oldContent) :: outputOldTail, (newName, newContent) :: outputNewTail) ->\n                    let\n                      fo = case subd of\n                        {_2=contentChange} -> fo ++ [(foldername + \"/\" + oldName, Write oldContent newContent contentChange)]\n                        _ -> fo\n                      fo = case subd of\n                        {_1=nameChange} -> fo ++ [(foldername + \"/\" + oldName, Rename (foldername + \"/\" + newName))]\n                        _ -> fo\n                    in\n                    aux (i + 1) outputOldTail outputNewTail diffTail fo\n              _ -> Err <| \"\"\"Unknown diff for listdircontent: @d\"\"\"\n        in case diffs of\n           VListDiffs diffs -> aux 0 outputOld outputNew diffs []\n           _ -> Err <| \"\"\"Don\'t know how to handle these list differences for listdircontent : @diffs\"\"\"\n    } fileOperations\n\n    isdir: String -> Bool\n    isdir name =  case listDict.get name fileOperations of\n       Just (CreateFolder content) -> True\n       _ -> basicFS.isdir name\n    isfolder = isdir\n    isdirectory = isdir\n\n    isfile: String -> Bool\n    isfile name =\n        case listDict.get name fileOperations of\n          Just Create -> True\n          Just (Write _ _ _) -> True\n          Just Delete -> True\n          _ -> basicFS.isfile name\n\n    isFile = isfile\n  }\n}\n\n-- Because we base decisions on random numbers,\n-- to update, it is essential that these random numbers are deterministically computed.\nrandom = {\n  -- Unsafe: it will not evaluate deterministically\n  jsNum = __jsEval__ \"\"\"Math.random()\"\"\"\n\n  type alias Seed = (Int, Int, Int, Int)\n  -- Builds a seed for a generator\n  seedOf: Int -> Seed\n  seedOf num = (num, num* -320161540, 320161540+num, 941627624 * num)\n\n  -- A random number generator that takes a seed and exposes a bunch of methods.\n  generator: Seed -> Generator\n  generator (a, b, c, d) = {\n    self () = generator (a, b, c, d)\n\n    -- Continuation version of randomFloat\n    randomFloat_: (Generator -> Float -> a) -> a\n    randomFloat_ withNewGeneratorResult =\n      let (newABCD, result) =\n        __jsEval__ \"\"\"\n        var a = @a, b = @b, c = @c, d = @d;\n        var t = b << 9, r = a * 5; r = (r << 7 | r >>> 25) * 9;\n        c ^= a; d ^= b;\n        b ^= c; a ^= d; c ^= t;\n        d = d << 11 | d >>> 21;\n        @(jsCode.tupleOf \"x\" [jsCode.tupleOf \"y\" [\"a\", \"b\", \"c\", \"d\"], \"(r >>> 0) / 4294967296\"]);\"\"\"\n      in\n      withNewGeneratorResult (generator newABCD) result\n\n    randomFloat: () -> (Generator, Float)\n    randomFloat () = randomFloat_ (,)\n\n    randomInt_: Int -> Int -> (Generator -> Int -> a) -> a\n    randomInt_ minInclusive maxExclusive withNewGeneratorInt =\n      randomFloat_ <| \\newGenerator float ->\n        withNewGeneratorInt newGenerator <|\n          floor (float * (maxExclusive - minInclusive)) + minInclusive\n\n    randomInt: Int -> Int -> (Generator, Int)\n    randomInt minInclusive maxExclusive = generateInt_ minInclusive maxExclusive (,)\n\n    -- Extract a random sublist of elements, but not in order\n    randomSublist_: Int -> List a -> (Generator -> List a -> b) -> b\n    randomSublist_ count list continuation =\n      if list == [] && count > 0 then continuation (self ()) list\n      else if count <= 0 then continuation (self ()) []\n      else randomInt_ 0 (List.length list) <| \\g n ->\n        case List.removeAt n list of\n          Nothing -> (g, []) -- Don\'t know why it would happen.\n          Just (head, remainingList) ->\n            g.randomSublist_ (count - 1) remainingList <| \\g2 tail ->\n            continuation g2 <| head::tail\n\n    randomSublist: Int -> List a -> (Generator, List a)\n    randomSublist count list = randomSublist_ count list (,)\n\n    shuffleList_: List a -> (Generator -> List a -> b) -> b\n    shuffleList_ list  continuation = randomSublist_ (List.length list) list continuation\n\n    shuffleList: List a -> (Generator, List a)\n    shuffleList list = shuffleList_ list (,)\n  }\n}\n\n-- TODO remove this; add as imports as needed in examples\n{textNode, p, th, td, h1, h2, h3, tr, table} = Html\ndiv_ = Html.div\n\n--------------------------------------------------------------------------------\n-- Lens: Table Library\n\n  -- Update.freeze and Update.softFreeze aren\'t needed below,\n  -- because library definitions are implicitly frozen.\n  -- But for performance it\'s better.\n\nTableWithButtons =\n  let wrapData rows =\n    let blankRow =\n      let numColumns =\n        case rows of\n          []     -> 0\n          row::_ -> List.length row\n      in\n      List.repeat numColumns \"?\"\n    in\n    Update.applyLens\n      { apply rows = List.map (\\row -> (False, row)) rows\n\n      , update {outputNew = flaggedRows} =\n          let processRow (flag, row) =\n            if flag == True\n              then [ row, blankRow ]\n              else [ row ]\n          in\n          Ok (Inputs [List.concatMap processRow flaggedRows])\n      }\n      rows\n  in\n  let mapData f flaggedRows =\n    List.map (Tuple.mapSecond f) flaggedRows\n  in\n  --\n  -- The globalBool flag is used to determine whether to insert \"\" or \" \"\n  -- before a couple attribute values. Toggling this choice in between\n  -- subsequent runs helps work around our issue forcing Elm to re-render.\n  --\n  let tr globalBool flag styles attrs children =\n    let (hasBeenClicked, nope, yep) =\n      (\"has-been-clicked\", Update.softFreeze \"gray\", Update.softFreeze \"coral\")\n    in\n    let dummyStrPrefix =\n      Update.softFreeze <| if globalBool then \"\" else \" \"\n    in\n    let onclick =\n      \"\"\"\n      var hasBeenClicked = document.createAttribute(\"@hasBeenClicked\");\n      var buttonStyle = document.createAttribute(\"style\");\n\n      if (this.parentNode.getAttribute(\"@hasBeenClicked\").endsWith(\"False\")) {\n        hasBeenClicked.value = \"@(dummyStrPrefix)True\";\n        buttonStyle.value = \"color: @yep;\";\n      } else {\n        hasBeenClicked.value = \"@(dummyStrPrefix)False\";\n        buttonStyle.value = \"color: @dummyStrPrefix@nope;\";\n      }\n\n      this.parentNode.setAttributeNode(hasBeenClicked);\n      this.setAttributeNode(buttonStyle);\n      \"\"\"\n    in\n    let button = -- text-button.enabled is an SnS class\n      [ \"span\"\n      , [ [\"class\", \"text-button.enabled\"]\n        , [\"onclick\", onclick]\n        , [\"style\", [[\"color\", dummyStrPrefix + nope]]]\n        ]\n      , [textNode \"+\"]\n      ]\n    in\n    Html.tr styles\n      ([hasBeenClicked, dummyStrPrefix + toString flag] :: attrs)\n      (snoc button children)\n  in\n  { wrapData = wrapData\n  , mapData = mapData\n  , tr = tr\n  }\n\nTableWithButtons =\n  -- Toggle the global boolean flag, to workaround the force re-render issue.\n  { new _ =\n      { TableWithButtons | tr = TableWithButtons.tr (toggleGlobalBool []) }\n  }\n\n\n-- Begin SVG Stuff -------------------------------------------------------------\n\n--\n-- SVG Manipulating Functions\n--\n\n-- === SVG Types ===\n\n-- type alias Point = [Num Num]\n-- type alias RGBA = [Num Num Num Num]\n-- type alias Color = (union String Num RGBA)\n-- type alias PathCmds = (List (union String Num))\n-- type alias Points = (List Point)\n-- type alias RotationCmd = [[String Num Num Num]]\n-- type alias AttrVal = (union String Num Bool Color PathCmds Points RotationCmd)\n-- type alias AttrName = String\n-- type alias AttrPair = [AttrName AttrVal]\n-- type alias Attrs = (List AttrPair)\n-- type alias NodeKind = String\n-- TODO add recursive types properly\n-- type alias SVG = [NodeKind Attrs (List SVG_or_Text)]\n-- type alias SVG_or_Text = (union SVG [String String])\n-- type alias Blob = (List SVG)\n\n-- === Attribute Lookup ===\n-- lookupWithDefault: (forall (k v) (-> v k (List [k v]) v))\nlookupWithDefault default k dict =\n  let foo = lookupWithDefault default k in\n  case dict of\n    [] -> default\n    [k1, v]::rest -> if k == k1 then v else foo rest\n\n--lookup: (forall (k v) (-> k (List [k v]) (union v Null)))\nlookup k dict =\n  let foo = lookup k in\n  case dict of\n    [] -> null\n    [k1, v]::rest -> if k == k1 then v else foo rest\n\n-- addExtras: (-> Num (List [String (List [Num AttrVal])]) SVG SVG)\naddExtras i extras shape =\n  case extras of\n    [] -> shape\n    [k, table]::rest ->\n      let v = lookup i table in\n      \"Error: typecase not yet implemented for Elm syntax\"\n\n-- lookupAttr: (-> SVG AttrName (union AttrVal Null))\nlookupAttr [_, attrs, _] k = lookup k attrs\n\n-- lookupAttrWithDefault: (-> AttrVal SVG AttrName AttrVal)\nlookupAttrWithDefault default [_, attrs, _] k =\n  lookupWithDefault default k attrs \n\n-- Pairs of Type-Specific Lookup Functions\n-- lookupNumAttr: (-> SVG AttrName (union Num Null))\nlookupNumAttr [_, attrs, _] k =\n  let val = lookup k attrs in\n  \"Error: typecase not yet implemented for Elm syntax\"\n  \n-- lookupNumAttrWithDefault: (-> Num SVG AttrName Num)\nlookupNumAttrWithDefault default shape k =\n  let val = lookupNumAttr shape k in\n  \"Error: typecase not yet implemented for Elm syntax\"\n\n-- lookupPointsAttr: (-> SVG AttrName (union Points Null))\nlookupPointsAttr [_, attrs, _] k =\n  let val = lookup k attrs in\n  \"Error: typecase not yet implemented for Elm syntax\"\n\n-- lookupPointsAttrWithDefault: (-> Points SVG AttrName Points)\nlookupPointsAttrWithDefault default shape k =\n  let val = lookupPointsAttr shape k in\n  \"Error: typecase not yet implemented for Elm syntax\"\n\n-- lookupStringAttr: (-> SVG AttrName (union String Null))\nlookupStringAttr [_, attrs, _] k =\n  let val = lookup k attrs in\n  \"Error: typecase not yet implemented for Elm syntax\"\n  \n-- lookupStringAttrWithDefault: (-> String SVG AttrName String)\nlookupStringAttrWithDefault default shape k =\n  let val = lookupStringAttr shape k in\n  \"Error: typecase not yet implemented for Elm syntax\"\n\n-- === Points ===\n\n-- type alias Vec2D = [Num Num]\n\n-- vec2DPlus: (-> Point Vec2D Point)\nvec2DPlus pt vec =\n  [ fst pt\n    + fst vec, snd pt\n    + snd vec\n  ]\n\n-- vec2DMinus: (-> Point Point Vec2D)\nvec2DMinus pt vec =\n  [ fst pt\n    - fst vec, snd pt\n    - snd vec\n  ]\n\n-- vec2DScalarMult: (-> Num Vec2D Point)\nvec2DScalarMult num vec =\n  [ fst vec\n    * num, snd vec\n    * num\n  ]\n\n-- vec2DScalarDiv: (-> Num Vec2D Point)\nvec2DScalarDiv num vec =\n  [ fst vec\n    / num, snd vec\n    / num\n  ]\n\n-- vec2DLength: (-> Point Point Num)\nvec2DLength [x1, y1] [x2, y2] =\n  let [dx, dy] = [ x2- x1, y2 - y1] in\n  sqrt (dx * dx + dy * dy) \n\n\n-- === Circles ===\n\ntype alias Circle = SVG\n\n--; argument order - color, x, y, radius\n--; creates a circle, center at (x,y) with given radius and color\n-- circle: (-> Color Num Num Num Circle)\ncircle fill cx cy r =\n  [\'circle\',\n     [[\'cx\', cx], [\'cy\', cy], [\'r\', r], [\'fill\', fill]],\n     []]\n\n-- circleCenter: (-> Ellipse Point)\ncircleCenter circle =\n  [\n    lookupNumAttrWithDefault 0 circle \'cx\',\n    lookupNumAttrWithDefault 0 circle \'cy\'\n  ]\n\n-- circleRadius: (-> Circle Num)\ncircleRadius circle =\n  lookupNumAttrWithDefault 0 circle \'r\'\n\n-- circleDiameter: (-> Circle Num)\ncircleDiameter circle = 2\n  * circleRadius circle\n\n-- circleNorth: (-> Circle Point)\ncircleNorth circle =\n  let [cx, cy] = circleCenter circle in\n    [cx, cy - circleRadius circle]\n\n-- circleEast: (-> Circle Point)\ncircleEast circle =\n  let [cx, cy] = circleCenter circle in\n    [ cx+ circleRadius circle, cy]\n\n-- circleSouth: (-> Circle Point)\ncircleSouth circle =\n  let [cx, cy] = circleCenter circle in\n    [cx, cy + circleRadius circle]\n\n-- circleWest: (-> Circle Point)\ncircleWest circle =\n  let [cx, cy] = circleCenter circle in\n    [ cx- circleRadius circle, cy] \n\n\n--; argument order - color, width, x, y, radius\n--; Just as circle, except new width parameter determines thickness of ring\n-- ring: (-> Color Num Num Num Num SVG)\nring c w x y r =\n  [\'circle\',\n     [ [\'cx\', x], [\'cy\', y], [\'r\', r], [\'fill\', \'none\'], [\'stroke\', c], [\'stroke-width\', w] ],\n     []] \n\n\n-- === Ellipses ===\n\ntype alias Ellipse = SVG\n\n--; argument order - color, x, y, x-radius, y-radius\n--; Just as circle, except radius is separated into x and y parameters\n-- ellipse: (-> Color Num Num Num Num Ellipse)\nellipse fill x y rx ry =\n  [\'ellipse\',\n     [ [\'cx\', x], [\'cy\', y], [\'rx\', rx], [\'ry\', ry], [\'fill\', fill] ],\n     []]\n\n-- ellipseCenter: (-> Ellipse Point)\nellipseCenter ellipse =\n  [\n    lookupNumAttrWithDefault 0 ellipse \'cx\',\n    lookupNumAttrWithDefault 0 ellipse \'cy\'\n  ]\n\n-- ellipseRadiusX: (-> Ellipse Num)\nellipseRadiusX ellipse =\n  lookupNumAttrWithDefault 0 ellipse \'rx\'\n\n-- ellipseRadiusY: (-> Ellipse Num)\nellipseRadiusY ellipse =\n  lookupNumAttrWithDefault 0 ellipse \'ry\'\n\n-- ellipseDiameterX: (-> Ellipse Num)\nellipseDiameterX ellipse = 2\n  * ellipseRadiusX ellipse\n\n-- ellipseDiameterY: (-> Ellipse Num)\nellipseDiameterY ellipse = 2\n  * ellipseRadiusY ellipse\n\n-- ellipseNorth: (-> Ellipse Point)\nellipseNorth ellipse =\n  let [cx, cy] = ellipseCenter ellipse in\n    [cx, cy - ellipseRadiusY ellipse]\n\n-- ellipseEast: (-> Ellipse Point)\nellipseEast ellipse =\n  let [cx, cy] = ellipseCenter ellipse in\n    [ cx+ ellipseRadiusX ellipse, cy]\n\n-- ellipseSouth: (-> Ellipse Point)\nellipseSouth ellipse =\n  let [cx, cy] = ellipseCenter ellipse in\n    [cx, cy + ellipseRadiusY ellipse]\n\n-- ellipseWest: (-> Ellipse Point)\nellipseWest ellipse =\n  let [cx, cy] = ellipseCenter ellipse in\n    [ cx- ellipseRadiusX ellipse, cy] \n\n\n-- === Bounds-based shapes (Oval and Box) ===\n\n-- type alias BoundedShape = SVG\n-- type alias Bounds = [Num Num Num Num]\n\n-- boundedShapeLeft: (-> BoundedShape Num)\nboundedShapeLeft shape =\n  lookupNumAttrWithDefault 0 shape \'LEFT\'\n\n-- boundedShapeTop: (-> BoundedShape Num)\nboundedShapeTop shape =\n  lookupNumAttrWithDefault 0 shape \'TOP\'\n\n-- boundedShapeRight: (-> BoundedShape Num)\nboundedShapeRight shape =\n  lookupNumAttrWithDefault 0 shape \'RIGHT\'\n\n-- boundedShapeBot: (-> BoundedShape Num)\nboundedShapeBot shape =\n  lookupNumAttrWithDefault 0 shape \'BOT\'\n\n-- boundedShapeWidth: (-> BoundedShape Num)\nboundedShapeWidth shape = boundedShapeRight shape\n  - boundedShapeLeft shape\n\n-- boundedShapeHeight: (-> BoundedShape Num)\nboundedShapeHeight shape = boundedShapeBot shape\n  - boundedShapeTop shape\n\n-- boundedShapeLeftTop: (-> BoundedShape Point)\nboundedShapeLeftTop shape =\n  [\n    boundedShapeLeft shape,\n    boundedShapeTop shape\n  ]\n\n-- boundedShapeCenterTop: (-> BoundedShape Point)\nboundedShapeCenterTop shape =\n  [ (boundedShapeLeft shape + boundedShapeRight shape)\n    / 2,\n    boundedShapeTop shape\n  ]\n\n-- boundedShapeRightTop: (-> BoundedShape Point)\nboundedShapeRightTop shape =\n  [\n    boundedShapeRight shape,\n    boundedShapeTop shape\n  ]\n\n-- boundedShapeRightCenter: (-> BoundedShape Point)\nboundedShapeRightCenter shape =\n  [\n    boundedShapeRight shape, (boundedShapeTop shape + boundedShapeBot shape)\n    / 2\n  ]\n\n-- boundedShapeRightBot: (-> BoundedShape Point)\nboundedShapeRightBot shape =\n  [\n    boundedShapeRight shape,\n    boundedShapeBot shape\n  ]\n\n-- boundedShapeCenterBot: (-> BoundedShape Point)\nboundedShapeCenterBot shape =\n  [ (boundedShapeLeft shape + boundedShapeRight shape)\n    / 2,\n    boundedShapeBot shape\n  ]\n\n-- boundedShapeLeftBot: (-> BoundedShape Point)\nboundedShapeLeftBot shape =\n  [\n    boundedShapeLeft shape,\n    boundedShapeBot shape\n  ]\n\n-- boundedShapeLeftCenter: (-> BoundedShape Point)\nboundedShapeLeftCenter shape =\n  [\n    boundedShapeLeft shape, (boundedShapeTop shape + boundedShapeBot shape)\n    / 2\n  ]\n\n-- boundedShapeCenter: (-> BoundedShape Point)\nboundedShapeCenter shape =\n  [ (boundedShapeLeft shape + boundedShapeRight shape)\n    / 2, (boundedShapeTop shape + boundedShapeBot shape)\n    / 2\n  ] \n\n\n-- === Rectangles ===\n\ntype alias Rect = SVG\n\n--; argument order - color, x, y, width, height\n--; creates a rectangle of given width and height with (x,y) as the top left corner coordinate\n-- rect: (-> Color Num Num Num Num Rect)\nrect fill x y w h =\n  [\'rect\',\n     [ [\'x\', x], [\'y\', y], [\'width\', w], [\'height\', h], [\'fill\', fill] ],\n     []]\n\n-- square: (-> Color Num Num Num Rect)\nsquare fill x y side = rect fill x y side side\n\n-- rectWidth: (-> Rect Num)\nrectWidth rect =\n  lookupNumAttrWithDefault 0 rect \'width\'\n\n-- rectHeight: (-> Rect Num)\nrectHeight rect =\n  lookupNumAttrWithDefault 0 rect \'height\'\n\n-- rectLeftTop: (-> Rect Point)\nrectLeftTop rect =\n  [\n    lookupNumAttrWithDefault 0 rect \'x\',\n    lookupNumAttrWithDefault 0 rect \'y\'\n  ]\n\n-- rectCenterTop: (-> Rect Point)\nrectCenterTop rect =\n  vec2DPlus\n    (rectLeftTop rect)\n    [ rectWidth rect / 2, 0 ]\n\n-- rectRightTop: (-> Rect Point)\nrectRightTop rect =\n  vec2DPlus\n    (rectLeftTop rect)\n    [ rectWidth rect, 0 ]\n\n-- rectRightCenter: (-> Rect Point)\nrectRightCenter rect =\n  vec2DPlus\n    (rectLeftTop rect)\n    [ rectWidth rect, rectHeight rect / 2 ]\n\n-- rectRightBot: (-> Rect Point)\nrectRightBot rect =\n  vec2DPlus\n    (rectLeftTop rect)\n    [ rectWidth rect, rectHeight rect ]\n\n-- rectCenterBot: (-> Rect Point)\nrectCenterBot rect =\n  vec2DPlus\n    (rectLeftTop rect)\n    [ rectWidth rect / 2, rectHeight rect ]\n\n-- rectLeftBot: (-> Rect Point)\nrectLeftBot rect =\n  vec2DPlus\n    (rectLeftTop rect)\n    [0, rectHeight rect ]\n\n-- rectLeftCenter: (-> Rect Point)\nrectLeftCenter rect =\n  vec2DPlus\n    (rectLeftTop rect)\n    [0, rectHeight rect / 2 ]\n\n-- rectCenter: (-> Rect Point)\nrectCenter rect =\n  vec2DPlus\n    (rectLeftTop rect)\n    [ rectWidth rect / 2, rectHeight rect / 2 ] \n\n\n-- === Lines ===\n\ntype alias Line = SVG\n\n--; argument order - color, width, x1, y1, x1, y2\n--; creates a line from (x1, y1) to (x2,y2) with given color and width\n-- line: (-> Color Num Num Num Num Num Line)\nline stroke w x1 y1 x2 y2 =\n  [\'line\',\n     [ [\'x1\', x1], [\'y1\', y1], [\'x2\', x2], [\'y2\', y2], [\'stroke\', stroke], [\'stroke-width\', w] ],\n     []]\n\n-- lineBetween: (-> Color Num Point Point Line)\nlineBetween stroke w [x1, y1] [x2, y2] =\n  line stroke w x1 y1 x2 y2\n\n-- lineStart: (-> Line Point)\nlineStart line =\n  [\n    lookupNumAttrWithDefault 0 line \'x1\',\n    lookupNumAttrWithDefault 0 line \'y1\'\n  ]\n\n-- lineEnd: (-> Line Point)\nlineEnd line =\n  [\n    lookupNumAttrWithDefault 0 line \'x2\',\n    lookupNumAttrWithDefault 0 line \'y2\'\n  ]\n\n-- lineMidPoint: (-> Line Point)\nlineMidPoint line =\n  halfwayBetween (lineStart line) (lineEnd line) \n\n\n--; argument order - fill, stroke, width, points\n--; creates a polygon following the list of points, with given fill color and a border with given width and stroke\n-- polygon: (-> Color Color Num Points SVG)\npolygon fill stroke w pts =\n  [\'polygon\',\n     [ [\'fill\', fill], [\'points\', pts], [\'stroke\', stroke], [\'stroke-width\', w] ],\n     []] \n\n--; argument order - fill, stroke, width, points\n--; See polygon\n-- polyline: (-> Color Color Num Points SVG)\npolyline fill stroke w pts =\n  [\'polyline\',\n     [ [\'fill\', fill], [\'points\', pts], [\'stroke\', stroke], [\'stroke-width\', w] ],\n     []] \n\n--; argument order - fill, stroke, width, d\n--; Given SVG path command d, create path with given fill color, stroke and width\n--; See https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Paths for path command info\n-- path: (-> Color Color Num PathCmds SVG)\npath fill stroke w d =\n  [\'path\',\n     [ [\'fill\', fill], [\'stroke\', stroke], [\'stroke-width\', w], [\'d\', d] ],\n     []] \n\n--; argument order - x, y, string\n--; place a text string with top left corner at (x,y) - with default color & font\n-- text: (-> Num Num String SVG)\ntext x y s =\n   [\'text\', [[\'x\', x], [\'y\', y], [\'style\', \'fill:black\'],\n            [\'font-family\', \'Tahoma, sans-serif\']],\n           [[\'TEXT\', s]]] \n\n--; argument order - shape, new attribute\n--; Add a new attribute to a given Shape\n-- addAttr: (-> SVG AttrPair SVG)\naddAttr [shapeKind, oldAttrs, children] newAttr =\n  [shapeKind, snoc newAttr oldAttrs, children]\n\n-- consAttr: (-> SVG AttrPair SVG)\nconsAttr [shapeKind, oldAttrs, children] newAttr =\n  [shapeKind, cons newAttr oldAttrs, children] \n\n--; Given a list of shapes, compose into a single SVG\nsvg shapes = [\'svg\', [], shapes] \n\n--; argument order - x-maximum, y-maximum, shapes\n--; Given a list of shapes, compose into a single SVG within the x & y maxima\n-- svgViewBox: (-> Num Num (List SVG) SVG)\nsvgViewBox xMax yMax shapes =\n  let [sx, sy] = [toString xMax, toString yMax] in\n  [\'svg\',\n    [[\'x\', \'0\'], [\'y\', \'0\'], [\'viewBox\', joinStrings \' \' [\'0\', \'0\', sx, sy]]],\n    shapes] \n\n--; As rect, except x & y represent the center of the defined rectangle\n-- rectByCenter: (-> Color Num Num Num Num Rect)\nrectByCenter fill cx cy w h =\n  rect fill (cx - w / 2) (cy - h / 2) w h \n\n--; As square, except x & y represent the center of the defined rectangle\n-- squareByCenter: (-> Color Num Num Num Rect)\nsquareByCenter fill cx cy w = rectByCenter fill cx cy w w \n\n--; Some shapes with given default values for fill, stroke, and stroke width\n-- TODO remove these\ncircle_ =    circle \'red\' \nellipse_ =   ellipse \'orange\' \nrect_ =      rect \'#999999\' \nsquare_ =    square \'#999999\' \nline_ =      line \'blue\' 2 \npolygon_ =   polygon \'green\' \'purple\' 3 \npath_ =      path \'transparent\' \'goldenrod\' 5 \n\n--; updates an SVG by comparing differences with another SVG\n--; Note: accDiff pre-condition: indices in increasing order\n--; (so can\'t just use foldr instead of reverse . foldl)\n-- updateCanvas: (-> SVG SVG SVG)\nupdateCanvas [_, svgAttrs, oldShapes] diff =\n  let oldShapesI = zipOld (list1N (len oldShapes)) oldShapes in\n  let initAcc = [[], diff] in\n  let f [i, oldShape] [accShapes, accDiff] =\n    case accDiff of\n      []->\n        [cons oldShape accShapes, accDiff]\n      [j, newShape]::accDiffRest->\n        if i == j then\n          [cons newShape accShapes, accDiffRest]\n        else\n          [cons oldShape accShapes, accDiff] in\n  let newShapes = reverse (fst (foldl f initAcc oldShapesI)) in\n    [\'svg\', svgAttrs, newShapes] \n\naddBlob newShapes [\'svg\', svgAttrs, oldShapes] =\n  [\'svg\', svgAttrs, append oldShapes newShapes]\n\n--  groupMap: (forall (a b) (-> (List a) (-> a b) (List b)))\ngroupMap xs f = map f xs \n\nautoChose _ x _ = x \ninferred x _ _ = x \nflow _ x = x \n\ntwoPi = 2 * pi \nhalfPi = pi / 2 \n\n--; Helper function for nPointsOnCircle, calculates angle of points\n--; Note: angles are calculated clockwise from the traditional pi/2 mark\n-- nPointsOnUnitCircle: (-> Num Num (List Point))\nnPointsOnUnitCircle n rot =\n  let off = halfPi - rot in\n  let foo i =\n    let ang = off + i / n * twoPi in\n    [cos ang, neg (sin ang)] in\n  map foo (list0N (n - 1))\n\n-- nPointsOnCircle: (-> Num Num Num Num Num (List Point))\n--; argument order - Num of points, degree of rotation, x-center, y-center, radius\n--; Scales nPointsOnUnitCircle to the proper size and location with a given radius and center\nnPointsOnCircle n rot cx cy r =\n  let pts = nPointsOnUnitCircle n rot in\n  map \\[x, y] -> [ cx+ x * r, cy + y * r] pts\n\n-- nStar: (-> Color Color Num Num Num Num Num Num Num SVG)\n--; argument order -\n--; fill color - interior color of star\n--; stroke color - border color of star\n--; width - thickness of stroke\n--; points - number of star points\n--; len1 - length from center to one set of star points\n--; len2 - length from center to other set of star points (either inner or outer compared to len1)\n--; rot - degree of rotation\n--; cx - x-coordinate of center position\n--; cy - y-coordinate of center position\n--; Creates stars that can be modified on a number of parameters\nnStar fill stroke w n len1 len2 rot cx cy =\n  let pti [i, len] =\n    let anglei = i * pi / n - rot + halfPi in\n    let xi = cx + len * cos anglei in\n    let yi = cy + neg (len * sin anglei) in\n      [xi, yi] in\n  let lengths =\n    map (\\b -> if b then len1 else len2)\n        (concat (repeat n [True, False])) in\n  let indices = list0N (2! * n - 1!) in\n    polygon fill stroke w (map pti (zipOld indices lengths))\n\n-- setZones: (-> String SVG SVG)\nsetZones s shape = addAttr shape [\'ZONES\', s]\n\n-- zones: (-> String (List SVG) (List SVG))\nzones s shapes = map (setZones s) shapes \n-- TODO eta-reduced version:\n-- (def zones (\\s (map (setZones s))))\n\n--; Remove all zones from shapes except for the first in the list\n-- hideZonesTail: (-> (List SVG) (List SVG))\nhideZonesTail hd :: tl = hd :: zones \'none\' tl \n\n--; Turn all zones to basic for a given list of shapes except for the first shape\n-- basicZonesTail: (-> (List SVG) (List SVG))\nbasicZonesTail hd :: tl = hd :: zones \'basic\' tl\n\n-- ghost: (-> SVG SVG)\nghost =\n  -- consAttr (instead of addAttr) makes internal calls to\n  -- Utils.maybeRemoveFirst \'HIDDEN\' slightly faster\n  \\shape -> consAttr shape [\'HIDDEN\', \'\'] \n\nghosts = map ghost \n\n--; hSlider_ : Bool -> Bool -> Int -> Int -> Int -> Num -> Num -> Str -> Num\n--; -> [Num (List Svg)]\n--; argument order - dropBall roundInt xStart xEnd y minVal maxVal caption srcVal\n--; dropBall - Determines if the slider ball continues to appear past the edges of the slider\n--; roundInt - Determines whether to round to Ints or not\n--; xStart - left edge of slider\n--; xEnd - right edge of slider\n--; y - y positioning of entire slider bar\n--; minVal - minimum value of slider\n--; maxVal - maximum value of slider\n--; caption - text to display along with the slider\n--; srcVal - the current value given by the slider ball\nhSlider_ dropBall roundInt x0 x1 y minVal maxVal caption srcVal =\n  let preVal = clamp minVal maxVal srcVal in\n  let targetVal = if roundInt then round preVal else preVal in\n  let shapes =\n    let ball =\n      let [xDiff, valDiff] = [ x1- x0, maxVal - minVal] in\n      let xBall = x0 + xDiff * (srcVal - minVal) / valDiff in\n      if preVal == srcVal then circle \'black\' xBall y 10! else\n      if dropBall then          circle \'black\' 0! 0! 0! else\n                            circle \'red\' xBall y 10! in\n    [ line \'black\' 3! x0 y x1 y,\n      text (x1 + 10) (y + 5) (caption + toString targetVal),\n      circle \'black\' x0 y 4!, circle \'black\' x1 y 4!, ball ] in\n  [targetVal, ghosts shapes] \n-- TODO only draw zones for ball\n\nvSlider_ dropBall roundInt y0 y1 x minVal maxVal caption srcVal =\n  let preVal = clamp minVal maxVal srcVal in\n  let targetVal = if roundInt then round preVal else preVal in\n  let shapes =\n    let ball =\n      let [yDiff, valDiff] = [ y1- y0, maxVal - minVal] in\n      let yBall = y0 + yDiff * (srcVal - minVal) / valDiff in\n      if preVal == srcVal then circle \'black\' x yBall 10! else\n      if dropBall then          circle \'black\' 0! 0! 0! else\n                            circle \'red\' x yBall 10! in\n    [ line \'black\' 3! x y0 x y1,\n      -- (text (+ x1 10) (+ y 5) (+ caption (toString targetVal)))\n      circle \'black\' x y0 4!, circle \'black\' x y1 4!, ball ] in\n  [targetVal, ghosts shapes] \n-- TODO only draw zones for ball\n\nhSlider = hSlider_ False \nvSlider = vSlider_ False \n\n--; button_ : Bool -> Num -> Num -> String -> Num -> SVG\n--; Similar to sliders, but just has boolean values\nbutton_ dropBall xStart y caption xCur =\n  let [rPoint, wLine, rBall, wSlider] = [4!, 3!, 10!, 70!] in\n  let xEnd = xStart + wSlider in\n  let xBall = xStart + xCur * wSlider in\n  let xBall_ = clamp xStart xEnd xBall in\n  let val = xCur < 0.5 in\n  let shapes1 =\n    [ circle \'black\' xStart y rPoint,\n      circle \'black\' xEnd y rPoint,\n      line \'black\' wLine xStart y xEnd y,\n      text (xEnd + 10) (y + 5) (caption + toString val) ] in\n  let shapes2 =\n    [ if xBall_ == xBall then circle (if val then \'darkgreen\' else \'darkred\') xBall y rBall else\n      if dropBall then         circle \'black\' 0! 0! 0! else\n                           circle \'red\' xBall y rBall ] in\n  let shapes = append (zones \'none\' shapes1) (zones \'basic\' shapes2) in\n  [val, ghosts shapes] \n\nbutton = button_ False \n\nxySlider xStart xEnd yStart yEnd xMin xMax yMin yMax xCaption yCaption xCur yCur =\n    let [rCorner, wEdge, rBall] = [4!, 3!, 10!] in\n    let [xDiff, yDiff, xValDiff, yValDiff] = [ xEnd- xStart, yEnd - yStart, xMax - xMin, yMax - yMin] in\n    let xBall = xStart + xDiff * (xCur - xMin) / xValDiff in\n    let yBall = yStart + yDiff * (yCur - yMin) / yValDiff in\n    let cBall = if and (between xMin xMax xCur) (between yMin yMax yCur)then \'black\'else \'red\' in\n    let xVal = ceiling clamp xMin xMax xCur in\n    let yVal = ceiling clamp yMin yMax yCur in\n    let myLine x1 y1 x2 y2 = line \'black\' wEdge x1 y1 x2 y2 in\n    let myCirc x0 y0 = circle \'black\' x0 y0 rCorner in\n    let shapes =\n      [ myLine xStart yStart xEnd yStart,\n        myLine xStart yStart xStart yEnd,\n        myLine xStart yEnd xEnd yEnd,\n        myLine xEnd yStart xEnd yEnd,\n        myCirc xStart yStart,\n        myCirc xStart yEnd,\n        myCirc xEnd yStart,\n        myCirc xEnd yEnd,\n        circle cBall xBall yBall rBall,\n        text (xStart + xDiff / 2 - 40) (yEnd + 20) (xCaption + toString xVal),\n        text (xEnd + 10) (yStart + yDiff / 2) (yCaption + toString yVal) ] in\n    [ [ xVal, yVal ], ghosts shapes ]\n    \n-- enumSlider: (forall a (-> Num Num Num [a|(List a)] String Num [a (List SVG)]))\nenumSlider x0 x1 ((ya::_) as enum) caption srcVal =\n  let n = len enum in\n  let [minVal, maxVal] = [0!, n] in\n  let preVal = clamp minVal maxVal srcVal in\n  let i = floor preVal in\n  let item = -- using dummy first element for typechecking\n    let item_ = nth enum if i == n then n - 1 else i in\n    \"Error: typecase not yet implemented for Elm syntax\" in\n  let wrap circ = addAttr circ [\'SELECTED\', \'\'] in -- TODO\n  let shapes =\n    let rail = [ line \'black\' 3! x0 y x1 y ] in\n    let ball =\n      let [xDiff, valDiff] = [ x1- x0, maxVal - minVal] in\n      let xBall = x0 + xDiff * (srcVal - minVal) / valDiff in\n      let colorBall = if preVal == srcVal then \'black\' else \'red\' in\n        [ wrap (circle colorBall xBall y 10!) ] in\n    let endpoints =\n      [ wrap (circle \'black\' x0 y 4!), wrap (circle \'black\' x1 y 4!) ] in\n    let tickpoints =\n      let sep = (x1 - x0) / n in\n      map (\\j -> wrap (circle \'grey\' (x0 + mult j sep) y 4!))\n          (range 1! (n - 1!)) in\n    let label = [ text (x1 + 10!) (y + 5!) (caption + toString item) ] in\n    concat [ rail, endpoints, tickpoints, ball, label ] in\n  [item, ghosts shapes] \n\naddSelectionSliders y0 seeds shapesCaps =\n  let shapesCapsSeeds = zipOld shapesCaps (take seeds (len shapesCaps)) in\n  let foo [i, [[shape, cap], seed]] =\n    let [k, _, _] = shape in\n    let enum =\n      if k == \'circle\'then [\'\', \'cx\', \'cy\', \'r\']else\n      if k == \'line\'then   [\'\', \'x1\', \'y1\', \'x2\', \'y2\']else\n      if k == \'rect\'then   [\'\', \'x\', \'y\', \'width\', \'height\']else\n        [ \'NO SELECTION ENUM FOR KIND \'+ k] in\n    let [item, slider] = enumSlider 20! 170! (y0 + mult i 30!) enum cap seed in\n    let shape1 = addAttr shape [\'SELECTED\', item] in -- TODO overwrite existing\n    shape1::slider in\n  concat (mapi foo shapesCapsSeeds) \n\n-- Text Widgets\n\nsimpleText family color size x1 x2 y horizAlignSeed textVal =\n  let xMid = x1 + (x2 - x1) / 2! in\n  let [anchor, hAlignSlider] =\n    let dx = (x2 - x1) / 4! in\n    let yLine = 30! + y in\n    enumSlider (xMid - dx) (xMid + dx) yLine\n      [\'start\', \'middle\', \'end\'] \'\' horizAlignSeed in\n  let x =\n    if anchor == \'start\' then x1 else\n    if anchor == \'middle\' then xMid else\n    if anchor == \'end\' then x2 else\n      \'CRASH\' in\n  let theText =\n    [\'text\',\n      [[\'x\', x], [\'y\', y],\n       [\'style\', \'fill:\' + color],\n       [\'font-family\', family], [\'font-size\', size],\n       [\'text-anchor\', anchor]],\n      [[\'TEXT\', textVal]]] in\n  let rails =\n    let pad = 15! in\n    let yBaseLine = y + pad in\n    let xSideLine = x1 - pad in\n    let rail = line \'gray\' 3 in\n    let baseLine = rail xSideLine yBaseLine x2 yBaseLine in\n    let sideLine = rail xSideLine yBaseLine xSideLine (y - size) in\n    let dragBall = circle \'black\' x yBaseLine 8! in\n    ghosts [baseLine, sideLine, dragBall] in\n  concat [[theText], hAlignSlider, rails]\n\n-- rotate: (-> SVG Num Num Num SVG)\n--; argument order - shape, rot, x, y\n--; Takes a shape rotates it rot degrees around point (x,y)\nrotate shape n1 n2 n3 =\n  addAttr shape [\'transform\', [[\'rotate\', n1, n2, n3]]]\n\n-- rotateAround: (-> Num Num Num SVG SVG)\nrotateAround rot x y shape =\n  addAttr shape [\'transform\', [[\'rotate\', rot, x, y]]]\n\n-- Polygon and Path Helpers\n-- middleOfPoints: (-> (List Point) Point)\nmiddleOfPoints pts =\n  let [xs, ys] = [map fst pts, map snd pts] in\n  let [xMin, xMax] = [minimum xs, maximum xs] in\n  let [yMin, yMax] = [minimum ys, maximum ys] in\n  let xMiddle = noWidgets (xMin + 0.5 * (xMax - xMin)) in\n  let yMiddle = noWidgets (yMin + 0.5 * (yMax - yMin)) in\n    [xMiddle, yMiddle]\n\n-- polygonPoints: (-> SVG Points)\npolygonPoints [shapeKind, _, _]asshape =\n  case shapeKind of\n    \'polygon\'-> lookupPointsAttrWithDefault [] shape \'points\'\n    _->         []\n    \n-- allPointsOfPathCmds_: (-> PathCmds (List [(union Num String) (union Num String)]))\nallPointsOfPathCmds_ cmds = case cmds\nof\n  []->    []\n  [\'Z\']-> []\n\n  \'M\'::x::y::rest-> cons [x, y] (allPointsOfPathCmds_ rest)\n  \'L\'::x::y::rest-> cons [x, y] (allPointsOfPathCmds_ rest)\n\n  \'Q\'::x1::y1::x::y::rest->\n    append [[x1, y1], [x, y]] (allPointsOfPathCmds_ rest)\n\n  \'C\'::x1::y1::x2::y2::x::y::rest->\n    append [[x1, y1], [x2, y2], [x, y]] (allPointsOfPathCmds_ rest)\n\n  _-> [let _ = debug \"Prelude.allPointsOfPathCmds_: not Nums...\" in [-1, -1]] \n\n-- (typ allPointsOfPathCmds (-> PathCmds (List Point)))\n-- (def allPointsOfPathCmds (\\cmds\n--   (let toNum (\\numOrString\n--     (typecase numOrString (Num numOrString) (String -1)))\n--   (map (\\[x y] [(toNum x) (toNum y)]) (allPointsOfPathCmds_ cmds)))))\n\n-- TODO remove inner annotations and named lambda\n-- allPointsOfPathCmds: (-> PathCmds (List Point))\nallPointsOfPathCmds cmds =\n  -- toNum: (-> (union Num String) Num)\n  let toNum numOrString =\n  \"Error: typecase not yet implemented for Elm syntax\" in\n  -- foo: (-> [(union Num String) (union Num String)] Point)\n  let foo [x, y] = [toNum x, toNum y] in\n  map foo (allPointsOfPathCmds_ cmds) \n\n\n-- Raw Shapes\n\nrawShape kind attrs = [kind, attrs, []]\n\n-- rawRect: (-> Color Color Num Num Num Num Num Num Rect)\nrawRect fill stroke strokeWidth x y w h rot =\n  let [cx, cy] = [ x+ w / 2!, y + h / 2!] in\n  rotateAround rot cx cy\n    (rawShape \'rect\' [\n      [\'x\', x], [\'y\', y], [\'width\', w], [\'height\', h],\n      [\'fill\', fill], [\'stroke\', stroke], [\'stroke-width\', strokeWidth] ])\n\n-- rawCircle: (-> Color Color Num Num Num Num Circle)\nrawCircle fill stroke strokeWidth cx cy r =\n  rawShape \'circle\' [\n    [\'cx\', cx], [\'cy\', cy], [\'r\', r],\n    [\'fill\', fill], [\'stroke\', stroke], [\'stroke-width\', strokeWidth] ]\n\n-- rawEllipse: (-> Color Color Num Num Num Num Num Num Ellipse)\nrawEllipse fill stroke strokeWidth cx cy rx ry rot =\n  rotateAround rot cx cy\n    (rawShape \'ellipse\' [\n      [\'cx\', cx], [\'cy\', cy], [\'rx\', rx], [\'ry\', ry],\n      [\'fill\', fill], [\'stroke\', stroke], [\'stroke-width\', strokeWidth] ])\n\n-- rawPolygon: (-> Color Color Num Points Num SVG)\nrawPolygon fill stroke w pts rot =\n  let [cx, cy] = middleOfPoints pts in\n  rotateAround rot cx cy\n    (rawShape \'polygon\'\n      [ [\'fill\', fill], [\'points\', pts], [\'stroke\', stroke], [\'stroke-width\', w] ])\n\n-- rawPath: (-> Color Color Num PathCmds Num SVG)\nrawPath fill stroke w d rot =\n  let [cx, cy] = middleOfPoints (allPointsOfPathCmds d) in\n  rotateAround rot cx cy\n    (rawShape \'path\'\n      [ [\'fill\', fill], [\'d\', d], [\'stroke\', stroke], [\'stroke-width\', w] ]) \n\n\n-- Shapes via Bounding Boxes\n-- box: (-> Bounds Color Color Num BoundedShape)\nbox bounds fill stroke strokeWidth =\n  let [x, y, xw, yh] = bounds in\n  [\'BOX\',\n    [ [\'LEFT\', x], [\'TOP\', y], [\'RIGHT\', xw], [\'BOT\', yh],\n      [\'fill\', fill], [\'stroke\', stroke], [\'stroke-width\', strokeWidth]\n    ], []\n  ] \n\n-- string fill/stroke/stroke-width attributes to avoid sliders\n-- hiddenBoundingBox: (-> Bounds BoundedShape)\nhiddenBoundingBox bounds =\n  ghost (box bounds \'transparent\' \'transparent\' \'0\')\n\n-- simpleBoundingBox: (-> Bounds BoundedShape)\nsimpleBoundingBox bounds =\n  ghost (box bounds \'transparent\' \'darkblue\' 1)\n\n-- strList: (-> (List String) String)\nstrList =\n  let foo x acc = acc + if acc == \'\'then \'\'else \' \' + toString x in\n  foldl foo \'\'\n\n-- fancyBoundingBox: (-> Bounds (List SVG))\nfancyBoundingBox bounds =\n  let [left, top, right, bot] = bounds in\n  let [width, height] = [ right- left, bot - top] in\n  let [c1, c2, r] = [\'darkblue\', \'skyblue\', 6] in\n  [ ghost (box bounds \'transparent\' c1 1),\n    ghost (setZones \'none\' (circle c2 left top r)),\n    ghost (setZones \'none\' (circle c2 right top r)),\n    ghost (setZones \'none\' (circle c2 right bot r)),\n    ghost (setZones \'none\' (circle c2 left bot r)),\n    ghost (setZones \'none\' (circle c2 left (top + height / 2) r)),\n    ghost (setZones \'none\' (circle c2 right (top + height / 2) r)),\n    ghost (setZones \'none\' (circle c2 (left + width / 2) top r)),\n    ghost (setZones \'none\' (circle c2 (left + width / 2) bot r))\n  ]\n\n-- groupWithPad: (-> Num Bounds (List SVG) SVG)\ngroupWithPad pad bounds shapes =\n  let [left, top, right, bot] = bounds in\n  let paddedBounds = [ left- pad, top - pad, right + pad, bot + pad] in\n  [\'g\', [[\'BOUNDS\', bounds]],\n       cons (hiddenBoundingBox paddedBounds) shapes]\n\n-- group: (-> Bounds (List SVG) SVG)\ngroup = groupWithPad let nGroupPad = 20 in nGroupPad \n\n-- NOTE:\n--   keep the names nGroupPad and nPolyPathPad (and values)\n--   in sync with ExpressionBasedTransform.elm\n\n-- (def group (groupWithPad 15))\n\npolyPathGroup = groupWithPad let nPolyPathPad = 10 in nPolyPathPad \n\n-- TODO make one pass over pts\n-- boundsOfPoints: (-> (List Point) Bounds)\nboundsOfPoints pts =\n  let left =  minimum (map fst pts) in\n  let right = maximum (map fst pts) in\n  let top =   minimum (map snd pts) in\n  let bot =   maximum (map snd pts) in\n    [left, top, right, bot]\n    \n-- extremeShapePoints: (-> SVG Points)\nextremeShapePoints ([kind, _, _] as shape) =\n  case kind of\n    \'line\'->\n      let [x1, y1, x2, y2]as attrs = map (lookupAttr shape) [\"x1\", \"y1\", \"x2\", \"y2\"] in\n      \"Error: typecase not yet implemented for Elm syntax\"\n\n    \'rect\'->\n      let [x, y, w, h]as attrs = map (lookupAttr shape) [\"x\", \"y\", \"width\", \"height\"] in\n      \"Error: typecase not yet implemented for Elm syntax\"\n\n    \'circle\'->\n      let [cx, cy, r]as attrs = map (lookupAttr shape) [\"cx\", \"cy\", \"r\"] in\n      \"Error: typecase not yet implemented for Elm syntax\"\n\n    \'ellipse\'->\n      let [cx, cy, rx, ry]as attrs = map (lookupAttr shape) [\"cx\", \"cy\", \"rx\", \"ry\"] in\n      \"Error: typecase not yet implemented for Elm syntax\"\n\n    \'polygon\'-> polygonPoints shape\n\n    \'path\'->\n      let pathCmds = lookupAttr shape \"d\" in\n      \"Error: typecase not yet implemented for Elm syntax\"\n\n    _-> []\n\n-- anchoredGroup: (-> (List SVG) SVG)\nanchoredGroup shapes =\n  let bounds = boundsOfPoints (concat (map extremeShapePoints shapes)) in\n  group bounds shapes \n\n-- (def group (\\(bounds shapes)\n--   [\'g\' [[\'BOUNDS\' bounds]]\n--        (cons (hiddenBoundingBox bounds) shapes)]))\n\n       -- (concat [(fancyBoundingBox bounds) shapes])]))\n\n-- TODO no longer used...\n-- rotatedRect: (-> Color Num Num Num Num Num Rect)\nrotatedRect fill x y w h rot =\n  let [cx, cy] = [ x+ w / 2!, y + h / 2!] in\n  let bounds = [x, y, x + w, y + h] in\n  let shape = rotateAround rot cx cy (rect fill x y w h) in\n  group bounds [shape]\n\n-- rectangle: (-> Color Color Num Num Bounds Rect)\nrectangle fill stroke strokeWidth rot bounds =\n  let [left, top, right, bot] = bounds in\n  let [cx, cy] = [ left+ (right - left) / 2!, top + (bot - top) / 2!] in\n  let shape = rotateAround rot cx cy (box bounds fill stroke strokeWidth) in\n  shape \n-- (group bounds [shape])\n\n-- TODO no longer used...\n-- rotatedEllipse: (-> Color Num Num Num Num Num Ellipse)\nrotatedEllipse fill cx cy rx ry rot =\n  let bounds = [ cx- rx, cy - ry, cx + rx, cy + ry] in\n  let shape = rotateAround rot cx cy (ellipse fill cx cy rx ry) in\n  group bounds [shape] \n\n-- TODO take rot\n-- oval: (-> Color Color Num Bounds BoundedShape)\noval fill stroke strokeWidth bounds =\n  let [left, top, right, bot] = bounds in\n  let shape =\n    [\'OVAL\',\n       [ [\'LEFT\', left], [\'TOP\', top], [\'RIGHT\', right], [\'BOT\', bot],\n         [\'fill\', fill], [\'stroke\', stroke], [\'stroke-width\', strokeWidth] ],\n       []] in\n  shape \n\n-- ; TODO take rot\n-- (def oval (\\(fill stroke strokeWidth bounds)\n--   (let [left top right bot] bounds\n--   (let [rx ry] [(/ (- right left) 2!) (/ (- bot top) 2!)]\n--   (let [cx cy] [(+ left rx) (+ top ry)]\n--   (let shape ; TODO change def ellipse to take stroke/strokeWidth\n--     [\'ellipse\'\n--        [ [\'cx\' cx] [\'cy\' cy] [\'rx\' rx] [\'ry\' ry]\n--          [\'fill\' fill] [\'stroke\' stroke] [\'stroke-width\' strokeWidth] ]\n--        []]\n--   (group bounds [shape])\n-- ))))))\n\nscaleBetween a b pct =\n  case pct of\n    0-> a\n    1-> b\n    _-> a + pct * (b - a)\n\n-- stretchyPolygon: (-> Bounds Color Color Num (List Num) SVG)\nstretchyPolygon bounds fill stroke strokeWidth percentages =\n  let [left, top, right, bot] = bounds in\n  let [xScale, yScale] = [scaleBetween left right, scaleBetween top bot] in\n  let pts = map \\[xPct, yPct] -> [ xScale xPct, yScale yPct ] percentages in\n  -- (group bounds [(polygon fill stroke strokeWidth pts)])\n  polyPathGroup bounds [polygon fill stroke strokeWidth pts] \n\n-- TODO no longer used...\npointyPath fill stroke w d =\n  let dot x y = ghost (circle \'orange\' x y 5) in\n  let pointsOf cmds =\n    case cmds of\n      []->                     []\n      [\'Z\']->                  []\n      \'M\'::x::y::rest->       append [dot x y] (pointsOf rest)\n      \'L\'::x::y::rest->       append [dot x y] (pointsOf rest)\n      \'Q\'::x1::y1::x::y::rest-> append [dot x1 y1, dot x y] (pointsOf rest)\n      \'C\'::x1::y1::x2::y2::x::y::rest-> append [dot x1 y1, dot x2 y2, dot x y] (pointsOf rest)\n      _->                      \'ERROR\' in\n  [\'g\', [],\n    cons\n      (path fill stroke w d)\n      []] \n-- turning off points for now\n-- (pointsOf d)) ]\n\n-- can refactor to make one pass\n-- can also change representation/template code to pair points\nstretchyPath bounds fill stroke w d =\n  let [left, top, right, bot] = bounds in\n  let [xScale, yScale] = [scaleBetween left right, scaleBetween top bot] in\n  let dot x y = ghost (circle \'orange\' x y 5) in\n  let toPath cmds =\n    case cmds of\n      []->    []\n      [\'Z\']-> [\'Z\']\n      \'M\'::x::y::rest-> append [\'M\', xScale x, yScale y] (toPath rest)\n      \'L\'::x::y::rest-> append [\'L\', xScale x, yScale y] (toPath rest)\n      \'Q\'::x1::y1::x::y::rest->\n        append [\'Q\', xScale x1, yScale y1, xScale x, yScale y]\n                (toPath rest)\n      \'C\'::x1::y1::x2::y2::x::y::rest->\n        append [\'C\', xScale x1, yScale y1, xScale x2, yScale y2, xScale x, yScale y]\n                (toPath rest)\n      _-> \'ERROR\' in\n  let pointsOf cmds =\n    case cmds of\n      []->    []\n      [\'Z\']-> []\n      \'M\'::x::y::rest-> append [dot (xScale x) (yScale y)] (pointsOf rest)\n      \'L\'::x::y::rest-> append [dot (xScale x) (yScale y)] (pointsOf rest)\n      \'Q\'::x1::y1::x::y::rest->\n        append [dot (xScale x1) (yScale y1), dot (xScale x) (yScale y)]\n                (pointsOf rest)\n      \'C\'::x1::y1::x2::y2::x::y::rest->\n        append [dot (xScale x1) (yScale y1),\n                 dot (xScale x2) (yScale y2),\n                 dot (xScale x)  (yScale y)]\n                (pointsOf rest)\n      _-> \'ERROR\' in\n  -- (group bounds\n  polyPathGroup bounds\n    (cons\n      (path fill stroke w (toPath d))\n      []) \n-- turning off points for now\n-- (pointsOf d)))\n-- evalOffset: (-> [Num Num] Num)\nevalOffset [base, off] =\n  case off of\n    0-> base\n    _-> base + off \n\nstickyPolygon bounds fill stroke strokeWidth offsets =\n  let pts = map \\[xOff, yOff] -> [ evalOffset xOff, evalOffset yOff ] offsets in\n  group bounds [polygon fill stroke strokeWidth pts]\n\n-- withBounds: (-> Bounds (-> Bounds (List SVG)) (List SVG))\nwithBounds bounds f = f bounds\n\n-- withAnchor: (-> Point (-> Point (List SVG)) (List SVG))\nwithAnchor anchor f = f anchor\n\n-- star: (-> Bounds (List SVG))\nstar bounds =\n  let [left, top, right, bot] = bounds in\n  let [width, height] = [ right- left, bot - top] in\n  let [cx, cy] = [ left+ width / 2, top + height / 2] in\n  [nStar 0 \'black\' 0 6 (min (width / 2) (height / 2)) 10 0 cx cy]\n\n-- blobs: (-> (List Blob) SVG)\nblobs blobs =\n  let modifyBlob [i, blob] =\n    case blob of\n      [[\'g\', gAttrs, shape :: shapes]]->\n       [[\'g\', gAttrs, consAttr shape [\'BLOB\', toString (i + 1)] :: shapes]]\n      [shape]-> [consAttr shape [\'BLOB\', toString (i + 1)]]\n      _->       blob in\n  svg (concat (mapi modifyBlob blobs)) \n\n\n-- === Relations ===\n-- halfwayBetween: (-> Point Point Point)\nhalfwayBetween pt1 pt2 =\n  vec2DScalarMult 0.5 (vec2DPlus pt1 pt2)\n\n-- nextInLine: (-> Point Point Point)\nnextInLine pt1 pt2 =\n  vec2DPlus pt2 (vec2DMinus pt2 pt1) \n\n-- Point on line segment, at `ratio` location.\n-- onLine: (-> Point Point Num Point)\nonLine pt1 pt2 ratio =\n  let vec = vec2DMinus pt2 pt1 in\n  vec2DPlus pt1 (vec2DScalarMult ratio vec) \n\n-- === Basic Replicate ===\n\nhorizontalArray n sep func [x, y] =\n  let _ = -- draw point widget to control anchor\n    [x, y] : Point in\n  let draw_i i =\n    let xi = x + i * sep in\n    func [xi, y] in\n  concat (map draw_i (zeroTo n)) \n\nlinearArrayFromTo n func [xStart, yStart] [xEnd, yEnd] =\n  let xsep = (xEnd - xStart) / (n - 1) in\n  let ysep = (yEnd - yStart) / (n - 1) in\n  let draw_i i =\n    let xi = xStart + i * xsep in\n    let yi = yStart + i * ysep in\n    func [xi, yi] in\n  concat (map draw_i (zeroTo n)) \n\n-- To reduce size of resulting trace,\n-- could subtract up to M>1 at a time.\n--\nfloorAndLocalFreeze n =\n  if le n 1 then 0 else\n  --else\n  1    + floorAndLocalFreeze (n - 1) \n\n-- (let _ ; draw point widget to control anchor\n--   ([cx cy] : Point)\nradialArray n radius rot func [cx, cy] =\n  let center = -- draw ghost circle to control anchor\n              -- not using point widget, since it\'s not selectable\n    ghost (circle \'orange\' cx cy 20) in\n  let _ = -- draw point widget to control radius\n    let xWidget = floorAndLocalFreeze cx in\n    let yWidget = floorAndLocalFreeze cy - radius in\n      [xWidget, yWidget] : Point in\n  let endpoints = nPointsOnCircle n rot cx cy radius in\n  let bounds =\n    [ cx- radius, cy - radius, cx + radius, cy + radius] in\n  [group bounds (cons center (concat (map func endpoints)))] \n\noffsetAnchor dx dy f =\n  \\[x, y] -> f [ x+ dx, y + dy] \n\nhorizontalArrayByBounds n sep func [left_0, top, right_0, bot] =\n  let w_i = right_0     - left_0 in\n  let left_i i = left_0 + i * (w_i + sep) in\n  let right_i i = left_i i + w_i in\n  let draw_i i = func [left_i i, top, right_i i, bot] in\n  let bounds =  [left_0, top, right_i (n - 1), bot] in\n    [groupWithPad 30 bounds (concat (map draw_i (zeroTo n)))] \n\nrepeatInsideBounds n sep func[left, top, right, bot]as bounds =\n  let w_i = (right - left - sep * (n - 1)) / n in\n  let draw_i i =\n    let left_i = left + i * (w_i + sep) in\n    let right_i = left_i + w_i in\n    func [left_i, top, right_i, bot] in\n  [groupWithPad 30 bounds (concat (map draw_i (zeroTo n)))] \n\n\ndraw = svg \n\nshowOne x y val =\n   [\'text\', [[\'x\', x], [\'y\', y], [\'style\', \'fill:black\'],\n            [\'font-family\', \'monospace\'],\n            [\'font-size\', \'12pt\']],\n           [[\'TEXT\', toString val]]] \n\nshow = showOne 20 30 \n\nshowList vals =\n  [\'g\', [], mapi \\[i, val] -> showOne 20 ((i + 1) * 30) val vals] \n\nrectWithBorder stroke strokeWidth fill x y w h =\n  addAttr (addAttr\n    (rect fill x y w h)\n      [\"stroke\", stroke])\n      [\"stroke-width\", strokeWidth] \n\nsetStyles newStyles [kind, attrs, children] =\n  let attrs =\n    -- TODO\n    if styleAttr == null\n      then [\"style\", []] :: attrs\n      else attrs\n  in\n  let attrs =\n    map \\[key, val] ->\n      case key of\n        \"style\"->\n          let otherStyles =\n            concatMap \\[k, v] ->\n              case elem k (map fst newStyles) of\n                True  ->  []\n                False -> [[k, v]]\n              val in\n          [\"style\", append newStyles otherStyles]\n        _->\n          [key, val]\n      attrs\n  in\n  [kind, attrs, children]\n\nplaceAt [x, y] node =\n  let _ = [x, y] : Point in\n  -- TODO px suffix should be added in LangSvg/Html translation\n  setStyles\n    [ [\"position\", \"absolute\"],\n      [\"left\", toString x + \"px\"],\n      [\"top\", toString y + \"px\"]\n    ]\n    node\n\nplaceAtFixed [x, y] node =\n  let _ = [x, y] : Point in\n  setStyles\n    [[\"position\", \"fixed\"], [\"FIXED_LEFT\", x], [\"FIXED_TOP\", y]]\n    node\n\nplaceSvgAt [x, y] w h shapes =\n  placeAt [x, y]\n    [\"svg\", [[\"width\", w], [\"height\", h]], shapes]\n\nworkspace minSize children =\n  div_\n    (cons\n      (placeAt minSize (h3 \"</workspace>\"))\n      children)\n\n-- End SVG Stuff ---------------------------------------------------------------\n\n-- TODO: Refactor this in another module\n\ntutorialUtils = {\n  -- Perform basic markdown replacement (titles, newlines, italics)\n  -- Do this step BEFORE the htmlpass, so that the code is not parsed.\n  markdown =\n    Html.replace (\"(?:^|\\n)(#+)\\\\s(.+)\") (\\match ->\n      [<@(\"h\" + toString (String.length (nth match.group 1)))>@(nth match.group 2)</@>]\n    ) >>\n    Html.replace (\"_(?=\\\\S)(.*?)_\") (\\match ->\n      [<i>@(nth match.group 1)</i>]) >>\n    Html.replace \"(\\r?\\n|  )\\r?\\n\" (\\_ -> [<br>])\n\n  ------ Functions to call during the construction of the document. ------\n  ------ After the document is constructed, pass it to `htmlpass`   ------\n  ------ to compute the code snippets, the line numbers, etc.       ------\n  type alias Instruction = HtmlNode\n  type alias Options = {production: Bool}\n\n  -- Sets the current code to \'code\'. Not visible in the final document.\n  newcode: String -> Instruction\n  newcode code = <newcode code=code></newcode>\n\n  -- Replaces the \'placeHolder\' by \'code\' in the current code. In the final document,\n  -- In the final document, displays a message \"Replace [placeHolder] (line XXX) by \"\n  replace: String -> String -> Instruction\n  replace placeHolder code = <replace placeholder=placeHolder code=code class=\"snippet\"></replace>\n\n  -- Replaces the \'placeHolder\' by \'code\' in the current code. Not visible in the final document\n  -- Can be useful to replace the code if we gave instructions to replace it from the output.\n  hiddenreplace: String -> String -> Instruction\n  hiddenreplace placeHolder code = <hiddenreplace placeholder=placeHolder code=code></hiddenreplace>\n\n  -- Display the current code. You will use this perhaps only at the beginning and the end,\n  -- or for checkpoints.\n  displaycode: Instruction\n  displaycode = <displaycode class=\"snippet\"></displaycode>\n\n  -- Displays the given code snippet without touching the current code\n  displaylocalcode: String -> Instruction\n  displaylocalcode code = <displaylocalcode code=code class=\"snippet\"></displaylocalcode>\n\n  -- Evaluates the current code and display its result.\n  displayevalcode: String -> Instruction\n  displayevalcode = <displayevalcode></displayevalcode>\n\n  -- Performs a regex replacement on the current code and display its result,\n  -- but does not modify the current code.\n  displayevalcodeLocalReplace: String -> String -> Instruction\n  displayevalcodeLocalReplace regex replacement = <displayevalcode replace=regex by=replacement></displayevalcode>\n\n  -- Displays the line of the given snippet as it appears in the current code.\n  lineof: String -> Instruction\n  lineof snippet = <lineof snippet=snippet></lineof>\n\n  -- Future: Overridable items.\n  text_replace_the_code = \"Replace the code\"\n  text_with = \"with\"\n  text_line = \"line\"\n  text_position_unknown = \"position unknown\"\n\n  -- Interpret all \'newcode\', \'displaycode\', \'displaylocalcode\', \'displayevalcode\',\n  -- \'displayevalcodeLocalReplace\', \'lineof\' in the given Html node.\n  htmlpass: Options -> HtmlNode -> HtmlNode\n  htmlpass options =\n  let\n    displayintermediateresult display src =\n      if display then\n        case __evaluate__ (__CurrentEnv__) src of\n          Err msg -> <code class=\"error\">@msg</code>\n          Ok evalNode ->\n            <div class=\"outputwrapper\">@evalNode</div>\n      else\n        <div class=\"intermediateresult\">options.production is off. <button onclick=\"this.setAttribute(\'v\', \'True\')\" v=(toString options.production)>Turn it on</button> to display the intermediate result there.</div>\n\n    localReplace src attrs = case attrs of\n      [\"replace\", regex]::[\"by\", replacement]::attrs ->\n        localReplace (Regex.replace (escape regex) (\\_ -> replacement) src) attrs\n      attrs -> (src, attrs)\n  in \\htmlnode ->\n  let aux src htmlnode = case htmlnode of\n    [\"newcode\", [\"code\", code]::attrs, []] ->\n      (code, htmlnode)\n    [\"hiddenreplace\", [\"placeholder\", placeHolder]::[\"code\", code]::attrs, []] ->\n      let newSrc = Regex.replace (escape placeHolder) (\\_ -> code) src in\n      (newSrc, htmlnode)\n    [\"replace\", [\"placeholder\", placeHolder]::[\"code\", code]::attrs, []] ->\n      let newSrc = Regex.replace (escape placeHolder) (\\_ -> code) src in\n      (newSrc, <span>@text_replace_the_code <code>@placeHolder</code> (@(positionOf placeHolder src)) @text_with<code @attrs>@code</code></span>)\n    [\"lineof\", [\"snippet\", snippet]::attrs, []] ->\n      (src, <span>@(positionOf snippet src)</span>)\n    [\"displaylocalcode\", [\"code\", code]::attrs, []] ->\n      (src, [\"code\", attrs, [[\"TEXT\", code]]])\n    [\"displaycode\", attrs, []] ->\n      (src, [\"code\", attrs, [[\"TEXT\", src]]])\n    [\"displayevalcode\", attrs, []] ->\n      let (localSrc, localAttrs) = localReplace src attrs in\n      (src, displayintermediateresult options.production <| localSrc + \"\\n\\nmain\")\n    [tag, attrs, children] ->\n      let (newSrc, newRevChildren) =\n        List.foldl (\\child (tmpSrc, revChildren) ->\n          let (newTmpSrc, newChild) = aux tmpSrc child in\n          (newTmpSrc, newChild::revChildren)\n        ) (src, []) children\n      in\n      (newSrc, [tag, attrs, List.reverse newRevChildren])\n    _ -> (src, htmlnode)\n  in Tuple.second <| aux \"\" htmlnode\n\n  -- Escapes a string so that we can search it using regexes.\n  -- Replaces ... by a regexp that parses any sequence of chars, minimally.\n  escape = Regex.escape >> Regex.replace \"\"\"\\\\\\.\\\\\\.\\\\\\.\"\"\" (\\m -> \"\"\"[\\s\\S]+?\"\"\")\n\n  -- Computes the line position of a placeholder inside a string.\n  positionOf: String -> String -> String\n  positionOf placeHolder code =\n    case Regex.extract \"\"\"^([\\s\\S]*?)@(escape placeHolder)([\\s\\S]*)$\"\"\" code of\n      Just [before, after] ->\n        let line = Regex.split \"\\r?\\n\" before |> List.length |> toString in\n        \"\"\"@text_line @line\"\"\"\n      _ -> text_position_unknown\n}\n\n-- Utilities to invoke some of the usual browser commands\nbrowser = {\n  -- Refresh the output\n  refresh: String\n  refresh = \"\"\"document.querySelector(\".run\") ? document.querySelector(\".run\").click()\"\"\"\n\n  -- Returns the value of the global javascript variable or a placeholder else\n  localvar: String -> String -> String\n  localvar name initContent = \n    __jsEval__ \"\"\"typeof @name == \'undefined\' ? @initContent : @name\"\"\"\n    \n    \n}\n\nmedia = \"@media\" -- For compatibility with <style>\nkeyframes = \"@keyframes\"\nfont = \"@font\"\nimport = \"@import\"\ncharSet = \"@charSet\"\n\n-- The type checker relies on the name of this definition.\nlet dummyPreludeMain = [\"svg\", [], []] in dummyPreludeMain\n\n';
+var _user$project$PreludeGenerated$preludeLeo = '\n-- This standard prelude library is accessible by every program.\n--------------------------------------------------------------------------------\n-- Debug --\n\nDebug = {\n  log msg value =\n    -- Call Debug.log \"msg\" value\n    let _ = debug (msg + \": \" + toString value) in\n    value\n  start msg value =\n    -- Call Debug.start \"msg\" <| \\_ -> (remaining)\n    let _ = debug msg in\n    value []\n  crash msg = error msg\n  time msg callback =\n    let start = getCurrentTime () in\n    let res = callback () in\n    let end = getCurrentTime () in\n    let _ = debug (msg + \" took \" + toString (end - start) + \"ms\") in\n    res\n}\n\n -- Much simpler version, does not handle @ symbols wells.\nhtmlViaEval string =\n  case __evaluate__ [(\"append\", append)] <| Update.freezeExcept (always \"Cannot modify raw template\") string <| \\string -> \"\"\"<raw>@string</raw>\"\"\" of\n    Ok [_, _, children] -> children\n    Err msg -> error msg\n    _ -> error \"Parsing HTML failed:\"\n\n-- building block for updating\nfreeze x = x\nexpressionFreeze x = Debug.log \"expressionFreeze is deprecated. Please use Update.freezeExcept instead\" x\n-----------------------------------------\n-- Building blocks functions\n\n-- The following functions should be removed if they are not used (they are redundant)\n\n--; The identity function - given a value, returns exactly that value\n-- id: (forall a (-> a a))\nid x = x\n--; Composes two functions together\n--compose: (forall (a b c) (-> (-> b c) (-> a b) (-> a c)))\ncompose f g = \\x -> f (g x)\n--fst: (forall (a b) (-> [a b] a))\n--snd: (forall (a b) (-> [a b] b))\nfst [a, _] = a\nsnd [_, b] = b\n--or:  (-> Bool Bool Bool)\n--and: (-> Bool Bool Bool)\nor p q = if p then True else q\nand p q = if p then q else False\n--lt: (-> Num Num Bool)\n--eq: (-> Num Num Bool)\n--le: (-> Num Num Bool)\n--gt: (-> Num Num Bool)\n--ge: (-> Num Num Bool)\nlt x y = x < y\neq x y = x == y\nle x y = or (lt x y) (eq x y)\ngt x y = x > y\nge x y = or (gt x y) (eq x y)\nnil = []\ncons x xs = x :: xs\n\n-- The following functions could be kept but could migrate (e.g. len to List.length)\n\n--; Given two bools, returns a bool regarding if the first argument is true, then the second argument is as well\n--implies: (-> Bool Bool Bool)\nimplies p q = if p then q else True\n\n--; Returns the length of a given list\n--len: (forall a (-> (List a) Num))\nlen xs = case xs of [] -> 0; (_ :: xs1) -> 1 + len xs1\n\nzip xs ys =\n  case (xs, ys) of\n    (x::xsRest, y::ysRest) -> (x, y) :: zip xsRest ysRest\n    _                      -> []\n\nzipOld xs ys =\n  case (xs, ys) of\n    (x::xsRest, y::ysRest) -> [x, y] :: zipOld xsRest ysRest\n    _                      -> []\n\nrange i j =\n  if i < j + 1\n    then cons i (range (i + 1) j)\n    else nil\n\n-----------------------------------------\n--Basics = {\n-- TODO: Once we have types, wrap these basics into a module.\n\n--(==) is an Op\n--(/=) is in builtinEnv\n--(<) is an Op\n--(>) is in builtinEnv\n--(<=) is in builtinEnv\n--(>=) is in builtinEnv\n\n--max: (-> Num Num Num)\nmax i j = if i >= j then i else j\n\n--min: (-> Num Num Num)\nmin i j = if i < j then i else j\n\ntype Order = LT | EQ | GT\n\ncompare a b = if a < b then LT else if a == b then EQ else GT\n\n--- Booleans\n\n--; Given a bool, returns the opposite boolean value\n--not: (-> Bool Bool)\nnot b =  {\n    apply b = if b then False else True\n    unapply b = Just (if b then False else True)\n  }.apply b\n\n--(&&) is built-in\n--(||) is built-in\n\nxor a b = if a then not b else b\n\n-- Mathematics\n\n-- (+) is an Op\n-- (-) is an Op\n-- (*) is an Op\n-- (/) is an Op\n-- (^) is an Op\n-- TODO: (//)\n-- TODO: rem\n\nnegate x = 0 - x\n\n--; Absolute value\n--abs: (-> Num Num)\nabs x = if x < 0 then neg x else x\n\n-- sqrt is an Op\n\n--; Given an upper bound, lower bound, and a number, restricts that number between those bounds (inclusive)\n--; Ex. clamp 1 5 4 = 4\n--; Ex. clamp 1 5 6 = 5\n--clamp: (-> Num Num Num Num)\nclamp i j n = if n < i then i else if j < n then j else n\n\n-- TODO: logBase base num\n\ne = 2.718281828459045\n\n-- pi is an Op\n\ntau = 2 * pi\n\n-- cos is an op\n-- sin is an op\n\ntan x = cos x / sin x\n\nacos = arccos\n\nasin = arcsin\n\n-- TODO: atan\n\natan2 = arctan2\n\n-- round is an op\n-- floor is an op\n-- ceiling is an op\ntruncate x = if x > 0 then floor x else ceiling x\n\ntoFloat x = x\n\n-- Convert radians to degrees\n-- radToDeg: (-> Num Num)\nradToDeg rad = rad / tau * 360!\n\n-- Convert degrees to radians\n-- degToRad: (-> Num Num)\ndegToRad deg = deg / 360! * tau\n\ndegrees = degToRad\n\nradians x = x\n\nturns x = x * tau\n\n-- Polar coordinates\n\ntoPolar (x, y) = (sqrt (x * x + y * y), atan2 y x)\nfromPolar (r, t) = (r * cos t, r * sin t)\n\n-- Floating point check\n\n-- TODO: isNaN\n-- TODO: isInfinite\n\n-- Strings and lists\n\n-- toString is an op\n-- (++) is interpreted as append\n\n-- Higher-order helpers\n\nidentity x = x\n  --; A function that always returns the same value a, regardless of b\n  -- always: (forall (a b) (-> a b a))\nalways x _ = x\n\n-- <| is defined as a left application\n-- |> is defined as a right application\n-- (<<) is defined in builtinEnv\n-- (>>) is defined in builtinEnv\n\n--flip: (forall (a b c) (-> (-> a b c) (-> b a c)))\nflip f = \\x y -> f y x\n\nflips = {\n  moveArg n m f =\n    if n == 1 && m == 1 then f\n    else if n > 1 && m > 1 then\n       \\x -> moveArg (n-1) (m-1) (f x)\n    else if n == 1 then   -- Here m > 1\n      moveArg 2 m (\\x y -> f y x)\n    else -- m == 1 && n > 1\n      \\x y -> (moveArg n 2 f) y x\n\n  ab_ba = moveArg 1 2 -- same as flip\n  abc_bca = moveArg 1 3\n  abcd_bcda = moveArg 1 4\n}\n\ncurry f a b = f (a,b)\nuncurry f (a,b) = f a b\n\n-- type Never\n\nnever x = Debug.crash \"Never can never be called\"\n\n--------------------------------------------------------------------------------\n-- LensLess modules (List, Results, String) for definitions without lenses\n\nLensLess =\n  let reverse l =\n    let r acc l = case l of [] -> acc; head::tail -> r (head::acc) tail in\n    r [] l\n  in\n  let map f l =\n     case l of\n       []    -> []\n       x::xs -> f x :: map f xs\n  in\n  let append xs ys =\n     case xs of\n       [] -> ys\n       x::xs1 -> x :: append xs1 ys\n  in\n  let split n l =\n    let aux acc n l =\n      if n == 0 then (reverse acc, l) else\n      case l of\n        [] -> (reverse acc, l)\n        head::tail -> aux (head::acc) (n - 1) tail\n    in aux [] n l in\n  let take =\n    let aux n l = if n == 0 then [] else\n      case l of\n        [] -> []\n        head::tail -> head :: (aux (n - 1) tail)\n    in aux in\n  let drop =\n    let aux n l = if n == 0 then l else\n      case l of\n        [] -> []\n        head::tail -> aux (n - 1) tail\n    in aux in\n  let reverse_move n stack from = if n <= 0 then (stack, from) else case from of\n    [] -> (stack, from)\n    head::tail -> reverse_move (n - 1) (head::stack) tail\n  in\n  let filterMap f l = case l of\n    [] -> []\n    (head :: tail) -> case f head of\n      Nothing -> filterMap f tail\n      Just newHead -> newHead :: filterMap f tail\n  in\n  let concatMap f l = case l of\n    [] -> []\n    head :: tail -> f head ++ concatMap f tail\n  in\n  let last l = case l of\n    [head] -> Just head\n    _ :: tail -> last tail\n    _ -> Nothing\n  in\n  let map2 f xs ys =\n    case [xs, ys] of\n      [x::xs1, y::ys1] -> f x y :: map2 f xs1 ys1\n      _                -> []\n  in\n  let zip = map2 (,) in\n  { appendStrDef = \"\"\"let append a b = case a of [] -> b; (h::t) -> h :: append t b in \"\"\"\n    Maybe = {\n      map f a = case a of\n        Nothing -> Nothing\n        Just x -> Just (f x)\n    }\n    List = {\n      append = append\n      split = split\n      take = take\n      drop = drop\n      reverse = reverse\n      reverse_move = reverse_move\n      filterMap = filterMap\n      map = map\n      last = last\n      map2 = map2\n      concatMap = concatMap\n      zip = zip\n    },\n    Result =\n      let map f res = case res of\n        Err msg -> res\n        Ok x -> Ok (f x)\n      in\n      let andThen f res = case res of\n        Err msg -> res\n        Ok x -> f x\n      in\n      {\n        map = map\n        andThen = andThen\n    },\n    Results =\n      let keepOks l =\n        case l of\n          [] -> []\n          (Err _) ::tail -> keepOks tail\n          (Ok ll) :: tail -> ll ++ keepOks tail\n      in\n      let projOks l =\n        case l of\n          [] -> Ok []\n          (Ok []) :: tail -> projOks tail\n          (Ok (vhead :: vtail)) ::tail -> Ok (vhead::(vtail ++ keepOks tail))\n          (Err msg) :: tail ->\n            case projOks tail of\n              Err msgTail -> Err msg\n              Ok []-> Err msg\n              result -> result\n      in\n      let andThen callback results =\n        --andThen : (a -> Results x b) -> Results x a -> Results x b\n        case results of\n          Ok ll -> ll |> map callback |> projOks\n          Err msg -> results\n      in\n      let resultMap callback results =\n        case results of\n          Ok ll -> Ok (ll |> map callback)\n          Err msg -> results\n      in\n      let andAlso otherResults results =\n        case (results, otherResults) of\n          (Ok ll, Ok otherLl) -> Ok (ll ++ otherLl)\n          (Err msg, Err msg2) -> Err (msg + \"\\n\" + msg2)\n          (Err msg, _) -> Err msg\n          (_, Err msg2) -> Err msg2\n      in\n      {\n        keepOks = keepOks\n        projOks = projOks\n        andThen = andThen\n        andAlso = andAlso\n        map = resultMap\n      }\n    String = {\n      toInt =\n        let d = __DictFromList__ [(\"0\", 0), (\"1\", 1), (\"2\", 2), (\"3\", 3), (\"4\", 4), (\"5\", 5), (\"6\", 6), (\"7\", 7), (\"8\", 8), (\"9\", 9)] in\n        let aux x =\n          case extractFirstIn \"^([0-9]*)([0-9])$\" x of\n            Just [init, last] -> (aux init)*10 + case __DictGet__ last d of\n              Just x -> x\n              Nothing -> 0\n            Nothing -> 0\n        in\n        \\x ->\n          case extractFirstIn \"^-(.*)$\" x of\n            Just part -> 0 - aux part\n            Nothing -> aux x\n\n      join delimiter list =\n        let aux acc list = case list of\n          [] -> acc\n          [head] -> acc + head\n          (head::tail) -> aux (acc + head + freeze delimiter) tail\n        in aux \"\" list\n\n      substring start end x =\n        case extractFirstIn (\"^[\\\\s\\\\S]{0,\" + toString start + \"}([\\\\s\\\\S]{0,\" + toString (end - start) + \"})\") x of\n          Just [substr] -> substr\n          Nothing -> Debug.crash <| \"bad arguments to String.substring \" + toString start + \" \" + toString end + \" \" + toString x\n\n      take length x =\n          case extractFirstIn (\"^([\\\\s\\\\S]{0,\" + toString length + \"})\") x of\n            Just [substr] -> substr\n            Nothing -> Debug.crash <| \"bad arguments to String.take \" + toString length + \" \" + toString x\n\n      drop length x =\n        if length <= 0 then x else\n        case extractFirstIn (\"^[\\\\s\\\\S]{0,\" + toString length + \"}([\\\\s\\\\S]*)\") x of\n                Just [substr] -> substr\n                Nothing -> Debug.crash <| \"bad arguments to String.drop \" + toString length + \" \" + toString x\n\n      dropLeft = drop\n      dropRight length x =\n        if length <= 0 then x else\n        case extractFirstIn \"\"\"^([\\s\\S]*?)[\\s\\S]{0,@length}$\"\"\" x of\n              Just [substr] -> substr\n              Nothing -> Debug.crash <| \"bad arguments to String.drop \" + toString length + \" \" + toString x\n\n      length x = __strLength__ x\n\n      slice = substring\n\n      toFloat s =\n        case extractFirstIn \"\"\"((-?)\\d+)\\.(\\d+)\"\"\" s of\n           Just [intPart, negative, floatPart] ->\n             let combine y = if negative == \"-\" then 0 - y else y in\n             toInt intPart + (combine <| toInt floatPart / (10 ^ length floatPart))\n           Nothing ->\n        case extractFirstIn \"\"\"((-?)\\d)(?:\\.(\\d*))?(?:e|E)\\+?(-?\\d+)\"\"\" s of -- Scientific notation\n           Just [beforeComma, negative, afterComma, exponent] ->\n             toInt beforeComma + (combine <| toInt afterComma  / (10 ^ length afterComma)) * 10 ^ (toInt exponent)\n           Nothing ->\n             toInt s\n\n      sprintf str inline = case inline of\n          a::tail -> sprintf (replaceFirstIn \"%s\" a str) tail\n          [] -> str\n          a -> replaceFirstIn \"%s\" a str\n    }\n  }\n\nResult = {\n  type Result err ok = Err err | Ok ok\n\n  map: (a -> b) -> Result err a -> Result err b\n  map f res = case res of\n    Err msg -> res\n    Ok x -> Ok (f x)\n\n  mapError err err2: (err -> err2) -> forall a. Result err a -> Result err2 a\n  mapError f res = case res of\n    Err msg -> res\n    Ok x -> Ok (f x)\n\n  andThen: (a -> Result err b) -> Result err a -> Result err b\n  andThen f res = case res of\n    Err msg -> res\n    Ok x -> f x\n\n  toMaybe: Result err ok -> Maybe ok\n  toMaybe res = case res of\n    Err msg -> Nothing\n    Ok x -> Just x\n\n  fromMaybe: err -> Maybe ok -> Result err ok\n  fromMaybe err res = case res of\n    Nothing -> Err err\n    Just x -> Ok x\n\n  fromMaybeLazy: (() -> err) -> Maybe ok -> Result err ok\n  fromMaybeLazy msgBuilder = case of\n    Just x -> Ok x\n    Nothing -> Err (msgBuilder ())\n\n  withDefault: ok -> Result err ok -> ok\n  withDefault defaultValue res = case res of\n    Err x -> defaultValue\n    Ok x -> x\n\n  (errn) n msg = if n == 1 then Err msg else \\_ -> errn (n - 1) msg\n\n  --Variable arity function. mapn 1 == map, mapn 2 == map2, etc.\n  --Dependently typed.\n  mapn n = if n == 1 then map else\n    \\f res -> case res of\n      Err msg -> errn n msg\n      Ok r -> mapn (n - 1) (f r)\n\n  map2 = mapn 2\n  map3 = mapn 3\n  map4 = mapn 4\n\n  andThenn n = if n == 1 then andThen else\n    \\f res -> case res of\n      Err msg -> errn n msg\n      Ok r -> andThenn (n - 1) (f r)\n\n  andThen2 = andThenn 2\n  andThen3 = andThenn 3\n  andThen4 = andThenn 4\n\n  withDefaultMapError: (b -> a) -> Result a b -> a\n  withDefaultMapError f = case of\n    Ok x -> x\n    Err msg -> f msg\n\n  fold : (err -> a) -> (x -> a) -> Result err x -> a\n  fold onErr onOk content =\n    case content of\n      Err msg -> onErr msg\n      Ok c -> onOk c\n}\n\n--------------------------------------------------------------------------------\n-- Update --\n\n--type ListElemDiff a = ListElemUpdate a | ListElemInsert Int | ListElemDelete Int\n--type VDictElemDiff = VDictElemDelete | VDictElemInsert | VDictElemUpdate VDiffs\n--type alias EnvDiffs = TupleDiffs VDiffs\n-- The environment of a closure if it was modified, the modifications of an environment else.\n--type VDiffs = VClosureDiffs EnvDiffs (Maybe EDiffs)\n--            | VListDiffs (ListDiffs VDiffs)\n--            | VDictDiffs (Dict (String, String) VDictElemDiff)\n--            | VRecordDiffs (Dict String VDiffs)\n--            | VConstDiffs\n\n--type EDiffs = EConstDiffs EWhitespaceDiffs\n--            | EListDiffs (ListDiffs EDiffs)\n--            | EChildDiffs (TupleDiffs EDiffs) -- Also for records\n\n--type EWhitespaceDiffs = EOnlyWhitespaceDiffs | EAnyDiffs\n  \n-- The diff primitive is:\n--\n--   type alias DiffOp : Value -> Value -> Result String (Maybe VDiffs)\n--   diff : DiffOp\n--   diff ~= SnS.Update.defaultVDiffs\n--\n\nUpdate =\n  let {String, List} = LensLess in\n  let {reverse} = List in\n  let freeze x =\n    x\n  in\n  let applyLens lens x =\n    lens.apply x\n  in\n  let softFreeze x =\n    -- Update.freeze x prevents changes to x (resulting in failure),\n    -- Update.softFreeze x ignores changes to x\n    let constantInputLens =\n      { apply x = x, update {input} = Ok (Inputs [input]) }\n    in\n    applyLens constantInputLens x\n  in\n  -- TODO: Replace this by enabling the return of Result String (Values [values...] | ValuesDiffs [(values, diffs)])\n  let valuesWithDiffs valuesDiffs = Ok (InputsWithDiffs valuesDiffs) in\n  let resultValuesWithDiffs valuesDiffs = case valuesDiffs of\n     [] -> Ok (InputsWithDiffs [])\n     (Ok vd)::tail -> case resultValuesWithDiffs tail of\n       Err msg -> Ok (InputsWithDiffs [vd])\n       Ok (InputsWithDiffs vds) -> Ok (InputsWithDiffs (vd :: vds))\n     (Err msg)::tail -> if tail == [] then Err msg else\n       case resultValuesWithDiffs tail of\n       Err error-> Err (msg + \"\\n\" + error)\n       x -> x\n  in\n  let addDiff f mbDiff (d, changed) =\n        case mbDiff of\n          Nothing -> (d, changed)\n          Just x -> (f d x, True)\n  in\n  let pairDiff2 mbDiff1 mbDiff2 =\n        ({}, False)\n        |> addDiff (\\d x -> {d | _1 = x}) mbDiff1\n        |> addDiff (\\d x -> {d | _2 = x}) mbDiff2\n        |> (\\(d, changed) -> if changed then Just (VRecordDiffs d) else Nothing)\n  in\n  let pairDiff3 mbDiff1 mbDiff2 mbDiff3 =\n        ({}, False)\n        |> addDiff (\\d x -> {d | _1 = x}) mbDiff1\n        |> addDiff (\\d x -> {d | _2 = x}) mbDiff2\n        |> addDiff (\\d x -> {d | _3 = x}) mbDiff3\n        |> (\\(d, changed) -> if changed then Just (VRecordDiffs d) else Nothing)\n  in\n  let pairDiff4 mbDiff1 mbDiff2 mbDiff3 mbDiff4 =\n        ({}, False)\n        |> addDiff (\\d x -> {d | _1 = x}) mbDiff1\n        |> addDiff (\\d x -> {d | _2 = x}) mbDiff2\n        |> addDiff (\\d x -> {d | _3 = x}) mbDiff3\n        |> addDiff (\\d x -> {d | _4 = x}) mbDiff4\n        |> (\\(d, changed) -> if changed then Just (VRecordDiffs d) else Nothing)\n  in\n  let\n    type SimpleListDiffOp = KeepValue | DeleteValue | InsertValue Value | UpdateValue Value\n  in\n  let listDiffOp diffOp oldValues newValues =\n   -- listDiffOp : DiffOp -> List Value -> List Value -> List SimpleListDiffOp\n\n    -- let {Keep, Delete, Insert, Update} = SimpleListDiffOp in\n     let {append} = List in\n     case diffOp oldValues newValues of\n        Ok (Just (VListDiffs listDiffs)) ->\n          let aux i revAcc oldValues newValues listDiffs =\n            case listDiffs of\n              [] ->\n                reverse (map1 (\\_ -> KeepValue) oldValues ++ revAcc)\n              (j, listDiff)::diffTail ->\n                if j > i then\n                  case [oldValues, newValues] of\n                    [_::oldTail, _::newTail] ->\n                      aux (i + 1) (KeepValue::revAcc) oldTail newTail listDiffs\n                    _ -> Debug.crash <| \"[Internal error] Expected two non-empty tails, got  \" + toString [oldValues, newValues]\n                else if j == i then\n                  case listDiff of\n                    ListElemUpdate _ ->\n                      case [oldValues, newValues] of\n                        [oldHead::oldTail, newHead::newTail] ->\n                          aux (i + 1) (UpdateValue newHead :: revAcc) oldTail newTail diffTail\n                        _ -> Debug.crash <| \"[Internal error] update but missing element\"\n                    ListElemInsert count ->\n                      case newValues of\n                        newHead::newTail ->\n                          aux i (InsertValue newHead::revAcc) oldValues newTail (if count == 1 then diffTail else (i, ListElemInsert (count - 1))::diffTail)\n                        _ -> Debug.crash <| \"[Internal error] insert but missing element\"\n                    ListElemDelete count ->\n                      case oldValues of\n                        oldHead::oldTail ->\n                          aux (i + 1) (DeleteValue::revAcc) oldTail newValues (if count == 1 then diffTail else (i + 1, ListElemDelete (count - 1))::diffTail)\n                        _ -> Debug.crash <| \"[Internal error] insert but missing element\"\n                else Debug.crash <| \"[Internal error] Differences not in order, got index \" + toString j + \" but already at index \" + toString i\n          in aux 0 [] oldValues newValues listDiffs\n\n        result -> Debug.crash (\"Expected Ok (Just (VListDiffs listDiffs)), got \" + toString result)\n  in\n  let\n    type StringDiffs = StringUpdate Int Int Int\n    type ConcStringDiffs = ConcStringUpdate Int Int String\n  in\n  -- Converts a VStringDiffs -> List ConcStringDiffs\n  let strDiffToConcreteDiff newString diffs =\n    case diffs of\n      VStringDiffs d ->\n        let aux offset d revAcc = case d of\n          [] -> List.reverse revAcc\n          ((StringUpdate start end replaced) :: tail) ->\n             ConcStringUpdate start end (String.slice (start + offset) (start + replaced + offset) newString) :: revAcc |>\n             aux (offset + replaced - (end - start)) tail\n        in aux 0 d []\n  in\n  let affinity a b = if a == \"\" || b == \"\" then 10 else\n     case extractFirstIn \"\\\\d$\" a of\n       Just _ -> case extractFirstIn \"^\\\\d\" b of\n         Just _ -> 8\n         _ -> 5\n       _ -> 5\n  in\n  let preferStringInsertionToLeft s1 inserted s2 = affinity s1 inserted > affinity inserted s2 in\n  let offsetStr n list = case list of\n      (StringUpdate start end replaced) :: tail -> StringUpdate (start + n) (end + n) replaced :: offsetStr n tail\n      [] -> []\n  in\n  let mbConsStringUpdate start end replaced tail =\n    if start == end && replaced == 0 then tail else (StringUpdate start end replaced) :: tail\n  in\n  let\n    -- Returns all the possible ways of splitting the string differences at a particular index,\n    -- at which the oldString used to be concatenated.\n    -- Returns the new strings for left and for right.\n    -- The old strings would simply be computed by (String.take n oldString) (String.drop n oldString)\n    splitStringDiffsAt n offset oldString newString stringDiffs = case stringDiffs of\n      [] -> [(String.take (n + offset) newString, [],\n             String.drop (n + offset) newString, [])]\n      ((StringUpdate start end replaced) as head) :: tail ->\n        if end < n then\n          splitStringDiffsAt n (offset + replaced - (end - start)) oldString newString tail\n          |> List.map (\\(left, leftDiffs, right, rightDiffs) -> (left, head::leftDiffs, right, rightDiffs))\n        else if n < start then\n          [(String.take (n + offset) newString, [],\n            String.drop (n + offset) newString, offsetStr (0 - n - offset) stringDiffs)]\n        else if replaced == 0 then\n          [(String.take (start + offset) newString, mbConsStringUpdate start n 0 [],\n            String.drop (start + offset) newString, offsetStr (0 - n) <| mbConsStringUpdate n end 0 tail)]\n        else\n          let insertionToLeft =\n           (String.take (start + offset + replaced) newString, mbConsStringUpdate start n replaced [],\n            String.drop (start + offset + replaced) newString, offsetStr (0 - n) <| mbConsStringUpdate n end 0 tail)\n          in\n          let insertionToRight =\n           (String.take (start + offset) newString, mbConsStringUpdate start n 0 [],\n             String.drop (start + offset) newString, offsetStr (0 - n) <| mbConsStringUpdate n end replaced tail)\n          in\n          if preferStringInsertionToLeft\n            (String.substring 0 start oldString)\n            (String.substring (start + offset)\n              (start + offset + replaced) newString)\n            (String.drop end oldString)\n          then [insertionToLeft, insertionToRight]\n          else [insertionToRight, insertionToLeft]\n  in\n  let\n    offsetList n list = case list of\n      (i, d)::tail -> (i + n, d)::offsetList n tail\n      [] -> []\n  in\n  -- Given a split index n (offset is zero at the beginning), split the newList that is being\n  -- pushed back at the index n (n should be the original length of the left list being concatenated)\n  -- Returns the new list to the left and its differences, and the new list on the right and its differences.\n  let\n    splitListDiffsAt n offset newList listDiffs = case listDiffs of\n      [] ->\n        let (left, right) = List.split (n + offset) newList in\n        [(left, [], right, [])]\n      (i, d) :: tail ->\n        let newOffset = case d of\n          ListElemInsert count -> offset + count\n          ListElemDelete count -> offset - count\n          ListElemUpdate _ -> offset\n        in\n        if i < n then\n          if i + (offset - newOffset) > n then -- a deletion spanning until after the split point\n            let (left, right) = List.split (n + offset) newList in\n            [(left, (i, ListElemDelete (n - i))::[],\n              right, offsetList (0 - n) <| (n, ListElemDelete (i + (offset - newOffset) - n))::tail)]\n          else\n          splitListDiffsAt n newOffset newList tail\n          |> List.map (\\(left, leftDiffs, right, rightDiffs) ->\n            (left, (i, d)::leftDiffs, right, rightDiffs))\n        else if i > n || i == n && (case d of ListElemInsert _ -> False; _ -> True) then\n          let (left, right) = List.split (n + offset) newList in\n          [(left, [], right, offsetList (0 - n) listDiffs)]\n        else -- i == n now, everything happens at the intersection.\n          let insertionToLeft =\n            let (left, right) = List.split (i + newOffset) newList in\n            (left, (i, d)::[],\n             right, tail)\n          in\n          let insertionToRight =\n            let (left, right) = List.split (i + offset) newList in\n            (left, [],\n             right, offsetList (0 - i) <| (i, d)::tail)\n          in\n          [insertionToLeft, insertionToRight]\n  in\n  let --------------------------------------------------------------------------------\n      -- Update.foldDiff\n\n      -- type Results err ok = Result err (List ok)\n\n      -- every onFunction should either return a Ok (List a) or an Err msg\n      -- start    : a\n      -- onUpdate : a -> {oldOutput: b, newOutput: b, index: Int, diffs: VDiffs} -> Results String a\n      -- onInsert : a -> {newOutput: b, index: Int, diffs: VDiffs}  -> Results String a\n      -- onRemove : a -> {oldOutput: b, index: Int, diffs! VDoffs}  -> Results String a\n      -- onSkip   : a -> {count: Int, index: Int, oldOutputs: List b, newOutputs: List b}  -> Results String a\n      -- onFinish : a -> Results String c\n      -- onGather : c -> (InputWithDiff (d, Maybe VDiffs) | Input d)\n      -- oldOutput: List b\n      -- newOutput: List b\n      -- diffs    : ListDiffs\n      -- Returns  : Err String | Ok (Inputs (List d} | InputsWithDiffs (List (d, Maybe VDiffs)))\n      foldDiff =\n        let {List, Results} = LensLess in\n        let {append, split, reverse} = List in\n        \\{start, onSkip, onUpdate, onRemove, onInsert, onFinish, onGather} oldOutput newOutput diffs ->\n        let listDiffs = case diffs of\n          VListDiffs l -> l\n          _ -> Debug.crash <| \"Expected VListDiffs, got \" + toString diffs\n        in\n        -- Returns either Err msg or Ok (list of values)\n        --     fold: Int -> List b -> List b -> List (Int, ListElemDiff) -> a -> Results String c\n        let fold  j      oldOutput  newOutput  listDiffs                    acc =\n            let next i      oldOutput_ newOutput_ d newAcc =\n              newAcc |> Results.andThen (\\accCase ->\n                fold i oldOutput_ newOutput_ d accCase\n              )\n            in\n            case listDiffs of\n            [] ->\n              let count = len newOutput in\n              if count == 0 then\n                onFinish acc\n              else\n               onSkip acc {count = count, index = j, oldOutputs = oldOutput, newOutputs = newOutput}\n               |> next (j + count) [] [] listDiffs\n\n            (i, diff)::dtail  ->\n              if i > j then\n                let count = i - j in\n                let (previous, remainingOld) = split count oldOutput in\n                let (current,  remainingNew) = split count newOutput in\n                onSkip acc {count = count, index = j, oldOutputs = previous, newOutputs = current}\n                |> next i remainingOld remainingNew listDiffs\n              else case diff of\n                ListElemUpdate d->\n                  let previous::remainingOld = oldOutput in\n                  let current::remainingNew = newOutput in\n                  onUpdate acc {oldOutput = previous, index = i, output = current, newOutput = current, diffs = d}\n                  |> next (i + 1) remainingOld remainingNew dtail\n                ListElemInsert count ->\n                  if count >= 1 then\n                    let current::remainingNew = newOutput in\n                    onInsert acc {newOutput = current, index = i}\n                    |> next i oldOutput remainingNew (if count == 1 then dtail else (i, ListElemInsert (count - 1))::dtail)\n                  else Debug.crash <| \"insertion count should be >= 1, got \" + toString count\n                ListElemDelete count ->\n                  if count >= 1 then\n                    let dropped::remainingOld = oldOutput in\n                    onRemove acc {oldOutput =dropped, index = i} |>\n                    next (i + count) remainingOld newOutput (if count == 1 then dtail else (i + 1, ListElemDelete (count - 1))::dtail)\n                  else Debug.crash <| \"deletion count should be >= 1, got \" ++ toString count\n            _ -> Debug.crash <| \"Expected a list of diffs, got \" + toString diffs\n        in\n        case fold 0 oldOutput newOutput listDiffs start of\n          Err msg -> Err msg\n          Ok values -> -- values might be a pair of value and diffs. We use onGather to do the split.\n            let aux revAccValues revAccDiffs values = case values of\n              [] -> case revAccDiffs of\n                Nothing -> Ok (Inputs (reverse revAccValues))\n                Just revDiffs -> Ok (InputsWithDiffs (LensLess.List.zip (reverse revAccValues) (reverse revDiffs)))\n              head::tail -> case onGather head of\n                Ok (InputWithDiff (value, diff)) -> case revAccDiffs of\n                  Nothing -> if len revAccValues > 0 then Err (\"Diffs not specified for all values, e.g.\" + toString value) else\n                    aux [value] (Just [diff]) tail\n                  Just revDiffs ->\n                    aux (value :: revAccValues) (Just (diff::revDiffs)) tail\n                Ok (Input value) -> case revAccDiffs of\n                  Nothing -> aux (value :: revAccValues) revAccDiffs tail\n                  Just revDiffs -> Err (\"Diffs not specified until \" + toString value)\n            in aux [] Nothing values\n  in\n  let sizeFreeze l = {\n         apply l = l\n         update {outputNew=newL, diffs=d} =\n           let lengthNotModified = case d of\n             VListDiffs ds -> let aux ds = case ds of\n               (_, ListElemDelete _)::tail -> False\n               (_, ListElemInsert _)::tail -> False\n               _::tail -> aux tail\n               [] -> True\n              in aux ds\n             _ -> False\n           in\n           if lengthNotModified then Ok (InputsWithDiffs [(newL, Just d)]) else Ok (InputsWithDiffs [])\n       }.apply l\n  in\n  let mbPairDiffs mbDiffsPair = case mbDiffsPair of\n        (Nothing, Nothing) -> Nothing\n        (Just d, Nothing) -> Just (VRecordDiffs {_1=d})\n        (Just d, Just d2) -> Just (VRecordDiffs {_1=d, _2=d2})\n        (Nothing, Just d2) -> Just (VRecordDiffs {_2=d2})\n  in\n  let bijection forward backward elem =\n    {apply elem = forward elem\n     update {outputNew} = Ok (Inputs [backward outputNew])\n    }.apply elem\n  in\n  -- exports from Update module\n  { freeze x = x\n    expressionFreeze x = Debug.log \"Update.expressionFreeze is deprecated. Please use Update.freezeExcept instead\" x\n    sizeFreeze = sizeFreeze\n    conditionalFreeze cond = if cond then (\\x -> freeze x) else identity\n\n    freezeWhen: Bool -> ((new_a, Diffs) -> String) -> a -> a\n    freezeWhen notPermission lazyMessage x = {\n      apply x = x\n      update {outputNew, diffs} =\n        if notPermission then\n          Err (lazyMessage (outputNew, diffs))\n        else\n          Ok (InputsWithDiffs [(outputNew, Just diffs)])\n    }.apply x\n\n    -- Alternative to expressionFreeze. Provides a cleaner error message and enables to specify which variables to freeze on\n    -- expressionFreeze F[x] <=> freezeExcept (always \"impossible\") x <| \\x -> F[x]\n    freezeExcept: (Diffs -> String) -> a -> (a -> b) -> b\n    freezeExcept lazyMessage arg fun = freezeWhenExcept True lazyMessage arg fun\n\n    -- More precise version of freezeExcept that accepts a condition operator\n    freezeWhenExcept: Bool -> (Diffs -> String) -> a -> (a -> b) -> b\n    freezeWhenExcept notPermission lazyMessage arg fun = (freezeWhen notPermission (\\(newA, newDiffs) -> lazyMessage newDiffs) fun) arg\n\n    foldDiff = foldDiff\n    applyLens = applyLens\n    lens l x = l.apply x\n    lens1 = lens\n    lens2 l x y = l.apply (x, y)\n    lens3 l x y z = l.apply (x, y, z)\n    lens4 l x y z w = l.apply (x, y, z, w)\n    bijection = bijection\n    vTupleDiffs_1 d = VRecordDiffs {_1=d}\n    vTupleDiffs_2 d = VRecordDiffs {_2=d}\n    vTupleDiffs_3 d = VRecordDiffs {_3=d}\n    vTupleDiffs_4 d = VRecordDiffs {_4=d}\n    vTupleDiffs_1_2 d1 d2 = VRecordDiffs {_1=d1, _2=d2}\n    default apply uInput =\n        __updateApp__ {uInput | fun = apply }\n    -- Instead of returning a result of a lens, just returns the list or empty if there is an error.\n    defaultAsListWithDiffs apply uInput =\n      case default apply uInput of\n        Err msg -> []\n        Ok (InputsWithDiffs l) -> l\n      -- \"f.apply x\" is a syntactic form for U-Lens, but eta-expanded anyway\n\n    softFreeze = softFreeze\n    splitStringDiffsAt = splitStringDiffsAt\n    listDiffOp = listDiffOp\n    updateApp  = __updateApp__\n    diff: a -> b -> Result (Maybe VDiffs)\n    diff = __diff__\n    -- Instead of returning Ok (Maybe VDiffs) or error, raises the error if there is one or returns the Maybe VDiffs\n    diffs: a -> b -> Maybe VDiffs\n    diffs a b = case __diff__ a b of\n        Err msg -> error msg\n        Ok d -> d\n    merge = __merge__\n    listDiff = listDiffOp __diff__\n    strDiffToConcreteDiff = strDiffToConcreteDiff\n    splitListDiffsAt = splitListDiffsAt\n    valuesWithDiffs = valuesWithDiffs\n    resultValuesWithDiffs = resultValuesWithDiffs\n    pairDiff2 = pairDiff2\n    pairDiff3 = pairDiff3\n    pairDiff4 = pairDiff4\n    mbPairDiffs = mbPairDiffs\n    Regex = {\n        -- Performs replacements on a string with differences but also return those differences along with the old ones.\n        replace: String -> (Match -> String) -> String -> Diffs -> (String, Diffs)\n        replace regex replacement string diffs = updateReplace regex replacement string diffs\n      }\n    mapInserted fun modifiedStr diffs =\n       let aux offset d strAcc = case d of\n       [] -> strAcc\n       ((ConcStringUpdate start end inserted) :: dtail) ->\n         let left = String.take (start + offset) strAcc in\n         let right =  String.dropLeft (start + offset + String.length inserted) strAcc in\n         let newInserted = fun inserted in\n         (if newInserted /= inserted then left + newInserted + right else strAcc) |>\n         aux (offset + String.length newInserted - (end - start)) dtail\n       in\n       aux 0 (strDiffToConcreteDiff modifiedStr diffs) modifiedStr\n\n    onUpdate callback = lens {\n        apply = identity\n        update {outputNew} = Ok (Inputs [callback outputNew])\n    }\n\n    debug msg x =\n         { apply x = x, update { input, newOutput, oldOutput, diffs} =\n           let _ = Debug.log (\"\"\"@msg:\noldOutput:@oldOutput\nnewOutput:@newOutput\ndiffs:@(if typeof oldOutput == \"string\" then strDiffToConcreteDiff newOutput diffs else diffs)\"\"\") \"end\" in\n           Ok (InputsWithDiffs [(newOutput, Just diffs)])\n         }.apply x\n    debugstr msg x = Debug.log \"Update.debugstr is deprecated. Use Update.debug instead\" <| debug msg x\n\n    debugFold msg callback value =\n      callback (debug msg value)\n\n    replaceInstead y x = {\n       apply y = x\n       update {outputNew,diffs} =\n         Ok (InputsWithDiffs [(outputNew, Just diffs)])\n     }.apply y\n  }\n\nevaluate program =\n  case __evaluate__ [] program of\n    Ok x -> x\n    Err msg -> Debug.crash msg\n\n--------------------------------------------------------------------------------\n-- ListLenses --\n\n-- append is defined here because it is used when we want x ++ y to be reversible.\n-- Note that because this is not syntactically a lambda, the function is not recursive.\nappend =\n  let {append,split} = LensLess.List in\n  \\aas bs -> {\n    apply [aas, bs] = append aas bs\n    update {input = [aas, bs], outputNew, outputOld, diffs} =\n      let asLength = len aas in\n      Update.foldDiff {\n        start = [[], [], [], [], len aas, len bs]\n        onSkip [nas, nbs, diffas, diffbs, numA, numB] {count = n, newOutputs = outs} =\n          if n <= numA then\n            Ok [[nas ++ outs, nbs, diffas, diffbs, numA - n, numB]]\n          else\n            let (forA, forB) = split numA outs in\n            Ok [[nas ++ forA, nbs ++ forB, diffas, diffbs, 0, numB - (n - numA)]]\n        onUpdate [nas, nbs, diffas, diffbs, numA, numB] {newOutput = out, diffs, index} =\n          Ok [if numA >= 1\n           then [nas ++ [out],                                      nbs,\n                 diffas ++ [(index, ListElemUpdate diffs)], diffbs,\n                 numA - 1,                                          numB]\n           else [nas,    nbs ++ [out],\n                 diffas, diffbs ++ [(index - asLength, ListElemUpdate diffs)],\n                 0,      numB - 1]]\n        onRemove  [nas, nbs, diffas, diffbs, numA, numB] {oldOutput, index} =\n          if 1 <= numA then\n            Ok [[nas, nbs, diffas ++ [(index, ListElemDelete 1)], diffbs, numA - 1, numB]]\n          else\n            Ok [[nas, nbs, diffas, diffbs ++ [(index - asLength, ListElemDelete 1)], numA, numB - 1]]\n        onInsert [nas, nbs, diffas, diffbs, numA, numB] {newOutput, index} =\n          Ok (\n            (if numA > 0 || len nbs == 0 then\n              [[nas ++ [newOutput], nbs,\n                diffas ++ [(index, ListElemInsert 1)], diffbs,\n                numA, numB]]\n            else []) ++\n              (if len nbs > 0 || numA == 0 then\n                [[nas,    nbs ++ [newOutput],\n                  diffas, diffbs ++ [(index - asLength, ListElemInsert 1)],\n                  numA, numB]]\n              else [])\n            )\n\n        onFinish [nas, nbs, diffas, diffbs, _, _] = Ok [[[nas, nbs], (if len diffas == 0 then [] else\n             [(0, ListElemUpdate (VListDiffs diffas))]) ++\n                   (if len diffbs == 0 then [] else\n             [(1, ListElemUpdate (VListDiffs diffbs))])]]\n        onGather [[nas, nbs], diffs] = Ok (InputWithDiff ([nas, nbs],\n          if len diffs == 0 then Nothing else Just (VListDiffs diffs)))\n      } outputOld outputNew diffs\n    }.apply [aas, bs]\n\n--; Maps a function, f, over a list of values and returns the resulting list\n\n--; Maps a function, f, over a list of values and returns the resulting list\n--map a b: (a -> b) -> List a -> List b\nmap f l = {\n  apply [f, l] = LensLess.List.map f l\n  update {input=[f, l], oldOutput, outputNew, diffs} =\n    Update.foldDiff {\n      start =\n        --Start: the collected functions and diffs,\n        -- the collected inputs,\n        -- The collected input diffs,\n        -- the inputs yet to process.\n        [[], [], [], l]\n\n\n      onSkip [fs, insA, diffInsA, insB] {count} =\n        --\'outs\' was the same in oldOutput and outputNew\n        let (skipped, remaining) = LensLess.List.split count insB in\n        Ok [[fs, insA ++ skipped, diffInsA, remaining]]\n\n      onUpdate [fs, insA, diffInsA, insB] {oldOutput, newOutput, diffs, index} =\n        let input::remaining = insB in\n        case Update.updateApp {fun (f,x) = f x, input = (f, input), output = newOutput, oldOutput = oldOutput, diffs = diffs} of\n          Err msg -> Err msg\n          Ok (InputsWithDiffs vsds) -> Ok (\n              LensLess.List.map (\\((newF, newA), d) ->\n                let newFs = case d of\n                  Just (VRecordDiffs {_1 = d}) -> (newF, Just d)::fs\n                  _ -> fs\n                in\n                let newDiffsInsA = case d of\n                  Just (VRecordDiffs {_2 = d}) -> diffInsA ++ [(index, ListElemUpdate d)]\n                  _ -> diffInsA\n                in\n                [newFs, insA ++ [newA], newDiffsInsA, remaining]) vsds)\n\n      onRemove [fs, insA, diffInsA, insB] {oldOutput, index} =\n        let _::remaining = insB in\n        Ok [[fs, insA, diffInsA ++ [(index, ListElemDelete 1)], remaining]]\n\n      onInsert [fs, insA, diffInsA, insB] {newOutput, index} =\n        let input =\n          case insB of h::_ -> h; _ ->\n          case LensLess.List.last insA of Just h -> h; Nothing -> Debug.crash \"Empty list for map, cannot insert\" in\n        case Update.updateApp {fun (f,x) = f x, input = (f, input), output = newOutput} of\n          Err msg -> Err msg\n          Ok (InputsWithDiffs vsds) -> Ok (\n              -- We disable the modification of f itself in the insertion (to prevent programmatic styling to change unexpectedly) newF::\n              let aprioriResult = LensLess.List.concatMap (\\((newF, newA), diff) ->\n                case diff of\n                  Just (VRecordDiffs {_1}) -> []\n                  _ -> [[fs, insA++[newA], diffInsA ++ [(index, ListElemInsert 1)], insB]]) <| vsds\n              in -- If one of the result does not change f, that\'s good. Else, we take all the results.\n              if aprioriResult == [] then -- Here we return all possibilities, ignoring changes to the function\n                LensLess.List.concatMap (\\((newF, newA), _) ->\n                   [[fs, insA++[newA], diffInsA ++ [(index, ListElemInsert 1)], insB]]) vsds\n              else\n                aprioriResult)\n\n      onFinish [newFs, newIns, diffInsA, _] =\n       --after we finish, we need to return the new function\n       --as a merge of original functions with all other modifications\n       -- and the collected new inputs\n       Ok [[Update.merge f newFs, newIns, diffInsA]]\n\n      onGather [(newF, fdiff), newIns, diffInsA] =\n        let fdiffPart = case fdiff of\n          Nothing -> []\n          Just d -> [(0, ListElemUpdate d)]\n        in\n        let inPart = case diffInsA of\n          [] -> []\n          d -> [(1, ListElemUpdate (VListDiffs d))]\n        in\n        let finalDiff = case fdiffPart ++ inPart of\n          [] -> Nothing\n          d -> Just (VListDiffs d)\n        in\n        Ok (InputWithDiff ([newF, newIns], finalDiff))\n    } oldOutput outputNew diffs\n  }.apply [f, l]\n\nmapWithDefault default f l = {\n  apply [f, l] = LensLess.List.map f l\n  update {input=[f, l], oldOutput, outputNew, diffs} =\n    Update.foldDiff {\n      start =\n        --Start: the collected functions and diffs,\n        -- the collected inputs,\n        -- The collected input diffs,\n        -- the inputs yet to process.\n        [[], [], [], l]\n\n\n      onSkip [fs, insA, diffInsA, insB] {count} =\n        --\'outs\' was the same in oldOutput and outputNew\n        let (skipped, remaining) = LensLess.List.split count insB in\n        Ok [[fs, insA ++ skipped, diffInsA, remaining]]\n\n      onUpdate [fs, insA, diffInsA, insB] {oldOutput, newOutput, diffs, index} =\n        let input::remaining = insB in\n        case Update.updateApp {fun (f,x) = f x, input = (f, input), output = newOutput, oldOutput = oldOutput, diffs = diffs} of\n          Err msg -> Err msg\n          Ok (InputsWithDiffs vsds) -> Ok (\n              LensLess.List.map (\\((newF, newA), d) ->\n                let newFs = case d of\n                  Just (VRecordDiffs {_1 = d}) -> (newF, Just d)::fs\n                  _ -> fs\n                in\n                let newDiffsInsA = case d of\n                  Just (VRecordDiffs {_2 = d}) -> diffInsA ++ [(index, ListElemUpdate d)]\n                  _ -> diffInsA\n                in\n                [newFs, insA ++ [newA], newDiffsInsA, remaining]) vsds)\n\n      onRemove [fs, insA, diffInsA, insB] {oldOutput, index} =\n        let _::remaining = insB in\n        Ok [[fs, insA, diffInsA ++ [(index, ListElemDelete 1)], remaining]]\n\n      onInsert [fs, insA, diffInsA, insB] {newOutput, index} =\n        let input = default in\n        case Update.updateApp {fun (f,x) = f x, input = (f, input), output = newOutput} of\n          Err msg -> Err msg\n          Ok (InputsWithDiffs vsds) -> Ok (\n              -- We disable the modification of f itself in the insertion (to prevent programmatic styling to change unexpectedly) newF::\n              let aprioriResult = LensLess.List.concatMap (\\((newF, newA), diff) ->\n                case diff of\n                  Just (VRecordDiffs {_1}) -> []\n                  _ -> [[fs, insA++[newA], diffInsA ++ [(index, ListElemInsert 1)], insB]]) <| vsds\n              in -- If one of the result does not change f, that\'s good. Else, we take all the results.\n              if aprioriResult == [] then -- Here we return all possibilities, ignoring changes to the function\n                LensLess.List.concatMap (\\((newF, newA), _) ->\n                   [[fs, insA++[newA], diffInsA ++ [(index, ListElemInsert 1)], insB]]) vsds\n              else\n                aprioriResult)\n\n      onFinish [newFs, newIns, diffInsA, _] =\n       --after we finish, we need to return the new function\n       --as a merge of original functions with all other modifications\n       -- and the collected new inputs\n       Ok [[Update.merge f newFs, newIns, diffInsA]]\n\n      onGather [(newF, fdiff), newIns, diffInsA] =\n        let fdiffPart = case fdiff of\n          Nothing -> []\n          Just d -> [(0, ListElemUpdate d)]\n        in\n        let inPart = case diffInsA of\n          [] -> []\n          d -> [(1, ListElemUpdate (VListDiffs d))]\n        in\n        let finalDiff = case fdiffPart ++ inPart of\n          [] -> Nothing\n          d -> Just (VListDiffs d)\n        in\n        Ok (InputWithDiff ([newF, newIns], finalDiff))\n    } oldOutput outputNew diffs\n  }.apply [f, l]\n\nmapWithReverse reverse f l = {\n  apply [f, l] = LensLess.List.map f l\n  update {input=[f, l], oldOutput, outputNew, diffs} =\n    Update.foldDiff {\n      start =\n        --Start: the collected functions and diffs,\n        -- the collected inputs,\n        -- The collected input diffs,\n        -- the inputs yet to process.\n        [[], [], [], l]\n\n\n      onSkip [fs, insA, diffInsA, insB] {count} =\n        --\'outs\' was the same in oldOutput and outputNew\n        let (skipped, remaining) = LensLess.List.split count insB in\n        Ok [[fs, insA ++ skipped, diffInsA, remaining]]\n\n      onUpdate [fs, insA, diffInsA, insB] {oldOutput, newOutput, diffs, index} =\n        let input::remaining = insB in\n        case Update.updateApp {fun (f,x) = f x, input = (f, input), output = newOutput, oldOutput = oldOutput, diffs = diffs} of\n          Err msg -> Err msg\n          Ok (InputsWithDiffs vsds) -> Ok (\n              LensLess.List.map (\\((newF, newA), d) ->\n                let newFs = case d of\n                  Just (VRecordDiffs {_1 = d}) -> (newF, Just d)::fs\n                  _ -> fs\n                in\n                let newDiffsInsA = case d of\n                  Just (VRecordDiffs {_2 = d}) -> diffInsA ++ [(index, ListElemUpdate d)]\n                  _ -> diffInsA\n                in\n                [newFs, insA ++ [newA], newDiffsInsA, remaining]) vsds)\n\n      onRemove [fs, insA, diffInsA, insB] {oldOutput, index} =\n        let _::remaining = insB in\n        Ok [[fs, insA, diffInsA ++ [(index, ListElemDelete 1)], remaining]]\n\n      onInsert [fs, insA, diffInsA, insB] {newOutput, index} =\n        let newA  = reverse newOutput in\n        Ok [[fs, insA ++ [newA], diffInsA ++ [(index, ListElemInsert 1)], insB]]\n\n      onFinish [newFs, newIns, diffInsA, _] =\n       --after we finish, we need to return the new function\n       --as a merge of original functions with all other modifications\n       -- and the collected new inputs\n       Ok [[Update.merge f newFs, newIns, diffInsA]]\n\n      onGather [(newF, fdiff), newIns, diffInsA] =\n        let fdiffPart = case fdiff of\n          Nothing -> []\n          Just d -> [(0, ListElemUpdate d)]\n        in\n        let inPart = case diffInsA of\n          [] -> []\n          d -> [(1, ListElemUpdate (VListDiffs d))]\n        in\n        let finalDiff = case fdiffPart ++ inPart of\n          [] -> Nothing\n          d -> Just (VListDiffs d)\n        in\n        Ok (InputWithDiff ([newF, newIns], finalDiff))\n    } oldOutput outputNew diffs\n  }.apply [f, l]\n\nzipWithIndex xs =\n  { apply x = zip (range 0 (len xs - 1)) xs\n    update {output} = Ok (Inputs [map (\\(i, x) -> x) output])}.apply xs\n\nindexedMap f l =\n  map (\\(i, x) -> f i x) (zipWithIndex l)\n\n-- TODO: Remove list lenses (lenses should be part of List)\nListLenses =\n  { map = map\n    append = append\n    zipWithIndex = zipWithIndex\n    indexedMap = indexedMap\n  }\n\n--------------------------------------------------------------------------------\n-- TODO (re-)organize this section into modules\n-- HEREHEREHERE\n\n--; Combines two lists with a given function, extra elements are dropped\n--map2: (forall (a b c) (-> (-> a b c) (List a) (List b) (List c)))\nmap2 f xs ys =\n  case [xs, ys] of\n    [x::xs1, y::ys1] -> f x y :: map2 f xs1 ys1\n    _                -> []\n\n--; Combines three lists with a given function, extra elements are dropped\n--map3: (forall (a b c d) (-> (-> a b c d) (List a) (List b) (List c) (List d)))\nmap3 f xs ys zs =\n  case [xs, ys, zs] of\n    [x::xs1, y::ys1, z::zs1] -> f x y z :: map3 f xs1 ys1 zs1\n    _                        -> []\n\n--; Combines four lists with a given function, extra elements are dropped\n--map4: (forall (a b c d e) (-> (-> a b c d e) (List a) (List b) (List c) (List d) (List e)))\nmap4 f ws xs ys zs =\n  case [ws, xs, ys, zs]of\n    [w::ws1, x::xs1, y::ys1, z::zs1] -> f w x y z :: map4 f ws1 xs1 ys1 zs1\n    _                                -> []\n\n--; Takes a function, an accumulator, and a list as input and reduces using the function from the left\n--foldl: (forall (a b) (-> (-> a b b) b (List a) b))\nfoldl f acc xs =\n  case xs of [] -> acc; x::xs1 -> foldl f (f x acc) xs1\n\n--; Takes a function, an accumulator, and a list as input and reduces using the function from the right\n--foldr: (forall (a b) (-> (-> a b b) b (List a) b))\nfoldr f acc xs =\n  case xs of []-> acc; x::xs1 -> f x (foldr f acc xs1)\n\n--; Given two lists, append the second list to the end of the first\n--append: (forall a (-> (List a) (List a) (List a)))\n-- append xs ys =\n--   case xs of [] -> ys; x::xs1 -> x :: append xs1 ys\n\n--; concatenate a list of lists into a single list\n--concat: (forall a (-> (List (List a)) (List a)))\nconcat xss = foldr append [] xss\n-- TODO eta-reduced version:\n-- (def concat (foldr append []))\n\n--; Map a given function over a list and concatenate the resulting list of lists\n--concatMap: (forall (a b) (-> (-> a (List b)) (List a) (List b)))\nconcatMap f xs = concat (map f xs)\n\n--; Takes two lists and returns a list that is their cartesian product\n--cartProd: (forall (a b) (-> (List a) (List b) (List [a b])))\ncartProd xs ys =\n  concatMap (\\x -> map (\\y -> [x, y]) ys) xs\n\n--; Takes elements at the same position from two input lists and returns a list of pairs of these elements\n--zip: (forall (a b) (-> (List a) (List b) (List [a b])))\n-- zip xs ys = map2 (\\x y -> [x, y]) xs ys\n-- TODO eta-reduced version:\n-- (def zip (map2 (\\(x y) [x y])))\n\n--; The empty list\n--; (typ nil (forall a (List a)))\n--nil: []\n-- nil = []\n\n--; attaches an element to the front of a list\n--cons: (forall a (-> a (List a) (List a)))\n-- cons x xs = x :: xs\n\n--; attaches an element to the end of a list\n--snoc: (forall a (-> a (List a) (List a)))\nsnoc x ys = append ys [x]\n\n--; Returns the first element of a given list\n--hd: (forall a (-> (List a) a))\n--tl: (forall a (-> (List a) (List a)))\nhd (x::xs) = x\ntl (x::xs) = xs\n\n--; Returns the last element of a given list\n--last: (forall a (-> (List a) a))\nlast xs =\n  case xs of\n    [x]   -> x\n    _::xs -> last xs\n\n--; Given a list, reverse its order\n--reverse: (forall a (-> (List a) (List a)))\nreverse xs = foldl cons nil xs\n-- TODO eta-reduced version:\n-- (def reverse (foldl cons nil))\n\nadjacentPairs xs = zipOld xs (tl xs)\n\n--; Given two numbers, creates the list between them (inclusive)\n--range: (-> Num Num (List Num))\n-- range i j =\n--   if i < j + 1\n--     then cons i (range (i + 1) j)\n--     else nil\n\n--; Given a number, create the list of 0 to that number inclusive (number must be > 0)\n--list0N: (-> Num (List Num))\nlist0N n = range 0 n\n\n--; Given a number, create the list of 1 to that number inclusive\n--list1N: (-> Num (List Num))\nlist1N n = range 1 n\n\n--zeroTo: (-> Num (List Num))\nzeroTo n = range 0 (n - 1)\n\n--; Given a number n and some value x, return a list with x repeated n times\n--repeat: (forall a (-> Num a (List a)))\nrepeat n x = map (always x) (range 1 n)\n\n--; Given two lists, return a single list that alternates between their values (first element is from first list)\n--intermingle: (forall a (-> (List a) (List a) (List a)))\nintermingle xs ys =\n  case [xs, ys] of\n    [x::xs1, y::ys1] -> cons x (cons y (intermingle xs1 ys1))\n    [[], []]         -> nil\n    _                -> append xs ys\n\nintersperse sep xs =\n  case xs of\n    []    -> xs\n    x::xs -> reverse (foldl (\\y acc -> y :: sep :: acc) [x] xs)\n\n--mapi: (forall (a b) (-> (-> [Num a] b) (List a) (List b)))\nmapi f xs = map f (zipWithIndex xs)\n\n--nth: (forall a (-> (List a) Num (union Null a)))\nnth xs n =\n  if n < 0 then error \"index out of range. Use List.nthMaybe instead of nth to avoid this\"\n  else\n    case [n, xs] of\n      [_, []]     -> error \"index out of range. Use List.nthMaybe instead of nth to avoid this\"\n      [0, x::xs1] -> x\n      [_, x::xs1] -> nth xs1 (n - 1)\n\n-- (defrec nth (\\(xs n)\n--   (if (< n 0)   \"ERROR: nth\"\n--     (case xs\n--       ([]       \"ERROR: nth\")\n--       ([x|xs1]  (if (= n 0) x (nth xs1 (- n 1))))))))\n\n-- TODO change typ/def\n-- (typ take (forall a (-> (List a) Num (union Null (List a)))))\n--take: (forall a (-> (List a) Num (List (union Null a))))\ntake xs n =\n  if n == 0 then []\n  else\n    case xs of\n      []     -> [null]\n      x::xs1 -> x :: take xs1 (n - 1)\n\n-- (def take\n--   (let take_ (\\(n xs)\n--     (case [n xs]\n--       ([0 _]       [])\n--       ([_ []]      [])\n--       ([_ [x|xs1]] [x | (take_ (- n 1) xs1)])))\n--   (compose take_ (max 0))))\n--drop: (forall a (-> (List a) Num (union Null (List a))))\ndrop xs n =\n  if le n 0 then xs\n  else\n    case xs of\n      []     -> null\n      x::xs1 -> drop xs1 (n - 1)\n\n--; Drop n elements from the end of a list\n-- dropEnd: (forall a (-> (List a) Num (union Null (List a))))\n-- dropEnd xs n =\n--   let tryDrop = drop (reverse xs) n in\n--     Err \"typecase not yet implemented for Elm syntax\"\n\n--elem: (forall a (-> a (List a) Bool))\nelem x ys =\n  case ys of\n    []     -> False\n    y::ys1 -> or (x == y) (elem x ys1)\n\nsortBy f xs =\n  let ins x ys =   -- insert is a keyword...\n    case ys of\n      []    -> [x]\n      y::ys -> if f x y then x :: y :: ys else y :: ins x ys\n  in\n  foldl ins [] xs\n\nsortAscending = sortBy lt\nsortDescending = sortBy gt\n\n\n--; multiply two numbers and return the result\n--mult: (-> Num Num Num)\nmult m n =\n  if m < 1 then 0 else n + mult (m + -1) n\n\n--; Given two numbers, subtract the second from the first\n--minus: (-> Num Num Num)\nminus x y = x + mult y -1\n\n--; Given two numbers, divide the first by the second\n--div: (-> Num Num Num)\ndiv m n =\n  if m < n then 0 else\n  if n < 2 then m else 1 + div (minus m n) n\n\n--; Given a number, returns the negative of that number\n--neg: (-> Num Num)\nneg x = 0 - x\n\n--; Sign function; -1, 0, or 1 based on sign of given number\n--sgn: (-> Num Num)\nsgn x = if 0 == x then 0 else x / abs x\n\n--some: (forall a (-> (-> a Bool) (List a) Bool))\nsome p xs =\n  case xs of\n    []     -> False\n    x::xs1 -> or (p x) (some p xs1)\n\n--all: (forall a (-> (-> a Bool) (List a) Bool))\nall p xs =\n  case xs of\n    []     -> True\n    x::xs1 -> and (p x) (all p xs1)\n\n--between: (-> Num Num Num Bool)\nbetween i j n = n == clamp i j n\n\n--plus: (-> Num Num Num)\nplus x y = x + y\n\n--minimum: (-> (List Num) Num)\nminimum (hd::tl) = foldl min hd tl\n\n--maximum: (-> (List Num) Num)\nmaximum (hd::tl) = foldl max hd tl\n\n--average: (-> (List Num) Num)\naverage nums =\n  let sum = foldl plus 0 nums in\n  let n = len nums in sum / n\n\n--; Combine a list of strings with a given separator\n--; Ex. joinStrings \", \" [\"hello\" \"world\"] = \"hello, world\"\n--joinStrings: (-> String (List String) String)\njoinStrings sep ss =\n  foldr (\\str acc -> if acc == \"\" then str else str + sep + acc) \"\" ss\n\n--; Concatenate a list of strings and return the resulting string\n--concatStrings: (-> (List String) String)\nconcatStrings = joinStrings \"\"\n\n--; Concatenates a list of strings, interspersing a single space in between each string\n--spaces: (-> (List String) String)\nspaces = joinStrings \" \"\n\n--; First two arguments are appended at the front and then end of the third argument correspondingly\n--; Ex. delimit \"+\" \"+\" \"plus\" = \"+plus+\"\n--delimit: (-> String String String String)\ndelimit a b s = concatStrings [a, s, b]\n\n--; delimit a string with parentheses\n--parens: (-> String String)\nparens = delimit \"(\" \")\"\n\n--;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;\n\n-- (def columnsToRows (\\columns\n--   (let numColumns (len columns)\n--   (let numRows ; maxColumnSize\n--     (if (= numColumns 0) 0 (maximum (map len columns)))\n--   (foldr\n--     (\\(col rows)\n--       (let paddedCol (append col (repeat (- numRows (len col)) \".\"))\n--       (map\n--         (\\[datum row] [ datum | row ])\n--         (zipOld paddedCol rows))))\n--     (repeat numRows [])\n--     columns)\n-- ))))\n--\n-- (def addColToRows (\\(col rows)\n--   (let width (maximum (map len rows))\n--   (let foo (\\(col rows)\n--     (case [col rows]\n--       ([ []     []     ] [                                          ])\n--       ([ [x|xs] [r|rs] ] [ (snoc x r)                 | (foo xs rs) ])\n--       ([ []     [r|rs] ] [ (snoc \"\" r)                | (foo [] rs) ])\n--       ([ [x|xs] []     ] [ (snoc x (repeat width \"\")) | (foo xs []) ])\n--     ))\n--   (foo col rows)))))\n\n-- (def border [\"border\" \"1px solid black\"])\n-- (def padding [\"padding\" \"5px\"])\n-- (def center [\"align\" \"center\"])\n-- (def style (\\list [\"style\" list]))\n-- (def onlyStyle (\\list [(style list)]))\n--\n-- (def td (\\text\n--   [\"td\" (onlyStyle [border padding])\n--         [[\"TEXT\" text]]]))\n--\n-- (def th (\\text\n--   [\"th\" (onlyStyle [border padding center])\n--         [[\"TEXT\" text]]]))\n--\n-- (def tr (\\children\n--   [\"tr\" (onlyStyle [border])\n--         children]))\n--\n-- ; TODO div name is already taken...\n--\n-- (def div_ (\\children [\"div\" [] children]))\n-- (def h1 (\\text [\"h1\" [] [[\"TEXT\" text]]]))\n-- (def h2 (\\text [\"h2\" [] [[\"TEXT\" text]]]))\n-- (def h3 (\\text [\"h3\" [] [[\"TEXT\" text]]]))\n--\n-- (def table (\\children\n--   [\"table\" (onlyStyle [border padding]) children]))\n\n-- (def table (\\children\n--   (let [x y] [100 100]\n--   [\"table\" (onlyStyle [border padding\n--                       [\"position\" \"relative\"]\n--                       [\"left\" (toString x)]\n--                       [\"top\" (toString y)]]) children])))\n\n-- (def tableOfData (\\data\n--   (let letters (explode \" ABCDEFGHIJKLMNOPQRSTUVWXYZ\")\n--   (let data (mapi (\\[i row] [(+ i 1) | row]) data)\n--   (let tableWidth (maximum (map len data))\n--   (let headers\n--     (tr (map (\\letter (th letter)) (take letters tableWidth)))\n--   (let rows\n--     (map (\\row (tr (map (\\col (td (toString col))) row))) data)\n--   (table\n--     [ headers | rows ]\n-- ))))))))\n\n\n\n-- absolutePositionStyles x y = let _ = [x, y] : Point in\n--   [ [\"position\", \"absolute\"]\n--   , [\"left\", toString x + \"px\"]\n--   , [\"top\", toString y + \"px\"]\n--   ]\n\n--------------------------------------------------------------------------------\n-- Regex --\n\nRegex =\n  let split regex = Update.lens {\n    apply s =\n      case extractFirstIn (\"^([\\\\s\\\\S]*?)(\" + regex + \")([\\\\s\\\\S]*)$\") s of\n        Just [before, removed, after] ->\n          if before == \"\" && removed == \"\" then\n            case extractFirstIn \"^([\\\\s\\\\S])([\\\\s\\\\S]*)$\" after of\n              Nothing -> [after]\n              Just [x, remaining] ->\n                let head::tail = split regex remaining in\n                (x + head) :: tail\n\n          else before :: split regex after\n        _ -> [s]\n    update {input=s, outputNew} =\n      case extractFirstIn (\"^([\\\\s\\\\S]*?)(\" + regex + \")([\\\\s\\\\S]*)$\") s of\n        Just [before, removed, after] ->\n          Ok (Inputs [outputNew |> LensLess.String.join removed])\n        _ -> case outputNew of\n          [x] -> Ok (Inputs [x])\n          _ -> Err \"Regex.split resulted in 1 element or less, cannot update with more elements. Use Regex.splitReverse if you know the join string\"\n    }\n  in\n  let splitReverse joinStr regex = Update.lens {\n    apply s = split regex s\n    update {input=s, outputNew} =\n      Ok (Inputs [outputNew |> LensLess.String.join joinStr])\n    }\n  in\n  let find regex s =\n    case extractFirstIn (\"(\" + regex + \")([\\\\s\\\\S]*)\") s of\n      Nothing -> []\n      Just matchremaining ->\n        case LensLess.List.split (len matchremaining - 1) matchremaining of\n          (init, [last]) ->\n            init::find regex last\n  in\n  {\n  replace regex replacement string = replaceAllIn regex replacement string\n  replaceFirst regex replacement string = replaceFirstIn regex replacement string\n  extract regex string = extractFirstIn regex string\n  matchIn r x = case extractFirstIn r x of\n    Nothing -> False\n    _ -> True\n  split = split\n  splitReverse = splitReverse\n  find = find\n  escape = replace \"\"\"\\||\\\\|\\{|\\}|\\[|\\]|\\$|\\.|\\?|\\+|\\(|\\)\"\"\" (\\m -> \"\\\\\" + m.match)\n}\n\n--------------------------------------------------------------------------------\n-- Dict --\n\n-- Interface\ndictLike = {\n  apply this d x = case this.get x d of\n    Just x -> x\n    _ -> Debug.crash (\"Expected element \" + toString x + \" in dict, got nothing\")\n  member this key list = this.get key list /= Nothing\n  contains this = this.member\n  delete this = this.remove\n  update this k f d = case f <| this.get k d of\n    Nothing -> this.delete k d\n    Just v -> this.insert k v d\n}\n\n-- Dictionary implementation\nDict = { dictLike |\n  empty = __DictEmpty__\n  fromList l = __DictFromList__ l\n  get x d = __DictGet__ x d\n  remove x d = __DictRemove__ x d\n  insert k v d = __DictInsert__ k v d\n}\n\n-- List of pairs implementation\nlistDict = { dictLike |\n  empty = []\n  fromList = identity\n  get key = Update.lens {\n    apply list = case list of\n      [] -> Nothing\n      (k, v) :: tail -> if k == key then Just v else get key tail\n    update = case of\n      {input, outputOld = Nothing, outputNew = Just v} ->\n        Ok (Inputs [insert key v input])\n      {input, outputOld = Just _, outputNew = Nothing} ->\n        Ok (Inputs [remove key input])\n      uInput -> Update.default apply uInput\n    }\n  remove key list = case list of\n    [] -> []\n    ((k, v) as head) :: tail -> if k == key then tail else head :: remove key tail\n  insert key value list = case list of\n    [] -> [(key, value)]\n    ((k, v) as head) :: tail -> if k == key then (k, value)::tail else head :: insert key value tail\n\n  -- Enables the deletion of the key-value in reverse\n  insert2 ([(key, value)] as keyValue) list = case list of\n    [] -> keyValue\n    _ ->\n      let (([(k, v)] as head), tail)  = List.split 1 list in\n      if k == key then keyValue ++ tail else head ++ insert2 keyValue tail\n}\n\n\n-- List of 2-element list implementation\nattrDict = { dictLike |\n  empty = []\n  fromList = identity\n  get key = Update.lens {\n    apply list = case list of\n      [] -> Nothing\n      [k, v] :: tail -> if k == key then Just v else get key tail\n    update = case of\n      {input, outputOld = Nothing, outputNew = Just v} ->\n        Ok (Inputs [insert key v input])\n      {input, outputOld = Just _, outputNew = Nothing} ->\n        Ok (Inputs [remove key input])\n      uInput -> Update.default apply uInput\n    }\n  remove key list = case list of\n    [] -> []\n    ([k, v] as head) :: tail -> if k == key then tail else head :: remove key tail\n  insert key value list = case list of\n    [] -> [[key, value]]\n    ([k, v] as head) :: tail -> if k == key then [k, value]::tail else head :: insert key value tail\n}\n\nSet = {\n  empty = __DictEmpty__\n  fromList l = __DictFromList__ (zip l l)\n  insert k d = __DictInsert__ k k d\n  remove x d = __Dict.remove__ x d\n  member x d = case __DictGet__ x d of\n      Just _ -> True\n      _ -> False\n}\n\n\n--------------------------------------------------------------------------------\n-- List (all operations should be lenses) --\n\nList = {\n  reverse =\n    let r = LensLess.List.reverse in\n    -- TODO: reverse the differences as well !\n    \\l -> { apply l = r l, update {output}= Ok (Inputs [r output])}.apply l\n\n  simpleMap = LensLess.List.map\n\n  {-\n  filterMap f l = case l of\n    [] -> []\n    _ ->\n      let ([head] as headList, tail) = split 1 l in\n      case f head of\n        Nothing -> filterMap f tail\n        Just newHead -> -- TODO: Correct for deletion, but not insertions!\n          (List.map (always newHead) headList) ++ filterMap f tail\n  -}\n  filterMap f l = map f l |> filter (\\x -> x /= Nothing) |> map (\\(Just x) -> x)\n\n  length x = len x\n\n  nth = nth\n  nthMaybe n list = case list of\n    head :: tail -> if n == 0 then Just head else nthMaybe (n - 1) tail\n    [] -> Nothing\n\n  (mapi) f xs = map f (zipWithIndex xs)\n  (mapiWithDefault) default f xs = mapWithDefault (0, default) f (zipWithIndex xs)\n  (mapiWithReverse) reverse f xs = mapWithReverse (\\x -> (0, reverse x)) f (zipWithIndex xs)\n\n  indexedMap f xs =\n    mapi (\\(i,x) -> f i x) xs\n\n  indexedMapWithDefault default f xs =\n    mapiWithDefault default (\\(i,x) -> f i x) xs\n\n  indexedMapWithReverse reverse f xs =\n    mapiWithReverse reverse (\\(i, x) -> f i x) xs\n\n  concatMap f l = case l of\n    [] -> []\n    head :: tail -> f head ++ concatMap f tail\n\n  indexedConcatMap f l =\n    let aux i l = case l of\n      [] -> []\n      head :: tail -> f i head ++ aux (i + 1) tail\n    in aux 0 l\n\n  cartesianProductWith f xs ys =\n    concatMap (\\x -> map (\\y -> f x y) ys) xs\n\n  unzip xys =\n    case xys of\n      []          -> ([], [])\n      (x,y)::rest -> let (xs,ys) = unzip rest in\n                     (x::xs, y::ys)\n\n  split n l = Update.lens {\n      apply l = LensLess.List.split n l\n      update {output = (l1, l2), diffs} =\n        let finalDiffs = case diffs of\n          VRecordDiffs {_1 = VListDiffs l1, _2 = VListDiffs l2} ->\n            Just (VListDiffs (l1 ++ simpleMap (\\(i, d) -> (i + n, d)) l2))\n          VRecordDiffs {_1 = VListDiffs l1} ->  Just (VListDiffs l1)\n          VRecordDiffs {_2 = VListDiffs l2} -> Just (VListDiffs (simpleMap (\\(i, d) -> (i + n, d)) l2))\n          _ -> Nothing\n        in\n        Ok (InputsWithDiffs [(l1 ++ l2, finalDiffs)])\n    } l\n\n  -- This filter lens supports insertions and deletions in output\n  filter f l =\n        case l of\n          [] -> l\n          _ ->\n             let ([head] as head1, tail) = split 1 l in\n             let cond = f head in\n             if cond then head1 ++ filter f tail\n             else filter f tail\n\n  -- In this version of foldl, the function f accepts a 1-element list instead of just the element.\n  -- This enable programmers to insert or delete values from the accumulator.\n  foldl2 f b l =\n    let aux b l = case l of\n      [] -> b\n      _ ->\n        let (h1, t1) = split 1 l in\n        aux (f h1 b) t1\n    in aux b l\n\n  -- Pushes the elements to the head of the reverse accumulator revAcc in O(elements) time\n  reverseInsert elements revAcc =\n    case elements of\n      [] -> revAcc\n      head::tail -> reverseInsert tail (head::revAcc)\n\n  sum l = foldl (\\x y -> x + y) 0 l\n  product l = foldl (\\x y -> x * y) 1 l\n\n  maximum l = case l of\n    [] -> Nothing\n    h :: t -> Just (foldl (\\x y -> if x > y then x else y) h t)\n\n  minimum l = case l of\n    [] -> Nothing\n    h :: t -> Just (foldl (\\x y -> if x < y then x else y) h t)\n\n  range min max = if min > max then [] else min :: range (min + 1) max\n\n  mapFirstSuccess f l = case l of\n    [] -> Nothing\n    head :: tail -> case f head of\n      Nothing -> mapFirstSuccess f tail\n      x -> x\n\n  contains n =\n    let aux l = case l of\n      [] -> False\n      head::tail -> if head == n then True else aux tail\n    in aux\n\n  -- Contrary to concatMap, concatMap_ supports insertion and deletions of elements.\n  -- It requires a function to indicate what to do when inserting in empty lists.\n  -- f takes a 1-element list but can push back many elements or remove them\n  concatMap_ insert_in_empty f l =\n        case l of -- Insertion to an emptylist.\n          [] -> { apply l = []\n                  update {input=l, outputNew=lp} = Ok (Inputs [insert_in_empty lp])\n                }.apply l\n          _ -> Update.applyLens { -- Back-propagating a ghost boolean indicating if the next element in the computation had its first element deleted.\n          apply (x, y) = x\n          update {output, diffs} = Ok (InputsWithDiffs [\n            ((output, True),\n             Just (VRecordDiffs { _1 = diffs, _2 = VConstDiffs}))])\n        } <| foldl2 (\\headList (oldAcc, dummyBool) ->\n          let lengthAcc = length oldAcc in\n          {apply (f, oldAcc, headList, dummyBool) = (oldAcc ++ f headList, dummyBool)\n           update {input=(f, oldAcc, headList, _) as input, outputNew=(newAccFHeadList, prevDeletedOrLast), diffs=ds} =\n             let handleDiffs = case ds of\n                VRecordDiffs {_1=VListDiffs diffs} -> \\continuation -> continuation diffs\n                _ -> \\continuation -> Ok (InputsWithDiffs [(input, Nothing)])\n             in handleDiffs <| \\diffs ->\n             Update.splitListDiffsAt lengthAcc 0 newAccFHeadList diffs\n             |> concatMap (\\(newAcc, newAccDiffs, newFHeadList, newFHeadListDiffs) ->\n               let finalAccDiffs = if newAccDiffs == [] then Nothing else Just (VListDiffs newAccDiffs) in\n               let finalAccDeletedRight =\n                 let aux diffs = case diffs of\n                   [] -> False\n                   (i, d)::tail -> case d of\n                     ListElemDelete count -> if count + i == lengthAcc then True else\n                       aux tail\n                     _ -> aux tail\n                 in aux newAccDiffs\n               in\n               let firstElementDeleted = case newFHeadListDiffs of\n                 (0, ListElemDelete x) :: tail -> True\n                 _ -> False\n               in\n               let deleteBoolUpdate = if firstElementDeleted then Just VConstDiffs else Nothing in\n               let surroundingElementsDeleted = finalAccDeletedRight && prevDeletedOrLast in\n               let headListDeletable = newFHeadList == []  && (firstElementDeleted || surroundingElementsDeleted) in\n               let atLeastOneSurroundingElementDeleted = finalAccDeletedRight || prevDeletedOrLast in\n               (if atLeastOneSurroundingElementDeleted && headListDeletable then [] else\n               case newFHeadListDiffs of\n                 [] -> [Ok ((f, newAcc, headList, firstElementDeleted),\n                            Update.pairDiff4 Nothing finalAccDiffs Nothing deleteBoolUpdate)]\n                 _ ->\n               case Update.updateApp{fun (f, x) = f x, input=(f, headList), output=newFHeadList, diffs=VListDiffs newFHeadListDiffs} of\n                 Ok (InputsWithDiffs fAndNewHeadListsWithDiffs) ->\n                    LensLess.List.map (\\((newF, newHeadList), diff) ->\n                      case diff of\n                        Nothing ->  Ok ((f, newAcc, headList, firstElementDeleted),\n                          Update.pairDiff4 Nothing finalAccDiffs Nothing deleteBoolUpdate)\n                        Just (VRecordDiffs d) ->\n                          let newFDiff = case d of {_1} -> Just _1; _ -> Nothing in\n                          let newHeadListDiffs = case d of {_2} -> Just _2; _ -> Nothing in\n                          Ok ((newF, newAcc, newHeadList, firstElementDeleted), Update.pairDiff4 newFDiff finalAccDiffs newHeadListDiffs deleteBoolUpdate)\n                    ) fAndNewHeadListsWithDiffs\n                 Err msg -> [Err msg]\n               ) ++ (\n                 if headListDeletable then\n                   [Ok ((f, newAcc, [], True),\n                        Update.pairDiff4 Nothing finalAccDiffs (Just (VListDiffs [(0, ListElemDelete 1)])) (Just VConstDiffs))]\n                 else\n                   [])\n              ) |> Update.resultValuesWithDiffs\n          }.apply (f, oldAcc, headList, dummyBool)) (Update.freeze [], Update.softFreeze False) l\n\n  indices l = range 0 (length l - 1)\n  isEmpty l = l == []\n  head = Update.lens {\n    apply l = case l of\n      h :: l -> Just h\n      _ -> Nothing\n    update {input, outputNew, diffs} = case (input, outputNew, diffs) of\n      (h :: tail, Nothing, _) ->\n        Ok (InputsWithDiffs [(tail, Just (VListDiffs [(0, ListElemDelete 1)]))])\n      (h :: tail, Just newH, VRecordDiffs {args= VRecordDiffs {_1=d}}) ->\n        Ok (InputsWithDiffs [(newH :: tail, Just (VListDiffs [(0, ListElemUpdate d)]))])\n      ([], Nothing, _) -> Ok (Inputs [input])\n      ([], Just newH, _) ->\n        Ok (InputsWithDiffs [([newH], Just (VListDiffs [(0, ListElemInsert 1)]))])\n      (_, _, _) -> Err (\"Inconsistent diffs in List.head\" ++ toString diffs)\n    }\n\n  tail =  Update.lens {\n    apply l = case l of\n      h :: l -> Just l\n      _ -> Nothing\n    update {input, outputNew, diffs} = case (input, outputNew, diffs) of\n      (h :: tail, Nothing, _) ->\n        Ok (InputsWithDiffs [([], Just (VListDiffs [(0, ListElemDelete (List.length input))]))])\n      (h :: tail, Just newTail, VRecordDiffs {args= VRecordDiffs {_1=VListDiffs tailDiffs}}) ->\n        Ok (InputsWithDiffs [(h :: newTail, Just (VListDiffs (List.map (\\(i, d) -> (i+1, d)) tailDiffs)))])\n      ([], Nothing, _) -> Ok (Inputs [input])\n      ([], Just newTail, _) ->\n        Err \"I don\'t know how to insert a new tail where there was none originally.\"\n      (_, _, _) -> Err (\"Inconsistent diffs in List.head\" ++ toString diffs)\n    }\n\n  take n l =\n    let (taken, remaining) = split n l in\n    taken\n\n  drop n l =\n    let (taken, remaining) = split n l in\n    remaining\n\n  singleton elem = [elem]\n\n  repeat n a =\n    {apply (n, a) =\n      let aux i = if i == 0 then [] else a :: aux (i - 1)\n      in aux n\n     update {input, outputNew, diffs = VListDiffs ds} =\n       let nNew = length outputNew in\n       let nNewDiffs = if nNew == n then Nothing else Just (VConstDiffs) in\n       let mergeEnabled =\n         let aux i diffs outputNew = case diffs of\n           [] -> []\n           (j, diff)::tailDiffs ->\n             if i == j then\n               case diff of\n                 ListElemUpdate d ->\n                   case outputNew of\n                     o :: t -> (o, Just d) :: aux (i + 1) tailDiffs t\n                 ListElemInsert count ->\n                   let (inserted, remOutputNew) = split count outputNew in\n                   concatMap (\\newA ->\n                     case __diff__ a newA of\n                       Err msg -> []\n                       Ok mbDiff -> [(newA, mbDiff)]) inserted ++ aux i tailDiffs remOutputNew\n                 ListElemDelete count ->\n                   aux (i + count) tailDiffs outputNew\n             else\n               let (_, remOutputNew) = split (j - i) outputNew in\n               aux j diffs remOutputNew\n           k::tailDiffs -> aux i tailDiffs outputNew\n         in aux 0 ds outputNew\n       in\n       let (nA, nDiffsA) = __merge__ a mergeEnabled in\n       Ok (InputsWithDiffs [((nNew, nA), Update.mbPairDiffs (nNewDiffs, nDiffsA))])\n    }.apply (n, a)\n\n  insertAt index newElem elements =\n    let (before, after) = split index elements in\n    before ++ [newElem] ++ after\n\n  removeAt index elements =\n    let (before, after) = split index elements in\n    case after of\n      [] -> Nothing\n      elem::afterTail ->\n        Just (elem, before ++ afterTail)\n\n  -- Given two converters cA and cB, a list and a target, finds an element\n  -- of the list that, converted using cA, equals target. Returns cB of this element.\n  -- In the reverse direction, it finds the cB of the new output and returns the cA.\n  findByAReturnB: (a -> b) -> (a -> c) -> b -> List a -> Maybe c\n  findByAReturnB =\n        Update.lens4 {\n          apply (cA, cB, target, l) =\n            let aux l = case l of\n              [] -> Nothing\n              h :: t -> if cA h == target then Just (cB h) else aux t\n            in aux l\n          update {input=(converterA, converterB, target, list) as input, outputNew} as uInput =\n            case outputNew of\n              Nothing -> Ok (InputsWithDiffs [(input, Nothing)])\n              Just outputNewTarget ->\n            case apply (converterB, converterA, outputNewTarget, list) of\n              Just x -> -- No rename here.\n                Ok (InputsWithDiffs [\n                  ((converterA, converterB, x, list),\n                    Update.diffs target x |> LensLess.Maybe.map Update.vTupleDiffs_3)])\n              Nothing ->\n                Update.default apply uInput\n            -- To ways to update: Either find the new B in the list and return A\n            -- Or just regular update (to change the name)\n        }\n\n  find pred list = case list of\n    [] -> Nothing\n    head :: tail -> if pred head then Just head else find pred tail\n\n  indexWhere pred list =\n    let aux n list = case list of\n      head :: tail -> if pred head then n else aux (n + 1) tail\n      _ -> -1\n    in\n    aux 0 list\n\n  indexOf value list = Update.lens {\n    apply value =  indexWhere ((==) value) list\n    update {input=value, outputNew=newIndex} as uInput =\n      case nthMaybe newIndex list of\n        Just newValue -> Ok (Inputs [newValue])\n        Nothing -> Err <| \"\"\"Index @newIndex not found in @list\"\"\"\n  } value\n\n  -- TODO: Continue to insert List functions from Elm (http://package.elm-lang.org/packages/elm-lang/core/latest/List#range)\n  map = map\n\n  append = append\n\n  concat = concatMap identity\n\n  intersperse elem list = drop 1 (concatMap_ identity (\\headAsList -> elem :: headAsList)) list\n\n  partition pred list = case list of\n    [] -> (list, list)\n    _ ->\n     let ([head] as headList, tail) = split 1 list in\n     let (ok, notok) = partition pred tail in\n     if pred head then\n       (headList ++ ok, notok)\n     else\n       (ok, headList ++ notok)\n\n  mapWithDefault = mapWithDefault\n  mapWithReverse = mapWithReverse\n  map2 = map2 -- TOOD: Make it a lens that supports insertion?\n  nil = nil\n  cons = cons\n  foldl = foldl\n  foldr = foldr\n\n  scanl : (a -> b -> b) -> b -> List a -> List b\n  scanl f acc list = case list of\n    [] -> [acc]\n    head :: tail -> acc :: scanl f (f head acc) tail\n\n  scanr : (a -> b -> b) -> b -> List a -> List b\n  scanr f acc list = case list of\n    [] -> [acc]\n    head :: tail ->\n      let headAcc::tailAcc = scanr f acc tail in\n      f head headAcc :: headAcc :: tailAcc\n\n  sort : List comparable -> List comparable\n  sort = sortBy identity\n\n  sortBy : (a -> comparable) -> List a -> List a\n  sortBy f xs =\n    let ins x ys =\n      case ys of\n        []    -> [x]\n        y::ys -> if f x < f y then x :: y :: ys else y :: ins x ys\n    in\n    foldl ins [] xs\n\n  sortWith : (a -> a -> Order) -> List a -> List a\n  sortWith f xs =\n    let ins x ys =\n      case ys of\n        []    -> [x]\n        y::ys -> if f x y == LT then x :: y :: ys else y :: ins x ys\n    in\n    foldl ins [] xs\n\n  zipWithIndex = zipWithIndex\n  member = contains\n  last = LensLess.List.last\n\n  all pred list = case list of\n    [] -> True\n    hd :: tl -> if pred hd then all pred tl else False\n\n  any pred list = case list of\n    [] -> False\n    hd :: tl -> if pred hd then True else any pred tl\n\n  projOks list = case list of\n    [] -> Ok []\n    head :: tail ->\n      Result.andThen2 (\\x y -> Ok (x :: y)) head (projOks tail)\n}\n\n\n--------------------------------------------------------------------------------\n-- String --\nString = {\n  ({toInt=strToInt, toFloat=strToFloat, join=join__}) = LensLess.String\n  (length) = LensLess.String.length -- We redefine length as a lens later in this module\n\n  (join_) x =\n    -- An example of using reversible foldl to join strings without separators\n    -- Here no insertion of element is possible, but we can remove elements.\n    -- We use a trick to propagate a value that is never computed, in order to know if, during update,\n    -- the last string had its first char deleted\n    case x of\n        [] -> {apply x = \"\", update {outputNew} = Ok (Inputs [[outputNew]])}.apply x\n        _ -> Update.applyLens {\n        apply (x, y) = x\n        update {output, diffs} = Ok (InputsWithDiffs\n          [((output, True), Just (VRecordDiffs { _1 = diffs, _2 = VConstDiffs}))])\n        } <| List.foldl2 (\\oldHeadList (oldAcc, dummyBool) ->\n      { apply (oldAcc, [head], dummyBool) = (oldAcc + head, dummyBool)\n        update {input=(oldAcc, [head], _) as input,outputNew=(newAcc, prevDeletedOrLast),diffs=ds} =\n          let handleDiffs = case ds of\n            VRecordDiffs {_1=VStringDiffs diffs} -> \\continuation -> continuation diffs\n            _ -> \\continuation -> Ok (InputsWithDiffs [(input, Nothing)])\n          in handleDiffs <| \\diffs ->\n          Update.splitStringDiffsAt (length oldAcc) 0 (oldAcc + head) newAcc diffs\n          |> List.concatMap (\\(leftValue, leftDiffs, rightValue, rightDiffs) ->\n            let lastCharLeftDeleted =\n              let aux leftDiffs = case leftDiffs of\n                [StringUpdate _ end 0] -> end == length oldAcc\n                head::tail -> aux tail\n                _ -> leftValue == \"\"\n              in aux leftDiffs\n            in\n            let firstCharDeleted = case rightDiffs of (StringUpdate 0 i 0) :: tail -> i > 0; _ -> False in\n            let surroundingElementsDeleted = lastCharLeftDeleted && prevDeletedOrLast in\n            let atLeastOneSurroundingElementDeleted = lastCharLeftDeleted || prevDeletedOrLast in\n            let elemDeleted = rightValue == \"\" && (firstCharDeleted || surroundingElementsDeleted) in\n            (if atLeastOneSurroundingElementDeleted && elemDeleted then [] else\n              [((leftValue, [rightValue], firstCharDeleted),\n                Update.pairDiff3\n                  (if leftDiffs == [] then Nothing else Just (VStringDiffs leftDiffs))\n                  (if rightDiffs == [] then Nothing else\n                   Just (VListDiffs [(0, ListElemUpdate (VStringDiffs rightDiffs))]))\n                  (if firstCharDeleted then Just VConstDiffs else Nothing)\n              )]) ++\n            (if elemDeleted then -- The string was deleted, one solution is to remove it.\n              [((leftValue, [], True),\n                Update.pairDiff3\n                  (if leftDiffs == [] then Nothing else Just (VStringDiffs leftDiffs))\n                  (Just (VListDiffs [(0, ListElemDelete 1)]))\n                  (Just VConstDiffs)\n                  )]\n            else [])\n          ) |> Update.valuesWithDiffs\n      }.apply (oldAcc, oldHeadList, dummyBool)\n      ) (freeze \"\", Update.softFreeze False) x\n\n  {substring,\n   take,\n   drop,\n   dropLeft,\n   dropRight,\n   sprintf} = LensLess.String\n\n  -- Repeats or shrinks s until it makes the given target length\n  (makeSize) s targetLength =\n    let n = length s in\n    if n < targetLength then makeSize (s + s) targetLength\n    else if n == targetLength then s\n    else take targetLength s\n\n  repeat n s = if n <= 0 then \"\" else if n == 1 then s else s + repeat (n - 1) s\n  slice = substring\n  left = take\n  right n x = dropLeft (max 0 ((length x) - n)) x\n\n  uncons s = case extractFirstIn \"^([\\\\s\\\\S])([\\\\s\\\\S]*)$\" s of\n    Just [x, y] -> Just (x, y)\n    Nothing -> Nothing\n\n  padLeft n c = Update.lens {\n    apply s = (List.range 1 (n - length s) |> List.map (always c) |> join \"\") + s\n    update {outputNew} =\n       case extractFirstIn (\"^(\" + c + \")*([\\\\s\\\\S]*)$\") outputNew of\n         Just [padding, str] -> Ok (Inputs [str])\n         Nothing -> Err \"String.pad could not complete\"\n  }\n\n  toInt = Update.lens\n    { apply x = strToInt x\n      unapply output = Just (toString output) }\n\n  toFloat = Update.lens\n      { apply x = strToFloat x -- TODO: Recognize strange floats (e.g. NaN, infinity)\n        unapply output = Just (toString output) }\n\n  join delimiter x =\n    if delimiter == \"\" then join_ x\n    else join__ delimiter x\n\n  -- In the forward direction, it joins the string.\n  -- In the backwards direction, if the delimiter is not empty, it splits the output string with it.\n  joinAndSplitBack regexSplit delimiter x = if delimiter == \"\" then join_ x else {\n        apply x = join__ delimiter x\n        update {output, oldOutput, diffs} =\n          Ok (Inputs [Regex.split regexSplit output])\n      }.apply x\n\n  length = Update.lens {\n    apply = length\n    update {input, oldOutput, newOutput} =\n      if newOutput < oldOutput then\n        Ok (InputsWithDiffs [(take newOutput input, Just (VStringDiffs [StringUpdate newOutput oldOutput 0]))])\n      else if newOutput == oldOutput then\n        Ok (InputsWithDiffs [(input, Nothing)])\n      else\n        let increment = newOutput - oldOutput in\n        let addition = makeSize (if input == \"\" then \"#\" else input) increment in\n        Ok (InputsWithDiffs [(input + addition, Just (VStringDiffs [StringUpdate oldOutput oldOutput increment]))])\n    }\n\n  trim s =\n    case extractFirstIn \"^\\\\s*([\\\\s\\\\S]*?)\\\\s*$\" s of\n      Just [trimmed] -> trimmed\n      _ -> s\n\n  update = {\n      freezeRight = Update.lens {\n        apply x = x\n        update {input, outputNew} =\n          if take (length input) outputNew == input then\n            Err <| \"Cannot add anything to the right of \'\" + input + \"\'\"\n          else\n            Ok <| Inputs [outputNew]\n      }\n\n      freezeLeft = Update.lens {\n        apply x = x\n        update {input, outputNew} =\n          if drop (length outputNew - length input) outputNew == input then\n            Err <| \"Cannot add anything to the left of \'\" + input + \"\'\"\n          else\n            Ok <| Inputs [outputNew]\n      }\n\n      debug tag text = onDeleteInsertLeftRight (\\l d i r ->\n        Debug.log (tag + \" deleted: \" + toString d + \", left: \" + toString (drop (max 0 (length l - 100)) l) + \", right: \" + toString (take 100 r) + \", inserted:\") i) text\n\n      onInsert callbackOnInserted string =\n        onDeleteInsertLeftRight (\\left deleted inserted right -> callbackOnInserted inserted) string\n\n      onDeleteInsertLeftRight callbackOnLeftDeletedInsertedRight string = Update.lens {\n        apply string = string\n        update {outputOld, outputNew, diffs=(VStringDiffs sDiffs)} =\n          let aux offset outputNewUpdated revDiffsUpdated oldDiffs = case oldDiffs of\n            [] -> Ok (InputsWithDiffs [\n              (outputNewUpdated, Just (VStringDiffs (List.reverse revDiffsUpdated)))])\n            ((StringUpdate start end replaced) as headDiff) :: tailOldDiffs ->\n              let inserted = substring (start + offset) (start + offset + replaced) outputNewUpdated in\n              let left = take (start+offset) outputNewUpdated in\n              let right = drop (start+offset+replaced) outputNewUpdated in\n              let deleted = substring start end outputOld in\n              let newInserted = callbackOnLeftDeletedInsertedRight left deleted inserted right in\n              let lengthNewInserted = length newInserted in\n              let newOffset = offset + lengthNewInserted - (end - start) in\n              let (newOutputNewUpdated, newDiff) = if inserted /= newInserted then\n                 ( take (start + offset) outputNewUpdated +\n                   newInserted + drop (start + offset + replaced) outputNewUpdated\n                 , StringUpdate start end lengthNewInserted)\n                 else (outputNewUpdated, headDiff)\n              in\n              aux newOffset newOutputNewUpdated (newDiff::revDiffsUpdated) tailOldDiffs\n           in aux 0 outputNew [] sDiffs\n       } string\n\n      fixTagUpdates string = Update.lens {\n         apply string = string\n         update {outputOld, outputNew, diffs=(VStringDiffs sDiffs)} =\n           let aux offset revDiffsUpdated oldDiffs = case oldDiffs of\n             [] -> Ok (InputsWithDiffs [\n               (outputNew, Just (VStringDiffs (List.reverse revDiffsUpdated)))])\n             ((StringUpdate start end replaced) as headDiff) :: tailOldDiffs ->\n               let continueWith callback = case tailOldDiffs of\n                 StringUpdate start2 end2 replaced2 :: tailTailOldDiffs->\n                   if start2 <= end + 2 && start2 /= end then -- Second condition necessary to not merge immediate deletion/insertions\n                     if not <| Regex.matchIn \"[<>]\" (substring end start2 outputOld) then\n                       aux offset revDiffsUpdated (StringUpdate start end2 (replaced + replaced2 + start2 - end) :: tailTailOldDiffs)\n                     else\n                       callback ()\n                   else\n                     callback ()\n                 _ ->\n                 callback ()\n               in\n               continueWith <| \\_ ->\n               let inserted = substring (start + offset) (start + offset + replaced) outputNew in\n               let deleted = substring start end outputOld in\n               let right = drop (start + offset + replaced) outputNew in\n               let rightOld = drop end outputOld in\n               let left = take (start + offset) outputNew in\n               let newOffset = offset + replaced - (end - start) in\n               if Regex.matchIn \"\"\"^<[\\s\\S]*>$\"\"\" inserted && Regex.matchIn \"\"\"^<[\\s\\S]*>$\"\"\" deleted then\n                 -- <img> --> <br> It should be a true replacement instead, else we\'ll back-propagate the transformation inside the <>\n                 aux offset revDiffsUpdated (StringUpdate start end 0 :: StringUpdate end end replaced :: tailOldDiffs)\n               else\n               let newDiff =\n                    if Regex.matchIn \"^><\" inserted  && Regex.matchIn \"^>\" right then\n                      StringUpdate (start + 1) (end + 1) replaced\n                    else if Regex.matchIn \"<$\" left && Regex.matchIn \"><$\" inserted then\n                      StringUpdate (start - 1) (end - 1) replaced\n                    else if Regex.matchIn \"</$\" left && Regex.matchIn \"></$\" inserted then\n                      StringUpdate (start - 2) (end - 2) replaced\n                    else if Regex.matchIn \"<$\" left && Regex.matchIn \"<$\" deleted then\n                      StringUpdate (start - 1) (end - 1) replaced\n                    else if Regex.matchIn \"^>\" deleted && Regex.matchIn \"^>\" right then\n                      StringUpdate (start + 1) (end + 1) replaced\n                    else if Regex.matchIn \"<$\" left && Regex.matchIn \"^>\" right && Regex.matchIn \"^>\" rightOld then -- We expand the replacement\n                      StringUpdate (start - 1) (end + 1) (replaced + 2)\n                    else\n                      headDiff\n               in\n               aux newOffset (newDiff::revDiffsUpdated) tailOldDiffs\n            in aux 0 [] sDiffs\n        } string\n  }\n\n  newlines = {\n    isCRLF = Regex.matchIn \"\\r\\n\"\n    toUnix string =\n      if isCRLF string then\n        Regex.split \"\\r\\n\" string\n        |> joinAndSplitBack \"\\n\" \"\\n\"\n      else\n        string\n  }\n\n  toLowerCase string =\n    Regex.replace \"[A-Z]\" (\\m ->\n      Update.replaceInstead m.match <|\n      case m.match of\n        \"A\" -> \"a\"; \"B\" -> \"b\"; \"C\" -> \"c\"; \"D\" -> \"d\"; \"E\" -> \"e\"; \"F\" -> \"f\"; \"G\" -> \"g\"; \"H\" -> \"h\"; \"I\" -> \"i\";\n        \"J\" -> \"j\"; \"K\" -> \"k\"; \"L\" -> \"l\"; \"M\" -> \"m\"; \"N\" -> \"n\"; \"O\" -> \"o\"; \"P\" -> \"p\"; \"Q\" -> \"q\"; \"R\" -> \"r\";\n        \"S\" -> \"s\"; \"T\" -> \"t\"; \"U\" -> \"u\"; \"V\" -> \"v\"; \"W\" -> \"w\"; \"X\" -> \"x\"; \"Y\" -> \"y\"; \"Z\" -> \"z\"; _ -> m.match\n      ) string\n\n  toUpperCase string =\n    Regex.replace \"[a-z]\" (\\m ->\n      Update.replaceInstead m.match <|\n      case m.match of\n        \"a\" -> \"A\"; \"b\" -> \"B\"; \"c\" -> \"C\"; \"d\" -> \"D\"; \"e\" -> \"E\"; \"f\" -> \"F\"; \"g\" -> \"G\"; \"h\" -> \"H\"; \"i\" -> \"I\";\n        \"j\" -> \"J\"; \"k\" -> \"K\"; \"l\" -> \"L\"; \"m\" -> \"M\"; \"n\" -> \"N\"; \"o\" -> \"O\"; \"p\" -> \"P\"; \"q\" -> \"Q\"; \"r\" -> \"R\";\n        \"s\" -> \"S\"; \"t\" -> \"T\"; \"u\" -> \"U\"; \"v\" -> \"V\"; \"w\" -> \"W\"; \"x\" -> \"X\"; \"y\" -> \"Y\"; \"z\" -> \"Z\"; _ -> m.match\n      ) string\n\n  markdown text =\n    let escapeHtml = Regex.replace \"[<>&]\" (case of\n          {match = \"<\"} -> freeze \"&lt;\"\n          {match = \">\"} -> freeze \"&gt;\"\n          {match = \"&\"} -> freeze \"&amp;\")\n        escapeAttribute = Regex.replace \"\\r?\\n|\\\"\" (case of\n          \"\\\"\" -> \"\\\\\\\"\"\n          _ -> \"\")\n        notincode = \"\"\"(?!(?:(?!<code>)[\\s\\S])*</code>)\"\"\"\n        notinulol = \"\"\"(?!(?:(?!<[uo]l>)[\\s\\S])*</[uo]l>)\"\"\"\n        notinattr = \"\"\"(?!(?:(?!<)[\\s\\S])*>)\"\"\"\n        regexFootnotes = \"\"\"\\r?\\n\\[\\^@notincode([^\\]]+)\\]:\\s*@notincode((?:(?!\\r?\\n\\r?\\n)[\\s\\S])+)@notincode\"\"\"\n        regexReferences = \"\"\"\\r?\\n\\[(?!\\^)([^\\]\\\\]+)\\]:\\s*@notincode(\\S+)@notincode\"\"\"\n        footnotes = Regex.find regexFootnotes text\n                     |> List.map (\\m -> (nth m 1, nth m 2))\n                     |> List.indexedMap (\\i (name, value) -> (name, (i + 1, value)))\n        references = Regex.find regexReferences text\n                     |> List.map (\\m -> (nth m 1, nth m 2))\n        r  = Regex.replace\n        lregex = \"\"\"(?:\\r?\\n|^)((?:(?![\\r\\n])\\s)*)(\\*|-|\\d+\\.)(\\s+)((?:@notincode.*)(?:\\r?\\n\\1  ?\\3(?:@notincode.*))*(?:\\r?\\n\\1(?:\\*|-|\\d+\\.)\\3(?:@notincode.*)(?:\\r?\\n\\1 \\3(?:@notincode.*))*)*)@notincode\"\"\"\n        handleLists text  =\n          flip (r lregex) text <|\n            \\m -> let indent = nth m.group 1\n                      afterindent = nth m.group 3\n                      symbol = nth m.group 2\n                      ul_ol = Update.bijection\n                               (case of \"*\" -> \"ul\"; \"-\" -> \"ul\"; _ -> \"ol\")\n                               (case of\n                                 \"ul\" -> if symbol == \"*\" || symbol == \"-\" then symbol else \"*\"\n                                 \"ol\" -> if symbol == \"*\" || symbol == \"-\" then \"1.\" else symbol\n                                 x -> error \"\"\"tag name \'@x\' not compatible with ul or ol\"\"\")\n                               symbol\n                      elements =\n                        Regex.split \"\"\"\\r?\\n@indent(?:\\*|-|\\d+\\.)@afterindent\"\"\" (nth m.group 4)\n                      insertionPoint callback = Update.lens {\n                        apply elements = \"\"\n                        update {input=elements, output} =\n                          case Regex.extract \"\"\"^<li>([\\s\\S]*)</li>$\"\"\" output of\n                            Just [content] ->\n                              Ok (Inputs [callback elements (Regex.split \"\"\"</li><li>\"\"\" content)]) -- TODO: Precompute diffs (insertions)\n                            _->\n                              Err (\"Can only insert <li> elements to lists, got \" + output)\n                      } elements\n                      insertAfter = insertionPoint (append)\n                      insertBefore = insertionPoint (flip append)\n                  in\n                  Update.freezeExcept (\\_ ->  \"ul template\")  [ul_ol, insertBefore, handleLists, elements, notinulol, insertAfter] <|\n                                                             \\[ul_ol, insertBefore, handleLists, elements, notinulol, insertAfter] ->\n                  \"\"\"<@ul_ol>@insertBefore<li>@(\n                    List.map handleLists elements\n                    |> joinAndSplitBack \"\"\"</li><li>@notinulol\"\"\" \"</li><li>\")</li>@insertAfter</@ul_ol>\"\"\"\n\n        handleblockquotes text =\n          Regex.replace \"\"\"(?:(?:\\r?\\n|^)>(?!.*</.*).*)+@notincode\"\"\" (\\m ->\n           Regex.extract \"\"\"(\\r?\\n|^)>([\\s\\S]*)\"\"\" m.match\n           |> Maybe.map (\\[newline, content] ->\n             let quoteContent =\n                  Regex.replace \"\"\"(\\r?\\n)> *\"\"\" (\\m -> nth m.group 1) content\n             in\n             let recursivecontent = quoteContent |> handleblockquotes in\n             Update.freezeExcept (\\_ -> \"blockquote template\") [newline, recursivecontent] <|\n                                                              \\[newline, recursivecontent] ->\n             \"\"\"@newline<blockquote>@recursivecontent</blockquote>\"\"\"\n           ) |> Maybe.withDefault m.match\n          ) text\n    in let\n    text =\n      r \"\"\"(```)([\\s\\S]*?)\\1(?!`)|(\\r?\\n *|^ *)((?:\\r?\\n    .*)+)\"\"\" (\\m ->\n      if nth m.group 1 == \"\" then\n        nth m.group 4 |>\n        Regex.extract \"\"\"^\\r?\\n    ([\\s\\S]*)$\"\"\" |>\n        Maybe.map (\\[code] ->\n                nth m.group 3 + \"\"\"<pre><code>@(Regex.split \"\"\"\\r?\\n    \"\"\" code |> join \"\\n\" |> trim |> escapeHtml)</code></pre>\"\"\")\n        |> Maybe.withDefault m.match\n      else\n      \"\"\"<pre><code>@(nth m.group 2 |> trim |> escapeHtml)</code></pre>\"\"\") text\n    text =  handleblockquotes text\n    text =  r \"\"\"(`)(?=[^\\s`])(@notincode.*?)\\1@notincode\"\"\" (\\m -> \"\"\"<code>@(nth m.group 2 |> escapeHtml)</code>\"\"\") text\n    text =  r \"\"\"(?:@regexReferences|@regexFootnotes)@notincode\"\"\" (\\m -> \"\") text\n    text = -- Expand footnotes\n      if List.length footnotes == 0 then text\n      else text + \"\"\"\n  <div class=\"footnotes\"><hr><ol>@(footnotes |>\n              List.map (\\(name, (n, value)) ->\n                \"\"\"<li id=\"fn@n\"><p>@value<a href=\"#fnref@n\">↩</a></p></li>\"\"\"\n              ) |> join \"\")</ol></div>\"\"\"\n    text = r \"\"\"(^|\\r?\\n)(#+)\\s*(@notincode[^\\r\\n]*)@notincode\"\"\" (\\m ->\n      let hlevel = \"\"\"h@(length (nth m.group 2))\"\"\" in\n      Update.freezeExcept (always \"h-template\") [m, hlevel] <| \\[m, hlevel] -> \"\"\"@(nth m.group 1)<@hlevel>@(nth m.group 3)</@hlevel>\"\"\") text\n    text = handleLists text\n    text = r \"\"\"(?:(\\r?\\n *\\r?\\n)(?:\\\\noindent\\r?\\n)?|^)((?=\\s*\\w|\\S)@notincode[\\s\\S]*?)(?=(\\r?\\n *\\r?\\n|\\r?\\n$|$))@notincode\"\"\" (\n      \\m ->\n        if nth m.group 1 == \"\" && nth m.group 3 == \"\" -- titles and images should not be paragraphs.\n         || Regex.matchIn \"\"\"</?(?:h\\d|ul|ol|p|pre|center)>\"\"\" (nth m.group 2) then m.match else Update.freezeExcept (always \"p template\") m <| \\m -> \"\"\"@(nth m.group 1)<p>@(nth m.group 2)</p>\"\"\") text\n    text = r \"\"\"(!?)\\[([^\\]\\[\\\\]+)\\](\\^?)(\\(|\\[)([^\\[\\)\\]\\s]+)\\s?\"?([^\\)\\]\"]+)?\"?(?:\\)|\\])|(?:http|ftp|https):\\/\\/(?:[\\w_-]+(?:(?:\\.[\\w_-]+)+))(?:[\\w.,@@?^=%&:/~+#-]*[\\w@@?^=%&/~+#-])?@notincode@notinattr\"\"\" (\n      \\{group=[match, picPrefix, text, targetblank, parensStyle, url, title]} ->  -- Direct and indirect References + syntax ^ to open in external page.\n      let a = if picPrefix == \"!\" then \"img\" else \"a\"\n          aclose = if picPrefix == \"!\" then \"\" else text + \"</a>\"\n          href = if picPrefix == \"!\" then \"src\" else \"href\"\n          t = if title == \"\" then \"\" else \" title=\'\" + title + \"\'\"\n          targetblank = if targetblank == \"^\" then \"\"\" target=\'_blank\'\"\"\" else \"\"\n          alt = if picPrefix == \"!\" then \"\"\" alt=\'@text\'\"\"\" else \"\"\n      in\n      case parensStyle of\n        \"(\" -> (Update.freezeWhen True toString (\\a t href url targetblank alt aclose -> \"\"\"<@a @t @href=\"@url\"@targetblank@alt>@aclose\"\"\"))\n                  a t href url targetblank alt aclose\n        \"[\" -> listDict.get url references |> case of\n              Just link ->\n                Update.freezeExcept (always \"a or img relative template\")\n                  [a, t, href, link, targetblank, alt, aclose] <|\n                 \\[a, t, href, link, targetblank, alt, aclose] ->\n               \"\"\"<@a @t @href=\"@link\"@targetblank@alt>@aclose\"\"\"\n              Nothing -> match\n        _ -> Update.freezeExcept (always \"full URL template\") match <| \\match -> \"\"\"<a href=\"@match\">@(escapeHtml match)</a>\"\"\"\n        ) text\n    text = r \"\"\"\\[\\^(@notincode[^\\]]+)\\]@notincode\"\"\" (\\m ->  -- Footnotes\n      listDict.get (nth m.group 1) footnotes |> case of\n        Just (n, key) ->\n          Update.freezeExcept (always \"footnote template\") [n, key] <| \\[n, key] ->\n          \"\"\"<a href=\"#fn@n\" title=\"@(escapeAttribute key)\" class=\"footnoteRef\" id=\"fnref@n\"><sup>@n</sup></a>\"\"\"\n        Nothing -> m.match) text\n    text = r \"\"\"(\\*{1,3}|_{1,3})(?=[^\\s\\*_])(@notincode(?:(?!\\\\\\*|\\_).)*?)(\\1)@notincode@notinattr\"\"\" (\\m ->\n      let content = nth m.group 2 in\n      let n = nth m.group 1 |> length in\n      let m = nth m.group 3 |> length in\n      let (start, end)= Update.lens2 {\n        apply (n, m) = case n of\n          1 -> (\"<em>\", \"</em>\")\n          2 -> (\"<strong>\", \"</strong>\")\n          3 -> (\"<em><strong>\", \"</strong></em>\")\n        update {outputNew=(start,end)} = case (start, end) of\n          (\"\", \"\") -> Ok (Inputs [(0, 0)])\n          (\"<span>\", \"</span>\") -> Ok (Inputs [(0, 0)])\n          (\"<em>\", \"</em>\") -> Ok (Inputs [(1, 1)])\n          (\"<strong>\", \"</strong>\") -> Ok (Inputs [(2, 2)])\n          _ -> Err \"Cannot touch em and strong tags directly. For now, just delete and replace the text without italics/bold\"\n      } n m\n      in start + content + end) text\n    text = r \"\"\"(&mdash;|\\\\\\*|\\\\_|\\\\\\[|\\\\\\]|  \\r?\\n)@notincode\"\"\" (\\m -> case m.match of\n      \"&mdash;\" -> \"—\"\n      \"\\\\*\" -> drop 1 m.match\n      \"\\\\_\" -> drop 1 m.match\n      \"\\\\[\" -> drop 1 m.match\n      \"\\\\]\" -> drop 1 m.match\n      \"  \\r\\n\" -> \"<br>\"\n      \"  \\n\" -> \"<br>\"\n      ) text\n    text = update.onDeleteInsertLeftRight (\\left deleted inserted right ->\n      let\n        inserted =\n          Regex.replace \"\"\"<(b|i|em|strong)>(?=\\S)((?:(?!</\\1\\s*>).)*\\S)</\\1\\s*>\"\"\" (\\m ->\n            let tag = nth m.group 1\n                content = nth m.group 2\n            in if tag == \"b\" || tag == \"strong\" then\n              \"**\" + content + \"**\"\n            else\n              \"*\" + content + \"*\"\n          ) inserted\n        inserted = case Regex.extract \"\"\"^([\\s\\S]*)</p>\\s*<p>([\\s\\S]*)$\"\"\" inserted of\n          Just [before, after] -> before + \"\\n\\n\" + after\n          _ -> inserted\n        inserted = case Regex.extract \"\"\"^([\\s\\S]*)<div>([\\s\\S]*)</div>([\\s\\S]*)$\"\"\" inserted of\n          Just [before, paragraph, after] ->\n             before + \"\\n\\n\" + paragraph + after\n          _ -> inserted\n        inserted = case Regex.extract \"\"\"^([\\s\\S]*)<(/?)(b|i|strong|em)\\s*>([\\s\\S]*)$\"\"\" inserted of\n          Just [before, mbSlash, bi, after] ->\n            let mdtag = if bi == \"b\" || bi == \"strong\" then \"**\" else \"*\" in\n            let mdtagregex = if bi == \"b\" then \"\\\\*\\\\*\" else \"\\\\*\" in\n            if mbSlash == \"\" && Regex.matchIn \"\"\"^\\S(?:(?!</@bi\\s*>).)*?\\S</@bi\\s*>\"\"\" (after + right) then\n              before + mdtag + after\n            else if mbSlash == \"/\" && Regex.matchIn \"\"\"@mdtagregex\\S(?:(?!@mdtagregex).)*?$\"\"\" (left + before) then\n              before + mdtag + after\n            else inserted\n          _ -> inserted\n        inserted = Regex.replace \"\"\"<a href=\"((?:(?!</a>).)*)\">((?:(?!</a>).)*)</a>\"\"\" (\\{submatches=[url, text]} ->\n             \"[\" + text + \"](\"+ url +\")\"\n          ) inserted\n        inserted = Regex.replace \"\"\"<img[^>]+\\bsrc=[^>]+>\"\"\" (\\match ->\n           case htmlViaEval match.match of\n              [[\"img\", attrs, _]] ->\n                let title = attrDict.get \"title\" attrs |> Maybe.map (\\x -> \" \\\"\" + x + \"\\\"\") |> Maybe.withDefault \"\"\n                    alt = attrDict.get \"alt\" attrs |> Maybe.map (\\x -> if x == \"\" then \"Image\" else x) |> Maybe.withDefault \"Image\"\n                    url = attrDict.get \"src\" attrs |> Maybe.withDefault \"url\"\n                in\n                \"![\" + alt + \"](\"+ url + title + \")\"\n              _ -> match.match) inserted\n      in inserted\n      ) text\n    text = update.fixTagUpdates text\n    in text\n\n  q3 = \"\\\"\\\"\\\"\" -- To interpolate triple quotes into strings\n}\n\n\n--------------------------------------------------------------------------------\n-- Maybe --\n\nMaybe =\n  { type Maybe a = Nothing | Just a\n\n    -- Returns the first argument if the second is Nothing. If the second is Just x returns x\n    withDefault d mb =\n      case mb of\n        Nothing -> d\n        Just j -> j\n\n    -- Like withDefault, but if the default was used and we push a new value,\n    -- it will push it back as a \"Just\" before trying the usual behavior. Ideal for displaying placeholders.\n    withDefaultReplace = Update.lens2 {\n      apply (d, mb) = case mb of\n        Nothing -> d\n        Just j -> j\n      update {input=(d,mb) as input,outputNew} as uInput =\n        Ok (InputsWithDiffs ([((d, Just outputNew),\n              Update.diffs mb (Just outputNew) |> LensLess.Maybe.map Update.vTupleDiffs_2)] ++ (\n              if mb /= Nothing then [] else Update.defaultAsListWithDiffs apply uInput)))\n    }\n\n    -- Like withDefault, but the default value is a callback that is called if mb is empty.\n    withDefaultLazy df mb =\n      case mb of\n        Nothing -> df ()\n        Just j -> j\n\n    -- Like withDefault, but if the default was used and we push a new value,\n    -- it will push it back as a \"Just\" before trying the usual behavior. Ideal for displaying placeholders.\n    withDefaultReplaceLazy = Update.lens2 {\n      apply (df, mb) = case mb of\n        Nothing -> df ()\n        Just j -> j\n      update {input=(df,mb) as input,outputNew} as uInput =\n        Ok (InputsWithDiffs ([((df, Just outputNew),\n              Update.diffs mb (Just outputNew) |> LensLess.Maybe.map Update.vTupleDiffs_2)] ++ (\n              if mb /= Nothing then [] else Update.defaultAsListWithDiffs apply uInput)))\n    }\n\n    map = Update.lens2 {\n      apply (f, a) = case a of\n        Nothing -> Nothing\n        Just x -> Just (f x)\n      update = case of\n        {outputOld=Just x, outputNew=Nothing} ->\n          Ok (InputsWithDiffs [((f, Nothing), Update.mbPairDiffs (Nothing, Just VConstDiffs))])\n        uInput -> Update.default apply uInput\n    }\n\n    -- Like map, but does not fail if the input was NOthing and the new output is Just, because it knows a default element.\n    mapWithDefault = Update.lens2 {\n      apply (default, f, a) = case a of\n        Nothing -> Nothing\n        Just x -> Just (f x)\n      update = case of\n        {outputOld=Just x, outputNew=Nothing} ->\n           Ok (InputsWithDiffs [((f, Nothing), Update.mbPairDiffs (Nothing, Just VConstDiffs))])\n        {outputOld=Nothing, outputNew=Just x} ->\n           case Update.updateApp {fun (_, f, x) = f x, input = (default, f, default), outputNew = x} of\n             Err msg -> Err msg\n             Ok (InputsWithDiffs inputsWithDiffs) ->\n               Ok (InputsWithDiffs (inputsWithDiffs |> List.map (\\((default, f, newX), newDiff) ->\n                 ((default, f, Just newX), case newDiff of\n                   Just _ -> Just (VRecordDiffs { _3=VConstDiffs})\n                   Nothing -> Nothing)\n               )))\n        uInput -> Update.default apply uInput\n    }\n\n    andThen f a = case a of\n      Nothing -> Nothing\n      Just x -> f x\n\n    orElse mb2 mb1 = case mb1 of\n      Just _ -> mb1\n      Nothing -> mb2\n\n    -- like orElse, but in the reverse direction, will try to push Nothing to mb1\n    orElseReplace = Update.lens2 {\n      apply (mb2, mb1) = case mb1 of\n        Nothing -> mb2\n        Just x -> mb1\n      update {input=(mb2, mb1), outputOld, outputNew} =\n        case outputNew of\n          Just _ -> case mb1 of\n            Nothing -> Ok (Inputs [(mb2, outputNew), (outputNew, mb1)])\n            Just _ -> Ok (Inputs [(mb2, outputNew)])\n          Nothing -> Ok (Inputs [(mb2, Nothing)])\n    }\n\n    -- Given emptyCondition and Just x, returns x.\n    -- On the reverse direction, if the new x passes the emptyCondition, propagates back Nothing\n    getUnless emptyCondition = Update.lens {\n      apply (Just x) = x\n      update {outputNew} as uInput =\n        if emptyCondition outputNew then\n          Ok (Inputs [Nothing])\n        else\n          Update.default apply uInput\n    }\n\n    fold : a -> (x -> a) -> Maybe x -> a\n    fold onNothing onJust content =\n      case content of\n        Nothing -> onNothing\n        Just c -> onJust c\n\n    foldLazy : (() -> a) -> (x -> a) -> Maybe x -> a\n    foldLazy onNothing onJust content =\n      case content of\n        Nothing -> onNothing ()\n        Just c -> onJust c\n  }\n\n-- if we decide to allow types to be defined within (and exported from) modules\n--\n-- {Nothing, Just} = Maybe\n--\n-- might look something more like\n--\n-- {Maybe(Nothing,Just)} = Maybe\n-- {Maybe(..)} = Maybe\n--\n-- -- Sample deconstructors once generalized pattern matching works.\n-- Nothing$ = {\n--   unapplySeq exp = case exp of\n--     {$d_ctor=\"Nothing\", args=[]} -> Just []\n--     _ -> Nothing\n-- }\n-- Just$ = {\n--   unapplySeq exp = case exp of\n--     {$d_ctor=\"Just\", args=[x]} -> Just [x]\n--     _ -> Nothing\n-- }\n\n--------------------------------------------------------------------------------\n-- Tuple --\n\nTuple =\n  { mapFirst f (x, y) = (f x, y)\n    mapSecond f (x, y) = (x, f y)\n    first (x, y) = x\n    second (x, y) = y\n  }\n\n--------------------------------------------------------------------------------\n-- Editor --\n\nEditor = {}\n\n-- TODO remove this; add as imports as needed in examples\n{freeze, applyLens} = Update\n\n-- Custom Update: List Map, List Append, ...\n\n-- TODO\n\n-- HTML\n\n--------------------------------------------------------------------------------\n-- Html.html\n\n--type HTMLAttributeValue = HTMLAttributeUnquoted WS WS String | HTMLAttributeString WS WS String {-Delimiter char-}  String | HTMLAttributeNoValue\n--type HTMLAttribute = HTMLAttribute WS String HTMLAttributeValue\n--type HTMLCommentStyle = Less_Greater String {- The string should start with a ? -}\n--                      | LessSlash_Greater {- The string should start with a space -} String\n--                      | LessBang_Greater String\n--                      | LessBangDashDash_DashDashGreater String\n\n--type HTMLClosingStyle = RegularClosing WS | VoidClosing | AutoClosing | ForgotClosing\n--type HTMLEndOpeningStyle = RegularEndOpening {- usually > -} | SlashEndOpening {- add a slash before the \'>\' of the opening, does not mark the element as ended in non-void HTML elements -}\n-- HTMLInner may have unmatched closing tags inside it. You have to remove them to create a real innerHTML\n-- HTMLInner may have unescaped chars (e.g. <, >, & etc.)\n--type HTMLNode = HTMLInner String\n--              | HTMLElement String (List HTMLAttribute) WS HTMLEndOpeningStyle (List HTMLNode) HTMLClosingStyle\n--              | HTMLComment HTMLCommentStyle\n\nupdateOutputToResults c = case c of\n  Ok (Inputs i) -> Ok i\n  Ok (InputsWithDiffs id) -> Ok (List.unzip id |> Tuple.first)\n  Err msg -> Err msg\n\n-- Returns a list of HTML nodes parsed from a string. It uses the API for loosely parsing HTML\n-- Example: html \"Hello<b>world</b>\" returns [[\"TEXT\",\"Hello\"],[\"b\",[], [[\"TEXT\", \"world\"]]]]\nhtml string = {\n  apply trees =\n    let unwrapcontent elems = List.map (case of\n      HTMLAttributeStringRaw raw -> raw\n      HTMLAttributeEntity rendered _ -> rendered) elems |> String.join \"\" in\n    let domap tree = case tree of\n      HTMLInner v -> [\"TEXT\",\n        replaceAllIn \"</[^>]*>\" (\\{match} -> \"\") v]\n      HTMLEntity entityRendered entity -> [\"TEXT\", entityRendered]\n      HTMLElement tagName attrs ws1 endOp children closing ->\n        [ tagName\n        , map (case of\n          HTMLAttribute ws0 name value ->\n            let (name, content) = case value of\n              HTMLAttributeUnquoted _ _ content -> (name, unwrapcontent content)\n              HTMLAttributeString _ _ _ content -> (name, unwrapcontent content)\n              HTMLAttributeNoValue -> (name, \"\")\n            in\n            if name == \"style\" then\n              let styleContent = Regex.split \"(?=;\\\\s*\\\\S)\" content |> LensLess.List.filterMap (\n                  Regex.extract \"^;?([\\\\s\\\\S]*):([\\\\s\\\\S]*);?\\\\s*$\"\n                )\n              in\n              [name, styleContent]\n            else [name, content]\n            ) attrs\n        , map domap children]\n      HTMLComment {args = {_1=content}} -> [\"comment\", [[\"display\", \"none\"]], [[\"TEXT\", content]]]\n    in map domap trees\n\n  update {input, oldOutput, newOutput, diffs} =\n    let toHTMLAttribute [name, mbStyleValue] =\n      let value =\n        if name == \"style\" then\n          LensLess.String.join \"; \" (LensLess.List.map (\\[styleName, styleValue] ->\n            styleName + \":\" + styleValue\n          ) mbStyleValue)\n        else mbStyleValue\n      in\n      HTMLAttribute \" \" name (HTMLAttributeString \"\" \"\" \"\\\"\" value) in\n    let toHTMLInner text = HTMLInner (replaceAllIn \"<|>|&\" (\\{match} -> case match of \"&\" -> \"&amp;\"; \"<\" -> \"&lt;\"; \">\" -> \"&gt;\"; _ -> \"\") text) in\n    let toHTMLNode e = case e of\n      [\"TEXT\",v2] -> toHTMLInner v2\n      [tag, attrs, children] -> HTMLElement tag (map toHTMLAttribute attrs) \"\"\n           RegularEndOpening (map toHTMLNode children) (RegularClosing \"\")\n    in\n    let reconcile oldAttrElems newString = [HTMLAttributeStringRaw newString] in\n    let mergeAttrs input oldOutput newOutput diffs =\n      Update.foldDiff {\n        start =\n          -- Accumulator of HTMLAttributes, accumulator of differences, original list of HTMLAttributes\n          ([], [], input)\n        onSkip (revAcc, revDiffs, input) {count} =\n          --\'outs\' was the same in oldOutput and outputNew\n          let (newRevAcc, remainingInput) = LensLess.List.reverse_move count revAcc input in\n          Ok [(newRevAcc, revDiffs, remainingInput)]\n\n        onUpdate (revAcc, revDiffs, input) {oldOutput, newOutput, diffs, index} =\n          let inputElem::inputRemaining = input in\n          let newInputElem = case (inputElem, newOutput) of\n            (HTMLAttribute sp0 name value, [name2, value2 ]) ->\n             let realValue2 =\n               if name == \"style\" then -- value2\n                 String.join \"\" (List.map (\\[styleName, styleValue] ->\n                   styleName + \":\" + styleValue + \";\"\n                 ) value2)\n               else value2\n             in\n             case value of\n               HTMLAttributeUnquoted sp1 sp2 v ->\n                 case extractFirstIn \"\\\\s\" realValue2 of\n                   Nothing ->\n                     HTMLAttribute sp0 name2 (HTMLAttributeUnquoted sp1 sp2 (reconcile v realValue2))\n                   _ ->\n                     HTMLAttribute sp0 name2 (HTMLAttributeString sp1 sp2 \"\\\"\" (reconcile v realValue2))\n               HTMLAttributeString sp1 sp2 delim v ->\n                     HTMLAttribute sp0 name2 (HTMLAttributeString sp1 sp2 delim (reconcile v realValue2))\n               HTMLAttributeNoValue ->\n                  if value2 == \"\" then HTMLAttribute sp0 name2 (HTMLAttributeNoValue)\n                  else toHTMLAttribute [name2, value2]\n               _ -> Debug.crash <| \"expected HTMLAttributeUnquoted, HTMLAttributeString, HTMLAttributeNoValue, got \" ++ toString (inputElem, newOutput)\n            _ -> Debug.crash \"Expected HTMLAttribute, got \" ++ toString (inputElem, newOutput)\n          in\n          let newRevDiffs = case Update.diff inputElem newInputElem of\n            Ok (Just d) -> (index, ListElemUpdate d)::revDiffs\n            Ok (Nothing) ->  revDiffs\n            Err msg -> Debug.crash msg\n          in\n          Ok [(newInputElem::revAcc, newRevDiffs, inputRemaining)]\n\n        onRemove (revAcc, revDiffs, input) {oldOutput, index} =\n          let _::remainingInput = input in\n          Ok [(revAcc, (index, ListElemDelete 1)::revDiffs, remainingInput)]\n\n        onInsert (revAcc, revDiffs, input) {newOutput, index} =\n          Ok [(toHTMLAttribute newOutput :: revAcc, (index, ListElemInsert 1)::revDiffs, input)]\n\n        onFinish (revAcc, revDiffs, _) =\n          Ok [(reverse revAcc, reverse revDiffs)]\n\n        onGather (acc, diffs) =\n          Ok (InputWithDiff (acc,\n               (if len diffs == 0 then Nothing else Just (VListDiffs diffs))))\n      } oldOutput newOutput diffs\n    in\n    -- Returns Ok (List (List HTMLNode)., diffs = List (Maybe ListDiff)} or Err msg\n    let mergeNodes input oldOutput newOutput diffs =\n      Update.foldDiff {\n        start =\n          -- Accumulator of values, accumulator of differences, original input\n          ([], [], input)\n\n        onSkip (revAcc, revDiffs, input) {count} =\n          --\'outs\' was the same in oldOutput and outputNew\n          let (newRevAcc, remainingInput) = LensLess.List.reverse_move count revAcc input in\n          Ok [(newRevAcc, revDiffs, remainingInput)]\n\n        onUpdate (revAcc, revDiffs, input) {oldOutput, newOutput, diffs, index} =\n          let inputElem::inputRemaining = input in\n          --Debug.start (\"onUpdate\" + toString (oldOutput, newOutput, diffs, index)) <| \\_ ->\n          let newInputElems = case (inputElem, oldOutput, newOutput) of\n            ( HTMLInner v, _, [\"TEXT\",v2]) -> Ok [toHTMLInner v2]\n            ( HTMLEntity entityRendered entity, _, [\"TEXT\", v2]) -> Ok [HTMLEntity v2 v2]\n            ( HTMLElement tagName attrs ws1 endOp children closing,\n              [tag1, attrs1, children1], [tag2, attrs2, children2] ) ->\n               if tag2 == tagName || attrs1 == attrs2 || children2 == children1  then\n                 case diffs of\n                   VListDiffs listDiffs ->\n                     let (newAttrsMerged, otherDiffs) = case listDiffs of\n                       (1, ListElemUpdate diffAttrs)::tailDiff ->\n                         (mergeAttrs attrs attrs1 attrs2 diffAttrs, tailDiff)\n                       _ -> (Ok (Inputs [attrs]), listDiffs)\n                     in\n                     let newChildrenMerged = case otherDiffs of\n                       (2, ListElemUpdate diffNodes)::_ ->\n                         case mergeNodes children children1 children2 diffNodes of\n                           Ok (InputsWithDiffs vds) -> Ok (List.map Tuple.first vds)\n                           Err msg -> Err msg\n                       _ -> Ok [children]\n                     in\n                     newAttrsMerged |> updateOutputToResults |> LensLess.Results.andThen (\\newAttrs ->\n                       newChildrenMerged |>LensLess.Results.andThen (\\newChildren ->\n                         Ok [HTMLElement tag2 newAttrs ws1 endOp newChildren closing]\n                       )\n                     )\n               else Ok [toHTMLNode newOutput]\n            _ -> Ok [toHTMLNode newOutput]\n          in\n          newInputElems |>LensLess.Results.andThen (\\newInputElem ->\n            --Debug.start (\"newInputElem:\" + toString newInputElem) <| \\_ ->\n            case Update.diff inputElem newInputElem of\n              Err msg -> Err msg\n              Ok maybeDiff ->\n                let newRevDiffs = case maybeDiff of\n                  Nothing -> revDiffs\n                  Just v -> (index, ListElemUpdate v)::revDiffs in\n                Ok [ (newInputElem::revAcc, newRevDiffs, inputRemaining) ]\n          )\n\n        onRemove (revAcc, revDiffs, input) {oldOutput, index} =\n          let _::remainingInput = input in\n          Ok [(revAcc, (index, ListElemDelete 1)::revDiffs, remainingInput)]\n\n        onInsert (revAcc, revDiffs, input) {newOutput, index} =\n          Ok [(toHTMLNode newOutput :: revAcc, (index, ListElemInsert 1)::revDiffs, input)]\n\n        onFinish (revAcc, revDiffs, _) =\n          Ok [(reverse revAcc, reverse revDiffs)]\n\n        onGather (acc, diffs) =\n          Ok (InputWithDiff (acc, if len diffs == 0 then Nothing else Just (VListDiffs diffs)))\n      } oldOutput newOutput diffs\n    in mergeNodes input oldOutput newOutput diffs\n}.apply (parseHTML string)\n\n\n--------------------------------------------------------------------------------\n-- Html module\n\nHtml = {\n  -- Returns a list of one text element from a string, and updates by taking all the pasted text.\n  text = Update.lens {\n    apply s = [[\"TEXT\", s]]\n    update {output} =\n      let textOf = case of\n        [\"TEXT\", s]::tail -> s + textOf tail\n        [tag, attrs, children]::tail ->\n          textOf children + textOf tail\n        _ -> \"\"\n      in\n      Ok (Inputs [textOf output])\n  }\n\n  textNode text = [\"TEXT\", text]\n\n  (textElementHelper) tag styles attrs textContent =\n    [ tag,  [\"style\", styles] :: attrs , text textContent ]\n\n  p = textElementHelper \"p\"\n  th = textElementHelper \"th\"\n  td = textElementHelper \"td\"\n  h1 = textElementHelper \"h1\"\n  h2 = textElementHelper \"h2\"\n  h3 = textElementHelper \"h3\"\n  h4 = textElementHelper \"h4\"\n  h5 = textElementHelper \"h5\"\n  h6 = textElementHelper \"h6\"\n\n  (elementHelper) tag styles attrs children =\n    [ tag,  [\"style\", styles] :: attrs , children ]\n\n  div = elementHelper \"div\"\n  tr = elementHelper \"tr\"\n  table = elementHelper \"table\"\n  span = elementHelper \"span\"\n  b= elementHelper \"b\"\n  i= elementHelper \"i\"\n  li = elementHelper \"li\"\n  ul = elementHelper \"ul\"\n  br = [\"br\", [], []]\n\n  element = elementHelper\n\n  parse = html\n  parseViaEval = htmlViaEval\n\n  freshTag = Update.lens {\n    apply x = \"dummy\" + toString (getCurrentTime x)\n    update {input} = Ok (InputsWithDiffs [(input, Nothing)]) }\n\n  integerRefresh i node = [\"\"\"span@i\"\"\", [], [node]]\n\n  forceRefresh node = [freshTag True, [], [node]]\n\n  (option) value selected content =\n    <option v=value @(\n      Update.bijection\n        (\\selected -> if selected then [[\"selected\",\"selected\"]] else [])\n        ((==) []) selected\n    )>@content</option>\n\n  select attributes strArray index =\n    let options = List.indexedMap (\\i opt ->\n        option (toString i) (i == index) [[\"TEXT\", opt]]\n      ) strArray\n    in\n    <select selected-index=(toString index)\n      onchange=\"this.setAttribute(\'selected-index\', this.selectedIndex)\" @attributes>@options</select>\n\n  checkbox text title isChecked =\n      let id = \"checkbox-\"+Regex.replace \"[^\\\\w]\" \"\" text in\n      [\"span\", [], [\n        [\"label\", [[\"class\",\"switch\"],[\"title\", title]], [\n          [\"input\", [\"type\",\"checkbox\"] :: [\"id\", id] :: [\"onclick\",\"if(this.checked) { this.setAttribute(\'checked\', \'\'); } else { this.removeAttribute(\'checked\') }\"]::\n            { apply checked =\n                if checked then [[\"checked\", \"\"]] else []\n              update {newOutput} = case newOutput of\n                [] -> Ok (Inputs [ False ])\n                _ ->  Ok (Inputs [ True ])\n            }.apply isChecked,\n            [[\"span\", [[\"class\", \"slider round\"]], []]]\n          ]\n        ]],\n        [\"label\", [[\"for\",id], [\"title\", title]], [[\"TEXT\", text]]]\n      ]]\n\n  -- Do not use if the view DOM is not totally re-rendered.\n  onChangeAttribute model controller =\n    Update.lens {\n      apply model = \"\"\n      update {input, outputNew} = Ok (Inputs [controller input outputNew])\n    } model\n\n  onClickCallback model controller =  Update.lens {\n    apply model = \"\"\"/*@getCurrentTime*/this.setAttribute(\'onclick\', \" \" + this.getAttribute(\'onclick\'))\"\"\"\n    update {input, outputNew} =\n      if String.take 1 outputNew == \" \" then\n      Ok (Inputs [controller model])\n      else\n      Ok (InputsWithDiffs [(input, Nothing)])\n    } model\n  \n  do = onClickCallback\n\n  button name title model controller =\n    <button title=title onclick=(onClickCallback model controller)>@name</button>\n\n  input tpe value =\n    <input type=tpe value=value v=value onchange=\"this.setAttribute(\'v\', this.value)\">\n\n  observeCopyValueToAttribute query attribute =\n    <script>\n      function handleMutation(mutations) {\n        mutations.forEach(function(mutation) {\n          mutation.target.value = mutation.target.getAttribute(\"@attribute\");\n        }) }\n      var textAreasObserver = new MutationObserver(handleMutation);\n      var textAreas = document.querySelectorAll(@query);\n      for (i = 0; i &lt; textAreas.length; i++)\n        textAreasObserver.observe(textAreas[i], {attributes: true});\n    </script>\n\n  -- Takes a 1-element node list, and whatever this element is replaced by.\n  -- In the reverse direction, modifies the element but also propagates its deletion to the list\n  -- or insertions of new elements.\n  mergeMatch: String -> Diffs -> Match -> String\n  (mergeMatch) originalMatch mDiffs m =\n     case mDiffs of\n       VRecordDiffs dDiffs ->\n         let matchLength = String.length originalMatch in\n         let gatherDiffs groups starts groupDiffs =\n           let combineDiffs i groupDiffs accDiffs =\n             case groupDiffs of\n               [] -> accDiffs\n               (j, d)::tdgd ->\n                 if i < j then combineDiffs (i + 1) groupDiffs accDiffs\n                 else case d of\n                     ListElemUpdate ud ->\n                       let startInMatch = nth starts i - m.index in\n                       case ud of\n                         VStringDiffs sds ->\n                           let (_, concreteUpdates) =  List.foldl (\\(StringUpdate start end replacement) (offset, accDiffs) ->\n                               (offset + replacement - (end - start),\n                                accDiffs ++ [ConcreteUpdate\n                                               (start + startInMatch)\n                                               (end + startInMatch)\n                                               (String.substring (start + offset) (start + replacement + offset) (nth groups i))\n                                            ])\n                             ) (0, []) sds\n                           in combineDiffs (i + 1) tdgd (accDiffs ++ concreteUpdates)\n                         _ -> error (\"Expected string diffs, got \" + toString ud)\n                     ListElemInsert _ -> error \"Not possible ot insert match groups\"\n                     ListElemDelete _ -> error \"Not possible to delete match groups\"\n           in\n           combineDiffs 0 groupDiffs []\n         in\n         let totalUpdates = (case dDiffs of\n           { group = VListDiffs groupDiffs} ->\n             gatherDiffs m.group m.start groupDiffs\n           _ -> []) ++ (case dDiffs of\n           { submatches = VListDiffs groupDiffs} ->\n             gatherDiffs m.submatches (List.drop 1 m.start) groupDiffs\n           _ -> []) ++ (case dDiffs of\n           {match = matchDiffs} ->\n             gatherDiffs [m.match] [m.index] [(0, ListElemUpdate matchDiffs)]\n           _ -> [])\n         in\n         let concreteUpdates = totalUpdates |>\n              sortBy (\\(ConcreteUpdate s1 _ _) (ConcreteUpdate s2 _ _) -> s1 <= s2) |>\n              List.foldl (\\((ConcreteUpdate start end replacement) as a) (accConcreteUpdates, minStartIndex) ->\n                if start >= minStartIndex && end <= matchLength then\n                  (a::accConcreteUpdates, end)\n                else\n                  (accConcreteUpdates, minStartIndex)\n                ) ([], 0) |>\n              Tuple.first\n         in\n         List.foldl (\\(ConcreteUpdate start end replacement) match ->\n           String.take start match + replacement + String.drop end match)\n             originalMatch concreteUpdates\n\n  -- Split the text into Text [[\"TEXT\", unchanged text]] and Match (match)\n  -- On the other direction, recombines the nodes of Text and Match\n  -- Allows to back-propagate insertions and deletions of nodes\n  findAugmentedInterleavings number regex ([[\"TEXT\", text]] as tNodes) =\n    let interleavings = findInterleavings number regex text in\n    let rev = List.foldl (\\elem acc -> case elem of\n        Left text -> Text [[\"TEXT\", text]] :: acc\n        Right match -> Match match :: acc\n      ) [] interleavings\n    in\n    let augmentedInterleavings = List.reverse rev in\n    let allMatches: List (Int, Match)\n        allMatches = List.concatMap (case of Match match -> [(match.number, match)]; _ -> []) augmentedInterleavings in\n    Update.lens {\n      apply tNodes = augmentedInterleavings\n      update ({outputNew, diffs} as uInput) = -- We should extract all the new matches\n        case diffs of\n          VListDiffs ds ->\n            let rebuild i outputNew ds newInput =\n               case ds of\n                 [] ->\n                   case outputNew of\n                     [] ->\n                       Ok (Inputs [__mergeHtmlText__ newInput])\n                     Text nodes :: outputNewTail ->\n                       newInput ++ nodes |>\n                       rebuild (i + 1) outputNewTail ds\n                     Match m :: outputNewTail ->\n                       newInput ++ [[\"TEXT\", m.match]] |>\n                       rebuild (i + 1) outputNewTail ds\n                 (j, ld)::tds ->\n                   if i < j then\n                     case outputNew of\n                     Text nodes :: outputNewTail ->\n                       newInput ++ nodes |>\n                       rebuild (i + 1) outputNewTail ds\n                     Match m :: outputNewTail ->\n                       newInput ++ [[\"TEXT\", m.match]] |>\n                       rebuild (i + 1) outputNewTail ds\n                     [] ->\n                       Err (\"Unexpected end of findAugmentedInterleavings.outputNew\" + toString uInput)\n                   else case ld of\n                     ListElemUpdate u  ->\n                       case outputNew of\n                         Text nodes :: outputNewTail ->\n                           newInput ++ nodes |>\n                           rebuild (i + 1) outputNewTail tds\n                         Match m :: outputNewTail ->\n                           case u of\n                             VRecordDiffs {args = VRecordDiffs { _1 = mDiffs } } ->\n                               let originalMatch = (listDict.get m.number allMatches |> Maybe.withDefault m).match in\n                               newInput ++ [[\"TEXT\", mergeMatch originalMatch mDiffs m]] |>\n                               rebuild (i + 1) outputNewTail tds\n                             _ -> Err (\"Unexpected findAugmentedInterleavings diffs: \" + toString u)\n                         [] ->\n                           Err (\"Unexpected end of findAugmentedInterleavings.outputNew\" + toString uInput)\n\n                     ListElemInsert n  ->\n                       let tailDiffs = if n == 1 then tds else (j, ListElemInsert (n - 1)) :: tds in\n                       case outputNew of\n                         [] ->\n                           Err (\"Expected inserted elements, got nothing\")\n                         Text nodes :: outputNewTail ->\n                           newInput ++ nodes |>\n                           rebuild i outputNewTail tailDiffs\n                         Match m :: outputNewTail ->\n                           newInput ++ [[\"TEXT\", m.match]] |>\n                           rebuild i outputNewTail tailDiffs\n\n                     ListElemDelete n  ->\n                       rebuild (i + n) outputNew tds newInput\n            in\n              rebuild 0 outputNew ds []\n          _ -> Err (\"Expected VListDiffs, got \" + toString diffs)\n    } tNodes\n\n  -- given a 1-element list and an element, returns the element wrapped\n  -- On the way back, back-propagates insertions and deletions to the list after applying the inverse\n  -- convertInserted,\n  -- and changes to element itself on the other side\n  insertionDeletionUpdatesTo: (b -> a) -> (List a, b) -> List b\n  insertionDeletionUpdatesTo convertInserted = Update.lens2 {\n      apply (node1List, node1) = [node1]\n      update {input=(node1List, node1), outputNew=newNodes, diffs} =\n        case diffs of\n          VListDiffs listDiffs ->\n            let aux i newNodes listDiffs newNode1List newNode1ListDiffs newNode1 mbNode1Diffs =\n              case listDiffs of\n                [] ->\n                  Ok (InputsWithDiffs [(\n                    (newNode1List, newNode1),\n                    Update.pairDiff2\n                      (if newNode1ListDiffs == [] then\n                        Nothing\n                       else Just (VListDiffs newNode1ListDiffs))\n                      mbNode1Diffs\n                  )])\n                (j, d)::diffTail ->\n                  if i < j then -- i == 0 and j == 1\n                    let (skipped, remainingNodes) = List.split 1 newNodes in\n                    aux j remainingNodes listDiffs (newNode1List ++ skipped) newNode1ListDiffs newNode1 mbNode1Diffs\n                  else\n                    case d of\n                      ListElemInsert x ->\n                        let (inserted, remainingNodes) = List.split x newNodes in\n                        let insertionDiffs = newNode1ListDiffs ++ [(j, ListElemInsert x)] in\n                        aux j remainingNodes diffTail\n                          (newNode1List ++ convertInserted inserted) insertionDiffs newNode1 mbNode1Diffs\n\n                      ListElemUpdate x ->\n                        let newNode1_ :: remainingNodes = newNodes in\n                        aux (j + 1) remainingNodes diffTail\n                          (newNode1List ++ node1List) newNode1ListDiffs newNode1_ (Just x)\n\n                      ListElemDelete 1 -> -- Only the element can be deleted.\n                        let deletionDiffs = newNode1ListDiffs ++ [(0, ListElemDelete 1)] in\n                        aux (j + 1) newNodes diffTail\n                          newNode1List deletionDiffs node1 Nothing\n\n                      _ -> Err <| \"Unexpected diff for insertionDeletionUpdatesTo:\" ++ toString d\n            in aux 0 newNodes listDiffs [] [] node1 Nothing\n          _ -> Err <| \"Expected VListDiffs for insertionDeletionUpdatesTo, got \" ++ toString diffs\n      }\n\n  -- Takes a list of nodes, returns a list of nodes.\n  replaceNodesIf nodePred regex replacement nodes =\n      List.concatMap_ identity (\\[node] as node1List ->\n        if not (nodePred node) then node1List else\n        case node of\n          [\"TEXT\", text] ->\n            findAugmentedInterleavings 0 regex node1List\n              |> List.concatMap_ identity (\\[head] as headList ->\n              case head of\n                Text nodes -> nodes\n                Match match -> replacement match\n            ) |> __mergeHtmlText__ |> List.filter (/= [\"TEXT\", \"\"])\n          [tag, attrs, children] ->\n            insertionDeletionUpdatesTo identity node1List <|\n              [tag, attrs, replaceNodesIf nodePred regex replacement children]\n      ) nodes\n\n  -- Takes a list of nodes, returns a list of nodes.\n  replaceNodes = replaceNodesIf (\\_ -> True)\n\n  {- Given\n     * a regex\n     * a replacement function that takes a string match and returns a list of Html nodes\n     * a node\n     This functions returns a node, (excepted if the top-level node is a [\"TEXT\", _] and is splitted.\n  -}\n  replaceIf nodePred regex replacement node = case replaceNodesIf nodePred regex replacement [node] of\n       [x] -> x\n       y -> y\n\n  replace  = replaceIf (\\_ -> True)\n\n  replaceNodesAsTextIf nodePred regex replacement nodes =\n       if nodes == [] then nodes else\n       let nodesAsText = nodes |> List.indexedMapWithReverse identity (\\i n -> case n of\n         [\"TEXT\", t] -> n\n         [tag, _, _] -> [\"TEXT\", \"\"\"<|#@i#@tag#|>\"\"\"]) |> __mergeHtmlText__\n       in\n       -- Takes a list of nodes, and replaces each <|(number)|> by the matching node in the top-level text nodes.\n       -- Calls replaceNodesAsTextIf on the result.\n       let reinsertNodes insideNodes = replaceNodesIf (\\_ -> True) \"\"\"<\\|#(\\d+)#\\w+#\\|>\"\"\" (\\m ->\n          Update.sizeFreeze [nth nodes (String.toInt (nth m.group 1))]) insideNodes in\n       let reinsertNodesInText text = reinsertNodes [[\"TEXT\", text]] in\n       -- Takes a string and replaces  each <|(number)|> by the matching node in the top-level text nodes.\n       let reinsertNodesInText text = reinsertNodes [[\"TEXT\", text]] in\n       -- Takes a string and replace each <|(number)|> by the node in raw format (i.e. printed as HTML)\n       let reinsertNodesRaw insideNodes = replaceNodesIf (\\_ -> True) \"\"\"<\\|#(\\d+)#\\w+#\\|>\"\"\" (\\m ->\n         let oldNode = nth nodes (String.toInt (nth m.group 1)) in\n         [[\"TEXT\", valToHTMLSource oldNode]]\n       ) insideNodes in\n       let reinsertNodesRawInText text = reinsertNodesRaw [[\"TEXT\", text]] in\n       nodesAsText |>\n       findAugmentedInterleavings 0 regex |>\n       List.concatMap (\\head ->\n         case head of\n           Text nodes -> reinsertNodes nodes\n           Match m ->  reinsertNodes (replacement { m | reinsertNodesRawInText = reinsertNodesRawInText})\n       ) |> __mergeHtmlText__ |>\n       List.filter (\\a -> a /= [\"TEXT\", \"\"]) |>\n       List.mapWithReverse identity (\\node -> case node of\n         [\"TEXT\", _] -> node\n         [tag, attrs, children] ->\n           if nodePred node then [tag, attrs,\n             replaceNodesAsTextIf nodePred regex replacement children] else node)\n\n  replaceNodesAsText regex replacement nodes = replaceNodesAsTextIf (\\_ -> True) regex replacement nodes\n\n  replaceAsTextIf nodePred regex replacement node = case replaceNodesAsTextIf nodePred regex replacement [node] of\n        [x] -> x\n        y -> y\n\n  replaceAsText = replaceAsTextIf (\\_ -> True)\n\n  find regex node =\n    let aux node = case node of\n       [\"TEXT\", text] ->\n         findInterleavings 0 regex text\n         |> List.concatMap (case of\n            Left _ -> []\n            Right match -> [match]\n          )\n       [tag, attrs, children] ->\n         List.concatMap aux children\n    in aux node\n\n  -- Takes a regex, a function that accepts a match and an accumulator and returns a list of nodes and the new accumulator\'s value.\n  -- a starting accumulator and a starting node. Returns the final accumulator and the final node.\n  foldAndReplace regex matchAccToNewNodesNewAcc startAcc node =\n          let aux acc node = case node of\n             [\"TEXT\", text] ->\n               findInterleavings 0 regex text\n               |> List.foldl (\\interleaving (nodes, acc) ->\n                 case interleaving of\n                  Left str -> (nodes ++ [[\"TEXT\", str]], acc)\n                  Right match -> let (newNodes, newAcc) = matchAccToNewNodesNewAcc match acc in\n                    (nodes ++ newNodes, newAcc)\n                ) ([], acc) |> Tuple.mapFirst (__mergeHtmlText__ >> List.filter (/= [\"TEXT\", \"\"]))\n             [tag, attrs, children] ->\n               let (newChildren, newAcc) =\n                 List.foldl (\\child (buildingChildren, acc) ->\n                   let (nChildren, nAcc) = aux acc child in\n                   (buildingChildren ++ nChildren, nAcc)\n                 ) ([], acc) children in\n               ([[tag, attrs, newChildren]], newAcc)\n          in case aux startAcc node of\n            ([node], acc)-> (node, acc)\n            r -> r\n\n  isEmptyText = case of\n        [\"TEXT\", x] -> Regex.matchIn \"^\\\\s*$\" x\n        _ -> False\n\n  filter pred elemList =\n        List.concatMap (case of\n          [tagName, attrs, children] as elem ->\n            if pred elem then [[tagName, attrs, filter pred children]]\n            else []\n          elem -> if pred elem then [elem] else []) elemList\n\n  translate =\n    let freshVarName name i dictionary =\n      if name == \"\" then freshVarName \"translation\" i dictionary else\n      let suffix = if i == 0 then \"\" else toString i in\n      let potentialName = name + suffix in\n      if Dict.member potentialName dictionary then freshVarName name (i + 1) dictionary else potentialName\n    in\n    \\translations indexLangue node ->\n    let currentTranslation = nth translations indexLangue |> Tuple.second |> Dict.fromList in\n    replace \"\"\"\\$(\\w+|\\$)\"\"\" (\\m ->\n      if m.match == \"$\" then [[\"TEXT\", m.match]] else\n        let key = nth m.group 1 in\n        case Dict.get key currentTranslation of\n          Nothing -> [[\"TEXT\", m.match]]\n          Just definition -> [[\"TEXT\", definition]]\n      ) node |>\n    \\htmlNode ->\n      Update.lens2 {\n        apply (htmlNode, _) = htmlNode\n        update {input = (_, translations), outputNew=newHtmlNode} =\n          find \"\"\"\\{:([^\\}]*(?!\\})\\S[^\\}]*):\\}\"\"\" newHtmlNode\n          |> List.foldl (\\matchToTranslate (updatedHtmlNode, currentTranslation, translations) ->\n              let definition = nth matchToTranslate.group 1\n                  name = freshVarName (Regex.replace \"[^a-zA-Z]\" \"\" definition |> String.take 16) 0 currentTranslation\n                  textToFind = \"\"\"\\{:@(Regex.escape definition):\\}\"\"\"\n              in\n              (replace textToFind (\\_ -> [[\"TEXT\", \"$\" + name]]) updatedHtmlNode,\n               Dict.insert name definition currentTranslation,\n               List.map (\\(lang, d) -> (lang, d ++ [(name, definition)])) translations)\n            ) (newHtmlNode, currentTranslation, translations)\n          |> \\(finalHtmlNode, _, newTranslations) ->\n            Ok (Inputs [(finalHtmlNode, newTranslations)])\n      } htmlNode translations\n\n  markdown node =\n      let\n          regexFootnotes = \"\"\"\\r?\\n\\[\\^([^\\]]+)\\]:\\s*((?:(?!\\r?\\n\\r?\\n)[\\s\\S])+)\"\"\"\n          regexReferences = \"\"\"\\r?\\n\\[(?!\\^)([^\\]\\\\]+)\\]:\\s*(\\S+)\"\"\"\n          footnotes = find regexFootnotes node\n                       |> List.map (\\m -> (nth m.group 1, nth m.group 2))\n                       |> List.indexedMap (\\i (name, value) -> (name, (i + 1, value)))\n          references = find regexReferences node\n                       |> List.map (\\m -> (nth m.group 1, nth m.group 2))\n          notCode = case of [\"code\", _, _] -> False; _ -> True\n          notTitle = case of [tag, _, _] -> not (Regex.matchIn \"\"\"h\\d\"\"\" tag); _ -> True\n          notList = case of [tag, _, _] -> tag /= \"ul\" && tag /= \"ol\"; _ -> True\n          notPara = case of [\"p\", _, _] -> False; _ -> True\n          notA = case of [\"a\", _, _] -> False; _ -> True\n          r: String -> (Match -> List HtmlNode) -> HtmlNode -> HtmlNode\n          r  = replaceAsTextIf notCode\n          r2 = replaceAsTextIf (\\x -> notCode x && notTitle x && notList x && notPara x)\n          ra = replaceAsTextIf (\\x -> notCode x && notA x)\n          lregex = \"\"\"(?:\\r?\\n|^)((?:(?![\\r\\n])\\s)*)(\\*|-|\\d+\\.)(\\s+)((?:.*)(?:\\r?\\n\\1  ?\\3(?:.*))*(?:\\r?\\n\\1(?:\\*|-|\\d+\\.)\\3(?:.*)(?:\\r?\\n\\1 \\3(?:.*))*)*)\"\"\"\n          handleLists node  =\n            r lregex (\n              \\m -> let indent = nth m.group 1\n                        afterindent = nth m.group 3\n                        ul_ol = case nth m.group 2 of \"*\" -> \"ul\"; \"-\" -> \"ul\"; _ -> \"ol\"\n                        elements =\n                          Regex.split \"\"\"\\r?\\n@indent(?:\\*|-|\\d+\\.)@afterindent\"\"\" (nth m.group 4)\n                    in\n                    [<@ul_ol>@(List.map (\\elem -> <li>@elem</li>) elements)</@>]) node\n      in (\n      node\n      |> r \"\"\"@regexReferences|@regexFootnotes\"\"\" (\\m -> [])\n      |> (\\result -> -- Expand footnotes\n        if List.length footnotes == 0 then result\n        else case result of\n          [tag, attrs, children] ->\n            [tag, attrs, children ++ Update.sizeFreeze [\n              <div class=\"footnotes\"><hr><ol>@(footnotes |>\n                List.map (\\(name, (n, value)) ->\n                  <li id=\"\"\"fn@n\"\"\"><p>@value<a href=\"\"\"#fnref@n\"\"\">↩</a></p></li>\n                ))</ol></div>]\n            ])\n      |> r \"\"\"(```)([\\s\\S]*?)\\1(?!`)|((?:\\r?\\n    .*)+)\"\"\" (\\m ->\n        if nth m.group 1 == \"\" then\n          nth m.group 3 |>\n          Regex.extract \"\"\"\\r?\\n    ([\\s\\S]*)\"\"\" |>\n          Maybe.map (\\[code] ->\n                  [<pre><code>@(Regex.split \"\"\"\\r?\\n    \"\"\" code |> String.join \"\\n\" |> String.trim |> m.reinsertNodesRawInText)</code></pre>])\n          |> Maybe.withDefault [[\"TEXT\", m.match]]\n        else [\n        <pre><code>@(nth m.group 2 |> String.trim |> m.reinsertNodesRawInText)</code></pre>])\n      |> r \"\"\"(^|\\r?\\n)(#+)\\s*([^\\r\\n]*)\"\"\" (\\m -> [[\"TEXT\", nth m.group 1], <@(\"\"\"h@(String.length (nth m.group 2))\"\"\")>@(nth m.group 3)</@>])\n      |> handleLists --|> (\\x -> let _ = Debug.log (\"Paragraph phase\") () in x)\n      |> r2 \"\"\"(\\r?\\n *\\r?\\n(?:\\\\noindent\\r?\\n)?|^)((?=\\s*\\w|\\S)[\\s\\S]*?)(?=(\\r?\\n *\\r?\\n|\\r?\\n$|$))\"\"\" (\n        \\m ->\n          --let _ = Debug.log m.match () in\n          if nth m.group 1 == \"\" && nth m.group 3 == \"\" -- titles and images should not be paragraphs.\n           || Regex.matchIn \"\"\"^\\s*<\\|#\\d+#(?:h\\d|ul|ol|p|pre|center)#\\|>\\s*$\"\"\" (nth m.group 2) then [[\"TEXT\", m.match]] else  [<p>@(nth m.group 2)</p>]) --|> (\\x -> let _ = Debug.log (\"End of paragraph phase:\" + valToHTMLSource x) () in x)\n      |> ra \"\"\"\\[([^\\]\\\\]+)\\](\\^?)(\\(|\\[)([^\\)\\]]+)(\\)|\\])|(?:http|ftp|https)://(?:[\\w_-]+(?:(?:\\.[\\w_-]+)+))(?:[\\w.,@@?^=%&:/~+#-]*[\\w@@?^=%&/~+#-])?\"\"\" (\\m -> [ -- Direct and indirect References + syntax ^ to open in external page.\n        case nth m.group 3 of\n          \"(\" -> <a href=(nth m.group 4) @(if nth m.group 2 == \"^\" then [[\"target\", \"_blank\"]] else [])>@(nth m.group 1)</a>\n          \"[\" -> listDict.get (nth m.group 4) references |> case of\n                Just link -> <a href=link>@(nth m.group 1)</a>\n                Nothing -> [\"TEXT\", m.match]\n          _ -> <a href=m.match>@(m.match)</a>\n          ])\n      |> r \"\"\"\\[\\^([^\\]]+)\\]\"\"\" (\\m ->  -- Footnotes\n        listDict.get (nth m.group 1) footnotes |> case of\n          Just (n, key) -> [ <a href=\"\"\"#fn@n\"\"\" class=\"footnoteRef\" id=\"\"\"fnref@n\"\"\"><sup>@n</sup></a>]\n          Nothing -> [[\"TEXT\", m.match]])\n      |> r \"(`)(?=[^\\\\s`])(.*?)\\\\1\" (\\m -> [<code>@(nth m.group 2 |> m.reinsertNodesRawInText)</code>])\n      |> r \"\"\"(\\*{1,3}|_{1,3})(?=[^\\s\\*_])((?:(?!\\\\\\*|\\_).)*?)\\1\"\"\" (\\m -> [\n        case nth m.group 1 |> String.length of\n          1 -> <em>@(nth m.group 2)</em>\n          2 -> <strong>@(nth m.group 2)</strong>\n          _ -> <em><strong>@(nth m.group 2)</strong></em>])\n      |> r \"\"\"&mdash;|\\\\\\*|\\\\_|\\\\\\[|\\\\\\]\"\"\" (\\m -> [[\"TEXT\", case m.match of\n        \"&mdash;\" -> \"—\"\n        \"\\\\*\" -> String.drop 1 m.match\n        \"\\\\_\" -> String.drop 1 m.match\n        \"\\\\[\" -> String.drop 1 m.match\n        \"\\\\]\" -> String.drop 1 m.match\n        ]])\n      )\n\n  scriptFindEnclosing tagName varnameWhatToDo = \"\"\"\n      var elem = this\n      while(elem != null && elem.tagName.toLowerCase() != \"@tagName\")\n        elem = elem.parentElement;\n      if(elem == null) {\n        console.log(\'Error: duplicate button could not find enclosing target @tagName\');\n      } else {\n        @(varnameWhatToDo \"elem\")\n      }\"\"\"\n\n  buttonToDuplicateEnclosing tagNameToDuplicate attrs children =\n      <button onclick=(scriptFindEnclosing(tagNameToDuplicate)(\\v ->\n          \"\"\"@(v).parentElement.insertBefore(@(v).cloneNode(true), @(v))\"\"\"))\n      @attrs>@children</button>\n\n  buttonToDeleteEnclosing tagNameToDelete attrs children=\n      <button onclick=(scriptFindEnclosing(tagNameToDelete)(\\v ->\n          \"\"\"@(v).remove()\"\"\"))\n      @attrs>@children</button>\n\n  addClass name [t, attrs, c] =\n    [ t\n    , attrDict.update \"class\" (case of\n        Just classes -> if Regex.matchIn (\"\\\\b\" + name + \"\\\\b\") classes then Just classes else Just (classes + \" \" + name)\n        Nothing -> Just name) attrs\n    , c]\n}\n\n--------------------------------------------------------------------------------\n-- Javascript\n\njsCode = {\n  -- Create a tuple of a list of strings. Uses v as intermediate variable.\n  -- calling __jsEval__ (\"var a = 1\\n\" ++ tupleOf \"x\" [\"a\", \"2\", \"a\"]) == (1, 2, 1)\n  tupleOf: String -> List String -> String\n  tupleOf v list =\n    \"\"\"(function() { var @v = {@(List.indexedMap (\\i x -> \"\"\"_@(i+1): @x\"\"\") list |> String.join \",\")}; @v[\'$t_ctor\']=\'Tuple@(List.length list)\'; return @v})()\"\"\"\n\n  -- Creates a datatype of a list of strings. Uses v as intermediate variable.\n  datatypeOf: String -> String -> List String -> String\n  datatypeOf v kind args =\n    \"\"\"(function() { var @v = {args: {@(List.indexedMap (\\i x -> \"\"\"_@(i+1): @x\"\"\") args |> String.join \",\")}}; @v[\'$d_ctor\']=\'@kind\'; return @v})()\"\"\"\n\n  -- JS representation of a given string\n  stringOf: String -> String\n  stringOf content =\n    \"\\\"\" + Regex.replace \"\\\\\\\\|\\\"|\\r|\\n|\\t\" (\\m -> case m.match of\n      \"\\r\" -> \"\\\\r\"\n      \"\\n\" -> \"\\\\n\"\n      \"\\t\" -> \"\\\\t\"\n      x -> \"\\\\\" + x) content + \"\\\"\"\n}\n\n\nnodejs = {\n  (nothingJs) = jsCode.datatypeOf \"x\" \"Nothing\" []\n  (justJs) arg = jsCode.datatypeOf \"x\" \"Just\" [arg]\n  (fsjs) defaultValue prog = __jsEval__ \"\"\"\n    (function() {\n      if(!require) return @defaultValue;\n      const fs = require(\"fs\");\n      if(!fs) return @defaultValue;\n      @prog\n    })()\"\"\"\n\n  type alias BasicFileSystemUtils = {\n    read: String -> Maybe String,\n    listdir: String -> List String,\n    isdir: String -> Bool,\n    isfile: String -> Bool\n  }\n  -- Reads the file system directly without instrumentation.\n  nodeFS: BasicFileSystemUtils\n  nodeFS = {\n    read  name = fsjs nothingJs \"\"\"\n      const name = @(jsCode.stringOf name);\n      if(!fs) return @nothingJs;\n      if(fs.existsSync(name)) { // TODO: Atomic read\n        if(fs.lstatSync(name).isDirectory()) {\n          return @nothingJs;\n        } else {\n          return @(justJs \"fs.readFileSync(name, \'utf-8\')\");\n        }\n      } else return @nothingJs;\"\"\"\n    listdir foldername = fsjs \"[]\" \"\"\"\n      var name = @(jsCode.stringOf foldername);\n      if(name == \"\") name = \".\";\n      if(fs.existsSync(name) && fs.lstatSync(name).isDirectory()) {\n        var filesfolders =\n          fs.readdirSync(name);\n        return filesfolders;\n      } else {\n        return []\n      }\"\"\"\n    isdir name =\n      fsjs \"false\" \"\"\"\n       const name = @(jsCode.stringOf name);\n       return name == \"\" || fs.existsSync(name) && fs.lstatSync(@(jsCode.stringOf name)).isDirectory();\"\"\"\n    isfile name =\n      fsjs \"false\" \"\"\"\n       return fs.existsSync(@(jsCode.stringOf name)) && fs.lstatSync(@(jsCode.stringOf name)).isFile();\"\"\"\n  }\n\n\n  type FileOperation = Write {-old-} String {-new-} String Diffs |\n                       Rename {-newName-} String |\n                       Create {-content-} String |\n                       Delete |\n                       CreateFolder (List String {- file names in this folder -})\n  type alias ListFileOperations = List ({-filename-}String, FileOperation)\n\n  -- Consumes all update values by writing to the file system. Use this only if you don\'t need to display ambiguity.\n  nodeFSWrite: ListFileOperations\n  nodeFSWrite = Update.lens {\n    apply = identity\n    update {outputNew} =\n     List.foldl (\\(name, action) b ->\n      let write name contentOld content =\n        let mbCreateDir = case contentOld of\n             Nothing -> fsjs \"0\" \"\"\"\n               var pathToFile = @(jsCode.stringOf name);\n               var filePathSplit = pathToFile.split(\'/\');\n               var dirName = \"\";\n               for (var index = 0; index < filePathSplit.length - 1; index++) {\n                  dirName += filePathSplit[index]+\'/\';\n                  if (!fs.existsSync(dirName))\n                      fs.mkdirSync(dirName);\n               }\n               return 1;\"\"\" -- Create the file\'s directory structure.\n             Just oldContent -> \"\"\n            written = fsjs \"0\" \"\"\"\n              fs.writeFileSync(@(jsCode.stringOf name), @(jsCode.stringOf content), \"utf-8\");\n              return 1;\"\"\"\n        in ()\n      in\n      let _ = case action of\n        Write oldContent newContent diffs -> write name (Just oldcontent) newContent\n        Create content -> write name Nothing content\n        Delete -> fsjs \"0\" \"\"\"\n            fs.unlinkSync(@(jsCode.stringOf name));\n            return 1;\"\"\"\n        Rename newName -> fsjs \"0\" \"\"\"\n            fs.renameSync(@(jsCode.stringOf name), @(jsCode.stringOf newName));\n            return 1;\"\"\"\n      in b) (Ok <| InputsWithDiffs [([], Nothing)]) outputNew\n  } []\n\n  type alias InlineFS = List ({-path-}String, File content | Folder (List String)) -> BasicFileSystemUtils\n\n  inlineFS: InlineFS -> BasicFileSystemUtils\n  inlineFS content = {\n    read name = case listDict.get name content of\n       Just (File content) -> Just content\n       _ -> Nothing\n    listdir foldername = case listDict.get foldername content of\n       Just (Folder files) -> files\n       _ -> Nothing\n    isdir name = case listDict.get name content of\n      Just (Folder _) -> True\n      _ -> False\n    isfile name = case listDict.get name content of\n      Just (File _) -> True\n      _ -> False\n  }\n\n  inlineFSWrite: InlineFS -> ListFileOperations\n  inlineFSWrite = Update.lens {\n    apply inlineFS = []\n    update {input=inlineFS, outputNew} =\n      List.foldl (\\(name, action) resInlineFS ->\n        resInlineFS\n        |> Result.andThen (\\inlineFS ->\n          let prev = listDict.get name inlineFS in\n          case (prev, action) of\n             (Just (Folder _), Write oldContent newContent diffs) -> Err <| \"Can\'t write a folder as if it was a file\"\n             (_,               Write oldContent newContent diffs) -> Ok <| listDict.insert name (File newContent) inlineFS\n             (Nothing, Delete) -> Err <| \"Can\'t delete \" + name + \" from file system because it did not exist\"\n             (_, Delete) -> listDict.delete name inlineFS |>\n                List.map (\\(oname, ocontent) ->\n                  case ocontent of\n                  Folder subfiles ->\n                      (oname, Folder (List.filter (\\subfile -> oname + \"/\" + subfile /= name) subfiles))\n                  _ -> (oname, ocontent)\n                  ) |> Ok\n             (Just x, Create content) ->  Err <| \"Can\'t create \" + name + \" in file system because it did exist\"\n             (_, Create newContent) ->  listDict.insert name (File newContent) inlineFS |>\n               List.map (\\(oname, ocontent) ->\n                  case ocontent of\n                  Folder subfiles ->\n                      if String.left (String.length oname) name == oname then -- Starts with the folder\'s name\n                        let remaining = String.drop (String.length oname) name in\n                        if not (Regex.matchIn \"./\" remaining) && String.take 1 remaining == \"/\"  then\n                          (oname, Folder (subfiles ++ [String.drop 1 remaining]))\n                        else\n                          (oname, Folder subfiles)\n                      else\n                        (oname, Folder subfiles)\n                  _ -> (oname, ocontent)\n                  ) |> Ok\n             (Just x, Rename newName) -> case listDict.get newName inlineFS of\n               Just _ -> Err <| \"Can\'t rename \" + name + \" to \" + newName + \" because it already exists\"\n               _ -> inlineFS |> listDict.remove name |> listDict.insert newName x |>\n                    List.map (\\(oname, ocontent) ->\n                      case ocontent of\n                      Folder subfiles ->\n                          (oname, Folder (List.map (\\subfile -> if oname + \"/\" + subfile == name then\n                            String.drop (String.length (oname + \"/\")) newName else subfile)\n                          subfiles))\n                      _ -> (oname, ocontent)\n                      ) |> Ok\n             (_, Rename _) -> Err <| \"Can\'t rename \" + name + \" because it did not exist\"))  (Ok inlineFS) outputNew\n      |> Result.map (\\x -> Inputs [x])\n  }\n\n  type alias FileSystemUtils =  {\n    read: String -> Maybe String,\n    listdir: String -> List String,\n    listdircontent: String -> List (String, String),\n    isdir: String -> Bool,\n    isfile: String -> Bool\n  }\n\n  {- nodejs.delayedFS basicFS fileOperations   provides a file system utility that, on update,\n     does not change the files on disk, but fills an array of fileOperations (create, write, delete, rename)\n\n     basicFS:         To read files from disk using node.js, use `nodejs.nodeFS`\n                      To simply read an inline content, which is a\n                        list of (path, File content | Folder (list of filenames)),\n                        use `(nodjs.inlineFS content)`\n     fileOperations:  Pass `[]` to recover file operations on update.\n                        If not empty, its operations will overwrite the content of basicFS.\n                      Pass `nodejs.nodeFSWrite` if writes do not have ambiguity\n                        and should be performed immediately on disk\n                      Pass `nodejs.inlineFSWrite content` if the first argument is `nodejs.inlineFS content` and\n                        you want the content to be immediately overriden.\n\n     -- Sample call (put fileOperations: [] in the environment)\n     fs = nodejs.delayedFS nodejs.nodeFS fileOperations\n\n     -- Sample mock call (to locally test a file system\n     fsContent = [(\"test/a.txt\", File \"Hello\"), (\"test/b.txt\", File \"World\"), (\"test\", Folder [\"a.txt\", \"b.txt\"])]\n     fs = nodejs.delayedFS (nodejs.inlineFS fsContent) (nodejs.inlineFSWrite fsContent)\n     fs.read \"test/a.txt\"\n     ...\n     -}\n  delayedFS: BasicFileSystemUtils -> ListFileOperations -> FileSystemUtils\n  delayedFS  basicFS                 fileOperations = {\n    (fileOperationsRaw) = Update.lens {\n      apply = identity\n      (remove) name = List.filter (\\(otherName, _) -> otherName /= name)\n      update {input=fileOperations, outputNew} =\n        let process outputNew revAcc = case outputNew of\n          [] -> Ok <| Inputs [List.reverse revAcc]\n          (name, action) :: tail ->\n            case action of\n              Delete -> process (remove name tail) ((name, action) :: remove name revAcc)\n              Create content -> process (remove name tail) ((name, action) :: remove name revAcc)\n              Write oldContent newContent diffs ->\n                let (sameName, otherNames) = List.partition (\\(otherName, _) -> name == otherName) tail in\n                let extractedWrites = List.concatMap (\\(_, action) -> case action of\n                     Write oldContent newContent diffs -> [(newContent, Just diffs)]\n                     _ -> []) sameName in\n                let (finalContent, finalDiffs) =\n                      Update.merge oldContent ((newContent, Just diffs) :: extractedWrites)\n                in\n                let finalAction =\n                  case listDict.get name fileOperations of\n                    Just (Create content) -> Create finalContent\n                    _ -> Write oldContent finalContent finalDiffs\n                in\n                process otherNames ((name, finalAction) :: revAcc)\n              Rename newName ->\n                if List.all (\\(_, action) -> case action of Rename _ -> True) tail then\n                  process tail ((name, action)::revAcc)\n                else\n                  process (tail ++ [(name, action)]) revAcc\n              CreateFolder content ->\n                process tail ((name, action)::revAcc)\n        in process outputNew []\n    } fileOperations\n\n    read: String -> Maybe String\n    read filename = Update.lens {\n      apply fileOperations =\n        case listDict.get filename fileOperations of\n          Just (Write oldContent newContent diffs) -> Just newContent\n          Just (Create content) -> Just content\n          Just (Delete) -> Nothing\n          Just (Rename _) -> Nothing\n          Just (CreateFolder _) -> Nothing\n          _ -> basicFS.read filename\n      update  = case of\n        {input=fileOperations, outputOld = Just x , outputNew = Nothing} ->\n          Ok <| InputsWithDiffs [((filename, Delete) :: fileOperations, Just <| VListDiffs [(0, ListElemInsert 1)])]\n        {input=fileOperations, outputOld = Just oldContent, outputNew = Just newContent, diffs} ->\n          let contentDiffs = case diffs of\n            VRecordDiffs { args = VRecordDiffs { _1 = d } } -> d\n            _ -> VStringDiffs []\n          in\n           Ok <| InputsWithDiffs [((filename, Write oldContent newContent contentDiffs) :: fileOperations, Just <| VListDiffs [(0, ListElemInsert 1)])]\n        {input=fileOperations, outputOld = Nothing, outputNew = Just newContent} ->\n           Ok <| InputsWithDiffs [((filename, Create newContent) :: fileOperations, Just <| VListDiffs [(0, ListElemInsert 1)])]\n        {input=fileOperations} ->\n          Ok (InputsWithDiffs [(fileOperations, Nothing)])\n      } fileOperationsRaw\n\n    listdir: String -> List String\n    listdir foldername = Update.lens {\n      apply fileOperations = case listDict.get foldername fileOperations of\n        Just (CreateFolder content) -> content -- We can mock the file system by creating a folder in initial fileOperations\n        _ -> basicFS.listdir foldername |>\n          (if fileOperations == [] then identity else\n          List.filterMap (\\name -> case listDict.get (foldername + \"/\" + name) fileOperations of\n            Just Delete -> Nothing\n            Just (Rename newName) ->\n              let fn = foldername + \"/\" in\n              let fnLenth = String.length fn in\n              let possibleFolder = String.take fnLenth newName in\n              let possibleName = String.drop fnLenth newName in\n              if possibleFolder == fn then\n                if Regex.matchIn \"/\" possibleName then Nothing\n                else if possibleName == \"\" then Nothing\n                else Just possibleName\n              else Nothing\n            _ -> Just name\n          ))\n      update {outputOld, outputNew, diffs} =\n        let aux i outputOld outputNew diffs fo = case diffs of\n          [] -> Ok (Inputs [fo])\n          (j, d)::diffTail ->\n            if i < j then\n              aux j (List.drop (j - i) outputOld) (List.drop (j - i) outputNew) diffs fo\n            else case d of\n              ListElemInsert count -> Err <| \"fs.listdir cannot insert in reverse because it does not know if it should insert files or folders. Use fs.read instead\"\n\n              ListElemDelete count ->\n                let (deleted, remaining) = List.split count outputOld in\n                fo ++ (List.map (\\nameDeleted -> (foldername + \"/\" + nameDeleted, Delete)) deleted) |>\n                aux (i + count) remaining outputNew diffTail\n\n              ListElemUpdate nameChange ->\n                case (outputOld, outputNew) of\n                  (oldName :: outputOldTail, newName :: outputNewTail) ->\n                    fo ++ [(foldername + \"/\" + oldName, Rename (foldername + \"/\" + newName))] |>\n                    aux (i + 1) outputOldTail outputNewTail diffTail\n              _ -> Err <| \"\"\"Unknown diff for listdir @d\"\"\"\n        in case diffs of\n          VListDiffs diffs -> aux 0 outputOld outputNew diffs []\n          _ -> Err <| \"\"\"Don\'t know how to handle these list differences for listdircontent : @diffs\"\"\"\n    } fileOperations\n\n    listdircontent: String -> List (String, String)\n    listdircontent foldername = Update.lens {\n      apply fileOperations = listdir foldername |>\n          List.filter (\\name -> isfile \"\"\"@foldername/@name\"\"\") |>\n          List.map (\\name ->\n          let fullname = \"\"\"@foldername/@name\"\"\" in\n          (name, read fullname |> Maybe.withDefault (freeze \"\"\"Unknown file @fullname\"\"\")))\n      update {outputOld, outputNew, diffs} =\n        -- Insertions can be treated as Create, and deletions as Delete.\n        -- Changing the first component can be viewed as a Rename, whereas chaging the second component as a Write.\n        let aux i outputOld outputNew diffs fo = case diffs of\n          [] -> Ok (Inputs [fo])\n          (j, d)::diffTail ->\n            if i < j then\n              aux j (List.drop (j - i) outputOld) (List.drop (j - i) outputNew) diffs fo\n            else case d of\n              ListElemInsert count ->\n                let (inserted, remaining) = List.split count outputNew in\n                fo ++ (List.map (\\(nameInserted, contentInserted) -> (foldername + \"/\" + nameInserted, Create contentInserted)) inserted) |>\n                aux i outputOld remaining diffTail\n\n              ListElemDelete count ->\n                let (deleted, remaining) = List.split count outputOld in\n                fo ++ (List.map (\\(nameDeleted, contentInserted) -> (foldername + \"/\" + nameDeleted, Delete)) deleted) |>\n                aux (i + count) remaining outputNew diffTail\n\n              ListElemUpdate (VRecordDiffs subd) ->\n                case (outputOld, outputNew) of\n                  ((oldName, oldContent) :: outputOldTail, (newName, newContent) :: outputNewTail) ->\n                    let\n                      fo = case subd of\n                        {_2=contentChange} -> fo ++ [(foldername + \"/\" + oldName, Write oldContent newContent contentChange)]\n                        _ -> fo\n                      fo = case subd of\n                        {_1=nameChange} -> fo ++ [(foldername + \"/\" + oldName, Rename (foldername + \"/\" + newName))]\n                        _ -> fo\n                    in\n                    aux (i + 1) outputOldTail outputNewTail diffTail fo\n              _ -> Err <| \"\"\"Unknown diff for listdircontent: @d\"\"\"\n        in case diffs of\n           VListDiffs diffs -> aux 0 outputOld outputNew diffs []\n           _ -> Err <| \"\"\"Don\'t know how to handle these list differences for listdircontent : @diffs\"\"\"\n    } fileOperations\n\n    isdir: String -> Bool\n    isdir name =  case listDict.get name fileOperations of\n       Just (CreateFolder content) -> True\n       _ -> basicFS.isdir name\n    isfolder = isdir\n    isdirectory = isdir\n\n    isfile: String -> Bool\n    isfile name =\n        case listDict.get name fileOperations of\n          Just Create -> True\n          Just (Write _ _ _) -> True\n          Just Delete -> True\n          _ -> basicFS.isfile name\n\n    isFile = isfile\n  }\n}\n\n-- Because we base decisions on random numbers,\n-- to update, it is essential that these random numbers are deterministically computed.\nrandom = {\n  -- Unsafe: it will not evaluate deterministically\n  jsNum = __jsEval__ \"\"\"Math.random()\"\"\"\n\n  type alias Seed = (Int, Int, Int, Int)\n  -- Builds a seed for a generator\n  seedOf: Int -> Seed\n  seedOf num = (num, num* -320161540, 320161540+num, 941627624 * num)\n\n  -- A random number generator that takes a seed and exposes a bunch of methods.\n  generator: Seed -> Generator\n  generator (a, b, c, d) = {\n    self () = generator (a, b, c, d)\n\n    -- Continuation version of randomFloat\n    randomFloat_: (Generator -> Float -> a) -> a\n    randomFloat_ withNewGeneratorResult =\n      let (newABCD, result) =\n        __jsEval__ \"\"\"\n        var a = @a, b = @b, c = @c, d = @d;\n        var t = b << 9, r = a * 5; r = (r << 7 | r >>> 25) * 9;\n        c ^= a; d ^= b;\n        b ^= c; a ^= d; c ^= t;\n        d = d << 11 | d >>> 21;\n        @(jsCode.tupleOf \"x\" [jsCode.tupleOf \"y\" [\"a\", \"b\", \"c\", \"d\"], \"(r >>> 0) / 4294967296\"]);\"\"\"\n      in\n      withNewGeneratorResult (generator newABCD) result\n\n    randomFloat: () -> (Generator, Float)\n    randomFloat () = randomFloat_ (,)\n\n    randomInt_: Int -> Int -> (Generator -> Int -> a) -> a\n    randomInt_ minInclusive maxExclusive withNewGeneratorInt =\n      randomFloat_ <| \\newGenerator float ->\n        withNewGeneratorInt newGenerator <|\n          floor (float * (maxExclusive - minInclusive)) + minInclusive\n\n    randomInt: Int -> Int -> (Generator, Int)\n    randomInt minInclusive maxExclusive = generateInt_ minInclusive maxExclusive (,)\n\n    -- Extract a random sublist of elements, but not in order\n    randomSublist_: Int -> List a -> (Generator -> List a -> b) -> b\n    randomSublist_ count list continuation =\n      if list == [] && count > 0 then continuation (self ()) list\n      else if count <= 0 then continuation (self ()) []\n      else randomInt_ 0 (List.length list) <| \\g n ->\n        case List.removeAt n list of\n          Nothing -> (g, []) -- Don\'t know why it would happen.\n          Just (head, remainingList) ->\n            g.randomSublist_ (count - 1) remainingList <| \\g2 tail ->\n            continuation g2 <| head::tail\n\n    randomSublist: Int -> List a -> (Generator, List a)\n    randomSublist count list = randomSublist_ count list (,)\n\n    shuffleList_: List a -> (Generator -> List a -> b) -> b\n    shuffleList_ list  continuation = randomSublist_ (List.length list) list continuation\n\n    shuffleList: List a -> (Generator, List a)\n    shuffleList list = shuffleList_ list (,)\n  }\n}\n\n-- TODO remove this; add as imports as needed in examples\n{textNode, p, th, td, h1, h2, h3, tr, table} = Html\ndiv_ = Html.div\n\n--------------------------------------------------------------------------------\n-- Lens: Table Library\n\n  -- Update.freeze and Update.softFreeze aren\'t needed below,\n  -- because library definitions are implicitly frozen.\n  -- But for performance it\'s better.\n\nTableWithButtons =\n  let wrapData rows =\n    let blankRow =\n      let numColumns =\n        case rows of\n          []     -> 0\n          row::_ -> List.length row\n      in\n      List.repeat numColumns \"?\"\n    in\n    Update.applyLens\n      { apply rows = List.map (\\row -> (False, row)) rows\n\n      , update {outputNew = flaggedRows} =\n          let processRow (flag, row) =\n            if flag == True\n              then [ row, blankRow ]\n              else [ row ]\n          in\n          Ok (Inputs [List.concatMap processRow flaggedRows])\n      }\n      rows\n  in\n  let mapData f flaggedRows =\n    List.map (Tuple.mapSecond f) flaggedRows\n  in\n  --\n  -- The globalBool flag is used to determine whether to insert \"\" or \" \"\n  -- before a couple attribute values. Toggling this choice in between\n  -- subsequent runs helps work around our issue forcing Elm to re-render.\n  --\n  let tr globalBool flag styles attrs children =\n    let (hasBeenClicked, nope, yep) =\n      (\"has-been-clicked\", Update.softFreeze \"gray\", Update.softFreeze \"coral\")\n    in\n    let dummyStrPrefix =\n      Update.softFreeze <| if globalBool then \"\" else \" \"\n    in\n    let onclick =\n      \"\"\"\n      var hasBeenClicked = document.createAttribute(\"@hasBeenClicked\");\n      var buttonStyle = document.createAttribute(\"style\");\n\n      if (this.parentNode.getAttribute(\"@hasBeenClicked\").endsWith(\"False\")) {\n        hasBeenClicked.value = \"@(dummyStrPrefix)True\";\n        buttonStyle.value = \"color: @yep;\";\n      } else {\n        hasBeenClicked.value = \"@(dummyStrPrefix)False\";\n        buttonStyle.value = \"color: @dummyStrPrefix@nope;\";\n      }\n\n      this.parentNode.setAttributeNode(hasBeenClicked);\n      this.setAttributeNode(buttonStyle);\n      \"\"\"\n    in\n    let button = -- text-button.enabled is an SnS class\n      [ \"span\"\n      , [ [\"class\", \"text-button.enabled\"]\n        , [\"onclick\", onclick]\n        , [\"style\", [[\"color\", dummyStrPrefix + nope]]]\n        ]\n      , [textNode \"+\"]\n      ]\n    in\n    Html.tr styles\n      ([hasBeenClicked, dummyStrPrefix + toString flag] :: attrs)\n      (snoc button children)\n  in\n  { wrapData = wrapData\n  , mapData = mapData\n  , tr = tr\n  }\n\nTableWithButtons =\n  -- Toggle the global boolean flag, to workaround the force re-render issue.\n  { new _ =\n      { TableWithButtons | tr = TableWithButtons.tr (toggleGlobalBool []) }\n  }\n\n\n-- Begin SVG Stuff -------------------------------------------------------------\n\n--\n-- SVG Manipulating Functions\n--\n\n-- === SVG Types ===\n\n-- type alias Point = [Num Num]\n-- type alias RGBA = [Num Num Num Num]\n-- type alias Color = (union String Num RGBA)\n-- type alias PathCmds = (List (union String Num))\n-- type alias Points = (List Point)\n-- type alias RotationCmd = [[String Num Num Num]]\n-- type alias AttrVal = (union String Num Bool Color PathCmds Points RotationCmd)\n-- type alias AttrName = String\n-- type alias AttrPair = [AttrName AttrVal]\n-- type alias Attrs = (List AttrPair)\n-- type alias NodeKind = String\n-- TODO add recursive types properly\n-- type alias SVG = [NodeKind Attrs (List SVG_or_Text)]\n-- type alias SVG_or_Text = (union SVG [String String])\n-- type alias Blob = (List SVG)\n\n-- === Attribute Lookup ===\n-- lookupWithDefault: (forall (k v) (-> v k (List [k v]) v))\nlookupWithDefault default k dict =\n  let foo = lookupWithDefault default k in\n  case dict of\n    [] -> default\n    [k1, v]::rest -> if k == k1 then v else foo rest\n\n--lookup: (forall (k v) (-> k (List [k v]) (union v Null)))\nlookup k dict =\n  let foo = lookup k in\n  case dict of\n    [] -> null\n    [k1, v]::rest -> if k == k1 then v else foo rest\n\n-- addExtras: (-> Num (List [String (List [Num AttrVal])]) SVG SVG)\naddExtras i extras shape =\n  case extras of\n    [] -> shape\n    [k, table]::rest ->\n      let v = lookup i table in\n      \"Error: typecase not yet implemented for Elm syntax\"\n\n-- lookupAttr: (-> SVG AttrName (union AttrVal Null))\nlookupAttr [_, attrs, _] k = lookup k attrs\n\n-- lookupAttrWithDefault: (-> AttrVal SVG AttrName AttrVal)\nlookupAttrWithDefault default [_, attrs, _] k =\n  lookupWithDefault default k attrs \n\n-- Pairs of Type-Specific Lookup Functions\n-- lookupNumAttr: (-> SVG AttrName (union Num Null))\nlookupNumAttr [_, attrs, _] k =\n  let val = lookup k attrs in\n  \"Error: typecase not yet implemented for Elm syntax\"\n  \n-- lookupNumAttrWithDefault: (-> Num SVG AttrName Num)\nlookupNumAttrWithDefault default shape k =\n  let val = lookupNumAttr shape k in\n  \"Error: typecase not yet implemented for Elm syntax\"\n\n-- lookupPointsAttr: (-> SVG AttrName (union Points Null))\nlookupPointsAttr [_, attrs, _] k =\n  let val = lookup k attrs in\n  \"Error: typecase not yet implemented for Elm syntax\"\n\n-- lookupPointsAttrWithDefault: (-> Points SVG AttrName Points)\nlookupPointsAttrWithDefault default shape k =\n  let val = lookupPointsAttr shape k in\n  \"Error: typecase not yet implemented for Elm syntax\"\n\n-- lookupStringAttr: (-> SVG AttrName (union String Null))\nlookupStringAttr [_, attrs, _] k =\n  let val = lookup k attrs in\n  \"Error: typecase not yet implemented for Elm syntax\"\n  \n-- lookupStringAttrWithDefault: (-> String SVG AttrName String)\nlookupStringAttrWithDefault default shape k =\n  let val = lookupStringAttr shape k in\n  \"Error: typecase not yet implemented for Elm syntax\"\n\n-- === Points ===\n\n-- type alias Vec2D = [Num Num]\n\n-- vec2DPlus: (-> Point Vec2D Point)\nvec2DPlus pt vec =\n  [ fst pt\n    + fst vec, snd pt\n    + snd vec\n  ]\n\n-- vec2DMinus: (-> Point Point Vec2D)\nvec2DMinus pt vec =\n  [ fst pt\n    - fst vec, snd pt\n    - snd vec\n  ]\n\n-- vec2DScalarMult: (-> Num Vec2D Point)\nvec2DScalarMult num vec =\n  [ fst vec\n    * num, snd vec\n    * num\n  ]\n\n-- vec2DScalarDiv: (-> Num Vec2D Point)\nvec2DScalarDiv num vec =\n  [ fst vec\n    / num, snd vec\n    / num\n  ]\n\n-- vec2DLength: (-> Point Point Num)\nvec2DLength [x1, y1] [x2, y2] =\n  let [dx, dy] = [ x2- x1, y2 - y1] in\n  sqrt (dx * dx + dy * dy) \n\n\n-- === Circles ===\n\ntype alias Circle = SVG\n\n--; argument order - color, x, y, radius\n--; creates a circle, center at (x,y) with given radius and color\n-- circle: (-> Color Num Num Num Circle)\ncircle fill cx cy r =\n  [\'circle\',\n     [[\'cx\', cx], [\'cy\', cy], [\'r\', r], [\'fill\', fill]],\n     []]\n\n-- circleCenter: (-> Ellipse Point)\ncircleCenter circle =\n  [\n    lookupNumAttrWithDefault 0 circle \'cx\',\n    lookupNumAttrWithDefault 0 circle \'cy\'\n  ]\n\n-- circleRadius: (-> Circle Num)\ncircleRadius circle =\n  lookupNumAttrWithDefault 0 circle \'r\'\n\n-- circleDiameter: (-> Circle Num)\ncircleDiameter circle = 2\n  * circleRadius circle\n\n-- circleNorth: (-> Circle Point)\ncircleNorth circle =\n  let [cx, cy] = circleCenter circle in\n    [cx, cy - circleRadius circle]\n\n-- circleEast: (-> Circle Point)\ncircleEast circle =\n  let [cx, cy] = circleCenter circle in\n    [ cx+ circleRadius circle, cy]\n\n-- circleSouth: (-> Circle Point)\ncircleSouth circle =\n  let [cx, cy] = circleCenter circle in\n    [cx, cy + circleRadius circle]\n\n-- circleWest: (-> Circle Point)\ncircleWest circle =\n  let [cx, cy] = circleCenter circle in\n    [ cx- circleRadius circle, cy] \n\n\n--; argument order - color, width, x, y, radius\n--; Just as circle, except new width parameter determines thickness of ring\n-- ring: (-> Color Num Num Num Num SVG)\nring c w x y r =\n  [\'circle\',\n     [ [\'cx\', x], [\'cy\', y], [\'r\', r], [\'fill\', \'none\'], [\'stroke\', c], [\'stroke-width\', w] ],\n     []] \n\n\n-- === Ellipses ===\n\ntype alias Ellipse = SVG\n\n--; argument order - color, x, y, x-radius, y-radius\n--; Just as circle, except radius is separated into x and y parameters\n-- ellipse: (-> Color Num Num Num Num Ellipse)\nellipse fill x y rx ry =\n  [\'ellipse\',\n     [ [\'cx\', x], [\'cy\', y], [\'rx\', rx], [\'ry\', ry], [\'fill\', fill] ],\n     []]\n\n-- ellipseCenter: (-> Ellipse Point)\nellipseCenter ellipse =\n  [\n    lookupNumAttrWithDefault 0 ellipse \'cx\',\n    lookupNumAttrWithDefault 0 ellipse \'cy\'\n  ]\n\n-- ellipseRadiusX: (-> Ellipse Num)\nellipseRadiusX ellipse =\n  lookupNumAttrWithDefault 0 ellipse \'rx\'\n\n-- ellipseRadiusY: (-> Ellipse Num)\nellipseRadiusY ellipse =\n  lookupNumAttrWithDefault 0 ellipse \'ry\'\n\n-- ellipseDiameterX: (-> Ellipse Num)\nellipseDiameterX ellipse = 2\n  * ellipseRadiusX ellipse\n\n-- ellipseDiameterY: (-> Ellipse Num)\nellipseDiameterY ellipse = 2\n  * ellipseRadiusY ellipse\n\n-- ellipseNorth: (-> Ellipse Point)\nellipseNorth ellipse =\n  let [cx, cy] = ellipseCenter ellipse in\n    [cx, cy - ellipseRadiusY ellipse]\n\n-- ellipseEast: (-> Ellipse Point)\nellipseEast ellipse =\n  let [cx, cy] = ellipseCenter ellipse in\n    [ cx+ ellipseRadiusX ellipse, cy]\n\n-- ellipseSouth: (-> Ellipse Point)\nellipseSouth ellipse =\n  let [cx, cy] = ellipseCenter ellipse in\n    [cx, cy + ellipseRadiusY ellipse]\n\n-- ellipseWest: (-> Ellipse Point)\nellipseWest ellipse =\n  let [cx, cy] = ellipseCenter ellipse in\n    [ cx- ellipseRadiusX ellipse, cy] \n\n\n-- === Bounds-based shapes (Oval and Box) ===\n\n-- type alias BoundedShape = SVG\n-- type alias Bounds = [Num Num Num Num]\n\n-- boundedShapeLeft: (-> BoundedShape Num)\nboundedShapeLeft shape =\n  lookupNumAttrWithDefault 0 shape \'LEFT\'\n\n-- boundedShapeTop: (-> BoundedShape Num)\nboundedShapeTop shape =\n  lookupNumAttrWithDefault 0 shape \'TOP\'\n\n-- boundedShapeRight: (-> BoundedShape Num)\nboundedShapeRight shape =\n  lookupNumAttrWithDefault 0 shape \'RIGHT\'\n\n-- boundedShapeBot: (-> BoundedShape Num)\nboundedShapeBot shape =\n  lookupNumAttrWithDefault 0 shape \'BOT\'\n\n-- boundedShapeWidth: (-> BoundedShape Num)\nboundedShapeWidth shape = boundedShapeRight shape\n  - boundedShapeLeft shape\n\n-- boundedShapeHeight: (-> BoundedShape Num)\nboundedShapeHeight shape = boundedShapeBot shape\n  - boundedShapeTop shape\n\n-- boundedShapeLeftTop: (-> BoundedShape Point)\nboundedShapeLeftTop shape =\n  [\n    boundedShapeLeft shape,\n    boundedShapeTop shape\n  ]\n\n-- boundedShapeCenterTop: (-> BoundedShape Point)\nboundedShapeCenterTop shape =\n  [ (boundedShapeLeft shape + boundedShapeRight shape)\n    / 2,\n    boundedShapeTop shape\n  ]\n\n-- boundedShapeRightTop: (-> BoundedShape Point)\nboundedShapeRightTop shape =\n  [\n    boundedShapeRight shape,\n    boundedShapeTop shape\n  ]\n\n-- boundedShapeRightCenter: (-> BoundedShape Point)\nboundedShapeRightCenter shape =\n  [\n    boundedShapeRight shape, (boundedShapeTop shape + boundedShapeBot shape)\n    / 2\n  ]\n\n-- boundedShapeRightBot: (-> BoundedShape Point)\nboundedShapeRightBot shape =\n  [\n    boundedShapeRight shape,\n    boundedShapeBot shape\n  ]\n\n-- boundedShapeCenterBot: (-> BoundedShape Point)\nboundedShapeCenterBot shape =\n  [ (boundedShapeLeft shape + boundedShapeRight shape)\n    / 2,\n    boundedShapeBot shape\n  ]\n\n-- boundedShapeLeftBot: (-> BoundedShape Point)\nboundedShapeLeftBot shape =\n  [\n    boundedShapeLeft shape,\n    boundedShapeBot shape\n  ]\n\n-- boundedShapeLeftCenter: (-> BoundedShape Point)\nboundedShapeLeftCenter shape =\n  [\n    boundedShapeLeft shape, (boundedShapeTop shape + boundedShapeBot shape)\n    / 2\n  ]\n\n-- boundedShapeCenter: (-> BoundedShape Point)\nboundedShapeCenter shape =\n  [ (boundedShapeLeft shape + boundedShapeRight shape)\n    / 2, (boundedShapeTop shape + boundedShapeBot shape)\n    / 2\n  ] \n\n\n-- === Rectangles ===\n\ntype alias Rect = SVG\n\n--; argument order - color, x, y, width, height\n--; creates a rectangle of given width and height with (x,y) as the top left corner coordinate\n-- rect: (-> Color Num Num Num Num Rect)\nrect fill x y w h =\n  [\'rect\',\n     [ [\'x\', x], [\'y\', y], [\'width\', w], [\'height\', h], [\'fill\', fill] ],\n     []]\n\n-- square: (-> Color Num Num Num Rect)\nsquare fill x y side = rect fill x y side side\n\n-- rectWidth: (-> Rect Num)\nrectWidth rect =\n  lookupNumAttrWithDefault 0 rect \'width\'\n\n-- rectHeight: (-> Rect Num)\nrectHeight rect =\n  lookupNumAttrWithDefault 0 rect \'height\'\n\n-- rectLeftTop: (-> Rect Point)\nrectLeftTop rect =\n  [\n    lookupNumAttrWithDefault 0 rect \'x\',\n    lookupNumAttrWithDefault 0 rect \'y\'\n  ]\n\n-- rectCenterTop: (-> Rect Point)\nrectCenterTop rect =\n  vec2DPlus\n    (rectLeftTop rect)\n    [ rectWidth rect / 2, 0 ]\n\n-- rectRightTop: (-> Rect Point)\nrectRightTop rect =\n  vec2DPlus\n    (rectLeftTop rect)\n    [ rectWidth rect, 0 ]\n\n-- rectRightCenter: (-> Rect Point)\nrectRightCenter rect =\n  vec2DPlus\n    (rectLeftTop rect)\n    [ rectWidth rect, rectHeight rect / 2 ]\n\n-- rectRightBot: (-> Rect Point)\nrectRightBot rect =\n  vec2DPlus\n    (rectLeftTop rect)\n    [ rectWidth rect, rectHeight rect ]\n\n-- rectCenterBot: (-> Rect Point)\nrectCenterBot rect =\n  vec2DPlus\n    (rectLeftTop rect)\n    [ rectWidth rect / 2, rectHeight rect ]\n\n-- rectLeftBot: (-> Rect Point)\nrectLeftBot rect =\n  vec2DPlus\n    (rectLeftTop rect)\n    [0, rectHeight rect ]\n\n-- rectLeftCenter: (-> Rect Point)\nrectLeftCenter rect =\n  vec2DPlus\n    (rectLeftTop rect)\n    [0, rectHeight rect / 2 ]\n\n-- rectCenter: (-> Rect Point)\nrectCenter rect =\n  vec2DPlus\n    (rectLeftTop rect)\n    [ rectWidth rect / 2, rectHeight rect / 2 ] \n\n\n-- === Lines ===\n\ntype alias Line = SVG\n\n--; argument order - color, width, x1, y1, x1, y2\n--; creates a line from (x1, y1) to (x2,y2) with given color and width\n-- line: (-> Color Num Num Num Num Num Line)\nline stroke w x1 y1 x2 y2 =\n  [\'line\',\n     [ [\'x1\', x1], [\'y1\', y1], [\'x2\', x2], [\'y2\', y2], [\'stroke\', stroke], [\'stroke-width\', w] ],\n     []]\n\n-- lineBetween: (-> Color Num Point Point Line)\nlineBetween stroke w [x1, y1] [x2, y2] =\n  line stroke w x1 y1 x2 y2\n\n-- lineStart: (-> Line Point)\nlineStart line =\n  [\n    lookupNumAttrWithDefault 0 line \'x1\',\n    lookupNumAttrWithDefault 0 line \'y1\'\n  ]\n\n-- lineEnd: (-> Line Point)\nlineEnd line =\n  [\n    lookupNumAttrWithDefault 0 line \'x2\',\n    lookupNumAttrWithDefault 0 line \'y2\'\n  ]\n\n-- lineMidPoint: (-> Line Point)\nlineMidPoint line =\n  halfwayBetween (lineStart line) (lineEnd line) \n\n\n--; argument order - fill, stroke, width, points\n--; creates a polygon following the list of points, with given fill color and a border with given width and stroke\n-- polygon: (-> Color Color Num Points SVG)\npolygon fill stroke w pts =\n  [\'polygon\',\n     [ [\'fill\', fill], [\'points\', pts], [\'stroke\', stroke], [\'stroke-width\', w] ],\n     []] \n\n--; argument order - fill, stroke, width, points\n--; See polygon\n-- polyline: (-> Color Color Num Points SVG)\npolyline fill stroke w pts =\n  [\'polyline\',\n     [ [\'fill\', fill], [\'points\', pts], [\'stroke\', stroke], [\'stroke-width\', w] ],\n     []] \n\n--; argument order - fill, stroke, width, d\n--; Given SVG path command d, create path with given fill color, stroke and width\n--; See https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Paths for path command info\n-- path: (-> Color Color Num PathCmds SVG)\npath fill stroke w d =\n  [\'path\',\n     [ [\'fill\', fill], [\'stroke\', stroke], [\'stroke-width\', w], [\'d\', d] ],\n     []] \n\n--; argument order - x, y, string\n--; place a text string with top left corner at (x,y) - with default color & font\n-- text: (-> Num Num String SVG)\ntext x y s =\n   [\'text\', [[\'x\', x], [\'y\', y], [\'style\', \'fill:black\'],\n            [\'font-family\', \'Tahoma, sans-serif\']],\n           [[\'TEXT\', s]]] \n\n--; argument order - shape, new attribute\n--; Add a new attribute to a given Shape\n-- addAttr: (-> SVG AttrPair SVG)\naddAttr [shapeKind, oldAttrs, children] newAttr =\n  [shapeKind, snoc newAttr oldAttrs, children]\n\n-- consAttr: (-> SVG AttrPair SVG)\nconsAttr [shapeKind, oldAttrs, children] newAttr =\n  [shapeKind, cons newAttr oldAttrs, children] \n\n--; Given a list of shapes, compose into a single SVG\nsvg shapes = [\'svg\', [], shapes] \n\n--; argument order - x-maximum, y-maximum, shapes\n--; Given a list of shapes, compose into a single SVG within the x & y maxima\n-- svgViewBox: (-> Num Num (List SVG) SVG)\nsvgViewBox xMax yMax shapes =\n  let [sx, sy] = [toString xMax, toString yMax] in\n  [\'svg\',\n    [[\'x\', \'0\'], [\'y\', \'0\'], [\'viewBox\', joinStrings \' \' [\'0\', \'0\', sx, sy]]],\n    shapes] \n\n--; As rect, except x & y represent the center of the defined rectangle\n-- rectByCenter: (-> Color Num Num Num Num Rect)\nrectByCenter fill cx cy w h =\n  rect fill (cx - w / 2) (cy - h / 2) w h \n\n--; As square, except x & y represent the center of the defined rectangle\n-- squareByCenter: (-> Color Num Num Num Rect)\nsquareByCenter fill cx cy w = rectByCenter fill cx cy w w \n\n--; Some shapes with given default values for fill, stroke, and stroke width\n-- TODO remove these\ncircle_ =    circle \'red\' \nellipse_ =   ellipse \'orange\' \nrect_ =      rect \'#999999\' \nsquare_ =    square \'#999999\' \nline_ =      line \'blue\' 2 \npolygon_ =   polygon \'green\' \'purple\' 3 \npath_ =      path \'transparent\' \'goldenrod\' 5 \n\n--; updates an SVG by comparing differences with another SVG\n--; Note: accDiff pre-condition: indices in increasing order\n--; (so can\'t just use foldr instead of reverse . foldl)\n-- updateCanvas: (-> SVG SVG SVG)\nupdateCanvas [_, svgAttrs, oldShapes] diff =\n  let oldShapesI = zipOld (list1N (len oldShapes)) oldShapes in\n  let initAcc = [[], diff] in\n  let f [i, oldShape] [accShapes, accDiff] =\n    case accDiff of\n      []->\n        [cons oldShape accShapes, accDiff]\n      [j, newShape]::accDiffRest->\n        if i == j then\n          [cons newShape accShapes, accDiffRest]\n        else\n          [cons oldShape accShapes, accDiff] in\n  let newShapes = reverse (fst (foldl f initAcc oldShapesI)) in\n    [\'svg\', svgAttrs, newShapes] \n\naddBlob newShapes [\'svg\', svgAttrs, oldShapes] =\n  [\'svg\', svgAttrs, append oldShapes newShapes]\n\n--  groupMap: (forall (a b) (-> (List a) (-> a b) (List b)))\ngroupMap xs f = map f xs \n\nautoChose _ x _ = x \ninferred x _ _ = x \nflow _ x = x \n\ntwoPi = 2 * pi \nhalfPi = pi / 2 \n\n--; Helper function for nPointsOnCircle, calculates angle of points\n--; Note: angles are calculated clockwise from the traditional pi/2 mark\n-- nPointsOnUnitCircle: (-> Num Num (List Point))\nnPointsOnUnitCircle n rot =\n  let off = halfPi - rot in\n  let foo i =\n    let ang = off + i / n * twoPi in\n    [cos ang, neg (sin ang)] in\n  map foo (list0N (n - 1))\n\n-- nPointsOnCircle: (-> Num Num Num Num Num (List Point))\n--; argument order - Num of points, degree of rotation, x-center, y-center, radius\n--; Scales nPointsOnUnitCircle to the proper size and location with a given radius and center\nnPointsOnCircle n rot cx cy r =\n  let pts = nPointsOnUnitCircle n rot in\n  map \\[x, y] -> [ cx+ x * r, cy + y * r] pts\n\n-- nStar: (-> Color Color Num Num Num Num Num Num Num SVG)\n--; argument order -\n--; fill color - interior color of star\n--; stroke color - border color of star\n--; width - thickness of stroke\n--; points - number of star points\n--; len1 - length from center to one set of star points\n--; len2 - length from center to other set of star points (either inner or outer compared to len1)\n--; rot - degree of rotation\n--; cx - x-coordinate of center position\n--; cy - y-coordinate of center position\n--; Creates stars that can be modified on a number of parameters\nnStar fill stroke w n len1 len2 rot cx cy =\n  let pti [i, len] =\n    let anglei = i * pi / n - rot + halfPi in\n    let xi = cx + len * cos anglei in\n    let yi = cy + neg (len * sin anglei) in\n      [xi, yi] in\n  let lengths =\n    map (\\b -> if b then len1 else len2)\n        (concat (repeat n [True, False])) in\n  let indices = list0N (2! * n - 1!) in\n    polygon fill stroke w (map pti (zipOld indices lengths))\n\n-- setZones: (-> String SVG SVG)\nsetZones s shape = addAttr shape [\'ZONES\', s]\n\n-- zones: (-> String (List SVG) (List SVG))\nzones s shapes = map (setZones s) shapes \n-- TODO eta-reduced version:\n-- (def zones (\\s (map (setZones s))))\n\n--; Remove all zones from shapes except for the first in the list\n-- hideZonesTail: (-> (List SVG) (List SVG))\nhideZonesTail hd :: tl = hd :: zones \'none\' tl \n\n--; Turn all zones to basic for a given list of shapes except for the first shape\n-- basicZonesTail: (-> (List SVG) (List SVG))\nbasicZonesTail hd :: tl = hd :: zones \'basic\' tl\n\n-- ghost: (-> SVG SVG)\nghost =\n  -- consAttr (instead of addAttr) makes internal calls to\n  -- Utils.maybeRemoveFirst \'HIDDEN\' slightly faster\n  \\shape -> consAttr shape [\'HIDDEN\', \'\'] \n\nghosts = map ghost \n\n--; hSlider_ : Bool -> Bool -> Int -> Int -> Int -> Num -> Num -> Str -> Num\n--; -> [Num (List Svg)]\n--; argument order - dropBall roundInt xStart xEnd y minVal maxVal caption srcVal\n--; dropBall - Determines if the slider ball continues to appear past the edges of the slider\n--; roundInt - Determines whether to round to Ints or not\n--; xStart - left edge of slider\n--; xEnd - right edge of slider\n--; y - y positioning of entire slider bar\n--; minVal - minimum value of slider\n--; maxVal - maximum value of slider\n--; caption - text to display along with the slider\n--; srcVal - the current value given by the slider ball\nhSlider_ dropBall roundInt x0 x1 y minVal maxVal caption srcVal =\n  let preVal = clamp minVal maxVal srcVal in\n  let targetVal = if roundInt then round preVal else preVal in\n  let shapes =\n    let ball =\n      let [xDiff, valDiff] = [ x1- x0, maxVal - minVal] in\n      let xBall = x0 + xDiff * (srcVal - minVal) / valDiff in\n      if preVal == srcVal then circle \'black\' xBall y 10! else\n      if dropBall then          circle \'black\' 0! 0! 0! else\n                            circle \'red\' xBall y 10! in\n    [ line \'black\' 3! x0 y x1 y,\n      text (x1 + 10) (y + 5) (caption + toString targetVal),\n      circle \'black\' x0 y 4!, circle \'black\' x1 y 4!, ball ] in\n  [targetVal, ghosts shapes] \n-- TODO only draw zones for ball\n\nvSlider_ dropBall roundInt y0 y1 x minVal maxVal caption srcVal =\n  let preVal = clamp minVal maxVal srcVal in\n  let targetVal = if roundInt then round preVal else preVal in\n  let shapes =\n    let ball =\n      let [yDiff, valDiff] = [ y1- y0, maxVal - minVal] in\n      let yBall = y0 + yDiff * (srcVal - minVal) / valDiff in\n      if preVal == srcVal then circle \'black\' x yBall 10! else\n      if dropBall then          circle \'black\' 0! 0! 0! else\n                            circle \'red\' x yBall 10! in\n    [ line \'black\' 3! x y0 x y1,\n      -- (text (+ x1 10) (+ y 5) (+ caption (toString targetVal)))\n      circle \'black\' x y0 4!, circle \'black\' x y1 4!, ball ] in\n  [targetVal, ghosts shapes] \n-- TODO only draw zones for ball\n\nhSlider = hSlider_ False \nvSlider = vSlider_ False \n\n--; button_ : Bool -> Num -> Num -> String -> Num -> SVG\n--; Similar to sliders, but just has boolean values\nbutton_ dropBall xStart y caption xCur =\n  let [rPoint, wLine, rBall, wSlider] = [4!, 3!, 10!, 70!] in\n  let xEnd = xStart + wSlider in\n  let xBall = xStart + xCur * wSlider in\n  let xBall_ = clamp xStart xEnd xBall in\n  let val = xCur < 0.5 in\n  let shapes1 =\n    [ circle \'black\' xStart y rPoint,\n      circle \'black\' xEnd y rPoint,\n      line \'black\' wLine xStart y xEnd y,\n      text (xEnd + 10) (y + 5) (caption + toString val) ] in\n  let shapes2 =\n    [ if xBall_ == xBall then circle (if val then \'darkgreen\' else \'darkred\') xBall y rBall else\n      if dropBall then         circle \'black\' 0! 0! 0! else\n                           circle \'red\' xBall y rBall ] in\n  let shapes = append (zones \'none\' shapes1) (zones \'basic\' shapes2) in\n  [val, ghosts shapes] \n\nbutton = button_ False \n\nxySlider xStart xEnd yStart yEnd xMin xMax yMin yMax xCaption yCaption xCur yCur =\n    let [rCorner, wEdge, rBall] = [4!, 3!, 10!] in\n    let [xDiff, yDiff, xValDiff, yValDiff] = [ xEnd- xStart, yEnd - yStart, xMax - xMin, yMax - yMin] in\n    let xBall = xStart + xDiff * (xCur - xMin) / xValDiff in\n    let yBall = yStart + yDiff * (yCur - yMin) / yValDiff in\n    let cBall = if and (between xMin xMax xCur) (between yMin yMax yCur)then \'black\'else \'red\' in\n    let xVal = ceiling clamp xMin xMax xCur in\n    let yVal = ceiling clamp yMin yMax yCur in\n    let myLine x1 y1 x2 y2 = line \'black\' wEdge x1 y1 x2 y2 in\n    let myCirc x0 y0 = circle \'black\' x0 y0 rCorner in\n    let shapes =\n      [ myLine xStart yStart xEnd yStart,\n        myLine xStart yStart xStart yEnd,\n        myLine xStart yEnd xEnd yEnd,\n        myLine xEnd yStart xEnd yEnd,\n        myCirc xStart yStart,\n        myCirc xStart yEnd,\n        myCirc xEnd yStart,\n        myCirc xEnd yEnd,\n        circle cBall xBall yBall rBall,\n        text (xStart + xDiff / 2 - 40) (yEnd + 20) (xCaption + toString xVal),\n        text (xEnd + 10) (yStart + yDiff / 2) (yCaption + toString yVal) ] in\n    [ [ xVal, yVal ], ghosts shapes ]\n    \n-- enumSlider: (forall a (-> Num Num Num [a|(List a)] String Num [a (List SVG)]))\nenumSlider x0 x1 ((ya::_) as enum) caption srcVal =\n  let n = len enum in\n  let [minVal, maxVal] = [0!, n] in\n  let preVal = clamp minVal maxVal srcVal in\n  let i = floor preVal in\n  let item = -- using dummy first element for typechecking\n    let item_ = nth enum if i == n then n - 1 else i in\n    \"Error: typecase not yet implemented for Elm syntax\" in\n  let wrap circ = addAttr circ [\'SELECTED\', \'\'] in -- TODO\n  let shapes =\n    let rail = [ line \'black\' 3! x0 y x1 y ] in\n    let ball =\n      let [xDiff, valDiff] = [ x1- x0, maxVal - minVal] in\n      let xBall = x0 + xDiff * (srcVal - minVal) / valDiff in\n      let colorBall = if preVal == srcVal then \'black\' else \'red\' in\n        [ wrap (circle colorBall xBall y 10!) ] in\n    let endpoints =\n      [ wrap (circle \'black\' x0 y 4!), wrap (circle \'black\' x1 y 4!) ] in\n    let tickpoints =\n      let sep = (x1 - x0) / n in\n      map (\\j -> wrap (circle \'grey\' (x0 + mult j sep) y 4!))\n          (range 1! (n - 1!)) in\n    let label = [ text (x1 + 10!) (y + 5!) (caption + toString item) ] in\n    concat [ rail, endpoints, tickpoints, ball, label ] in\n  [item, ghosts shapes] \n\naddSelectionSliders y0 seeds shapesCaps =\n  let shapesCapsSeeds = zipOld shapesCaps (take seeds (len shapesCaps)) in\n  let foo [i, [[shape, cap], seed]] =\n    let [k, _, _] = shape in\n    let enum =\n      if k == \'circle\'then [\'\', \'cx\', \'cy\', \'r\']else\n      if k == \'line\'then   [\'\', \'x1\', \'y1\', \'x2\', \'y2\']else\n      if k == \'rect\'then   [\'\', \'x\', \'y\', \'width\', \'height\']else\n        [ \'NO SELECTION ENUM FOR KIND \'+ k] in\n    let [item, slider] = enumSlider 20! 170! (y0 + mult i 30!) enum cap seed in\n    let shape1 = addAttr shape [\'SELECTED\', item] in -- TODO overwrite existing\n    shape1::slider in\n  concat (mapi foo shapesCapsSeeds) \n\n-- Text Widgets\n\nsimpleText family color size x1 x2 y horizAlignSeed textVal =\n  let xMid = x1 + (x2 - x1) / 2! in\n  let [anchor, hAlignSlider] =\n    let dx = (x2 - x1) / 4! in\n    let yLine = 30! + y in\n    enumSlider (xMid - dx) (xMid + dx) yLine\n      [\'start\', \'middle\', \'end\'] \'\' horizAlignSeed in\n  let x =\n    if anchor == \'start\' then x1 else\n    if anchor == \'middle\' then xMid else\n    if anchor == \'end\' then x2 else\n      \'CRASH\' in\n  let theText =\n    [\'text\',\n      [[\'x\', x], [\'y\', y],\n       [\'style\', \'fill:\' + color],\n       [\'font-family\', family], [\'font-size\', size],\n       [\'text-anchor\', anchor]],\n      [[\'TEXT\', textVal]]] in\n  let rails =\n    let pad = 15! in\n    let yBaseLine = y + pad in\n    let xSideLine = x1 - pad in\n    let rail = line \'gray\' 3 in\n    let baseLine = rail xSideLine yBaseLine x2 yBaseLine in\n    let sideLine = rail xSideLine yBaseLine xSideLine (y - size) in\n    let dragBall = circle \'black\' x yBaseLine 8! in\n    ghosts [baseLine, sideLine, dragBall] in\n  concat [[theText], hAlignSlider, rails]\n\n-- rotate: (-> SVG Num Num Num SVG)\n--; argument order - shape, rot, x, y\n--; Takes a shape rotates it rot degrees around point (x,y)\nrotate shape n1 n2 n3 =\n  addAttr shape [\'transform\', [[\'rotate\', n1, n2, n3]]]\n\n-- rotateAround: (-> Num Num Num SVG SVG)\nrotateAround rot x y shape =\n  addAttr shape [\'transform\', [[\'rotate\', rot, x, y]]]\n\n-- Polygon and Path Helpers\n-- middleOfPoints: (-> (List Point) Point)\nmiddleOfPoints pts =\n  let [xs, ys] = [map fst pts, map snd pts] in\n  let [xMin, xMax] = [minimum xs, maximum xs] in\n  let [yMin, yMax] = [minimum ys, maximum ys] in\n  let xMiddle = noWidgets (xMin + 0.5 * (xMax - xMin)) in\n  let yMiddle = noWidgets (yMin + 0.5 * (yMax - yMin)) in\n    [xMiddle, yMiddle]\n\n-- polygonPoints: (-> SVG Points)\npolygonPoints [shapeKind, _, _]asshape =\n  case shapeKind of\n    \'polygon\'-> lookupPointsAttrWithDefault [] shape \'points\'\n    _->         []\n    \n-- allPointsOfPathCmds_: (-> PathCmds (List [(union Num String) (union Num String)]))\nallPointsOfPathCmds_ cmds = case cmds\nof\n  []->    []\n  [\'Z\']-> []\n\n  \'M\'::x::y::rest-> cons [x, y] (allPointsOfPathCmds_ rest)\n  \'L\'::x::y::rest-> cons [x, y] (allPointsOfPathCmds_ rest)\n\n  \'Q\'::x1::y1::x::y::rest->\n    append [[x1, y1], [x, y]] (allPointsOfPathCmds_ rest)\n\n  \'C\'::x1::y1::x2::y2::x::y::rest->\n    append [[x1, y1], [x2, y2], [x, y]] (allPointsOfPathCmds_ rest)\n\n  _-> [let _ = debug \"Prelude.allPointsOfPathCmds_: not Nums...\" in [-1, -1]] \n\n-- (typ allPointsOfPathCmds (-> PathCmds (List Point)))\n-- (def allPointsOfPathCmds (\\cmds\n--   (let toNum (\\numOrString\n--     (typecase numOrString (Num numOrString) (String -1)))\n--   (map (\\[x y] [(toNum x) (toNum y)]) (allPointsOfPathCmds_ cmds)))))\n\n-- TODO remove inner annotations and named lambda\n-- allPointsOfPathCmds: (-> PathCmds (List Point))\nallPointsOfPathCmds cmds =\n  -- toNum: (-> (union Num String) Num)\n  let toNum numOrString =\n  \"Error: typecase not yet implemented for Elm syntax\" in\n  -- foo: (-> [(union Num String) (union Num String)] Point)\n  let foo [x, y] = [toNum x, toNum y] in\n  map foo (allPointsOfPathCmds_ cmds) \n\n\n-- Raw Shapes\n\nrawShape kind attrs = [kind, attrs, []]\n\n-- rawRect: (-> Color Color Num Num Num Num Num Num Rect)\nrawRect fill stroke strokeWidth x y w h rot =\n  let [cx, cy] = [ x+ w / 2!, y + h / 2!] in\n  rotateAround rot cx cy\n    (rawShape \'rect\' [\n      [\'x\', x], [\'y\', y], [\'width\', w], [\'height\', h],\n      [\'fill\', fill], [\'stroke\', stroke], [\'stroke-width\', strokeWidth] ])\n\n-- rawCircle: (-> Color Color Num Num Num Num Circle)\nrawCircle fill stroke strokeWidth cx cy r =\n  rawShape \'circle\' [\n    [\'cx\', cx], [\'cy\', cy], [\'r\', r],\n    [\'fill\', fill], [\'stroke\', stroke], [\'stroke-width\', strokeWidth] ]\n\n-- rawEllipse: (-> Color Color Num Num Num Num Num Num Ellipse)\nrawEllipse fill stroke strokeWidth cx cy rx ry rot =\n  rotateAround rot cx cy\n    (rawShape \'ellipse\' [\n      [\'cx\', cx], [\'cy\', cy], [\'rx\', rx], [\'ry\', ry],\n      [\'fill\', fill], [\'stroke\', stroke], [\'stroke-width\', strokeWidth] ])\n\n-- rawPolygon: (-> Color Color Num Points Num SVG)\nrawPolygon fill stroke w pts rot =\n  let [cx, cy] = middleOfPoints pts in\n  rotateAround rot cx cy\n    (rawShape \'polygon\'\n      [ [\'fill\', fill], [\'points\', pts], [\'stroke\', stroke], [\'stroke-width\', w] ])\n\n-- rawPath: (-> Color Color Num PathCmds Num SVG)\nrawPath fill stroke w d rot =\n  let [cx, cy] = middleOfPoints (allPointsOfPathCmds d) in\n  rotateAround rot cx cy\n    (rawShape \'path\'\n      [ [\'fill\', fill], [\'d\', d], [\'stroke\', stroke], [\'stroke-width\', w] ]) \n\n\n-- Shapes via Bounding Boxes\n-- box: (-> Bounds Color Color Num BoundedShape)\nbox bounds fill stroke strokeWidth =\n  let [x, y, xw, yh] = bounds in\n  [\'BOX\',\n    [ [\'LEFT\', x], [\'TOP\', y], [\'RIGHT\', xw], [\'BOT\', yh],\n      [\'fill\', fill], [\'stroke\', stroke], [\'stroke-width\', strokeWidth]\n    ], []\n  ] \n\n-- string fill/stroke/stroke-width attributes to avoid sliders\n-- hiddenBoundingBox: (-> Bounds BoundedShape)\nhiddenBoundingBox bounds =\n  ghost (box bounds \'transparent\' \'transparent\' \'0\')\n\n-- simpleBoundingBox: (-> Bounds BoundedShape)\nsimpleBoundingBox bounds =\n  ghost (box bounds \'transparent\' \'darkblue\' 1)\n\n-- strList: (-> (List String) String)\nstrList =\n  let foo x acc = acc + if acc == \'\'then \'\'else \' \' + toString x in\n  foldl foo \'\'\n\n-- fancyBoundingBox: (-> Bounds (List SVG))\nfancyBoundingBox bounds =\n  let [left, top, right, bot] = bounds in\n  let [width, height] = [ right- left, bot - top] in\n  let [c1, c2, r] = [\'darkblue\', \'skyblue\', 6] in\n  [ ghost (box bounds \'transparent\' c1 1),\n    ghost (setZones \'none\' (circle c2 left top r)),\n    ghost (setZones \'none\' (circle c2 right top r)),\n    ghost (setZones \'none\' (circle c2 right bot r)),\n    ghost (setZones \'none\' (circle c2 left bot r)),\n    ghost (setZones \'none\' (circle c2 left (top + height / 2) r)),\n    ghost (setZones \'none\' (circle c2 right (top + height / 2) r)),\n    ghost (setZones \'none\' (circle c2 (left + width / 2) top r)),\n    ghost (setZones \'none\' (circle c2 (left + width / 2) bot r))\n  ]\n\n-- groupWithPad: (-> Num Bounds (List SVG) SVG)\ngroupWithPad pad bounds shapes =\n  let [left, top, right, bot] = bounds in\n  let paddedBounds = [ left- pad, top - pad, right + pad, bot + pad] in\n  [\'g\', [[\'BOUNDS\', bounds]],\n       cons (hiddenBoundingBox paddedBounds) shapes]\n\n-- group: (-> Bounds (List SVG) SVG)\ngroup = groupWithPad let nGroupPad = 20 in nGroupPad \n\n-- NOTE:\n--   keep the names nGroupPad and nPolyPathPad (and values)\n--   in sync with ExpressionBasedTransform.elm\n\n-- (def group (groupWithPad 15))\n\npolyPathGroup = groupWithPad let nPolyPathPad = 10 in nPolyPathPad \n\n-- TODO make one pass over pts\n-- boundsOfPoints: (-> (List Point) Bounds)\nboundsOfPoints pts =\n  let left =  minimum (map fst pts) in\n  let right = maximum (map fst pts) in\n  let top =   minimum (map snd pts) in\n  let bot =   maximum (map snd pts) in\n    [left, top, right, bot]\n    \n-- extremeShapePoints: (-> SVG Points)\nextremeShapePoints ([kind, _, _] as shape) =\n  case kind of\n    \'line\'->\n      let [x1, y1, x2, y2]as attrs = map (lookupAttr shape) [\"x1\", \"y1\", \"x2\", \"y2\"] in\n      \"Error: typecase not yet implemented for Elm syntax\"\n\n    \'rect\'->\n      let [x, y, w, h]as attrs = map (lookupAttr shape) [\"x\", \"y\", \"width\", \"height\"] in\n      \"Error: typecase not yet implemented for Elm syntax\"\n\n    \'circle\'->\n      let [cx, cy, r]as attrs = map (lookupAttr shape) [\"cx\", \"cy\", \"r\"] in\n      \"Error: typecase not yet implemented for Elm syntax\"\n\n    \'ellipse\'->\n      let [cx, cy, rx, ry]as attrs = map (lookupAttr shape) [\"cx\", \"cy\", \"rx\", \"ry\"] in\n      \"Error: typecase not yet implemented for Elm syntax\"\n\n    \'polygon\'-> polygonPoints shape\n\n    \'path\'->\n      let pathCmds = lookupAttr shape \"d\" in\n      \"Error: typecase not yet implemented for Elm syntax\"\n\n    _-> []\n\n-- anchoredGroup: (-> (List SVG) SVG)\nanchoredGroup shapes =\n  let bounds = boundsOfPoints (concat (map extremeShapePoints shapes)) in\n  group bounds shapes \n\n-- (def group (\\(bounds shapes)\n--   [\'g\' [[\'BOUNDS\' bounds]]\n--        (cons (hiddenBoundingBox bounds) shapes)]))\n\n       -- (concat [(fancyBoundingBox bounds) shapes])]))\n\n-- TODO no longer used...\n-- rotatedRect: (-> Color Num Num Num Num Num Rect)\nrotatedRect fill x y w h rot =\n  let [cx, cy] = [ x+ w / 2!, y + h / 2!] in\n  let bounds = [x, y, x + w, y + h] in\n  let shape = rotateAround rot cx cy (rect fill x y w h) in\n  group bounds [shape]\n\n-- rectangle: (-> Color Color Num Num Bounds Rect)\nrectangle fill stroke strokeWidth rot bounds =\n  let [left, top, right, bot] = bounds in\n  let [cx, cy] = [ left+ (right - left) / 2!, top + (bot - top) / 2!] in\n  let shape = rotateAround rot cx cy (box bounds fill stroke strokeWidth) in\n  shape \n-- (group bounds [shape])\n\n-- TODO no longer used...\n-- rotatedEllipse: (-> Color Num Num Num Num Num Ellipse)\nrotatedEllipse fill cx cy rx ry rot =\n  let bounds = [ cx- rx, cy - ry, cx + rx, cy + ry] in\n  let shape = rotateAround rot cx cy (ellipse fill cx cy rx ry) in\n  group bounds [shape] \n\n-- TODO take rot\n-- oval: (-> Color Color Num Bounds BoundedShape)\noval fill stroke strokeWidth bounds =\n  let [left, top, right, bot] = bounds in\n  let shape =\n    [\'OVAL\',\n       [ [\'LEFT\', left], [\'TOP\', top], [\'RIGHT\', right], [\'BOT\', bot],\n         [\'fill\', fill], [\'stroke\', stroke], [\'stroke-width\', strokeWidth] ],\n       []] in\n  shape \n\n-- ; TODO take rot\n-- (def oval (\\(fill stroke strokeWidth bounds)\n--   (let [left top right bot] bounds\n--   (let [rx ry] [(/ (- right left) 2!) (/ (- bot top) 2!)]\n--   (let [cx cy] [(+ left rx) (+ top ry)]\n--   (let shape ; TODO change def ellipse to take stroke/strokeWidth\n--     [\'ellipse\'\n--        [ [\'cx\' cx] [\'cy\' cy] [\'rx\' rx] [\'ry\' ry]\n--          [\'fill\' fill] [\'stroke\' stroke] [\'stroke-width\' strokeWidth] ]\n--        []]\n--   (group bounds [shape])\n-- ))))))\n\nscaleBetween a b pct =\n  case pct of\n    0-> a\n    1-> b\n    _-> a + pct * (b - a)\n\n-- stretchyPolygon: (-> Bounds Color Color Num (List Num) SVG)\nstretchyPolygon bounds fill stroke strokeWidth percentages =\n  let [left, top, right, bot] = bounds in\n  let [xScale, yScale] = [scaleBetween left right, scaleBetween top bot] in\n  let pts = map \\[xPct, yPct] -> [ xScale xPct, yScale yPct ] percentages in\n  -- (group bounds [(polygon fill stroke strokeWidth pts)])\n  polyPathGroup bounds [polygon fill stroke strokeWidth pts] \n\n-- TODO no longer used...\npointyPath fill stroke w d =\n  let dot x y = ghost (circle \'orange\' x y 5) in\n  let pointsOf cmds =\n    case cmds of\n      []->                     []\n      [\'Z\']->                  []\n      \'M\'::x::y::rest->       append [dot x y] (pointsOf rest)\n      \'L\'::x::y::rest->       append [dot x y] (pointsOf rest)\n      \'Q\'::x1::y1::x::y::rest-> append [dot x1 y1, dot x y] (pointsOf rest)\n      \'C\'::x1::y1::x2::y2::x::y::rest-> append [dot x1 y1, dot x2 y2, dot x y] (pointsOf rest)\n      _->                      \'ERROR\' in\n  [\'g\', [],\n    cons\n      (path fill stroke w d)\n      []] \n-- turning off points for now\n-- (pointsOf d)) ]\n\n-- can refactor to make one pass\n-- can also change representation/template code to pair points\nstretchyPath bounds fill stroke w d =\n  let [left, top, right, bot] = bounds in\n  let [xScale, yScale] = [scaleBetween left right, scaleBetween top bot] in\n  let dot x y = ghost (circle \'orange\' x y 5) in\n  let toPath cmds =\n    case cmds of\n      []->    []\n      [\'Z\']-> [\'Z\']\n      \'M\'::x::y::rest-> append [\'M\', xScale x, yScale y] (toPath rest)\n      \'L\'::x::y::rest-> append [\'L\', xScale x, yScale y] (toPath rest)\n      \'Q\'::x1::y1::x::y::rest->\n        append [\'Q\', xScale x1, yScale y1, xScale x, yScale y]\n                (toPath rest)\n      \'C\'::x1::y1::x2::y2::x::y::rest->\n        append [\'C\', xScale x1, yScale y1, xScale x2, yScale y2, xScale x, yScale y]\n                (toPath rest)\n      _-> \'ERROR\' in\n  let pointsOf cmds =\n    case cmds of\n      []->    []\n      [\'Z\']-> []\n      \'M\'::x::y::rest-> append [dot (xScale x) (yScale y)] (pointsOf rest)\n      \'L\'::x::y::rest-> append [dot (xScale x) (yScale y)] (pointsOf rest)\n      \'Q\'::x1::y1::x::y::rest->\n        append [dot (xScale x1) (yScale y1), dot (xScale x) (yScale y)]\n                (pointsOf rest)\n      \'C\'::x1::y1::x2::y2::x::y::rest->\n        append [dot (xScale x1) (yScale y1),\n                 dot (xScale x2) (yScale y2),\n                 dot (xScale x)  (yScale y)]\n                (pointsOf rest)\n      _-> \'ERROR\' in\n  -- (group bounds\n  polyPathGroup bounds\n    (cons\n      (path fill stroke w (toPath d))\n      []) \n-- turning off points for now\n-- (pointsOf d)))\n-- evalOffset: (-> [Num Num] Num)\nevalOffset [base, off] =\n  case off of\n    0-> base\n    _-> base + off \n\nstickyPolygon bounds fill stroke strokeWidth offsets =\n  let pts = map \\[xOff, yOff] -> [ evalOffset xOff, evalOffset yOff ] offsets in\n  group bounds [polygon fill stroke strokeWidth pts]\n\n-- withBounds: (-> Bounds (-> Bounds (List SVG)) (List SVG))\nwithBounds bounds f = f bounds\n\n-- withAnchor: (-> Point (-> Point (List SVG)) (List SVG))\nwithAnchor anchor f = f anchor\n\n-- star: (-> Bounds (List SVG))\nstar bounds =\n  let [left, top, right, bot] = bounds in\n  let [width, height] = [ right- left, bot - top] in\n  let [cx, cy] = [ left+ width / 2, top + height / 2] in\n  [nStar 0 \'black\' 0 6 (min (width / 2) (height / 2)) 10 0 cx cy]\n\n-- blobs: (-> (List Blob) SVG)\nblobs blobs =\n  let modifyBlob [i, blob] =\n    case blob of\n      [[\'g\', gAttrs, shape :: shapes]]->\n       [[\'g\', gAttrs, consAttr shape [\'BLOB\', toString (i + 1)] :: shapes]]\n      [shape]-> [consAttr shape [\'BLOB\', toString (i + 1)]]\n      _->       blob in\n  svg (concat (mapi modifyBlob blobs)) \n\n\n-- === Relations ===\n-- halfwayBetween: (-> Point Point Point)\nhalfwayBetween pt1 pt2 =\n  vec2DScalarMult 0.5 (vec2DPlus pt1 pt2)\n\n-- nextInLine: (-> Point Point Point)\nnextInLine pt1 pt2 =\n  vec2DPlus pt2 (vec2DMinus pt2 pt1) \n\n-- Point on line segment, at `ratio` location.\n-- onLine: (-> Point Point Num Point)\nonLine pt1 pt2 ratio =\n  let vec = vec2DMinus pt2 pt1 in\n  vec2DPlus pt1 (vec2DScalarMult ratio vec) \n\n-- === Basic Replicate ===\n\nhorizontalArray n sep func [x, y] =\n  let _ = -- draw point widget to control anchor\n    [x, y] : Point in\n  let draw_i i =\n    let xi = x + i * sep in\n    func [xi, y] in\n  concat (map draw_i (zeroTo n)) \n\nlinearArrayFromTo n func [xStart, yStart] [xEnd, yEnd] =\n  let xsep = (xEnd - xStart) / (n - 1) in\n  let ysep = (yEnd - yStart) / (n - 1) in\n  let draw_i i =\n    let xi = xStart + i * xsep in\n    let yi = yStart + i * ysep in\n    func [xi, yi] in\n  concat (map draw_i (zeroTo n)) \n\n-- To reduce size of resulting trace,\n-- could subtract up to M>1 at a time.\n--\nfloorAndLocalFreeze n =\n  if le n 1 then 0 else\n  --else\n  1    + floorAndLocalFreeze (n - 1) \n\n-- (let _ ; draw point widget to control anchor\n--   ([cx cy] : Point)\nradialArray n radius rot func [cx, cy] =\n  let center = -- draw ghost circle to control anchor\n              -- not using point widget, since it\'s not selectable\n    ghost (circle \'orange\' cx cy 20) in\n  let _ = -- draw point widget to control radius\n    let xWidget = floorAndLocalFreeze cx in\n    let yWidget = floorAndLocalFreeze cy - radius in\n      [xWidget, yWidget] : Point in\n  let endpoints = nPointsOnCircle n rot cx cy radius in\n  let bounds =\n    [ cx- radius, cy - radius, cx + radius, cy + radius] in\n  [group bounds (cons center (concat (map func endpoints)))] \n\noffsetAnchor dx dy f =\n  \\[x, y] -> f [ x+ dx, y + dy] \n\nhorizontalArrayByBounds n sep func [left_0, top, right_0, bot] =\n  let w_i = right_0     - left_0 in\n  let left_i i = left_0 + i * (w_i + sep) in\n  let right_i i = left_i i + w_i in\n  let draw_i i = func [left_i i, top, right_i i, bot] in\n  let bounds =  [left_0, top, right_i (n - 1), bot] in\n    [groupWithPad 30 bounds (concat (map draw_i (zeroTo n)))] \n\nrepeatInsideBounds n sep func[left, top, right, bot]as bounds =\n  let w_i = (right - left - sep * (n - 1)) / n in\n  let draw_i i =\n    let left_i = left + i * (w_i + sep) in\n    let right_i = left_i + w_i in\n    func [left_i, top, right_i, bot] in\n  [groupWithPad 30 bounds (concat (map draw_i (zeroTo n)))] \n\n\ndraw = svg \n\nshowOne x y val =\n   [\'text\', [[\'x\', x], [\'y\', y], [\'style\', \'fill:black\'],\n            [\'font-family\', \'monospace\'],\n            [\'font-size\', \'12pt\']],\n           [[\'TEXT\', toString val]]] \n\nshow = showOne 20 30 \n\nshowList vals =\n  [\'g\', [], mapi \\[i, val] -> showOne 20 ((i + 1) * 30) val vals] \n\nrectWithBorder stroke strokeWidth fill x y w h =\n  addAttr (addAttr\n    (rect fill x y w h)\n      [\"stroke\", stroke])\n      [\"stroke-width\", strokeWidth] \n\nsetStyles newStyles [kind, attrs, children] =\n  let attrs =\n    -- TODO\n    if styleAttr == null\n      then [\"style\", []] :: attrs\n      else attrs\n  in\n  let attrs =\n    map \\[key, val] ->\n      case key of\n        \"style\"->\n          let otherStyles =\n            concatMap \\[k, v] ->\n              case elem k (map fst newStyles) of\n                True  ->  []\n                False -> [[k, v]]\n              val in\n          [\"style\", append newStyles otherStyles]\n        _->\n          [key, val]\n      attrs\n  in\n  [kind, attrs, children]\n\nplaceAt [x, y] node =\n  let _ = [x, y] : Point in\n  -- TODO px suffix should be added in LangSvg/Html translation\n  setStyles\n    [ [\"position\", \"absolute\"],\n      [\"left\", toString x + \"px\"],\n      [\"top\", toString y + \"px\"]\n    ]\n    node\n\nplaceAtFixed [x, y] node =\n  let _ = [x, y] : Point in\n  setStyles\n    [[\"position\", \"fixed\"], [\"FIXED_LEFT\", x], [\"FIXED_TOP\", y]]\n    node\n\nplaceSvgAt [x, y] w h shapes =\n  placeAt [x, y]\n    [\"svg\", [[\"width\", w], [\"height\", h]], shapes]\n\nworkspace minSize children =\n  div_\n    (cons\n      (placeAt minSize (h3 \"</workspace>\"))\n      children)\n\n-- End SVG Stuff ---------------------------------------------------------------\n\n-- TODO: Refactor this in another module\n\ntutorialUtils = {\n  -- Perform basic markdown replacement (titles, newlines, italics)\n  -- Do this step BEFORE the htmlpass, so that the code is not parsed.\n  markdown =\n    Html.replace (\"(?:^|\\n)(#+)\\\\s(.+)\") (\\match ->\n      [<@(\"h\" + toString (String.length (nth match.group 1)))>@(nth match.group 2)</@>]\n    ) >>\n    Html.replace (\"_(?=\\\\S)(.*?)_\") (\\match ->\n      [<i>@(nth match.group 1)</i>]) >>\n    Html.replace \"(\\r?\\n|  )\\r?\\n\" (\\_ -> [<br>])\n\n  ------ Functions to call during the construction of the document. ------\n  ------ After the document is constructed, pass it to `htmlpass`   ------\n  ------ to compute the code snippets, the line numbers, etc.       ------\n  type alias Instruction = HtmlNode\n  type alias Options = {production: Bool}\n\n  -- Sets the current code to \'code\'. Not visible in the final document.\n  newcode: String -> Instruction\n  newcode code = <newcode code=code></newcode>\n\n  -- Replaces the \'placeHolder\' by \'code\' in the current code. In the final document,\n  -- In the final document, displays a message \"Replace [placeHolder] (line XXX) by \"\n  replace: String -> String -> Instruction\n  replace placeHolder code = <replace placeholder=placeHolder code=code class=\"snippet\"></replace>\n\n  -- Replaces the \'placeHolder\' by \'code\' in the current code. Not visible in the final document\n  -- Can be useful to replace the code if we gave instructions to replace it from the output.\n  hiddenreplace: String -> String -> Instruction\n  hiddenreplace placeHolder code = <hiddenreplace placeholder=placeHolder code=code></hiddenreplace>\n\n  -- Display the current code. You will use this perhaps only at the beginning and the end,\n  -- or for checkpoints.\n  displaycode: Instruction\n  displaycode = <displaycode class=\"snippet\"></displaycode>\n\n  -- Displays the given code snippet without touching the current code\n  displaylocalcode: String -> Instruction\n  displaylocalcode code = <displaylocalcode code=code class=\"snippet\"></displaylocalcode>\n\n  -- Evaluates the current code and display its result.\n  displayevalcode: String -> Instruction\n  displayevalcode = <displayevalcode></displayevalcode>\n\n  -- Performs a regex replacement on the current code and display its result,\n  -- but does not modify the current code.\n  displayevalcodeLocalReplace: String -> String -> Instruction\n  displayevalcodeLocalReplace regex replacement = <displayevalcode replace=regex by=replacement></displayevalcode>\n\n  -- Displays the line of the given snippet as it appears in the current code.\n  lineof: String -> Instruction\n  lineof snippet = <lineof snippet=snippet></lineof>\n\n  -- Future: Overridable items.\n  text_replace_the_code = \"Replace the code\"\n  text_with = \"with\"\n  text_line = \"line\"\n  text_position_unknown = \"position unknown\"\n\n  -- Interpret all \'newcode\', \'displaycode\', \'displaylocalcode\', \'displayevalcode\',\n  -- \'displayevalcodeLocalReplace\', \'lineof\' in the given Html node.\n  htmlpass: Options -> HtmlNode -> HtmlNode\n  htmlpass options =\n  let\n    displayintermediateresult display src =\n      if display then\n        case __evaluate__ (__CurrentEnv__) src of\n          Err msg -> <code class=\"error\">@msg</code>\n          Ok evalNode ->\n            <div class=\"outputwrapper\">@evalNode</div>\n      else\n        <div class=\"intermediateresult\">options.production is off. <button onclick=\"this.setAttribute(\'v\', \'True\')\" v=(toString options.production)>Turn it on</button> to display the intermediate result there.</div>\n\n    localReplace src attrs = case attrs of\n      [\"replace\", regex]::[\"by\", replacement]::attrs ->\n        localReplace (Regex.replace (escape regex) (\\_ -> replacement) src) attrs\n      attrs -> (src, attrs)\n  in \\htmlnode ->\n  let aux src htmlnode = case htmlnode of\n    [\"newcode\", [\"code\", code]::attrs, []] ->\n      (code, htmlnode)\n    [\"hiddenreplace\", [\"placeholder\", placeHolder]::[\"code\", code]::attrs, []] ->\n      let newSrc = Regex.replace (escape placeHolder) (\\_ -> code) src in\n      (newSrc, htmlnode)\n    [\"replace\", [\"placeholder\", placeHolder]::[\"code\", code]::attrs, []] ->\n      let newSrc = Regex.replace (escape placeHolder) (\\_ -> code) src in\n      (newSrc, <span>@text_replace_the_code <code>@placeHolder</code> (@(positionOf placeHolder src)) @text_with<code @attrs>@code</code></span>)\n    [\"lineof\", [\"snippet\", snippet]::attrs, []] ->\n      (src, <span>@(positionOf snippet src)</span>)\n    [\"displaylocalcode\", [\"code\", code]::attrs, []] ->\n      (src, [\"code\", attrs, [[\"TEXT\", code]]])\n    [\"displaycode\", attrs, []] ->\n      (src, [\"code\", attrs, [[\"TEXT\", src]]])\n    [\"displayevalcode\", attrs, []] ->\n      let (localSrc, localAttrs) = localReplace src attrs in\n      (src, displayintermediateresult options.production <| localSrc + \"\\n\\nmain\")\n    [tag, attrs, children] ->\n      let (newSrc, newRevChildren) =\n        List.foldl (\\child (tmpSrc, revChildren) ->\n          let (newTmpSrc, newChild) = aux tmpSrc child in\n          (newTmpSrc, newChild::revChildren)\n        ) (src, []) children\n      in\n      (newSrc, [tag, attrs, List.reverse newRevChildren])\n    _ -> (src, htmlnode)\n  in Tuple.second <| aux \"\" htmlnode\n\n  -- Escapes a string so that we can search it using regexes.\n  -- Replaces ... by a regexp that parses any sequence of chars, minimally.\n  escape = Regex.escape >> Regex.replace \"\"\"\\\\\\.\\\\\\.\\\\\\.\"\"\" (\\m -> \"\"\"[\\s\\S]+?\"\"\")\n\n  -- Computes the line position of a placeholder inside a string.\n  positionOf: String -> String -> String\n  positionOf placeHolder code =\n    case Regex.extract \"\"\"^([\\s\\S]*?)@(escape placeHolder)([\\s\\S]*)$\"\"\" code of\n      Just [before, after] ->\n        let line = Regex.split \"\\r?\\n\" before |> List.length |> toString in\n        \"\"\"@text_line @line\"\"\"\n      _ -> text_position_unknown\n}\n\n-- Utilities to invoke some of the usual browser commands\nbrowser = {\n  -- Refresh the output\n  refresh: String\n  refresh = \"\"\"document.querySelector(\".run\") ? document.querySelector(\".run\").click()\"\"\"\n\n  -- Returns the value of the global javascript variable or a placeholder else\n  localvar: String -> String -> String\n  localvar name initContent = \n    __jsEval__ \"\"\"typeof @name == \'undefined\' ? @initContent : @name\"\"\"\n    \n    \n}\n\nmedia = \"@media\" -- For compatibility with <style>\nkeyframes = \"@keyframes\"\nfont = \"@font\"\nimport = \"@import\"\ncharSet = \"@charSet\"\n\n-- The type checker relies on the name of this definition.\nlet dummyPreludeMain = [\"svg\", [], []] in dummyPreludeMain\n\n';
 var _user$project$PreludeGenerated$prelude = '\n; prelude.little\n;\n; This little library is accessible by every program.\n; This is not an example that generates an SVG canvas,\n; but we include it here for reference.\n\n;; The identity function - given a value, returns exactly that value\n(typ id (forall a (-> a a)))\n(def id (\\x x))\n\n;; A function that always returns the same value a, regardless of b\n(typ always (forall (a b) (-> a b a)))\n(def always (\\(x _) x))\n\n;; Composes two functions together\n(typ compose (forall (a b c) (-> (-> b c) (-> a b) (-> a c))))\n(def compose (\\(f g) (\\x (f (g x)))))\n\n(typ flip (forall (a b c) (-> (-> a b c) (-> b a c))))\n(def flip (\\f (\\(x y) (f y x))))\n  ; TODO other version:\n  ; (def flip (\\(f x y) (f y x)))\n\n(typ fst (forall (a b) (-> [a b] a)))\n(typ snd (forall (a b) (-> [a b] b)))\n\n(def fst (\\[a _] a))\n(def snd (\\[_ b] b))\n\n;; Given a bool, returns the opposite boolean value\n(typ not (-> Bool Bool))\n(def not (\\b (if b false true)))\n\n;; Given two bools, returns a bool regarding if the first argument is true, then the second argument is as well\n(typ implies (-> Bool Bool Bool))\n(def implies (\\(p q) (if p q true)))\n\n(typ or  (-> Bool Bool Bool))\n(typ and (-> Bool Bool Bool))\n\n(def or  (\\(p q) (if p true q)))\n(def and (\\(p q) (if p q false)))\n\n(typ lt (-> Num Num Bool))\n(typ eq (-> Num Num Bool))\n(typ le (-> Num Num Bool))\n(typ gt (-> Num Num Bool))\n(typ ge (-> Num Num Bool))\n\n(def lt (\\(x y) (< x y)))\n(def eq (\\(x y) (= x y)))\n(def le (\\(x y) (or (lt x y) (eq x y))))\n(def gt (flip lt))\n(def ge (\\(x y) (or (gt x y) (eq x y))))\n\n;; Returns the length of a given list\n(typ len (forall a (-> (List a) Num)))\n(defrec len (\\xs (case xs ([] 0) ([_ | xs1] (+ 1 (len xs1))))))\n\n;; Maps a function, f, over a list of values and returns the resulting list\n(typ map (forall (a b) (-> (-> a b) (List a) (List b))))\n(defrec map (\\(f xs)\n  (case xs ([] []) ([hd|tl] [(f hd)|(map f tl)]))))\n\n;; Combines two lists with a given function, extra elements are dropped\n(typ map2 (forall (a b c) (-> (-> a b c) (List a) (List b) (List c))))\n(defrec map2 (\\(f xs ys)\n  (case [xs ys]\n    ([[x|xs1] [y|ys1]] [ (f x y) | (map2 f xs1 ys1) ])\n    (_                 []))))\n\n;; Combines three lists with a given function, extra elements are dropped\n(typ map3 (forall (a b c d) (-> (-> a b c d) (List a) (List b) (List c) (List d))))\n(defrec map3 (\\(f xs ys zs)\n  (case [xs ys zs]\n    ([[x|xs1] [y|ys1] [z|zs1]] [ (f x y z) | (map3 f xs1 ys1 zs1) ])\n    (_                         []))))\n\n;; Combines four lists with a given function, extra elements are dropped\n(typ map4 (forall (a b c d e) (-> (-> a b c d e) (List a) (List b) (List c) (List d) (List e))))\n(defrec map4 (\\(f ws xs ys zs)\n  (case [ws xs ys zs]\n    ([[w|ws1] [x|xs1] [y|ys1] [z|zs1]] [ (f w x y z) | (map4 f ws1 xs1 ys1 zs1) ])\n    (_                                 []))))\n\n;; Takes a function, an accumulator, and a list as input and reduces using the function from the left\n(typ foldl (forall (a b) (-> (-> a b b) b (List a) b)))\n(defrec foldl (\\(f acc xs)\n  (case xs ([] acc) ([x|xs1] (foldl f (f x acc) xs1)))))\n\n;; Takes a function, an accumulator, and a list as input and reduces using the function from the right\n(typ foldr (forall (a b) (-> (-> a b b) b (List a) b)))\n(defrec foldr (\\(f acc xs)\n  (case xs ([] acc) ([x|xs1] (f x (foldr f acc xs1))))))\n\n;; Given two lists, append the second list to the end of the first\n(typ append (forall a (-> (List a) (List a) (List a))))\n(defrec append (\\(xs ys)\n  (case xs ([] ys) ([x|xs1] [ x | (append xs1 ys)]))))\n\n;; concatenate a list of lists into a single list\n(typ concat (forall a (-> (List (List a)) (List a))))\n(def concat (\\xss (foldr append [] xss)))\n  ; TODO eta-reduced version:\n  ; (def concat (foldr append []))\n\n;; Map a given function over a list and concatenate the resulting list of lists\n(typ concatMap (forall (a b) (-> (-> a (List b)) (List a) (List b))))\n(def concatMap (\\(f xs) (concat (map f xs))))\n\n;; Takes two lists and returns a list that is their cartesian product\n(typ cartProd (forall (a b) (-> (List a) (List b) (List [a b]))))\n(def cartProd (\\(xs ys)\n  (concatMap (\\x (map (\\y [x y]) ys)) xs)))\n\n;; Takes elements at the same position from two input lists and returns a list of pairs of these elements\n(typ zip (forall (a b) (-> (List a) (List b) (List [a b]))))\n(def zip (\\(xs ys) (map2 (\\(x y) [x y]) xs ys)))\n  ; TODO eta-reduced version:\n  ; (def zip (map2 (\\(x y) [x y])))\n\n;; The empty list\n;; (typ nil (forall a (List a)))\n(typ nil [])\n(def nil [])\n\n;; attaches an element to the front of a list\n(typ cons (forall a (-> a (List a) (List a))))\n(def cons (\\(x xs) [x | xs]))\n\n;; attaches an element to the end of a list\n(typ snoc (forall a (-> a (List a) (List a))))\n(def snoc (\\(x ys) (append ys [x])))\n\n;; Returns the first element of a given list\n(typ hd (forall a (-> (List a) a)))\n(def hd (\\[x|xs] x))\n\n(typ tl (forall a (-> (List a) (List a))))\n(def tl (\\[x|xs] xs))\n\n;; Returns the last element of a given list\n(typ last (forall a (-> (List a) a)))\n(defrec last (\\xs\n  (case xs\n    ([x]    x)\n    ([_|xs] (last xs)))))\n\n;; Given a list, reverse its order\n(typ reverse (forall a (-> (List a) (List a))))\n(def reverse (\\xs (foldl cons nil xs)))\n  ; TODO eta-reduced version:\n  ; (def reverse (foldl cons nil))\n\n(def adjacentPairs (\\xs (zip xs (tl xs))))\n\n;; Given two numbers, creates the list between them (inclusive)\n(typ range (-> Num Num (List Num)))\n(defrec range (\\(i j)\n  (if (< i (+ j 1))\n      (cons i (range (+ i 1) j))\n      nil)))\n\n;; Given a number, create the list of 0 to that number inclusive (number must be > 0)\n(typ list0N (-> Num (List Num)))\n(def list0N (\\n (range 0 n)))\n\n;; Given a number, create the list of 1 to that number inclusive\n(typ list1N (-> Num (List Num)))\n(def list1N (\\n (range 1 n)))\n\n(typ zeroTo (-> Num (List Num)))\n(def zeroTo (\\n (range 0 (- n 1))))\n\n;; Given a number n and some value x, return a list with x repeated n times\n(typ repeat (forall a (-> Num a (List a))))\n(def repeat (\\(n x) (map (always x) (range 1 n))))\n\n;; Given two lists, return a single list that alternates between their values (first element is from first list)\n(typ intermingle (forall a (-> (List a) (List a) (List a))))\n(defrec intermingle (\\(xs ys)\n  (case [xs ys]\n    ([[x|xs1] [y|ys1]] (cons x (cons y (intermingle xs1 ys1))))\n    ([[]      []]      nil)\n    (_                 (append xs ys)))))\n\n(def intersperse (\\(sep xs)\n  (case xs\n    ([]     xs)\n    ([x|xs] (reverse (foldl (\\(y acc) [ y sep | acc ]) [x] xs))))))\n\n(typ mapi (forall (a b) (-> (-> [Num a] b) (List a) (List b))))\n(def mapi (\\(f xs) (map f (zip (range 0 (- (len xs) 1)) xs))))\n\n(def indexedMap (\\(f xs) (mapi (\\[i x] (f i x)) xs)))\n\n\n(typ nth (forall a (-> (List a) Num (union Null a))))\n(defrec nth (\\(xs n)\n  (if (< n 0)       null\n    (case [n xs]\n      ([_ []]       null)\n      ([0 [x|xs1]]  x)\n      ([_ [x|xs1]]  (nth xs1 (- n 1)))))))\n\n; (defrec nth (\\(xs n)\n;   (if (< n 0)   \'ERROR: nth\'\n;     (case xs\n;       ([]       \'ERROR: nth\')\n;       ([x|xs1]  (if (= n 0) x (nth xs1 (- n 1))))))))\n\n; TODO change typ/def\n; (typ take (forall a (-> (List a) Num (union Null (List a)))))\n\n(typ take (forall a (-> (List a) Num (List (union Null a)))))\n(defrec take (\\(xs n)\n  (if (= n 0) []\n    (case xs\n      ([]      [null])\n      ([x|xs1] [x | (take xs1 (- n 1))])))))\n\n; (def take\n;   (letrec take_ (\\(n xs)\n;     (case [n xs]\n;       ([0 _]       [])\n;       ([_ []]      [])\n;       ([_ [x|xs1]] [x | (take_ (- n 1) xs1)])))\n;   (compose take_ (max 0))))\n\n(typ drop (forall a (-> (List a) Num (union Null (List a)))))\n(defrec drop (\\(xs n)\n  (if (le n 0)\n    xs\n    (case xs\n      ([]      null)\n      ([x|xs1] (drop xs1 (- n 1)))))))\n\n;; Drop n elements from the end of a list\n(typ dropEnd (forall a (-> (List a) Num (union Null (List a)))))\n(def dropEnd (\\(xs n)\n  (let tryDrop (drop (reverse xs) n)\n  (typecase tryDrop\n    (Null null)\n    (_    (reverse tryDrop))))))\n\n(typ elem (forall a (-> a (List a) Bool)))\n(defrec elem (\\(x ys)\n  (case ys\n    ([]      false)\n    ([y|ys1] (or (= x y) (elem x ys1))))))\n\n(def sortBy (\\(f xs)\n  (letrec ins (\\(x ys)   ; insert is a keyword...\n    (case ys\n      ([]     [x])\n      ([y|ys] (if (f x y) [x y | ys] [y | (ins x ys)]))))\n  (foldl ins [] xs))))\n\n(def sortAscending (sortBy lt))\n(def sortDescending (sortBy gt))\n\n\n;; multiply two numbers and return the result\n(typ mult (-> Num Num Num))\n(defrec mult (\\(m n)\n  (if (< m 1) 0 (+ n (mult (+ m -1) n)))))\n\n;; Given two numbers, subtract the second from the first\n(typ minus (-> Num Num Num))\n(def minus (\\(x y) (+ x (mult y -1))))\n\n;; Given two numbers, divide the first by the second\n(typ div (-> Num Num Num))\n(defrec div (\\(m n)\n  (if (< m n) 0\n  (if (< n 2) m\n    (+ 1 (div (minus m n) n))))))\n\n;; Given a number, returns the negative of that number\n(typ neg (-> Num Num))\n(def neg (\\x (- 0 x)))\n\n;; Absolute value\n(typ abs (-> Num Num))\n(def abs (\\x (if (< x 0) (neg x) x)))\n\n;; Sign function; -1, 0, or 1 based on sign of given number\n(typ sgn (-> Num Num))\n(def sgn (\\x (if (= 0 x) 0 (/ x (abs x)))))\n\n(typ some (forall a (-> (-> a Bool) (List a) Bool)))\n(defrec some (\\(p xs)\n  (case xs\n    ([]      false)\n    ([x|xs1] (or (p x) (some p xs1))))))\n\n(typ all (forall a (-> (-> a Bool) (List a) Bool)))\n(defrec all (\\(p xs)\n  (case xs\n    ([]      true)\n    ([x|xs1] (and (p x) (all p xs1))))))\n\n;; Given an upper bound, lower bound, and a number, restricts that number between those bounds (inclusive)\n;; Ex. clamp 1 5 4 = 4\n;; Ex. clamp 1 5 6 = 5\n(typ clamp (-> Num Num Num Num))\n(def clamp (\\(i j n) (if (< n i) i (if (< j n) j n))))\n\n(typ between (-> Num Num Num Bool))\n(def between (\\(i j n) (= n (clamp i j n))))\n\n(typ plus (-> Num Num Num))\n(def plus (\\(x y) (+ x y)))\n\n(typ min (-> Num Num Num))\n(def min (\\(i j) (if (lt i j) i j)))\n\n(typ max (-> Num Num Num))\n(def max (\\(i j) (if (gt i j) i j)))\n\n(typ minimum (-> (List Num) Num))\n(def minimum (\\[hd|tl] (foldl min hd tl)))\n\n(typ maximum (-> (List Num) Num))\n(def maximum (\\[hd|tl] (foldl max hd tl)))\n\n(typ average (-> (List Num) Num))\n(def average (\\nums\n  (let sum (foldl plus 0 nums)\n  (let n   (len nums)\n    (/ sum n)))))\n\n;; Combine a list of strings with a given separator\n;; Ex. joinStrings \', \' [\'hello\' \'world\'] = \'hello, world\'\n(typ joinStrings (-> String (List String) String))\n(def joinStrings (\\(sep ss)\n  (foldr (\\(str acc) (if (= acc \'\') str (+ str (+ sep acc)))) \'\' ss)))\n\n;; Concatenate a list of strings and return the resulting string\n(typ concatStrings (-> (List String) String))\n(def concatStrings (joinStrings \'\'))\n\n;; Concatenates a list of strings, interspersing a single space in between each string\n(typ spaces (-> (List String) String))\n(def spaces (joinStrings \' \'))\n\n;; First two arguments are appended at the front and then end of the third argument correspondingly\n;; Ex. delimit \'+\' \'+\' \'plus\' = \'+plus+\'\n(typ delimit (-> String String String String))\n(def delimit (\\(a b s) (concatStrings [a s b])))\n\n;; delimit a string with parentheses\n(typ parens (-> String String))\n(def parens (delimit \'(\' \')\'))\n\n;\n; SVG Manipulating Functions\n;\n\n; === SVG Types ===\n\n(def Point [Num Num])\n(def RGBA [Num Num Num Num])\n(def Color (union String Num RGBA))\n(def PathCmds (List (union String Num)))\n(def Points (List Point))\n(def RotationCmd [[String Num Num Num]])\n(def AttrVal (union String Num Bool Color PathCmds Points RotationCmd))\n(def AttrName String)\n(def AttrPair [AttrName AttrVal])\n(def Attrs (List AttrPair))\n(def NodeKind String)\n; TODO add recursive types properly\n(def SVG [NodeKind Attrs (List SVG_or_Text)])\n(def SVG_or_Text (union SVG [String String]))\n(def Blob (List SVG))\n\n; === Attribute Lookup ===\n\n(typ lookupWithDefault (forall (k v) (-> v k (List [k v]) v)))\n(defrec lookupWithDefault (\\(default k dict)\n  (let foo (lookupWithDefault default k)\n  (case dict\n    ([]            default)\n    ([[k1 v]|rest] (if (= k k1) v (foo rest)))))))\n\n(typ lookup (forall (k v) (-> k (List [k v]) (union v Null))))\n(defrec lookup (\\(k dict)\n  (let foo (lookup k)\n  (case dict\n    ([]            null)\n    ([[k1 v]|rest] (if (= k k1) v (foo rest)))))))\n\n(typ addExtras (-> Num (List [String (List [Num AttrVal])]) SVG SVG))\n(defrec addExtras (\\(i extras shape)\n  (case extras\n    ([] shape)\n    ([[k table] | rest]\n      (let v (lookup i table)\n      (typecase v\n        (Null    (addExtras i rest shape))\n        (AttrVal (addExtras i rest (addAttr shape [k v])))))))))\n\n(typ lookupAttr (-> SVG AttrName (union AttrVal Null)))\n(def lookupAttr (\\([_ attrs _] k) (lookup k attrs)))\n\n(typ lookupAttrWithDefault (-> AttrVal SVG AttrName AttrVal))\n(def lookupAttrWithDefault (\\(default [_ attrs _] k) (lookupWithDefault default k attrs)))\n\n; Pairs of Type-Specific Lookup Functions\n\n(typ lookupNumAttr (-> SVG AttrName (union Num Null)))\n(def lookupNumAttr (\\([_ attrs _] k)\n  (let val (lookup k attrs)\n  (typecase val (Num val) (_ null)))))\n\n(typ lookupNumAttrWithDefault (-> Num SVG AttrName Num))\n(def lookupNumAttrWithDefault (\\(default shape k)\n  (let val (lookupNumAttr shape k)\n  (typecase val (Num val) (Null default)))))\n\n(typ lookupPointsAttr (-> SVG AttrName (union Points Null)))\n(def lookupPointsAttr (\\([_ attrs _] k)\n  (let val (lookup k attrs)\n  (typecase val ((List [Num Num]) val) (_ null)))))\n\n(typ lookupPointsAttrWithDefault (-> Points SVG AttrName Points))\n(def lookupPointsAttrWithDefault (\\(default shape k)\n  (let val (lookupPointsAttr shape k)\n  (typecase val ((List [Num Num]) val) (Null default)))))\n\n(typ lookupStringAttr (-> SVG AttrName (union String Null)))\n(def lookupStringAttr (\\([_ attrs _] k)\n  (let val (lookup k attrs)\n  (typecase val (String val) (_ null)))))\n\n(typ lookupStringAttrWithDefault (-> String SVG AttrName String))\n(def lookupStringAttrWithDefault (\\(default shape k)\n  (let val (lookupStringAttr shape k)\n  (typecase val (String val) (Null default)))))\n\n; === Points ===\n\n(def Vec2D [Num Num])\n\n(typ vec2DPlus (-> Point Vec2D Point))\n(def vec2DPlus (\\(pt vec)\n  [\n    (+ (fst pt) (fst vec))\n    (+ (snd pt) (snd vec))\n  ]\n))\n\n(typ vec2DMinus (-> Point Point Vec2D))\n(def vec2DMinus (\\(pt vec)\n  [\n    (- (fst pt) (fst vec))\n    (- (snd pt) (snd vec))\n  ]\n))\n\n(typ vec2DScalarMult (-> Num Vec2D Point))\n(def vec2DScalarMult (\\(num vec)\n  [\n    (* (fst vec) num)\n    (* (snd vec) num)\n  ]\n))\n\n(typ vec2DScalarDiv (-> Num Vec2D Point))\n(def vec2DScalarDiv (\\(num vec)\n  [\n    (/ (fst vec) num)\n    (/ (snd vec) num)\n  ]\n))\n\n(typ vec2DLength (-> Point Point Num))\n(def vec2DLength (\\([x1 y1] [x2 y2])\n  (let [dx dy] [(- x2 x1) (- y2 y1)]\n  (sqrt (+ (* dx dx) (* dy dy))))))\n\n\n; === Circles ===\n\n(def Circle SVG)\n\n;; argument order - color, x, y, radius\n;; creates a circle, center at (x,y) with given radius and color\n(typ circle (-> Color Num Num Num Circle))\n(def circle (\\(fill cx cy r)\n  [\'circle\'\n     [[\'cx\' cx] [\'cy\' cy] [\'r\' r] [\'fill\' fill]]\n     []]))\n\n(typ circleCenter (-> Ellipse Point))\n(def circleCenter (\\circle\n  [\n    (lookupNumAttrWithDefault 0 circle \'cx\')\n    (lookupNumAttrWithDefault 0 circle \'cy\')\n  ]\n))\n\n(typ circleRadius (-> Circle Num))\n(def circleRadius (\\circle\n  (lookupNumAttrWithDefault 0 circle \'r\')\n))\n\n(typ circleDiameter (-> Circle Num))\n(def circleDiameter (\\circle\n  (* 2 (circleRadius circle))\n))\n\n(typ circleNorth (-> Circle Point))\n(def circleNorth (\\circle\n  (let [cx cy] (circleCenter circle)\n    [cx (- cy (circleRadius circle))]\n  )\n))\n\n(typ circleEast (-> Circle Point))\n(def circleEast (\\circle\n  (let [cx cy] (circleCenter circle)\n    [(+ cx (circleRadius circle)) cy]\n  )\n))\n\n(typ circleSouth (-> Circle Point))\n(def circleSouth (\\circle\n  (let [cx cy] (circleCenter circle)\n    [cx (+ cy (circleRadius circle))]\n  )\n))\n\n(typ circleWest (-> Circle Point))\n(def circleWest (\\circle\n  (let [cx cy] (circleCenter circle)\n    [(- cx (circleRadius circle)) cy]\n  )\n))\n\n\n;; argument order - color, width, x, y, radius\n;; Just as circle, except new width parameter determines thickness of ring\n(typ ring (-> Color Num Num Num Num SVG))\n(def ring (\\(c w x y r)\n  [\'circle\'\n     [ [\'cx\' x] [\'cy\' y] [\'r\' r] [\'fill\' \'none\'] [\'stroke\' c] [\'stroke-width\' w] ]\n     []]))\n\n\n; === Ellipses ===\n\n(def Ellipse SVG)\n\n;; argument order - color, x, y, x-radius, y-radius\n;; Just as circle, except radius is separated into x and y parameters\n(typ ellipse (-> Color Num Num Num Num Ellipse))\n(def ellipse (\\(fill x y rx ry)\n  [\'ellipse\'\n     [ [\'cx\' x] [\'cy\' y] [\'rx\' rx] [\'ry\' ry] [\'fill\' fill] ]\n     []]))\n\n(typ ellipseCenter (-> Ellipse Point))\n(def ellipseCenter (\\ellipse\n  [\n    (lookupNumAttrWithDefault 0 ellipse \'cx\')\n    (lookupNumAttrWithDefault 0 ellipse \'cy\')\n  ]\n))\n\n(typ ellipseRadiusX (-> Ellipse Num))\n(def ellipseRadiusX (\\ellipse\n  (lookupNumAttrWithDefault 0 ellipse \'rx\')\n))\n\n(typ ellipseRadiusY (-> Ellipse Num))\n(def ellipseRadiusY (\\ellipse\n  (lookupNumAttrWithDefault 0 ellipse \'ry\')\n))\n\n(typ ellipseDiameterX (-> Ellipse Num))\n(def ellipseDiameterX (\\ellipse\n  (* 2 (ellipseRadiusX ellipse))\n))\n\n(typ ellipseDiameterY (-> Ellipse Num))\n(def ellipseDiameterY (\\ellipse\n  (* 2 (ellipseRadiusY ellipse))\n))\n\n(typ ellipseNorth (-> Ellipse Point))\n(def ellipseNorth (\\ellipse\n  (let [cx cy] (ellipseCenter ellipse)\n    [cx (- cy (ellipseRadiusY ellipse))]\n  )\n))\n\n(typ ellipseEast (-> Ellipse Point))\n(def ellipseEast (\\ellipse\n  (let [cx cy] (ellipseCenter ellipse)\n    [(+ cx (ellipseRadiusX ellipse)) cy]\n  )\n))\n\n(typ ellipseSouth (-> Ellipse Point))\n(def ellipseSouth (\\ellipse\n  (let [cx cy] (ellipseCenter ellipse)\n    [cx (+ cy (ellipseRadiusY ellipse))]\n  )\n))\n\n(typ ellipseWest (-> Ellipse Point))\n(def ellipseWest (\\ellipse\n  (let [cx cy] (ellipseCenter ellipse)\n    [(- cx (ellipseRadiusX ellipse)) cy]\n  )\n))\n\n\n; === Bounds-based shapes (Oval and Box) ===\n\n(def BoundedShape SVG)\n(def Bounds [Num Num Num Num])\n\n(typ boundedShapeLeft (-> BoundedShape Num))\n(def boundedShapeLeft (\\shape\n  (lookupNumAttrWithDefault 0 shape \'LEFT\')\n))\n\n(typ boundedShapeTop (-> BoundedShape Num))\n(def boundedShapeTop (\\shape\n  (lookupNumAttrWithDefault 0 shape \'TOP\')\n))\n\n(typ boundedShapeRight (-> BoundedShape Num))\n(def boundedShapeRight (\\shape\n  (lookupNumAttrWithDefault 0 shape \'RIGHT\')\n))\n\n(typ boundedShapeBot (-> BoundedShape Num))\n(def boundedShapeBot (\\shape\n  (lookupNumAttrWithDefault 0 shape \'BOT\')\n))\n\n(typ boundedShapeWidth (-> BoundedShape Num))\n(def boundedShapeWidth (\\shape\n  (- (boundedShapeRight shape) (boundedShapeLeft shape))\n))\n\n(typ boundedShapeHeight (-> BoundedShape Num))\n(def boundedShapeHeight (\\shape\n  (- (boundedShapeBot shape) (boundedShapeTop shape))\n))\n\n(typ boundedShapeLeftTop (-> BoundedShape Point))\n(def boundedShapeLeftTop (\\shape\n  [\n    (boundedShapeLeft shape)\n    (boundedShapeTop shape)\n  ]\n))\n\n(typ boundedShapeCenterTop (-> BoundedShape Point))\n(def boundedShapeCenterTop (\\shape\n  [\n    (/ (+ (boundedShapeLeft shape) (boundedShapeRight shape)) 2)\n    (boundedShapeTop shape)\n  ]\n))\n\n(typ boundedShapeRightTop (-> BoundedShape Point))\n(def boundedShapeRightTop (\\shape\n  [\n    (boundedShapeRight shape)\n    (boundedShapeTop shape)\n  ]\n))\n\n(typ boundedShapeRightCenter (-> BoundedShape Point))\n(def boundedShapeRightCenter (\\shape\n  [\n    (boundedShapeRight shape)\n    (/ (+ (boundedShapeTop shape) (boundedShapeBot shape)) 2)\n  ]\n))\n\n(typ boundedShapeRightBot (-> BoundedShape Point))\n(def boundedShapeRightBot (\\shape\n  [\n    (boundedShapeRight shape)\n    (boundedShapeBot shape)\n  ]\n))\n\n(typ boundedShapeCenterBot (-> BoundedShape Point))\n(def boundedShapeCenterBot (\\shape\n  [\n    (/ (+ (boundedShapeLeft shape) (boundedShapeRight shape)) 2)\n    (boundedShapeBot shape)\n  ]\n))\n\n(typ boundedShapeLeftBot (-> BoundedShape Point))\n(def boundedShapeLeftBot (\\shape\n  [\n    (boundedShapeLeft shape)\n    (boundedShapeBot shape)\n  ]\n))\n\n(typ boundedShapeLeftCenter (-> BoundedShape Point))\n(def boundedShapeLeftCenter (\\shape\n  [\n    (boundedShapeLeft shape)\n    (/ (+ (boundedShapeTop shape) (boundedShapeBot shape)) 2)\n  ]\n))\n\n(typ boundedShapeCenter (-> BoundedShape Point))\n(def boundedShapeCenter (\\shape\n  [\n    (/ (+ (boundedShapeLeft shape) (boundedShapeRight shape)) 2)\n    (/ (+ (boundedShapeTop shape) (boundedShapeBot shape)) 2)\n  ]\n))\n\n\n; === Rectangles ===\n\n(def Rect SVG)\n\n;; argument order - color, x, y, width, height\n;; creates a rectangle of given width and height with (x,y) as the top left corner coordinate\n(typ rect (-> Color Num Num Num Num Rect))\n(def rect (\\(fill x y w h)\n  [\'rect\'\n     [ [\'x\' x] [\'y\' y] [\'width\' w] [\'height\' h] [\'fill\' fill] ]\n     []]))\n\n(typ square (-> Color Num Num Num Rect))\n(def square (\\(fill x y side) (rect fill x y side side)))\n\n(typ rectWidth (-> Rect Num))\n(def rectWidth (\\rect\n  (lookupNumAttrWithDefault 0 rect \'width\')\n))\n\n(typ rectHeight (-> Rect Num))\n(def rectHeight (\\rect\n  (lookupNumAttrWithDefault 0 rect \'height\')\n))\n\n(typ rectLeftTop (-> Rect Point))\n(def rectLeftTop (\\rect\n  [\n    (lookupNumAttrWithDefault 0 rect \'x\')\n    (lookupNumAttrWithDefault 0 rect \'y\')\n  ]\n))\n\n(typ rectCenterTop (-> Rect Point))\n(def rectCenterTop (\\rect\n  (vec2DPlus\n    (rectLeftTop rect)\n    [ (/ (rectWidth rect) 2) 0 ]\n  )\n))\n\n(typ rectRightTop (-> Rect Point))\n(def rectRightTop (\\rect\n  (vec2DPlus\n    (rectLeftTop rect)\n    [ (rectWidth rect) 0 ]\n  )\n))\n\n(typ rectRightCenter (-> Rect Point))\n(def rectRightCenter (\\rect\n  (vec2DPlus\n    (rectLeftTop rect)\n    [ (rectWidth rect) (/ (rectHeight rect) 2) ]\n  )\n))\n\n(typ rectRightBot (-> Rect Point))\n(def rectRightBot (\\rect\n  (vec2DPlus\n    (rectLeftTop rect)\n    [ (rectWidth rect) (rectHeight rect) ]\n  )\n))\n\n(typ rectCenterBot (-> Rect Point))\n(def rectCenterBot (\\rect\n  (vec2DPlus\n    (rectLeftTop rect)\n    [ (/ (rectWidth rect) 2) (rectHeight rect) ]\n  )\n))\n\n(typ rectLeftBot (-> Rect Point))\n(def rectLeftBot (\\rect\n  (vec2DPlus\n    (rectLeftTop rect)\n    [0 (rectHeight rect) ]\n  )\n))\n\n(typ rectLeftCenter (-> Rect Point))\n(def rectLeftCenter (\\rect\n  (vec2DPlus\n    (rectLeftTop rect)\n    [0 (/ (rectHeight rect) 2) ]\n  )\n))\n\n(typ rectCenter (-> Rect Point))\n(def rectCenter (\\rect\n  (vec2DPlus\n    (rectLeftTop rect)\n    [ (/ (rectWidth rect) 2) (/ (rectHeight rect) 2) ]\n  )\n))\n\n\n; === Lines ===\n\n(def Line SVG)\n\n;; argument order - color, width, x1, y1, x1, y2\n;; creates a line from (x1, y1) to (x2,y2) with given color and width\n(typ line (-> Color Num Num Num Num Num Line))\n(def line (\\(stroke w x1 y1 x2 y2)\n  [\'line\'\n     [ [\'x1\' x1] [\'y1\' y1] [\'x2\' x2] [\'y2\' y2] [\'stroke\' stroke] [\'stroke-width\' w] ]\n     []]))\n\n(typ lineBetween (-> Color Num Point Point Line))\n(def lineBetween (\\(stroke w [x1 y1] [x2 y2])\n  (line stroke w x1 y1 x2 y2)))\n\n(typ lineStart (-> Line Point))\n(def lineStart (\\line\n  [\n    (lookupNumAttrWithDefault 0 line \'x1\')\n    (lookupNumAttrWithDefault 0 line \'y1\')\n  ]\n))\n\n(typ lineEnd (-> Line Point))\n(def lineEnd (\\line\n  [\n    (lookupNumAttrWithDefault 0 line \'x2\')\n    (lookupNumAttrWithDefault 0 line \'y2\')\n  ]\n))\n\n(typ lineMidPoint (-> Line Point))\n(def lineMidPoint (\\line\n  (halfwayBetween (lineStart line) (lineEnd line))\n))\n\n\n;; argument order - fill, stroke, width, points\n;; creates a polygon following the list of points, with given fill color and a border with given width and stroke\n(typ polygon (-> Color Color Num Points SVG))\n(def polygon (\\(fill stroke w pts)\n  [\'polygon\'\n     [ [\'fill\' fill] [\'points\' pts] [\'stroke\' stroke] [\'stroke-width\' w] ]\n     []]))\n\n;; argument order - fill, stroke, width, points\n;; See polygon\n(typ polyline (-> Color Color Num Points SVG))\n(def polyline (\\(fill stroke w pts)\n  [\'polyline\'\n     [ [\'fill\' fill] [\'points\' pts] [\'stroke\' stroke] [\'stroke-width\' w] ]\n     []]))\n\n;; argument order - fill, stroke, width, d\n;; Given SVG path command d, create path with given fill color, stroke and width\n;; See https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Paths for path command info\n(typ path (-> Color Color Num PathCmds SVG))\n(def path (\\(fill stroke w d)\n  [\'path\'\n     [ [\'fill\' fill] [\'stroke\' stroke] [\'stroke-width\' w] [\'d\' d] ]\n     []]))\n\n;; argument order - x, y, string\n;; place a text string with top left corner at (x,y) - with default color & font\n(typ text (-> Num Num String SVG))\n(def text (\\(x y s)\n   [\'text\' [[\'x\' x] [\'y\' y] [\'style\' \'fill:black\']\n            [\'font-family\' \'Tahoma, sans-serif\']]\n           [[\'TEXT\' s]]]))\n\n;; argument order - shape, new attribute\n;; Add a new attribute to a given Shape\n(typ addAttr (-> SVG AttrPair SVG))\n(def addAttr (\\([shapeKind oldAttrs children] newAttr)\n  [shapeKind (snoc newAttr oldAttrs) children]))\n\n(typ consAttr (-> SVG AttrPair SVG))\n(def consAttr (\\([shapeKind oldAttrs children] newAttr)\n  [shapeKind (cons newAttr oldAttrs) children]))\n\n;; Given a list of shapes, compose into a single SVG\n(def svg (\\shapes [\'svg\' [] shapes]))\n\n;; argument order - x-maximum, y-maximum, shapes\n;; Given a list of shapes, compose into a single SVG within the x & y maxima\n(typ svgViewBox (-> Num Num (List SVG) SVG))\n(def svgViewBox (\\(xMax yMax shapes)\n  (let [sx sy] [(toString xMax) (toString yMax)]\n  [\'svg\'\n    [[\'x\' \'0\'] [\'y\' \'0\'] [\'viewBox\' (joinStrings \' \' [\'0\' \'0\' sx sy])]]\n    shapes])))\n\n;; As rect, except x & y represent the center of the defined rectangle\n(typ rectByCenter (-> Color Num Num Num Num Rect))\n(def rectByCenter (\\(fill cx cy w h)\n  (rect fill (- cx (/ w 2)) (- cy (/ h 2)) w h)))\n\n;; As square, except x & y represent the center of the defined rectangle\n(typ squareByCenter (-> Color Num Num Num Rect))\n(def squareByCenter (\\(fill cx cy w) (rectByCenter fill cx cy w w)))\n\n;; Some shapes with given default values for fill, stroke, and stroke width\n; TODO remove these\n(def circle_    (circle \'red\'))\n(def ellipse_   (ellipse \'orange\'))\n(def rect_      (rect \'#999999\'))\n(def square_    (square \'#999999\'))\n(def line_      (line \'blue\' 2))\n(def polygon_   (polygon \'green\' \'purple\' 3))\n(def path_      (path \'transparent\' \'goldenrod\' 5))\n\n;; updates an SVG by comparing differences with another SVG\n;; Note: accDiff pre-condition: indices in increasing order\n;; (so can\'t just use foldr instead of reverse . foldl)\n(typ updateCanvas (-> SVG SVG SVG))\n(def updateCanvas (\\([_ svgAttrs oldShapes] diff)\n  (let oldShapesI (zip (list1N (len oldShapes)) oldShapes)\n  (let initAcc [[] diff]\n  (let f (\\([i oldShape] [accShapes accDiff])\n    (case accDiff\n      ([]\n        [(cons oldShape accShapes) accDiff])\n      ([[j newShape] | accDiffRest]\n        (if (= i j)\n          [(cons newShape accShapes) accDiffRest]\n          [(cons oldShape accShapes) accDiff]))))\n  (let newShapes (reverse (fst (foldl f initAcc oldShapesI)))\n    [\'svg\' svgAttrs newShapes]))))))\n\n(def addBlob (\\(newShapes [\'svg\' svgAttrs oldShapes])\n  [\'svg\' svgAttrs (append oldShapes newShapes)]))\n\n(typ groupMap (forall (a b) (-> (List a) (-> a b) (List b))))\n(def groupMap (\\(xs f) (map f xs)))\n\n(def autoChose (\\(_ x _) x))\n(def inferred  (\\(x _ _) x))\n(def flow (\\(_ x) x))\n\n; \'constant folding\'\n(def twoPi (* 2 (pi)))\n(def halfPi (/ (pi) 2))\n\n;; Helper function for nPointsOnCircle, calculates angle of points\n;; Note: angles are calculated clockwise from the traditional pi/2 mark\n(typ nPointsOnUnitCircle (-> Num Num (List Point)))\n(def nPointsOnUnitCircle (\\(n rot)\n  (let off (- halfPi rot)\n  (let foo (\\i\n    (let ang (+ off (* (/ i n) twoPi))\n    [(cos ang) (neg (sin ang))]))\n  (map foo (list0N (- n 1)))))))\n\n(typ nPointsOnCircle (-> Num Num Num Num Num (List Point)))\n;; argument order - Num of points, degree of rotation, x-center, y-center, radius\n;; Scales nPointsOnUnitCircle to the proper size and location with a given radius and center\n(def nPointsOnCircle (\\(n rot cx cy r)\n  (let pts (nPointsOnUnitCircle n rot)\n  (map (\\[x y] [(+ cx (* x r)) (+ cy (* y r))]) pts))))\n\n(typ nStar (-> Color Color Num Num Num Num Num Num Num SVG))\n;; argument order -\n;; fill color - interior color of star\n;; stroke color - border color of star\n;; width - thickness of stroke\n;; points - number of star points\n;; len1 - length from center to one set of star points\n;; len2 - length from center to other set of star points (either inner or outer compared to len1)\n;; rot - degree of rotation\n;; cx - x-coordinate of center position\n;; cy - y-coordinate of center position\n;; Creates stars that can be modified on a number of parameters\n(def nStar (\\(fill stroke w n len1 len2 rot cx cy)\n  (let pti (\\[i len]\n    (let anglei (+ (- (/ (* i (pi)) n) rot) halfPi)\n    (let xi (+ cx (* len (cos anglei)))\n    (let yi (+ cy (neg (* len (sin anglei))))\n      [xi yi]))))\n  (let lengths\n    (map (\\b (if b len1 len2))\n         (concat (repeat n [true false])))\n  (let indices (list0N (- (* 2! n) 1!))\n    (polygon fill stroke w (map pti (zip indices lengths))))))))\n\n(typ setZones (-> String SVG SVG))\n(def setZones (\\(s shape) (addAttr shape [\'ZONES\' s])))\n\n(typ zones (-> String (List SVG) (List SVG)))\n(def zones (\\(s shapes) (map (setZones s) shapes)))\n  ; TODO eta-reduced version:\n  ; (def zones (\\s (map (setZones s))))\n\n;; Remove all zones from shapes except for the first in the list\n(typ hideZonesTail (-> (List SVG) (List SVG)))\n(def hideZonesTail  (\\[hd | tl] [hd | (zones \'none\' tl)]))\n\n;; Turn all zones to basic for a given list of shapes except for the first shape\n(typ basicZonesTail (-> (List SVG) (List SVG)))\n(def basicZonesTail (\\[hd | tl] [hd | (zones \'basic\' tl)]))\n\n(typ ghost (-> SVG SVG))\n(def ghost\n  ; consAttr (instead of addAttr) makes internal calls to\n  ; Utils.maybeRemoveFirst \'HIDDEN\' slightly faster\n  (\\shape (consAttr shape [\'HIDDEN\' \'\'])))\n\n(def ghosts (map ghost))\n\n;; hSlider_ : Bool -> Bool -> Int -> Int -> Int -> Num -> Num -> Str -> Num\n;; -> [Num (List Svg)]\n;; argument order - dropBall roundInt xStart xEnd y minVal maxVal caption srcVal\n;; dropBall - Determines if the slider ball continues to appear past the edges of the slider\n;; roundInt - Determines whether to round to Ints or not\n;; xStart - left edge of slider\n;; xEnd - right edge of slider\n;; y - y positioning of entire slider bar\n;; minVal - minimum value of slider\n;; maxVal - maximum value of slider\n;; caption - text to display along with the slider\n;; srcVal - the current value given by the slider ball\n(def hSlider_ (\\(dropBall roundInt x0 x1 y minVal maxVal caption srcVal)\n  (let preVal (clamp minVal maxVal srcVal)\n  (let targetVal (if roundInt (round preVal) preVal)\n  (let shapes\n    (let ball\n      (let [xDiff valDiff] [(- x1 x0) (- maxVal minVal)]\n      (let xBall (+ x0 (* xDiff (/ (- srcVal minVal) valDiff)))\n      (if (= preVal srcVal) (circle \'black\' xBall y 10!)\n      (if dropBall          (circle \'black\' 0! 0! 0!)\n                            (circle \'red\' xBall y 10!)))))\n    [ (line \'black\' 3! x0 y x1 y)\n      (text (+ x1 10) (+ y 5) (+ caption (toString targetVal)))\n      (circle \'black\' x0 y 4!) (circle \'black\' x1 y 4!) ball ])\n  [targetVal (ghosts shapes)])))))\n; TODO only draw zones for ball\n\n(def vSlider_ (\\(dropBall roundInt y0 y1 x minVal maxVal caption srcVal)\n  (let preVal (clamp minVal maxVal srcVal)\n  (let targetVal (if roundInt (round preVal) preVal)\n  (let shapes\n    (let ball\n      (let [yDiff valDiff] [(- y1 y0) (- maxVal minVal)]\n      (let yBall (+ y0 (* yDiff (/ (- srcVal minVal) valDiff)))\n      (if (= preVal srcVal) (circle \'black\' x yBall 10!)\n      (if dropBall          (circle \'black\' 0! 0! 0!)\n                            (circle \'red\' x yBall 10!)))))\n    [ (line \'black\' 3! x y0 x y1)\n      ; (text (+ x1 10) (+ y 5) (+ caption (toString targetVal)))\n      (circle \'black\' x y0 4!) (circle \'black\' x y1 4!) ball ])\n  [targetVal (ghosts shapes)])))))\n; TODO only draw zones for ball\n\n(def hSlider (hSlider_ false))\n(def vSlider (vSlider_ false))\n\n;; button_ : Bool -> Num -> Num -> String -> Num -> SVG\n;; Similar to sliders, but just has boolean values\n(def button_ (\\(dropBall xStart y caption xCur)\n  (let [rPoint wLine rBall wSlider] [4! 3! 10! 70!]\n  (let xEnd (+ xStart wSlider)\n  (let xBall (+ xStart (* xCur wSlider))\n  (let xBall_ (clamp xStart xEnd xBall)\n  (let val (< xCur 0.5)\n  (let shapes1\n    [ (circle \'black\' xStart y rPoint)\n      (circle \'black\' xEnd y rPoint)\n      (line \'black\' wLine xStart y xEnd y)\n      (text (+ xEnd 10) (+ y 5) (+ caption (toString val))) ]\n  (let shapes2\n    [ (if (= xBall_ xBall) (circle (if val \'darkgreen\' \'darkred\') xBall y rBall)\n      (if dropBall         (circle \'black\' 0! 0! 0!)\n                           (circle \'red\' xBall y rBall))) ]\n  (let shapes (append (zones \'none\' shapes1) (zones \'basic\' shapes2))\n  [val (ghosts shapes)]))))))))))\n\n(def button (button_ false))\n\n(def xySlider\n  (\\(xStart xEnd yStart yEnd xMin xMax yMin yMax xCaption yCaption xCur yCur)\n    (let [rCorner wEdge rBall] [4! 3! 10!]\n    (let [xDiff yDiff xValDiff yValDiff] [(- xEnd xStart) (- yEnd yStart) (- xMax xMin) (- yMax yMin)]\n    (let xBall (+ xStart (* xDiff (/ (- xCur xMin) xValDiff)))\n    (let yBall (+ yStart (* yDiff (/ (- yCur yMin) yValDiff)))\n    (let cBall (if (and (between xMin xMax xCur) (between yMin yMax yCur)) \'black\' \'red\')\n    (let xVal (ceiling (clamp xMin xMax xCur))\n    (let yVal (ceiling (clamp yMin yMax yCur))\n    (let myLine (\\(x1 y1 x2 y2) (line \'black\' wEdge x1 y1 x2 y2))\n    (let myCirc (\\(x0 y0) (circle \'black\' x0 y0 rCorner))\n    (let shapes\n      [ (myLine xStart yStart xEnd yStart)\n        (myLine xStart yStart xStart yEnd)\n        (myLine xStart yEnd xEnd yEnd)\n        (myLine xEnd yStart xEnd yEnd)\n        (myCirc xStart yStart)\n        (myCirc xStart yEnd)\n        (myCirc xEnd yStart)\n        (myCirc xEnd yEnd)\n        (circle cBall xBall yBall rBall)\n        (text (- (+ xStart (/ xDiff 2)) 40) (+ yEnd 20) (+ xCaption (toString xVal)))\n        (text (+ xEnd 10) (+ yStart (/ yDiff 2)) (+ yCaption (toString yVal))) ]\n    [ [ xVal yVal ] (ghosts shapes) ]\n))))))))))))\n\n(typ enumSlider (forall a (-> Num Num Num [a|(List a)] String Num [a (List SVG)])))\n(def enumSlider (\\(x0 x1 y enum@[a|_] caption srcVal)\n  (let n (len enum)\n  (let [minVal maxVal] [0! n]\n  (let preVal (clamp minVal maxVal srcVal)\n  (let i (floor preVal)\n  (let item ; using dummy first element for typechecking\n    (let item_ (nth enum (if (= i n) (- n 1) i))\n    (typecase item_\n      (Null a)\n      (_    item_)))\n  (let wrap (\\circ (addAttr circ [\'SELECTED\' \'\'])) ; TODO\n  (let shapes\n    (let rail [ (line \'black\' 3! x0 y x1 y) ]\n    (let ball\n      (let [xDiff valDiff] [(- x1 x0) (- maxVal minVal)]\n      (let xBall (+ x0 (* xDiff (/ (- srcVal minVal) valDiff)))\n      (let colorBall (if (= preVal srcVal) \'black\' \'red\')\n        [ (wrap (circle colorBall xBall y 10!)) ])))\n    (let endpoints\n      [ (wrap (circle \'black\' x0 y 4!)) (wrap (circle \'black\' x1 y 4!)) ]\n    (let tickpoints\n      (let sep (/ (- x1 x0) n)\n      (map (\\j (wrap (circle \'grey\' (+ x0 (mult j sep)) y 4!)))\n           (range 1! (- n 1!))))\n    (let label [ (text (+ x1 10!) (+ y 5!) (+ caption (toString item))) ]\n    (concat [ rail endpoints tickpoints ball label ]))))))\n  [item (ghosts shapes)])))))))))\n\n(def addSelectionSliders (\\(y0 seeds shapesCaps)\n  (let shapesCapsSeeds (zip shapesCaps (take seeds (len shapesCaps)))\n  (let foo (\\[i [[shape cap] seed]]\n    (let [k _ _] shape\n    (let enum\n      (if (= k \'circle\') [\'\' \'cx\' \'cy\' \'r\']\n      (if (= k \'line\')   [\'\' \'x1\' \'y1\' \'x2\' \'y2\']\n      (if (= k \'rect\')   [\'\' \'x\' \'y\' \'width\' \'height\']\n        [(+ \'NO SELECTION ENUM FOR KIND \' k)])))\n    (let [item slider] (enumSlider 20! 170! (+ y0 (mult i 30!)) enum cap seed)\n    (let shape1 (addAttr shape [\'SELECTED\' item]) ; TODO overwrite existing\n    [shape1|slider])))))\n  (concat (mapi foo shapesCapsSeeds))))))\n\n; Text Widgets\n\n(def simpleText (\\(family color size x1 x2 y horizAlignSeed textVal)\n  (let xMid (+ x1 (/ (- x2 x1) 2!))\n  (let [anchor hAlignSlider]\n    (let dx (/ (- x2 x1) 4!)\n    (let yLine (+ 30! y)\n    (enumSlider (- xMid dx) (+ xMid dx) yLine\n      [\'start\' \'middle\' \'end\'] \'\' horizAlignSeed)))\n  (let x\n    (if (= anchor \'start\') x1\n    (if (= anchor \'middle\') xMid\n    (if (= anchor \'end\') x2\n      \'CRASH\')))\n  (let theText\n    [\'text\'\n      [[\'x\' x] [\'y\' y]\n       [\'style\' (+ \'fill:\' color)]\n       [\'font-family\' family] [\'font-size\' size]\n       [\'text-anchor\' anchor]]\n      [[\'TEXT\' textVal]]]\n  (let rails\n    (let pad 15!\n    (let yBaseLine (+ y pad)\n    (let xSideLine (- x1 pad)\n    (let rail (line \'gray\' 3)\n    (let baseLine (rail xSideLine yBaseLine x2 yBaseLine)\n    (let sideLine (rail xSideLine yBaseLine xSideLine (- y size))\n    (let dragBall (circle \'black\' x yBaseLine 8!)\n    (ghosts [baseLine sideLine dragBall]))))))))\n  (concat [[theText] hAlignSlider rails])\n)))))))\n\n\n(typ rotate (-> SVG Num Num Num SVG))\n;; argument order - shape, rot, x, y\n;; Takes a shape rotates it rot degrees around point (x,y)\n(def rotate (\\(shape n1 n2 n3)\n  (addAttr shape [\'transform\' [[\'rotate\' n1 n2 n3]]])))\n\n(typ rotateAround (-> Num Num Num SVG SVG))\n(def rotateAround (\\(rot x y shape)\n  (addAttr shape [\'transform\' [[\'rotate\' rot x y]]])))\n\n; Convert radians to degrees\n(typ radToDeg (-> Num Num))\n(def radToDeg (\\rad (* (/ rad (pi)) 180!)))\n\n; Convert degrees to radians\n(typ degToRad (-> Num Num))\n(def degToRad (\\deg (* (/ deg 180!) (pi))))\n\n; Polygon and Path Helpers\n\n(typ middleOfPoints (-> (List Point) Point))\n(def middleOfPoints (\\pts\n  (let [xs ys] [(map fst pts) (map snd pts)]\n  (let [xMin xMax] [(minimum xs) (maximum xs)]\n  (let [yMin yMax] [(minimum ys) (maximum ys)]\n  (let xMiddle (noWidgets (+ xMin (* 0.5 (- xMax xMin))))\n  (let yMiddle (noWidgets (+ yMin (* 0.5 (- yMax yMin))))\n    [xMiddle yMiddle] )))))))\n\n(typ polygonPoints (-> SVG Points))\n(def polygonPoints (\\shape@[shapeKind _ _]\n  (case shapeKind\n    (\'polygon\' (lookupPointsAttrWithDefault [] shape \'points\'))\n    (_         []))))\n\n(typ allPointsOfPathCmds_ (-> PathCmds (List [(union Num String) (union Num String)])))\n(defrec allPointsOfPathCmds_ (\\cmds (case cmds\n  ([]    [])\n  ([\'Z\'] [])\n\n  ([\'M\' x y | rest] (cons [x y] (allPointsOfPathCmds_ rest)))\n  ([\'L\' x y | rest] (cons [x y] (allPointsOfPathCmds_ rest)))\n\n  ([\'Q\' x1 y1 x y | rest]\n    (append [[x1 y1] [x y]] (allPointsOfPathCmds_ rest)))\n\n  ([\'C\' x1 y1 x2 y2 x y | rest]\n    (append [[x1 y1] [x2 y2] [x y]] (allPointsOfPathCmds_ rest)))\n\n  (_ [(let _ (debug \"Prelude.allPointsOfPathCmds_: not Nums...\") [-1 -1])])\n)))\n\n; (typ allPointsOfPathCmds (-> PathCmds (List Point)))\n; (def allPointsOfPathCmds (\\cmds\n;   (let toNum (\\numOrString\n;     (typecase numOrString (Num numOrString) (String -1)))\n;   (map (\\[x y] [(toNum x) (toNum y)]) (allPointsOfPathCmds_ cmds)))))\n\n; TODO remove inner annotations and named lambda\n\n(typ allPointsOfPathCmds (-> PathCmds (List Point)))\n(def allPointsOfPathCmds (\\cmds\n  (typ toNum (-> (union Num String) Num))\n  (let toNum (\\numOrString\n    (typecase numOrString (Num numOrString) (String -1)))\n  (typ foo (-> [(union Num String) (union Num String)] Point))\n  (let foo (\\[x y] [(toNum x) (toNum y)])\n  (map foo (allPointsOfPathCmds_ cmds))))))\n\n\n; Raw Shapes\n\n(def rawShape (\\(kind attrs) [kind attrs []]))\n\n(typ rawRect (-> Color Color Num Num Num Num Num Num Rect))\n(def rawRect (\\(fill stroke strokeWidth x y w h rot)\n  (let [cx cy] [(+ x (/ w 2!)) (+ y (/ h 2!))]\n  (rotateAround rot cx cy\n    (rawShape \'rect\' [\n      [\'x\' x] [\'y\' y] [\'width\' w] [\'height\' h]\n      [\'fill\' fill] [\'stroke\' stroke] [\'stroke-width\' strokeWidth] ])))))\n\n(typ rawCircle (-> Color Color Num Num Num Num Circle))\n(def rawCircle (\\(fill stroke strokeWidth cx cy r)\n  (rawShape \'circle\' [\n    [\'cx\' cx] [\'cy\' cy] [\'r\' r]\n    [\'fill\' fill] [\'stroke\' stroke] [\'stroke-width\' strokeWidth] ])))\n\n(typ rawEllipse (-> Color Color Num Num Num Num Num Num Ellipse))\n(def rawEllipse (\\(fill stroke strokeWidth cx cy rx ry rot)\n  (rotateAround rot cx cy\n    (rawShape \'ellipse\' [\n      [\'cx\' cx] [\'cy\' cy] [\'rx\' rx] [\'ry\' ry]\n      [\'fill\' fill] [\'stroke\' stroke] [\'stroke-width\' strokeWidth] ]))))\n\n(typ rawPolygon (-> Color Color Num Points Num SVG))\n(def rawPolygon (\\(fill stroke w pts rot)\n  (let [cx cy] (middleOfPoints pts)\n  (rotateAround rot cx cy\n    (rawShape \'polygon\'\n      [ [\'fill\' fill] [\'points\' pts] [\'stroke\' stroke] [\'stroke-width\' w] ])))))\n\n(typ rawPath (-> Color Color Num PathCmds Num SVG))\n(def rawPath (\\(fill stroke w d rot)\n  (let [cx cy] (middleOfPoints (allPointsOfPathCmds d))\n  (rotateAround rot cx cy\n    (rawShape \'path\'\n      [ [\'fill\' fill] [\'d\' d] [\'stroke\' stroke] [\'stroke-width\' w] ])))))\n\n\n; Shapes via Bounding Boxes\n\n(typ box (-> Bounds Color Color Num BoundedShape))\n(def box (\\(bounds fill stroke strokeWidth)\n  (let [x y xw yh] bounds\n  [\'BOX\'\n    [ [\'LEFT\' x] [\'TOP\' y] [\'RIGHT\' xw] [\'BOT\' yh]\n      [\'fill\' fill] [\'stroke\' stroke] [\'stroke-width\' strokeWidth]\n    ] []\n  ])))\n\n; string fill/stroke/stroke-width attributes to avoid sliders\n(typ hiddenBoundingBox (-> Bounds BoundedShape))\n(def hiddenBoundingBox (\\bounds\n  (ghost (box bounds \'transparent\' \'transparent\' \'0\'))))\n\n(typ simpleBoundingBox (-> Bounds BoundedShape))\n(def simpleBoundingBox (\\bounds\n  (ghost (box bounds \'transparent\' \'darkblue\' 1))))\n\n(typ strList (-> (List String) String))\n(def strList\n  (let foo (\\(x acc) (+ (+ acc (if (= acc \'\') \'\' \' \')) (toString x)))\n  (foldl foo \'\')))\n\n(typ fancyBoundingBox (-> Bounds (List SVG)))\n(def fancyBoundingBox (\\bounds\n  (let [left top right bot] bounds\n  (let [width height] [(- right left) (- bot top)]\n  (let [c1 c2 r] [\'darkblue\' \'skyblue\' 6]\n  [ (ghost (box bounds \'transparent\' c1 1))\n    (ghost (setZones \'none\' (circle c2 left top r)))\n    (ghost (setZones \'none\' (circle c2 right top r)))\n    (ghost (setZones \'none\' (circle c2 right bot r)))\n    (ghost (setZones \'none\' (circle c2 left bot r)))\n    (ghost (setZones \'none\' (circle c2 left (+ top (/ height 2)) r)))\n    (ghost (setZones \'none\' (circle c2 right (+ top (/ height 2)) r)))\n    (ghost (setZones \'none\' (circle c2 (+ left (/ width 2)) top r)))\n    (ghost (setZones \'none\' (circle c2 (+ left (/ width 2)) bot r)))\n  ])))))\n\n(typ groupWithPad (-> Num Bounds (List SVG) SVG))\n(def groupWithPad (\\(pad bounds shapes)\n  (let [left top right bot] bounds\n  (let paddedBounds [(- left pad) (- top pad) (+ right pad) (+ bot pad)]\n  [\'g\' [[\'BOUNDS\' bounds]]\n       (cons (hiddenBoundingBox paddedBounds) shapes)]\n))))\n\n(typ group (-> Bounds (List SVG) SVG))\n(def group (groupWithPad (let nGroupPad 20 nGroupPad)))\n\n  ; NOTE:\n  ;   keep the names nGroupPad and nPolyPathPad (and values)\n  ;   in sync with ExpressionBasedTransform.elm\n\n  ; (def group (groupWithPad 15))\n\n(def polyPathGroup (groupWithPad (let nPolyPathPad 10 nPolyPathPad)))\n\n; TODO make one pass over pts\n(typ boundsOfPoints (-> (List Point) Bounds))\n(def boundsOfPoints (\\pts\n  (let left  (minimum (map fst pts))\n  (let right (maximum (map fst pts))\n  (let top   (minimum (map snd pts))\n  (let bot   (maximum (map snd pts))\n    [left top right bot]\n))))))\n\n(typ extremeShapePoints (-> SVG Points))\n(def extremeShapePoints (\\shape@[kind _ _]\n  (case kind\n\n    (\'line\'\n      (let attrs@[x1 y1 x2 y2] (map (lookupAttr shape) [\"x1\" \"y1\" \"x2\" \"y2\"])\n      (typecase attrs\n        ([Num Num Num Num] [[x1 y1] [x2 y2]])\n        (_ []))))\n\n    (\'rect\'\n      (let attrs@[x y w h] (map (lookupAttr shape) [\"x\" \"y\" \"width\" \"height\"])\n      (typecase attrs\n        ([Num Num Num Num] [[x y] [(+ x w) (+ y h)]])\n        (_ []))))\n\n    (\'circle\'\n      (let attrs@[cx cy r] (map (lookupAttr shape) [\"cx\" \"cy\" \"r\"])\n      (typecase attrs\n        ([Num Num Num] [[(- cx r) (- cy r)] [(+ cx r) (+ cy r)]])\n        (_ []))))\n\n    (\'ellipse\'\n      (let attrs@[cx cy rx ry] (map (lookupAttr shape) [\"cx\" \"cy\" \"rx\" \"ry\"])\n      (typecase attrs\n        ([Num Num Num Num] [[(- cx rx) (- cy ry)] [(+ cx rx) (+ cy ry)]])\n        (_ []))))\n\n    (\'polygon\' (polygonPoints shape))\n\n    (\'path\'\n      (let pathCmds (lookupAttr shape \"d\")\n      (typecase pathCmds\n        ((List (union String Num)) (allPointsOfPathCmds pathCmds))\n        (_ []))))\n\n    (_ [])\n)))\n\n(typ anchoredGroup (-> (List SVG) SVG))\n(def anchoredGroup (\\shapes\n  (let bounds (boundsOfPoints (concat (map extremeShapePoints shapes)))\n  (group bounds shapes)\n)))\n\n; (def group (\\(bounds shapes)\n;   [\'g\' [[\'BOUNDS\' bounds]]\n;        (cons (hiddenBoundingBox bounds) shapes)]))\n\n       ; (concat [(fancyBoundingBox bounds) shapes])]))\n\n; TODO no longer used...\n(typ rotatedRect (-> Color Num Num Num Num Num Rect))\n(def rotatedRect (\\(fill x y w h rot)\n  (let [cx cy] [(+ x (/ w 2!)) (+ y (/ h 2!))]\n  (let bounds [x y (+ x w) (+ y h)]\n  (let shape (rotateAround rot cx cy (rect fill x y w h))\n  (group bounds [shape])\n)))))\n\n(typ rectangle (-> Color Color Num Num Bounds Rect))\n(def rectangle (\\(fill stroke strokeWidth rot bounds)\n  (let [left top right bot] bounds\n  (let [cx cy] [(+ left (/ (- right left) 2!)) (+ top (/ (- bot top) 2!))]\n  (let shape (rotateAround rot cx cy (box bounds fill stroke strokeWidth))\n  shape\n)))))\n  ; (group bounds [shape])\n\n; TODO no longer used...\n(typ rotatedEllipse (-> Color Num Num Num Num Num Ellipse))\n(def rotatedEllipse (\\(fill cx cy rx ry rot)\n  (let bounds [(- cx rx) (- cy ry) (+ cx rx) (+ cy ry)]\n  (let shape (rotateAround rot cx cy (ellipse fill cx cy rx ry))\n  (group bounds [shape])\n))))\n\n; TODO take rot\n(typ oval (-> Color Color Num Bounds BoundedShape))\n(def oval (\\(fill stroke strokeWidth bounds)\n  (let [left top right bot] bounds\n  (let shape\n    [\'OVAL\'\n       [ [\'LEFT\' left] [\'TOP\' top] [\'RIGHT\' right] [\'BOT\' bot]\n         [\'fill\' fill] [\'stroke\' stroke] [\'stroke-width\' strokeWidth] ]\n       []]\n  shape\n))))\n\n; ; TODO take rot\n; (def oval (\\(fill stroke strokeWidth bounds)\n;   (let [left top right bot] bounds\n;   (let [rx ry] [(/ (- right left) 2!) (/ (- bot top) 2!)]\n;   (let [cx cy] [(+ left rx) (+ top ry)]\n;   (let shape ; TODO change def ellipse to take stroke/strokeWidth\n;     [\'ellipse\'\n;        [ [\'cx\' cx] [\'cy\' cy] [\'rx\' rx] [\'ry\' ry]\n;          [\'fill\' fill] [\'stroke\' stroke] [\'stroke-width\' strokeWidth] ]\n;        []]\n;   (group bounds [shape])\n; ))))))\n\n(def scaleBetween (\\(a b pct)\n  (case pct\n    (0 a)\n    (1 b)\n    (_ (+ a (* pct (- b a)))))))\n\n(typ stretchyPolygon (-> Bounds Color Color Num (List Num) SVG))\n(def stretchyPolygon (\\(bounds fill stroke strokeWidth percentages)\n  (let [left top right bot] bounds\n  (let [xScale yScale] [(scaleBetween left right) (scaleBetween top bot)]\n  (let pts (map (\\[xPct yPct] [ (xScale xPct) (yScale yPct) ]) percentages)\n  ; (group bounds [(polygon fill stroke strokeWidth pts)])\n  (polyPathGroup bounds [(polygon fill stroke strokeWidth pts)])\n)))))\n\n; TODO no longer used...\n(def pointyPath (\\(fill stroke w d)\n  (let dot (\\(x y) (ghost (circle \'orange\' x y 5)))\n  (letrec pointsOf (\\cmds\n    (case cmds\n      ([]                     [])\n      ([\'Z\']                  [])\n      ([\'M\' x y | rest]       (append [(dot x y)] (pointsOf rest)))\n      ([\'L\' x y | rest]       (append [(dot x y)] (pointsOf rest)))\n      ([\'Q\' x1 y1 x y | rest] (append [(dot x1 y1) (dot x y)] (pointsOf rest)))\n      ([\'C\' x1 y1 x2 y2 x y | rest] (append [(dot x1 y1) (dot x2 y2) (dot x y)] (pointsOf rest)))\n      (_                      \'ERROR\')))\n  [\'g\' []\n    (cons\n      (path fill stroke w d)\n      [])]\n))))\n      ; turning off points for now\n      ; (pointsOf d)) ]\n\n; can refactor to make one pass\n; can also change representation/template code to pair points\n(def stretchyPath (\\(bounds fill stroke w d)\n  (let [left top right bot] bounds\n  (let [xScale yScale] [(scaleBetween left right) (scaleBetween top bot)]\n  (let dot (\\(x y) (ghost (circle \'orange\' x y 5)))\n  (letrec toPath (\\cmds\n    (case cmds\n      ([]    [])\n      ([\'Z\'] [\'Z\'])\n      ([\'M\' x y | rest] (append [\'M\' (xScale x) (yScale y)] (toPath rest)))\n      ([\'L\' x y | rest] (append [\'L\' (xScale x) (yScale y)] (toPath rest)))\n      ([\'Q\' x1 y1 x y | rest]\n        (append [\'Q\' (xScale x1) (yScale y1) (xScale x) (yScale y)]\n                (toPath rest)))\n      ([\'C\' x1 y1 x2 y2 x y | rest]\n        (append [\'C\' (xScale x1) (yScale y1) (xScale x2) (yScale y2) (xScale x) (yScale y)]\n                (toPath rest)))\n      (_ \'ERROR\')))\n  (letrec pointsOf (\\cmds\n    (case cmds\n      ([]    [])\n      ([\'Z\'] [])\n      ([\'M\' x y | rest] (append [(dot (xScale x) (yScale y))] (pointsOf rest)))\n      ([\'L\' x y | rest] (append [(dot (xScale x) (yScale y))] (pointsOf rest)))\n      ([\'Q\' x1 y1 x y | rest]\n        (append [(dot (xScale x1) (yScale y1)) (dot (xScale x) (yScale y))]\n                (pointsOf rest)))\n      ([\'C\' x1 y1 x2 y2 x y | rest]\n        (append [(dot (xScale x1) (yScale y1))\n                 (dot (xScale x2) (yScale y2))\n                 (dot (xScale x)  (yScale y))]\n                (pointsOf rest)))\n      (_ \'ERROR\')))\n  ; (group bounds\n  (polyPathGroup bounds\n    (cons\n      (path fill stroke w (toPath d))\n      []))\n)))))))\n      ; turning off points for now\n      ; (pointsOf d)))\n\n(typ evalOffset (-> [Num Num] Num))\n(def evalOffset (\\[base off]\n  (case off\n    (0 base)\n    (_ (+ base off)))))\n\n(def stickyPolygon (\\(bounds fill stroke strokeWidth offsets)\n  (let pts (map (\\[xOff yOff] [ (evalOffset xOff) (evalOffset yOff) ]) offsets)\n  (group bounds [(polygon fill stroke strokeWidth pts)])\n)))\n\n(typ withBounds (-> Bounds (-> Bounds (List SVG)) (List SVG)))\n(def withBounds (\\(bounds f) (f bounds)))\n\n(typ withAnchor (-> Point (-> Point (List SVG)) (List SVG)))\n(def withAnchor (\\(anchor f) (f anchor)))\n\n(typ star (-> Bounds (List SVG)))\n(def star (\\bounds\n  (let [left top right bot] bounds\n  (let [width height] [(- right left) (- bot top)]\n  (let [cx cy] [(+ left (/ width 2)) (+ top (/ height 2))]\n  [(nStar 0 \'black\' 0 6 (min (/ width 2) (/ height 2)) 10 0 cx cy)]\n)))))\n\n(typ blobs (-> (List Blob) SVG))\n(def blobs (\\blobs\n  (let modifyBlob (\\[i blob]\n    (case blob\n      ([[\'g\' gAttrs [shape | shapes]]]\n       [[\'g\' gAttrs [(consAttr shape [\'BLOB\' (toString (+ i 1))]) | shapes]]])\n      ([shape] [(consAttr shape [\'BLOB\' (toString (+ i 1))])])\n      (_       blob)))\n  (svg (concat (mapi modifyBlob blobs)))\n)))\n\n\n; === Relations ===\n\n(typ halfwayBetween (-> Point Point Point))\n(def halfwayBetween (\\(pt1 pt2)\n  (vec2DScalarMult 0.5 (vec2DPlus pt1 pt2))\n))\n\n(typ nextInLine (-> Point Point Point))\n(def nextInLine (\\(pt1 pt2)\n  (vec2DPlus pt2 (vec2DMinus pt2 pt1))\n))\n\n; Point on line segment, at `ratio` location.\n(typ onLine (-> Point Point Num Point))\n(def onLine (\\(pt1 pt2 ratio)\n  (let vec (vec2DMinus pt2 pt1)\n  (vec2DPlus pt1 (vec2DScalarMult ratio vec)))))\n\n; === Basic Replicate ===\n\n(def horizontalArray (\\(n sep func [x y])\n  (let _ ; draw point widget to control anchor\n    ([x y] : Point)\n  (let draw_i (\\i\n    (let xi (+ x (* i sep))\n    (func [xi y])))\n  (concat (map draw_i (zeroTo n)))\n))))\n\n(def linearArrayFromTo (\\(n func [xStart yStart] [xEnd yEnd])\n  (let xsep (/ (- xEnd xStart) (- n 1))\n  (let ysep (/ (- yEnd yStart) (- n 1))\n  (let draw_i (\\i\n    (let xi (+ xStart (* i xsep))\n    (let yi (+ yStart (* i ysep))\n    (func [xi yi]))))\n  (concat (map draw_i (zeroTo n)))\n)))))\n\n; To reduce size of resulting trace,\n; could subtract up to M>1 at a time.\n;\n(defrec floorAndLocalFreeze (\\n\n  (if (le n 1) 0\n  ;else\n    (+ 1 (floorAndLocalFreeze (- n 1))))))\n\n  ; (let _ ; draw point widget to control anchor\n  ;   ([cx cy] : Point)\n(def radialArray (\\(n radius rot func [cx cy])\n  (let center ; draw ghost circle to control anchor\n              ; not using point widget, since it\'s not selectable\n    (ghost (circle \'orange\' cx cy 20))\n  (let _ ; draw point widget to control radius\n    (let xWidget (floorAndLocalFreeze cx)\n    (let yWidget (- (floorAndLocalFreeze cy) radius)\n      ([xWidget yWidget] : Point)))\n  (let endpoints (nPointsOnCircle n rot cx cy radius)\n  (let bounds\n    [(- cx radius) (- cy radius) (+ cx radius) (+ cy radius)]\n  [(group bounds (cons center (concat (map func endpoints))))]\n))))))\n\n(def offsetAnchor (\\(dx dy f)\n  (\\[x y] (f [(+ x dx) (+ y dy)]))\n))\n\n(def horizontalArrayByBounds (\\(n sep func [left_0 top right_0 bot])\n  (let w_i     (- right_0 left_0)\n  (let left_i  (\\i (+ left_0 (* i (+ w_i sep))))\n  (let right_i (\\i (+ (left_i i) w_i))\n  (let draw_i  (\\i (func [(left_i i) top (right_i i) bot]))\n  (let bounds  [left_0 top (right_i (- n 1)) bot]\n    [(groupWithPad 30 bounds (concat (map draw_i (zeroTo n))))]\n)))))))\n\n(def repeatInsideBounds (\\(n sep func bounds@[left top right bot])\n  (let w_i (/ (- (- right left) (* sep (- n 1))) n)\n  (let draw_i (\\i\n    (let left_i (+ left (* i (+ w_i sep)))\n    (let right_i (+ left_i w_i)\n    (func [left_i top right_i bot]))))\n  [(groupWithPad 30 bounds (concat (map draw_i (zeroTo n))))]\n))))\n\n\n(def draw svg)\n\n(def showOne (\\(x y val)\n   [\'text\' [[\'x\' x] [\'y\' y] [\'style\' \'fill:black\']\n            [\'font-family\' \'monospace\']\n            [\'font-size\' \'12pt\']]\n           [[\'TEXT\' (toString val)]]]))\n\n(def show (showOne 20 30))\n\n(def showList (\\vals\n  [\'g\' [] (mapi (\\[i val] (showOne 20 (* (+ i 1) 30) val)) vals)]))\n\n(def rectWithBorder (\\(stroke strokeWidth fill x y w h)\n  (addAttr (addAttr\n    (rect fill x y w h)\n      [\"stroke\" stroke])\n      [\"stroke-width\" strokeWidth])))\n\n\n;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;\n\n; (def columnsToRows (\\columns\n;   (let numColumns (len columns)\n;   (let numRows ; maxColumnSize\n;     (if (= numColumns 0) 0 (maximum (map len columns)))\n;   (foldr\n;     (\\(col rows)\n;       (let paddedCol (append col (repeat (- numRows (len col)) \".\"))\n;       (map\n;         (\\[datum row] [ datum | row ])\n;         (zip paddedCol rows))))\n;     (repeat numRows [])\n;     columns)\n; ))))\n; \n; (def addColToRows (\\(col rows)\n;   (let width (maximum (map len rows))\n;   (letrec foo (\\(col rows)\n;     (case [col rows]\n;       ([ []     []     ] [                                          ])\n;       ([ [x|xs] [r|rs] ] [ (snoc x r)                 | (foo xs rs) ])\n;       ([ []     [r|rs] ] [ (snoc \'\' r)                | (foo [] rs) ])\n;       ([ [x|xs] []     ] [ (snoc x (repeat width \'\')) | (foo xs []) ])\n;     ))\n;   (foo col rows)))))\n\n; (def border [\'border\' \'1px solid black\'])\n; (def padding [\'padding\' \'5px\'])\n; (def center [\'align\' \'center\'])\n; (def style (\\list [\'style\' list]))\n; (def onlyStyle (\\list [(style list)]))\n; \n; (def td (\\text\n;   [\'td\' (onlyStyle [border padding])\n;         [[\'TEXT\' text]]]))\n; \n; (def th (\\text\n;   [\'th\' (onlyStyle [border padding center])\n;         [[\'TEXT\' text]]]))\n; \n; (def tr (\\children\n;   [\'tr\' (onlyStyle [border])\n;         children]))\n; \n; ; TODO div name is already taken...\n; \n; (def div_ (\\children [\'div\' [] children]))\n; (def h1 (\\text [\'h1\' [] [[\'TEXT\' text]]]))\n; (def h2 (\\text [\'h2\' [] [[\'TEXT\' text]]]))\n; (def h3 (\\text [\'h3\' [] [[\'TEXT\' text]]]))\n; \n; (def table (\\children\n;   [\'table\' (onlyStyle [border padding]) children]))\n\n; (def table (\\children\n;   (let [x y] [100 100]\n;   [\'table\' (onlyStyle [border padding\n;                       [\"position\" \"relative\"]\n;                       [\"left\" (toString x)]\n;                       [\"top\" (toString y)]]) children])))\n\n; (def tableOfData (\\data\n;   (let letters (explode \" ABCDEFGHIJKLMNOPQRSTUVWXYZ\")\n;   (let data (mapi (\\[i row] [(+ i 1) | row]) data)\n;   (let tableWidth (maximum (map len data))\n;   (let headers\n;     (tr (map (\\letter (th letter)) (take letters tableWidth)))\n;   (let rows\n;     (map (\\row (tr (map (\\col (td (toString col))) row))) data)\n;   (table\n;     [ headers | rows ]\n; ))))))))\n\n\n(def textNode (\\text\n  [\"TEXT\" text]))\n\n(def textElementHelper (\\(tag styles attrs text)\n  [ tag [ [\"style\" styles] | attrs ] [ (textNode text) ] ]))\n\n(def elementHelper (\\(tag styles attrs children)\n  [ tag [ [\"style\" styles] | attrs ] children ]))\n\n(def p (textElementHelper \"p\"))\n(def th (textElementHelper \"th\"))\n(def td (textElementHelper \"td\"))\n(def h1 (textElementHelper \"h1\"))\n(def h2 (textElementHelper \"h2\"))\n(def h3 (textElementHelper \"h3\"))\n\n(def div_ (elementHelper \"div\"))\n(def tr (elementHelper \"tr\"))\n(def table (elementHelper \"table\"))\n\n; absolutePositionStyles x y = let _ = [x, y] : Point in\n;   [ [\"position\", \"absolute\"]\n;   , [\"left\", toString x + \"px\"]\n;   , [\"top\", toString y + \"px\"]\n;   ] \n\n\n\n(def setStyles (\\(newStyles [kind attrs children])\n  (let attrs\n    (let styleAttr (lookup \'style\' attrs)\n    (typecase styleAttr\n      (Null [ [\'style\' []] | attrs ])\n      (_    attrs)))\n    ; (if (= styleAttr null)\n    ;   [ [\'style\' []] | attrs ]\n    ;   attrs)\n  (let attrs\n    (map (\\[key val]\n      (case key\n        (\'style\'\n          (let otherStyles\n            (concatMap (\\[k v]\n              (case (elem k (map fst newStyles))\n                (true  [])\n                (false [[k v]])))\n              val)\n          [\'style\' (append newStyles otherStyles)]))\n        (_\n          [key val])))\n      attrs)\n  [kind attrs children]\n))))\n\n(def placeAt (\\([x y] node)\n  (let _ ([x y] : Point)\n  ; TODO px suffix should be added in LangSvg/Html translation\n  (setStyles\n    [ [\'position\' \'absolute\']\n      [\'left\' (+ (toString x) \'px\')]\n      [\'top\' (+ (toString y) \'px\')]\n    ]\n    node))))\n\n(def placeAtFixed (\\([x y] node)\n  (let _ ([x y] : Point)\n  (setStyles\n    [[\'position\' \'fixed\'] [\'FIXED_LEFT\' x] [\'FIXED_TOP\' y]]\n    node))))\n\n(def placeSvgAt (\\([x y] w h shapes)\n  (placeAt [x y]\n    [\'svg\' [[\'width\' w] [\'height\' h]] shapes])))\n\n(def workspace (\\(minSize children)\n  (div_\n    (cons\n      (placeAt minSize (h3 \'</workspace>\'))\n      children))))\n\n;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;\n\n(def nothing [\"Nothing\"])\n(def just (\\x [\"Just\"  x]))\n\n(def mapFirst (\\(f [x y]) [(f x) y]))\n(def mapSecond (\\(f [x y]) [x (f y)]))\n\n(def freeze (\\x x))\n\n\n; The type checker relies on the name of this definition.\n(let dummyPreludeMain [\'svg\' [] []] dummyPreludeMain)\n\n';
 var _user$project$PreludeGenerated$src = _user$project$PreludeGenerated$prelude;
 
@@ -57784,8 +57784,8 @@ var _user$project$UpdateUtils$mergeDict = F6(
 										return _elm_lang$core$Native_Utils.crashCase(
 											'UpdateUtils',
 											{
-												start: {line: 2219, column: 11},
-												end: {line: 2230, column: 169}
+												start: {line: 2284, column: 11},
+												end: {line: 2295, column: 169}
 											},
 											_p32)(
 											A2(
@@ -57811,8 +57811,8 @@ var _user$project$UpdateUtils$mergeDict = F6(
 										return _elm_lang$core$Native_Utils.crashCase(
 											'UpdateUtils',
 											{
-												start: {line: 2219, column: 11},
-												end: {line: 2230, column: 169}
+												start: {line: 2284, column: 11},
+												end: {line: 2295, column: 169}
 											},
 											_p32)(
 											A2(
@@ -57919,8 +57919,8 @@ var _user$project$UpdateUtils$mergeList = function (submerger) {
 								return _elm_lang$core$Native_Utils.crash(
 									'UpdateUtils',
 									{
-										start: {line: 2115, column: 14},
-										end: {line: 2115, column: 25}
+										start: {line: 2180, column: 14},
+										end: {line: 2180, column: 25}
 									})(
 									A2(
 										_elm_lang$core$Basics_ops['++'],
@@ -57972,8 +57972,8 @@ var _user$project$UpdateUtils$mergeList = function (submerger) {
 									return _elm_lang$core$Native_Utils.crashCase(
 										'UpdateUtils',
 										{
-											start: {line: 2117, column: 14},
-											end: {line: 2122, column: 111}
+											start: {line: 2182, column: 14},
+											end: {line: 2187, column: 111}
 										},
 										_p46)(
 										A2(
@@ -58103,8 +58103,8 @@ var _user$project$UpdateUtils$mergeList = function (submerger) {
 														return _elm_lang$core$Native_Utils.crashCase(
 															'UpdateUtils',
 															{
-																start: {line: 2127, column: 19},
-																end: {line: 2131, column: 96}
+																start: {line: 2192, column: 19},
+																end: {line: 2196, column: 96}
 															},
 															_p57)('Expected non-empty modifications since they were updates');
 													}
@@ -58142,8 +58142,8 @@ var _user$project$UpdateUtils$mergeList = function (submerger) {
 															return _elm_lang$core$Native_Utils.crash(
 																'UpdateUtils',
 																{
-																	start: {line: 2155, column: 44},
-																	end: {line: 2155, column: 55}
+																	start: {line: 2220, column: 44},
+																	end: {line: 2220, column: 55}
 																})('Unexpected 0 here');
 														} else {
 															var _v59 = i,
@@ -58310,8 +58310,8 @@ var _user$project$UpdateUtils$mergeList = function (submerger) {
 															return _elm_lang$core$Native_Utils.crash(
 																'UpdateUtils',
 																{
-																	start: {line: 2162, column: 44},
-																	end: {line: 2162, column: 55}
+																	start: {line: 2227, column: 44},
+																	end: {line: 2227, column: 55}
 																})('Unexpected 0 here');
 														} else {
 															var _v94 = i,
@@ -58498,8 +58498,8 @@ var _user$project$UpdateUtils$mergeList = function (submerger) {
 												return _elm_lang$core$Native_Utils.crashCase(
 													'UpdateUtils',
 													{
-														start: {line: 2179, column: 19},
-														end: {line: 2182, column: 86}
+														start: {line: 2244, column: 19},
+														end: {line: 2247, column: 86}
 													},
 													_p73)('empty modified although it said it was updated');
 											}
@@ -58626,8 +58626,8 @@ var _user$project$UpdateUtils$mergeList = function (submerger) {
 													return _elm_lang$core$Native_Utils.crashCase(
 														'UpdateUtils',
 														{
-															start: {line: 2196, column: 18},
-															end: {line: 2199, column: 85}
+															start: {line: 2261, column: 18},
+															end: {line: 2264, column: 85}
 														},
 														_p78)('empty modified although it said it was updated');
 												}
@@ -58831,8 +58831,8 @@ var _user$project$UpdateUtils$mergeListDiffs = F3(
 									return _elm_lang$core$Native_Utils.crashCase(
 										'UpdateUtils',
 										{
-											start: {line: 1977, column: 13},
-											end: {line: 1987, column: 112}
+											start: {line: 2042, column: 13},
+											end: {line: 2052, column: 112}
 										},
 										_p91)(
 										A2(
@@ -58879,8 +58879,8 @@ var _user$project$UpdateUtils$mergeListDiffs = F3(
 											return _elm_lang$core$Native_Utils.crash(
 												'UpdateUtils',
 												{
-													start: {line: 1993, column: 13},
-													end: {line: 1993, column: 24}
+													start: {line: 2058, column: 13},
+													end: {line: 2058, column: 24}
 												})(
 												A2(
 													_elm_lang$core$Basics_ops['++'],
@@ -58995,8 +58995,8 @@ var _user$project$UpdateUtils$mergeTupleDiffs = F3(
 											return _elm_lang$core$Native_Utils.crash(
 												'UpdateUtils',
 												{
-													start: {line: 1964, column: 11},
-													end: {line: 1964, column: 22}
+													start: {line: 2029, column: 11},
+													end: {line: 2029, column: 22}
 												})(
 												A2(
 													_elm_lang$core$Basics_ops['++'],
@@ -59220,8 +59220,8 @@ var _user$project$UpdateUtils$mergeTuple = function (submerger) {
 				return _elm_lang$core$Native_Utils.crashCase(
 					'UpdateUtils',
 					{
-						start: {line: 1804, column: 8},
-						end: {line: 1822, column: 98}
+						start: {line: 1869, column: 8},
+						end: {line: 1887, column: 98}
 					},
 					_p108)(
 					A2(
@@ -59581,8 +59581,8 @@ var _user$project$UpdateUtils$zipDiffs = F2(
 									_elm_lang$core$Native_Utils.crash(
 										'UpdateUtils',
 										{
-											start: {line: 1453, column: 21},
-											end: {line: 1453, column: 32}
+											start: {line: 1518, column: 21},
+											end: {line: 1518, column: 32}
 										}),
 									'Malformed diffs',
 									{ctor: '_Tuple2', _0: diffs, _1: i}));
@@ -59645,8 +59645,8 @@ var _user$project$UpdateUtils$mapDiffs = F2(
 									_elm_lang$core$Native_Utils.crash(
 										'UpdateUtils',
 										{
-											start: {line: 1435, column: 21},
-											end: {line: 1435, column: 32}
+											start: {line: 1500, column: 21},
+											end: {line: 1500, column: 32}
 										}),
 									'Malformed diffs',
 									{ctor: '_Tuple2', _0: diffs, _1: i}));
@@ -60545,8 +60545,8 @@ var _user$project$UpdateUtils$tupleDiffsToString = F6(
 									return _elm_lang$core$Native_Utils.crashCase(
 										'UpdateUtils',
 										{
-											start: {line: 864, column: 11},
-											end: {line: 868, column: 104}
+											start: {line: 929, column: 11},
+											end: {line: 933, column: 104}
 										},
 										_p216)(
 										A2(
@@ -60558,8 +60558,8 @@ var _user$project$UpdateUtils$tupleDiffsToString = F6(
 								return _elm_lang$core$Native_Utils.crash(
 									'UpdateUtils',
 									{
-										start: {line: 870, column: 11},
-										end: {line: 870, column: 22}
+										start: {line: 935, column: 11},
+										end: {line: 935, column: 22}
 									})(
 									A2(
 										_elm_lang$core$Basics_ops['++'],
@@ -61169,93 +61169,6 @@ var _user$project$UpdateUtils$defaultConflictPolicy = F2(
 	function (a, b) {
 		return a;
 	});
-var _user$project$UpdateUtils$allStringDiffs = F2(
-	function (a, b) {
-		return _user$project$Results$ok1(
-			A2(_user$project$ImpureGoodies$diffString, a, b));
-	});
-var _user$project$UpdateUtils$defaultStringDiffs = F2(
-	function (before, after) {
-		return _elm_lang$core$Native_Utils.eq(before, after) ? _user$project$Results$ok1(_elm_lang$core$Maybe$Nothing) : A2(
-			_user$project$Results$andThen,
-			function (difference) {
-				var aux = F3(
-					function (i, diffs, revAccDiffs) {
-						aux:
-						while (true) {
-							var _p232 = diffs;
-							if (_p232.ctor === '[]') {
-								var _p233 = _elm_lang$core$List$reverse(revAccDiffs);
-								if (_p233.ctor === '[]') {
-									return _user$project$Results$ok1(_elm_lang$core$Maybe$Nothing);
-								} else {
-									return _user$project$Results$ok1(
-										_elm_lang$core$Maybe$Just(_p233));
-								}
-							} else {
-								switch (_p232._0.ctor) {
-									case 'DiffEqual':
-										var _v423 = i + _elm_lang$core$String$length(_p232._0._0),
-											_v424 = _p232._1,
-											_v425 = revAccDiffs;
-										i = _v423;
-										diffs = _v424;
-										revAccDiffs = _v425;
-										continue aux;
-									case 'DiffRemoved':
-										if ((_p232._1.ctor === '::') && (_p232._1._0.ctor === 'DiffAdded')) {
-											var lengthRemoved = _elm_lang$core$String$length(_p232._0._0);
-											var lengthAdded = _elm_lang$core$String$length(_p232._1._0._0);
-											var _v426 = i + lengthRemoved,
-												_v427 = _p232._1._1,
-												_v428 = {
-												ctor: '::',
-												_0: A3(_user$project$Lang$StringUpdate, i, i + lengthRemoved, lengthAdded),
-												_1: revAccDiffs
-											};
-											i = _v426;
-											diffs = _v427;
-											revAccDiffs = _v428;
-											continue aux;
-										} else {
-											var lengthRemoved = _elm_lang$core$String$length(_p232._0._0);
-											var _v429 = i + lengthRemoved,
-												_v430 = _p232._1,
-												_v431 = {
-												ctor: '::',
-												_0: A3(_user$project$Lang$StringUpdate, i, i + lengthRemoved, 0),
-												_1: revAccDiffs
-											};
-											i = _v429;
-											diffs = _v430;
-											revAccDiffs = _v431;
-											continue aux;
-										}
-									default:
-										var lengthAdded = _elm_lang$core$String$length(_p232._0._0);
-										var _v432 = i,
-											_v433 = _p232._1,
-											_v434 = {
-											ctor: '::',
-											_0: A3(_user$project$Lang$StringUpdate, i, i, lengthAdded),
-											_1: revAccDiffs
-										};
-										i = _v432;
-										diffs = _v433;
-										revAccDiffs = _v434;
-										continue aux;
-								}
-							}
-						}
-					});
-				return A3(
-					aux,
-					0,
-					difference,
-					{ctor: '[]'});
-			},
-			A2(_user$project$UpdateUtils$allStringDiffs, before, after));
-	});
 var _user$project$UpdateUtils$longestSufixSizeBetweenGuard = F3(
 	function (maxIndex, before, after) {
 		var lengthBefore = _elm_lang$core$String$length(before);
@@ -61266,8 +61179,8 @@ var _user$project$UpdateUtils$longestSufixSizeBetweenGuard = F3(
 				if ((_elm_lang$core$Native_Utils.cmp(i, maxIndex) < 1) && ((_elm_lang$core$Native_Utils.cmp(i, lengthBefore) < 0) && _elm_lang$core$Native_Utils.eq(
 					A3(_elm_lang$core$String$slice, (lengthBefore - 1) - i, lengthBefore - i, before),
 					A3(_elm_lang$core$String$slice, (lengthAfter - 1) - i, lengthAfter - i, after)))) {
-					var _v435 = i + 1;
-					i = _v435;
+					var _v421 = i + 1;
+					i = _v421;
 					continue aux;
 				} else {
 					return i;
@@ -61286,8 +61199,8 @@ var _user$project$UpdateUtils$longestSufixSizeBetween = F2(
 				if ((_elm_lang$core$Native_Utils.cmp(i, lengthBefore) < 0) && _elm_lang$core$Native_Utils.eq(
 					A3(_elm_lang$core$String$slice, (lengthBefore - 1) - i, lengthBefore - i, before),
 					A3(_elm_lang$core$String$slice, (lengthAfter - 1) - i, lengthAfter - i, after))) {
-					var _v436 = i + 1;
-					i = _v436;
+					var _v422 = i + 1;
+					i = _v422;
 					continue aux;
 				} else {
 					return i;
@@ -61305,8 +61218,8 @@ var _user$project$UpdateUtils$longestPrefixSizeBetween = F2(
 				if ((_elm_lang$core$Native_Utils.cmp(i, lengthBefore) < 0) && _elm_lang$core$Native_Utils.eq(
 					A3(_elm_lang$core$String$slice, i, i + 1, before),
 					A3(_elm_lang$core$String$slice, i, i + 1, after))) {
-					var _v437 = i + 1;
-					i = _v437;
+					var _v423 = i + 1;
+					i = _v423;
 					continue aux;
 				} else {
 					return i;
@@ -61357,7 +61270,7 @@ var _user$project$UpdateUtils$deltaLineRow = function (kept) {
 			_elm_lang$core$Regex$replace,
 			_elm_lang$core$Regex$All,
 			_elm_lang$core$Regex$regex('(.*\r?\n)*'),
-			function (_p234) {
+			function (_p232) {
 				return '';
 			},
 			kept));
@@ -61374,55 +61287,55 @@ var _user$project$UpdateUtils$displayDiffPositions = F3(
 		var newStringRowCol = F3(
 			function (prevRow, prevCol, l) {
 				var kept = lToString(l);
-				var _p235 = _user$project$UpdateUtils$deltaLineRow(kept);
-				var rowAdded = _p235._0;
-				var colAdded = _p235._1;
+				var _p233 = _user$project$UpdateUtils$deltaLineRow(kept);
+				var rowAdded = _p233._0;
+				var colAdded = _p233._1;
 				return _elm_lang$core$Native_Utils.eq(rowAdded, 0) ? {ctor: '_Tuple3', _0: kept, _1: prevRow, _2: prevCol + colAdded} : {ctor: '_Tuple3', _0: kept, _1: prevRow + rowAdded, _2: colAdded};
 			});
 		var maybeComma = function (s) {
 			return _elm_lang$core$Native_Utils.eq(s, '') ? s : A2(_elm_lang$core$Basics_ops['++'], s, ', \n');
 		};
 		var aux = F3(
-			function (_p237, _p236, difference) {
+			function (_p235, _p234, difference) {
 				aux:
 				while (true) {
-					var _p238 = _p237;
-					var _p248 = _p238._0;
-					var _p247 = _p238._1;
-					var _p239 = _p236;
-					var _p246 = _p239._0;
-					var _p245 = _p239._1;
-					var _p240 = difference;
-					if (_p240.ctor === '[]') {
-						return {ctor: '_Tuple2', _0: _p246, _1: _p245};
+					var _p236 = _p235;
+					var _p246 = _p236._0;
+					var _p245 = _p236._1;
+					var _p237 = _p234;
+					var _p244 = _p237._0;
+					var _p243 = _p237._1;
+					var _p238 = difference;
+					if (_p238.ctor === '[]') {
+						return {ctor: '_Tuple2', _0: _p244, _1: _p243};
 					} else {
-						switch (_p240._0.ctor) {
+						switch (_p238._0.ctor) {
 							case 'DiffEqual':
-								var _p241 = A3(newStringRowCol, _p248, _p247, _p240._0._0);
-								var sameString = _p241._0;
-								var newRow = _p241._1;
-								var newCol = _p241._2;
-								var _v441 = {ctor: '_Tuple2', _0: newRow, _1: newCol},
-									_v442 = {ctor: '_Tuple2', _0: _p246, _1: _p245},
-									_v443 = _p240._1;
-								_p237 = _v441;
-								_p236 = _v442;
-								difference = _v443;
+								var _p239 = A3(newStringRowCol, _p246, _p245, _p238._0._0);
+								var sameString = _p239._0;
+								var newRow = _p239._1;
+								var newCol = _p239._2;
+								var _v427 = {ctor: '_Tuple2', _0: newRow, _1: newCol},
+									_v428 = {ctor: '_Tuple2', _0: _p244, _1: _p243},
+									_v429 = _p238._1;
+								_p235 = _v427;
+								_p234 = _v428;
+								difference = _v429;
 								continue aux;
 							case 'DiffRemoved':
-								if ((_p240._1.ctor === '::') && (_p240._1._0.ctor === 'DiffAdded')) {
-									var removed = lToString(_p240._0._0);
-									var _p242 = A3(newStringRowCol, _p248, _p247, _p240._1._0._0);
-									var added = _p242._0;
-									var newRow = _p242._1;
-									var newCol = _p242._2;
-									var e = A5(_user$project$UpdateUtils$dummyExp, added, _p248, _p247, newRow, newCol);
-									var _v444 = {ctor: '_Tuple2', _0: newRow, _1: newCol},
-										_v445 = {
+								if ((_p238._1.ctor === '::') && (_p238._1._0.ctor === 'DiffAdded')) {
+									var removed = lToString(_p238._0._0);
+									var _p240 = A3(newStringRowCol, _p246, _p245, _p238._1._0._0);
+									var added = _p240._0;
+									var newRow = _p240._1;
+									var newCol = _p240._2;
+									var e = A5(_user$project$UpdateUtils$dummyExp, added, _p246, _p245, newRow, newCol);
+									var _v430 = {ctor: '_Tuple2', _0: newRow, _1: newCol},
+										_v431 = {
 										ctor: '_Tuple2',
 										_0: A2(
 											_elm_lang$core$Basics_ops['++'],
-											maybeComma(_p246),
+											maybeComma(_p244),
 											A2(
 												_elm_lang$core$Basics_ops['++'],
 												'Replaced ',
@@ -61430,57 +61343,57 @@ var _user$project$UpdateUtils$displayDiffPositions = F3(
 													_elm_lang$core$Basics_ops['++'],
 													removed,
 													A2(_elm_lang$core$Basics_ops['++'], ' by ', added)))),
-										_1: {ctor: '::', _0: e, _1: _p245}
+										_1: {ctor: '::', _0: e, _1: _p243}
 									},
-										_v446 = _p240._1._1;
-									_p237 = _v444;
-									_p236 = _v445;
-									difference = _v446;
+										_v432 = _p238._1._1;
+									_p235 = _v430;
+									_p234 = _v431;
+									difference = _v432;
 									continue aux;
 								} else {
-									var _p243 = _p240._0._0;
-									var removed = lToString(_p243);
+									var _p241 = _p238._0._0;
+									var removed = lToString(_p241);
 									var e = A5(
 										_user$project$UpdateUtils$dummyExp,
 										A2(_elm_lang$core$Basics_ops['++'], '- ', removed),
-										_p248,
-										_p247,
-										_p248,
-										_p247 + _elm_lang$core$List$length(_p243));
-									var _v447 = {ctor: '_Tuple2', _0: _p248, _1: _p247},
-										_v448 = {
+										_p246,
+										_p245,
+										_p246,
+										_p245 + _elm_lang$core$List$length(_p241));
+									var _v433 = {ctor: '_Tuple2', _0: _p246, _1: _p245},
+										_v434 = {
 										ctor: '_Tuple2',
 										_0: A2(
 											_elm_lang$core$Basics_ops['++'],
-											maybeComma(_p246),
+											maybeComma(_p244),
 											A2(_elm_lang$core$Basics_ops['++'], 'Removed ', removed)),
-										_1: {ctor: '::', _0: e, _1: _p245}
+										_1: {ctor: '::', _0: e, _1: _p243}
 									},
-										_v449 = _p240._1;
-									_p237 = _v447;
-									_p236 = _v448;
-									difference = _v449;
+										_v435 = _p238._1;
+									_p235 = _v433;
+									_p234 = _v434;
+									difference = _v435;
 									continue aux;
 								}
 							default:
-								var _p244 = A3(newStringRowCol, _p248, _p247, _p240._0._0);
-								var added = _p244._0;
-								var newRow = _p244._1;
-								var newCol = _p244._2;
-								var e = A5(_user$project$UpdateUtils$dummyExp, added, _p248, _p247, newRow, newCol);
-								var _v450 = {ctor: '_Tuple2', _0: newRow, _1: newCol},
-									_v451 = {
+								var _p242 = A3(newStringRowCol, _p246, _p245, _p238._0._0);
+								var added = _p242._0;
+								var newRow = _p242._1;
+								var newCol = _p242._2;
+								var e = A5(_user$project$UpdateUtils$dummyExp, added, _p246, _p245, newRow, newCol);
+								var _v436 = {ctor: '_Tuple2', _0: newRow, _1: newCol},
+									_v437 = {
 									ctor: '_Tuple2',
 									_0: A2(
 										_elm_lang$core$Basics_ops['++'],
-										maybeComma(_p246),
+										maybeComma(_p244),
 										A2(_elm_lang$core$Basics_ops['++'], 'Inserted ', added)),
-									_1: {ctor: '::', _0: e, _1: _p245}
+									_1: {ctor: '::', _0: e, _1: _p243}
 								},
-									_v452 = _p240._1;
-								_p237 = _v450;
-								_p236 = _v451;
-								difference = _v452;
+									_v438 = _p238._1;
+								_p235 = _v436;
+								_p234 = _v437;
+								difference = _v438;
 								continue aux;
 						}
 					}
@@ -61498,9 +61411,9 @@ var _user$project$UpdateUtils$displayDiffPositions = F3(
 	});
 var _user$project$UpdateUtils$addOffsetFromString = F2(
 	function (p, s1) {
-		var _p249 = _user$project$UpdateUtils$deltaLineRow(s1);
-		var r1 = _p249._0;
-		var c1 = _p249._1;
+		var _p247 = _user$project$UpdateUtils$deltaLineRow(s1);
+		var r1 = _p247._0;
+		var c1 = _p247._1;
 		return _user$project$UpdateUtils$collapseLastEdit(
 			{
 				ctor: '_Tuple2',
@@ -61510,17 +61423,17 @@ var _user$project$UpdateUtils$addOffsetFromString = F2(
 	});
 var _user$project$UpdateUtils$offsetFromStrings = F4(
 	function (lm, startOldReferential, s1, s2) {
-		var _p250 = lm;
-		var lmpos = _p250._0;
-		var lmline = _p250._1._0;
-		var lmcol = _p250._1._1;
+		var _p248 = lm;
+		var lmpos = _p248._0;
+		var lmline = _p248._1._0;
+		var lmcol = _p248._1._1;
 		var startNewReferential = A2(_user$project$UpdateUtils$offsetPosition, lm, startOldReferential);
-		var _p251 = _user$project$UpdateUtils$deltaLineRow(s1);
-		var r1 = _p251._0;
-		var c1 = _p251._1;
-		var _p252 = _user$project$UpdateUtils$deltaLineRow(s2);
-		var r2 = _p252._0;
-		var c2 = _p252._1;
+		var _p249 = _user$project$UpdateUtils$deltaLineRow(s1);
+		var r1 = _p249._0;
+		var c1 = _p249._1;
+		var _p250 = _user$project$UpdateUtils$deltaLineRow(s2);
+		var r2 = _p250._0;
+		var c2 = _p250._1;
 		var prevEndOldReferential = _user$project$UpdateUtils$collapseLastEdit(
 			{
 				ctor: '_Tuple2',
@@ -61554,8 +61467,8 @@ var _user$project$UpdateUtils$offsetFromStrings = F4(
 var _user$project$UpdateUtils$stringDiffsToString2 = F8(
 	function (renderingStyle, indent, lastEdit, lastPos, quoteChar, original, modified, diffs) {
 		var renderChars = function () {
-			var _p253 = renderingStyle;
-			switch (_p253.ctor) {
+			var _p251 = renderingStyle;
+			switch (_p251.ctor) {
 				case 'LongStringSyntax':
 					return _user$project$LeoUnparser$unparseLongStringContent;
 				case 'HtmlSyntax':
@@ -61566,42 +61479,42 @@ var _user$project$UpdateUtils$stringDiffsToString2 = F8(
 		}();
 		var initialLine = lastPos.line;
 		var aux = F6(
-			function (lastEdit, lastPos, lastEnd, offset, diffs, _p254) {
+			function (lastEdit, lastPos, lastEnd, offset, diffs, _p252) {
 				aux:
 				while (true) {
-					var _p255 = _p254;
-					var _p263 = _p255._1;
-					var _p262 = _p255._0;
-					var _p256 = diffs;
-					if (_p256.ctor === '[]') {
+					var _p253 = _p252;
+					var _p261 = _p253._1;
+					var _p260 = _p253._0;
+					var _p254 = diffs;
+					if (_p254.ctor === '[]') {
 						return {
 							ctor: '_Tuple2',
 							_0: A2(
 								_elm_lang$core$String$join,
 								', ',
-								_elm_lang$core$List$reverse(_p262)),
+								_elm_lang$core$List$reverse(_p260)),
 							_1: {
 								ctor: '_Tuple2',
 								_0: {ctor: '_Tuple2', _0: lastEdit, _1: lastPos},
-								_1: _elm_lang$core$List$reverse(_p263)
+								_1: _elm_lang$core$List$reverse(_p261)
 							}
 						};
 					} else {
-						var _p261 = _p256._0._0;
-						var _p260 = _p256._0._2;
-						var _p259 = _p256._0._1;
+						var _p259 = _p254._0._0;
+						var _p258 = _p254._0._2;
+						var _p257 = _p254._0._1;
 						var betweenNormalized = renderChars(
-							A3(_elm_lang$core$String$slice, lastEnd, _p261, original));
+							A3(_elm_lang$core$String$slice, lastEnd, _p259, original));
 						var lastPos1 = A2(_user$project$UpdateUtils$addOffsetFromString, lastPos, betweenNormalized);
 						var beforeS = renderChars(
-							A3(_elm_lang$core$String$slice, _p261, _p259, original));
+							A3(_elm_lang$core$String$slice, _p259, _p257, original));
 						var afterS = renderChars(
-							A3(_elm_lang$core$String$slice, _p261 + offset, (_p261 + offset) + _p260, modified));
-						var _p257 = A4(_user$project$UpdateUtils$offsetFromStrings, lastEdit, lastPos1, beforeS, afterS);
-						var newLastEdit = _p257._0;
-						var newEndPos = _p257._1;
+							A3(_elm_lang$core$String$slice, _p259 + offset, (_p259 + offset) + _p258, modified));
+						var _p255 = A4(_user$project$UpdateUtils$offsetFromStrings, lastEdit, lastPos1, beforeS, afterS);
+						var newLastEdit = _p255._0;
+						var newEndPos = _p255._1;
 						var newStartPos = A2(_user$project$UpdateUtils$offsetPosition, lastEdit, lastPos1);
-						var _p258 = _elm_lang$core$Native_Utils.eq(_p261, _p259) ? {
+						var _p256 = _elm_lang$core$Native_Utils.eq(_p259, _p257) ? {
 							ctor: '_Tuple2',
 							_0: A2(
 								_elm_lang$core$Basics_ops['++'],
@@ -61617,7 +61530,7 @@ var _user$project$UpdateUtils$stringDiffsToString2 = F8(
 											'Inserted [',
 											A2(_elm_lang$core$Basics_ops['++'], afterS, ']'))))),
 							_1: '+'
-						} : (_elm_lang$core$Native_Utils.eq(_p260, 0) ? {
+						} : (_elm_lang$core$Native_Utils.eq(_p258, 0) ? {
 							ctor: '_Tuple2',
 							_0: A2(
 								_elm_lang$core$Basics_ops['++'],
@@ -61656,29 +61569,29 @@ var _user$project$UpdateUtils$stringDiffsToString2 = F8(
 													A2(_elm_lang$core$Basics_ops['++'], afterS, ']'))))))),
 							_1: '~'
 						});
-						var accInc = _p258._0;
-						var title = _p258._1;
-						var newOffset = (offset - (_p259 - _p261)) + _p260;
-						var newRevAcc = {ctor: '::', _0: accInc, _1: _p262};
+						var accInc = _p256._0;
+						var title = _p256._1;
+						var newOffset = (offset - (_p257 - _p259)) + _p258;
+						var newRevAcc = {ctor: '::', _0: accInc, _1: _p260};
 						var endCol = (_elm_lang$core$Native_Utils.eq(newStartPos.line, newEndPos.line) && _elm_lang$core$Native_Utils.eq(newStartPos.col, newEndPos.col)) ? newEndPos.col : newEndPos.col;
 						var duckTapeOffset = (_elm_lang$core$Native_Utils.eq(renderingStyle, _user$project$Lang$LongStringSyntax) && (_elm_lang$core$Native_Utils.cmp(initialLine, newStartPos.line) < 0)) ? 1 : 0;
 						var insertedExp = A5(_user$project$UpdateUtils$dummyExp1, title, newStartPos.line, newStartPos.col + duckTapeOffset, newEndPos.line, endCol + duckTapeOffset);
-						var _v456 = newLastEdit,
-							_v457 = _elm_lang$core$Tuple$first(newLastEdit),
-							_v458 = _p259,
-							_v459 = newOffset,
-							_v460 = _p256._1,
-							_v461 = {
+						var _v442 = newLastEdit,
+							_v443 = _elm_lang$core$Tuple$first(newLastEdit),
+							_v444 = _p257,
+							_v445 = newOffset,
+							_v446 = _p254._1,
+							_v447 = {
 							ctor: '_Tuple2',
 							_0: newRevAcc,
-							_1: {ctor: '::', _0: insertedExp, _1: _p263}
+							_1: {ctor: '::', _0: insertedExp, _1: _p261}
 						};
-						lastEdit = _v456;
-						lastPos = _v457;
-						lastEnd = _v458;
-						offset = _v459;
-						diffs = _v460;
-						_p254 = _v461;
+						lastEdit = _v442;
+						lastPos = _v443;
+						lastEnd = _v444;
+						offset = _v445;
+						diffs = _v446;
+						_p252 = _v447;
 						continue aux;
 					}
 				}
@@ -61697,31 +61610,31 @@ var _user$project$UpdateUtils$stringDiffsToString2 = F8(
 			});
 	});
 var _user$project$UpdateUtils$eDiffsToStringPositions = F6(
-	function (renderingStyle, indent, lastEdit, _p265, _p264, ediff) {
-		var _p266 = _p265;
-		var _p278 = _p266._0;
-		var _p267 = _p264;
-		var _p277 = _p267._0;
+	function (renderingStyle, indent, lastEdit, _p263, _p262, ediff) {
+		var _p264 = _p263;
+		var _p276 = _p264._0;
+		var _p265 = _p262;
+		var _p275 = _p265._0;
 		var renderExp = function () {
-			var _p268 = renderingStyle;
-			if (_p268.ctor === 'HtmlSyntax') {
+			var _p266 = renderingStyle;
+			if (_p266.ctor === 'HtmlSyntax') {
 				return _user$project$LeoUnparser$unparseAnyHtml;
 			} else {
 				return _user$project$Syntax$unparser(_user$project$Syntax$Leo);
 			}
 		}();
-		var _p269 = ediff;
-		switch (_p269.ctor) {
+		var _p267 = ediff;
+		switch (_p267.ctor) {
 			case 'EConstDiffs':
-				if (_elm_lang$core$Native_Utils.eq(_p269._0, _user$project$Lang$EOnlyWhitespaceDiffs)) {
+				if (_elm_lang$core$Native_Utils.eq(_p267._0, _user$project$Lang$EOnlyWhitespaceDiffs)) {
 					var newLastEdit_newEnd = A4(
 						_user$project$UpdateUtils$offsetFromStrings,
 						lastEdit,
-						_p278.start,
+						_p276.start,
 						renderExp(
-							_user$project$Lang$Expr(_p278)),
+							_user$project$Lang$Expr(_p276)),
 						renderExp(
-							_user$project$Lang$Expr(_p277)));
+							_user$project$Lang$Expr(_p275)));
 					return {
 						ctor: '_Tuple2',
 						_0: '',
@@ -61740,12 +61653,12 @@ var _user$project$UpdateUtils$eDiffsToStringPositions = F6(
 							indent,
 							A2(
 								_elm_lang$core$Basics_ops['++'],
-								_user$project$UpdateUtils$displayPos(_p278.start),
+								_user$project$UpdateUtils$displayPos(_p276.start),
 								': ')));
 					var beforeS = renderExp(
-						_user$project$Lang$Expr(_p278));
+						_user$project$Lang$Expr(_p276));
 					var afterS = renderExp(
-						_user$project$Lang$Expr(_p277));
+						_user$project$Lang$Expr(_p275));
 					var msg = A2(
 						_elm_lang$core$Basics_ops['++'],
 						'Was ',
@@ -61753,10 +61666,10 @@ var _user$project$UpdateUtils$eDiffsToStringPositions = F6(
 							_elm_lang$core$Basics_ops['++'],
 							beforeS,
 							A2(_elm_lang$core$Basics_ops['++'], ', now ', afterS)));
-					var newStart = A2(_user$project$UpdateUtils$offsetPosition, lastEdit, _p278.start);
-					var _p270 = A4(_user$project$UpdateUtils$offsetFromStrings, lastEdit, _p278.start, beforeS, afterS);
-					var newLastEdit = _p270._0;
-					var newEnd = _p270._1;
+					var newStart = A2(_user$project$UpdateUtils$offsetPosition, lastEdit, _p276.start);
+					var _p268 = A4(_user$project$UpdateUtils$offsetFromStrings, lastEdit, _p276.start, beforeS, afterS);
+					var newLastEdit = _p268._0;
+					var newEnd = _p268._1;
 					var diffExp = A5(_user$project$UpdateUtils$dummyExp1, '~', newStart.line, newStart.col, newEnd.line, newEnd.col);
 					return {
 						ctor: '_Tuple2',
@@ -61773,18 +61686,18 @@ var _user$project$UpdateUtils$eDiffsToStringPositions = F6(
 					};
 				}
 			case 'EListDiffs':
-				var _p271 = {
+				var _p269 = {
 					ctor: '_Tuple2',
 					_0: _user$project$Lang$unwrapExp(
-						_user$project$Lang$Expr(_p278)),
+						_user$project$Lang$Expr(_p276)),
 					_1: _user$project$Lang$unwrapExp(
-						_user$project$Lang$Expr(_p277))
+						_user$project$Lang$Expr(_p275))
 				};
-				if (((_p271.ctor === '_Tuple2') && (_p271._0.ctor === 'EList')) && (_p271._1.ctor === 'EList')) {
-					var theStart = _p278.start;
+				if (((_p269.ctor === '_Tuple2') && (_p269._0.ctor === 'EList')) && (_p269._1.ctor === 'EList')) {
+					var theStart = _p276.start;
 					var lastPos = function () {
-						var _p272 = renderingStyle;
-						if (_p272.ctor === 'HtmlSyntax') {
+						var _p270 = renderingStyle;
+						if (_p270.ctor === 'HtmlSyntax') {
 							return theStart;
 						} else {
 							return _elm_lang$core$Native_Utils.update(
@@ -61792,7 +61705,7 @@ var _user$project$UpdateUtils$eDiffsToStringPositions = F6(
 								{col: theStart.col + 1});
 						}
 					}();
-					return A9(_user$project$UpdateUtils$listDiffsToString2, renderingStyle, 'list', renderExp, indent, lastEdit, lastPos, _p271._0._1, _p271._1._1, _p269._0);
+					return A9(_user$project$UpdateUtils$listDiffsToString2, renderingStyle, 'list', renderExp, indent, lastEdit, lastPos, _p269._0._1, _p269._1._1, _p267._0);
 				} else {
 					return {
 						ctor: '_Tuple2',
@@ -61808,36 +61721,36 @@ var _user$project$UpdateUtils$eDiffsToStringPositions = F6(
 									A2(
 										_elm_lang$core$Basics_ops['++'],
 										renderExp(
-											_user$project$Lang$Expr(_p278)),
+											_user$project$Lang$Expr(_p276)),
 										A2(
 											_elm_lang$core$Basics_ops['++'],
 											', ',
 											renderExp(
-												_user$project$Lang$Expr(_p277))))))),
+												_user$project$Lang$Expr(_p275))))))),
 						_1: {
 							ctor: '_Tuple2',
 							_0: {
 								ctor: '_Tuple2',
 								_0: lastEdit,
-								_1: A2(_user$project$UpdateUtils$offsetPosition, lastEdit, _p278.end)
+								_1: A2(_user$project$UpdateUtils$offsetPosition, lastEdit, _p276.end)
 							},
 							_1: {ctor: '[]'}
 						}
 					};
 				}
 			case 'EStringDiffs':
-				var _p273 = {
+				var _p271 = {
 					ctor: '_Tuple2',
 					_0: _user$project$Lang$unwrapExp(
-						_user$project$Lang$Expr(_p278)),
+						_user$project$Lang$Expr(_p276)),
 					_1: _user$project$Lang$unwrapExp(
-						_user$project$Lang$Expr(_p277))
+						_user$project$Lang$Expr(_p275))
 				};
-				if (((((_p273.ctor === '_Tuple2') && (_p273._0.ctor === 'EBase')) && (_p273._0._1.ctor === 'EString')) && (_p273._1.ctor === 'EBase')) && (_p273._1._1.ctor === 'EString')) {
-					var theStart = _p278.start;
+				if (((((_p271.ctor === '_Tuple2') && (_p271._0.ctor === 'EBase')) && (_p271._0._1.ctor === 'EString')) && (_p271._1.ctor === 'EBase')) && (_p271._1._1.ctor === 'EString')) {
+					var theStart = _p276.start;
 					var lastPos = function () {
-						var _p274 = renderingStyle;
-						switch (_p274.ctor) {
+						var _p272 = renderingStyle;
+						switch (_p272.ctor) {
 							case 'LongStringSyntax':
 								return theStart;
 							case 'HtmlSyntax':
@@ -61848,7 +61761,7 @@ var _user$project$UpdateUtils$eDiffsToStringPositions = F6(
 									{col: theStart.col + 1});
 						}
 					}();
-					return A8(_user$project$UpdateUtils$stringDiffsToString2, renderingStyle, indent, lastEdit, lastPos, _p273._0._1._0, _p273._0._1._1, _p273._1._1._1, _p269._0);
+					return A8(_user$project$UpdateUtils$stringDiffsToString2, renderingStyle, indent, lastEdit, lastPos, _p271._0._1._0, _p271._0._1._1, _p271._1._1._1, _p267._0);
 				} else {
 					return {
 						ctor: '_Tuple2',
@@ -61864,18 +61777,18 @@ var _user$project$UpdateUtils$eDiffsToStringPositions = F6(
 									A2(
 										_elm_lang$core$Basics_ops['++'],
 										renderExp(
-											_user$project$Lang$Expr(_p278)),
+											_user$project$Lang$Expr(_p276)),
 										A2(
 											_elm_lang$core$Basics_ops['++'],
 											', ',
 											renderExp(
-												_user$project$Lang$Expr(_p277))))))),
+												_user$project$Lang$Expr(_p275))))))),
 						_1: {
 							ctor: '_Tuple2',
 							_0: {
 								ctor: '_Tuple2',
 								_0: lastEdit,
-								_1: A2(_user$project$UpdateUtils$offsetPosition, lastEdit, _p278.end)
+								_1: A2(_user$project$UpdateUtils$offsetPosition, lastEdit, _p276.end)
 							},
 							_1: {ctor: '[]'}
 						}
@@ -61884,28 +61797,28 @@ var _user$project$UpdateUtils$eDiffsToStringPositions = F6(
 			default:
 				var childIndent = '';
 				var newRenderingStyle = function () {
-					var _p275 = _user$project$Lang$unwrapExp(
-						_user$project$Lang$Expr(_p278));
-					if (_p275.ctor === 'EParens') {
-						return _p275._2;
+					var _p273 = _user$project$Lang$unwrapExp(
+						_user$project$Lang$Expr(_p276));
+					if (_p273.ctor === 'EParens') {
+						return _p273._2;
 					} else {
 						return renderingStyle;
 					}
 				}();
-				var _p276 = A6(
+				var _p274 = A6(
 					_user$project$UpdateUtils$tupleDiffsToString2,
 					newRenderingStyle,
 					childIndent,
 					lastEdit,
 					_user$project$Lang$childExps(
-						_user$project$Lang$Expr(_p278)),
+						_user$project$Lang$Expr(_p276)),
 					_user$project$Lang$childExps(
-						_user$project$Lang$Expr(_p277)),
-					_p269._0);
-				var msg = _p276._0;
-				var newLastEdit = _p276._1._0;
-				var newExps = _p276._1._1;
-				var newLastPos = A2(_user$project$UpdateUtils$offsetPosition, newLastEdit, _p278.end);
+						_user$project$Lang$Expr(_p275)),
+					_p267._0);
+				var msg = _p274._0;
+				var newLastEdit = _p274._1._0;
+				var newExps = _p274._1._1;
+				var newLastPos = A2(_user$project$UpdateUtils$offsetPosition, newLastEdit, _p276.end);
 				return {
 					ctor: '_Tuple2',
 					_0: msg,
@@ -61934,53 +61847,53 @@ var _user$project$UpdateUtils$listDiffsToString2 = F9(
 			};
 		} else {
 			var displaySpaceComma = function () {
-				var _p279 = renderingStyle;
-				if (_p279.ctor === 'HtmlSyntax') {
+				var _p277 = renderingStyle;
+				if (_p277.ctor === 'HtmlSyntax') {
 					return false;
 				} else {
 					return true;
 				}
 			}();
 			var aux = F7(
-				function (i, lastEdit, lastPos, original, modifieds, diffs, _p280) {
+				function (i, lastEdit, lastPos, original, modifieds, diffs, _p278) {
 					aux:
 					while (true) {
-						var _p281 = _p280;
-						var _p308 = _p281._0;
-						var _p307 = _p281._1;
-						var _p282 = diffs;
-						if (_p282.ctor === '[]') {
+						var _p279 = _p278;
+						var _p306 = _p279._0;
+						var _p305 = _p279._1;
+						var _p280 = diffs;
+						if (_p280.ctor === '[]') {
 							return {
 								ctor: '_Tuple2',
-								_0: _p308,
+								_0: _p306,
 								_1: {
 									ctor: '_Tuple2',
 									_0: {ctor: '_Tuple2', _0: lastEdit, _1: lastPos},
-									_1: _p307
+									_1: _p305
 								}
 							};
 						} else {
-							var _p306 = _p282._0._0;
-							var _p305 = _p282._1;
-							if (_elm_lang$core$Native_Utils.cmp(_p306, i) > 0) {
-								var count = _p306 - i;
-								var _p283 = A2(_user$project$Utils$split, count, original);
-								var originalDropped = _p283._0;
-								var originalTaken = _p283._1;
-								var newLastPos = function (_p284) {
-									var _p285 = _p284;
-									return _p285._0.end;
+							var _p304 = _p280._0._0;
+							var _p303 = _p280._1;
+							if (_elm_lang$core$Native_Utils.cmp(_p304, i) > 0) {
+								var count = _p304 - i;
+								var _p281 = A2(_user$project$Utils$split, count, original);
+								var originalDropped = _p281._0;
+								var originalTaken = _p281._1;
+								var newLastPos = function (_p282) {
+									var _p283 = _p282;
+									return _p283._0.end;
 								}(
 									_elm_lang$core$Tuple$second(
 										A3(
 											_elm_lang$core$Basics$flip,
 											_user$project$Utils$maybeWithLazyDefault,
-											function (_p286) {
+											function (_p284) {
 												return _elm_lang$core$Native_Utils.crash(
 													'UpdateUtils',
 													{
-														start: {line: 1092, column: 16},
-														end: {line: 1092, column: 27}
+														start: {line: 1157, column: 16},
+														end: {line: 1157, column: 27}
 													})(
 													A2(
 														_elm_lang$core$Basics_ops['++'],
@@ -62042,29 +61955,29 @@ var _user$project$UpdateUtils$listDiffsToString2 = F9(
 																														_elm_lang$core$Basics$toString(diffs_)))))))))))))))))));
 											},
 											_user$project$Utils$maybeLast(originalDropped))));
-								var _v475 = _p306,
-									_v476 = lastEdit,
-									_v477 = newLastPos,
-									_v478 = A2(_elm_lang$core$List$drop, count, original),
-									_v479 = A2(_elm_lang$core$List$drop, count, modifieds),
-									_v480 = diffs,
-									_v481 = {ctor: '_Tuple2', _0: _p308, _1: _p307};
-								i = _v475;
-								lastEdit = _v476;
-								lastPos = _v477;
-								original = _v478;
-								modifieds = _v479;
-								diffs = _v480;
-								_p280 = _v481;
+								var _v461 = _p304,
+									_v462 = lastEdit,
+									_v463 = newLastPos,
+									_v464 = A2(_elm_lang$core$List$drop, count, original),
+									_v465 = A2(_elm_lang$core$List$drop, count, modifieds),
+									_v466 = diffs,
+									_v467 = {ctor: '_Tuple2', _0: _p306, _1: _p305};
+								i = _v461;
+								lastEdit = _v462;
+								lastPos = _v463;
+								original = _v464;
+								modifieds = _v465;
+								diffs = _v466;
+								_p278 = _v467;
 								continue aux;
 							} else {
-								var _p287 = _p282._0._1;
-								switch (_p287.ctor) {
+								var _p285 = _p280._0._1;
+								switch (_p285.ctor) {
 									case 'ListElemDelete':
-										var _p293 = _p287._0;
-										var _p288 = A2(_user$project$Utils$split, _p293, original);
-										var originalRemoved = _p288._0;
-										var originalKept = _p288._1;
+										var _p291 = _p285._0;
+										var _p286 = A2(_user$project$Utils$split, _p291, original);
+										var originalRemoved = _p286._0;
+										var originalKept = _p286._1;
 										var secondCommaSpace = A2(
 											_elm_lang$core$Maybe$withDefault,
 											'',
@@ -62075,11 +61988,11 @@ var _user$project$UpdateUtils$listDiffsToString2 = F9(
 												},
 												A2(
 													_elm_lang$core$Maybe$map,
-													function (_p289) {
+													function (_p287) {
 														return function (_) {
 															return _.val;
 														}(
-															_elm_lang$core$Tuple$first(_p289));
+															_elm_lang$core$Tuple$first(_p287));
 													},
 													A2(
 														_elm_lang$core$Maybe$andThen,
@@ -62091,34 +62004,34 @@ var _user$project$UpdateUtils$listDiffsToString2 = F9(
 											A2(
 												_elm_lang$core$List$indexedMap,
 												F2(
-													function (k, _p290) {
-														var _p291 = _p290;
+													function (k, _p288) {
+														var _p289 = _p288;
 														return A2(
 															_elm_lang$core$Basics_ops['++'],
-															((_elm_lang$core$Native_Utils.cmp(i + k, 0) > 0) && displaySpaceComma) ? A2(_elm_lang$core$Basics_ops['++'], _p291._0.val, ',') : '',
+															((_elm_lang$core$Native_Utils.cmp(i + k, 0) > 0) && displaySpaceComma) ? A2(_elm_lang$core$Basics_ops['++'], _p289._0.val, ',') : '',
 															A2(
 																_elm_lang$core$Basics_ops['++'],
-																elementDisplay(_p291._1),
+																elementDisplay(_p289._1),
 																(_elm_lang$core$Native_Utils.eq(i + k, 0) && displaySpaceComma) ? secondCommaSpace : ''));
 													}),
 												originalRemoved));
 										var afterS = '';
-										var _p292 = A4(_user$project$UpdateUtils$offsetFromStrings, lastEdit, lastPos, beforeS, afterS);
-										var newLastEdit = _p292._0;
-										var newEnd = _p292._1;
+										var _p290 = A4(_user$project$UpdateUtils$offsetFromStrings, lastEdit, lastPos, beforeS, afterS);
+										var newLastEdit = _p290._0;
+										var newEnd = _p290._1;
 										var newStartPos = A2(_user$project$UpdateUtils$offsetPosition, lastEdit, lastPos);
 										var removedExp = A5(_user$project$UpdateUtils$dummyExp1, '-', newStartPos.line, newStartPos.col, newStartPos.line, newStartPos.col);
-										var _v484 = i + _p293,
-											_v485 = newLastEdit,
-											_v486 = newEnd,
-											_v487 = originalKept,
-											_v488 = modifieds,
-											_v489 = _p305,
-											_v490 = {
+										var _v470 = i + _p291,
+											_v471 = newLastEdit,
+											_v472 = newEnd,
+											_v473 = originalKept,
+											_v474 = modifieds,
+											_v475 = _p303,
+											_v476 = {
 											ctor: '_Tuple2',
 											_0: A2(
 												_elm_lang$core$Basics_ops['++'],
-												_p308,
+												_p306,
 												A2(
 													_elm_lang$core$Basics_ops['++'],
 													'\n',
@@ -62132,20 +62045,20 @@ var _user$project$UpdateUtils$listDiffsToString2 = F9(
 																_elm_lang$core$Basics_ops['++'],
 																'Removed \'',
 																A2(_elm_lang$core$Basics_ops['++'], beforeS, '\'')))))),
-											_1: {ctor: '::', _0: removedExp, _1: _p307}
+											_1: {ctor: '::', _0: removedExp, _1: _p305}
 										};
-										i = _v484;
-										lastEdit = _v485;
-										lastPos = _v486;
-										original = _v487;
-										modifieds = _v488;
-										diffs = _v489;
-										_p280 = _v490;
+										i = _v470;
+										lastEdit = _v471;
+										lastPos = _v472;
+										original = _v473;
+										modifieds = _v474;
+										diffs = _v475;
+										_p278 = _v476;
 										continue aux;
 									case 'ListElemInsert':
-										var _p294 = A2(_user$project$Utils$split, _p287._0, modifieds);
-										var modifiedInserted = _p294._0;
-										var modifiedTail = _p294._1;
+										var _p292 = A2(_user$project$Utils$split, _p285._0, modifieds);
+										var modifiedInserted = _p292._0;
+										var modifiedTail = _p292._1;
 										var secondCommaSpace = A2(
 											_elm_lang$core$Maybe$withDefault,
 											'',
@@ -62156,11 +62069,11 @@ var _user$project$UpdateUtils$listDiffsToString2 = F9(
 												},
 												A2(
 													_elm_lang$core$Maybe$map,
-													function (_p295) {
+													function (_p293) {
 														return function (_) {
 															return _.val;
 														}(
-															_elm_lang$core$Tuple$first(_p295));
+															_elm_lang$core$Tuple$first(_p293));
 													},
 													A2(
 														_elm_lang$core$Maybe$andThen,
@@ -62173,33 +62086,33 @@ var _user$project$UpdateUtils$listDiffsToString2 = F9(
 											A2(
 												_elm_lang$core$List$indexedMap,
 												F2(
-													function (k, _p296) {
-														var _p297 = _p296;
+													function (k, _p294) {
+														var _p295 = _p294;
 														return A2(
 															_elm_lang$core$Basics_ops['++'],
-															((_elm_lang$core$Native_Utils.cmp(i + k, 0) > 0) && displaySpaceComma) ? A2(_elm_lang$core$Basics_ops['++'], _p297._0.val, ',') : '',
+															((_elm_lang$core$Native_Utils.cmp(i + k, 0) > 0) && displaySpaceComma) ? A2(_elm_lang$core$Basics_ops['++'], _p295._0.val, ',') : '',
 															A2(
 																_elm_lang$core$Basics_ops['++'],
-																elementDisplay(_p297._1),
+																elementDisplay(_p295._1),
 																(_elm_lang$core$Native_Utils.eq(i + k, 0) && displaySpaceComma) ? secondCommaSpace : ''));
 													}),
 												modifiedInserted));
-										var _p298 = A4(_user$project$UpdateUtils$offsetFromStrings, lastEdit, lastPos, beforeS, afterS);
-										var newLastEdit = _p298._0;
-										var newEnd = _p298._1;
+										var _p296 = A4(_user$project$UpdateUtils$offsetFromStrings, lastEdit, lastPos, beforeS, afterS);
+										var newLastEdit = _p296._0;
+										var newEnd = _p296._1;
 										var newStartPos = A2(_user$project$UpdateUtils$offsetPosition, lastEdit, lastPos);
 										var insertedExp = A5(_user$project$UpdateUtils$dummyExp1, '+', newStartPos.line, newStartPos.col, newEnd.line, newEnd.col);
-										var _v492 = i,
-											_v493 = newLastEdit,
-											_v494 = lastPos,
-											_v495 = original,
-											_v496 = modifiedTail,
-											_v497 = _p305,
-											_v498 = {
+										var _v478 = i,
+											_v479 = newLastEdit,
+											_v480 = lastPos,
+											_v481 = original,
+											_v482 = modifiedTail,
+											_v483 = _p303,
+											_v484 = {
 											ctor: '_Tuple2',
 											_0: A2(
 												_elm_lang$core$Basics_ops['++'],
-												_p308,
+												_p306,
 												A2(
 													_elm_lang$core$Basics_ops['++'],
 													'\n',
@@ -62213,34 +62126,34 @@ var _user$project$UpdateUtils$listDiffsToString2 = F9(
 																_elm_lang$core$Basics_ops['++'],
 																'Inserted \'',
 																A2(_elm_lang$core$Basics_ops['++'], afterS, '\'')))))),
-											_1: {ctor: '::', _0: insertedExp, _1: _p307}
+											_1: {ctor: '::', _0: insertedExp, _1: _p305}
 										};
-										i = _v492;
-										lastEdit = _v493;
-										lastPos = _v494;
-										original = _v495;
-										modifieds = _v496;
-										diffs = _v497;
-										_p280 = _v498;
+										i = _v478;
+										lastEdit = _v479;
+										lastPos = _v480;
+										original = _v481;
+										modifieds = _v482;
+										diffs = _v483;
+										_p278 = _v484;
 										continue aux;
 									default:
-										var _p304 = _p287._0;
-										var _p299 = {ctor: '_Tuple2', _0: original, _1: modifieds};
-										if (((((_p299.ctor === '_Tuple2') && (_p299._0.ctor === '::')) && (_p299._0._0.ctor === '_Tuple2')) && (_p299._1.ctor === '::')) && (_p299._1._0.ctor === '_Tuple2')) {
-											var _p303 = _p299._0._0._1._0;
-											var _p300 = function () {
-												var _p301 = _p304;
-												if ((_p301.ctor === 'EConstDiffs') && (_p301._0.ctor === 'EOnlyWhitespaceDiffs')) {
-													var _p302 = A4(_user$project$UpdateUtils$offsetFromStrings, lastEdit, lastPos, _p299._0._0._0.val, _p299._1._0._0.val);
-													var newLastEdit = _p302._0;
-													var newEndSpace = _p302._1;
-													var newElemEnd = A2(_user$project$UpdateUtils$offsetPosition, newLastEdit, _p303.end);
+										var _p302 = _p285._0;
+										var _p297 = {ctor: '_Tuple2', _0: original, _1: modifieds};
+										if (((((_p297.ctor === '_Tuple2') && (_p297._0.ctor === '::')) && (_p297._0._0.ctor === '_Tuple2')) && (_p297._1.ctor === '::')) && (_p297._1._0.ctor === '_Tuple2')) {
+											var _p301 = _p297._0._0._1._0;
+											var _p298 = function () {
+												var _p299 = _p302;
+												if ((_p299.ctor === 'EConstDiffs') && (_p299._0.ctor === 'EOnlyWhitespaceDiffs')) {
+													var _p300 = A4(_user$project$UpdateUtils$offsetFromStrings, lastEdit, lastPos, _p297._0._0._0.val, _p297._1._0._0.val);
+													var newLastEdit = _p300._0;
+													var newEndSpace = _p300._1;
+													var newElemEnd = A2(_user$project$UpdateUtils$offsetPosition, newLastEdit, _p301.end);
 													return {
 														ctor: '_Tuple2',
 														_0: '',
 														_1: {
 															ctor: '_Tuple2',
-															_0: {ctor: '_Tuple2', _0: newLastEdit, _1: _p303.end},
+															_0: {ctor: '_Tuple2', _0: newLastEdit, _1: _p301.end},
 															_1: {ctor: '[]'}
 														}
 													};
@@ -62250,46 +62163,46 @@ var _user$project$UpdateUtils$listDiffsToString2 = F9(
 														renderingStyle,
 														indent,
 														lastEdit,
-														_user$project$Lang$Expr(_p303),
-														_p299._1._0._1,
-														_p304);
+														_user$project$Lang$Expr(_p301),
+														_p297._1._0._1,
+														_p302);
 												}
 											}();
-											var incAcc = _p300._0;
-											var newLastEdit = _p300._1._0._0;
-											var lastPos2 = _p300._1._0._1;
-											var newHighlights = _p300._1._1;
-											var _v501 = i + 1,
-												_v502 = newLastEdit,
-												_v503 = lastPos2,
-												_v504 = _p299._0._1,
-												_v505 = _p299._1._1,
-												_v506 = _p305,
-												_v507 = {
+											var incAcc = _p298._0;
+											var newLastEdit = _p298._1._0._0;
+											var lastPos2 = _p298._1._0._1;
+											var newHighlights = _p298._1._1;
+											var _v487 = i + 1,
+												_v488 = newLastEdit,
+												_v489 = lastPos2,
+												_v490 = _p297._0._1,
+												_v491 = _p297._1._1,
+												_v492 = _p303,
+												_v493 = {
 												ctor: '_Tuple2',
-												_0: A2(_elm_lang$core$Basics_ops['++'], _p308, incAcc),
-												_1: A2(_elm_lang$core$Basics_ops['++'], newHighlights, _p307)
+												_0: A2(_elm_lang$core$Basics_ops['++'], _p306, incAcc),
+												_1: A2(_elm_lang$core$Basics_ops['++'], newHighlights, _p305)
 											};
-											i = _v501;
-											lastEdit = _v502;
-											lastPos = _v503;
-											original = _v504;
-											modifieds = _v505;
-											diffs = _v506;
-											_p280 = _v507;
+											i = _v487;
+											lastEdit = _v488;
+											lastPos = _v489;
+											original = _v490;
+											modifieds = _v491;
+											diffs = _v492;
+											_p278 = _v493;
 											continue aux;
 										} else {
 											return {
 												ctor: '_Tuple2',
 												_0: A2(
 													_elm_lang$core$Basics_ops['++'],
-													_p308,
+													_p306,
 													A2(
 														_elm_lang$core$Basics_ops['++'],
 														'[Internal error]2 For diff ',
 														A2(
 															_elm_lang$core$Basics_ops['++'],
-															_elm_lang$core$Basics$toString(_p304),
+															_elm_lang$core$Basics$toString(_p302),
 															A2(
 																_elm_lang$core$Basics_ops['++'],
 																', expected non-empty lists, got [',
@@ -62318,7 +62231,7 @@ var _user$project$UpdateUtils$listDiffsToString2 = F9(
 												_1: {
 													ctor: '_Tuple2',
 													_0: {ctor: '_Tuple2', _0: lastEdit, _1: lastPos},
-													_1: _p307
+													_1: _p305
 												}
 											};
 										}
@@ -62345,60 +62258,60 @@ var _user$project$UpdateUtils$listDiffsToString2 = F9(
 var _user$project$UpdateUtils$tupleDiffsToString2 = F6(
 	function (renderingStyle, indent, lastEdit, originalChildren, modifiedChildren, childDiffs) {
 		var aux = F6(
-			function (i, lastEdit, original, modified, diffs, _p309) {
+			function (i, lastEdit, original, modified, diffs, _p307) {
 				aux:
 				while (true) {
-					var _p310 = _p309;
-					var _p316 = _p310._0;
-					var _p315 = _p310._1;
-					var _p311 = diffs;
-					if (_p311.ctor === '[]') {
+					var _p308 = _p307;
+					var _p314 = _p308._0;
+					var _p313 = _p308._1;
+					var _p309 = diffs;
+					if (_p309.ctor === '[]') {
 						return {
 							ctor: '_Tuple2',
-							_0: _p316,
-							_1: {ctor: '_Tuple2', _0: lastEdit, _1: _p315}
+							_0: _p314,
+							_1: {ctor: '_Tuple2', _0: lastEdit, _1: _p313}
 						};
 					} else {
-						var _p314 = _p311._0._0;
-						if (_elm_lang$core$Native_Utils.cmp(_p314, i) > 0) {
-							var count = _p314 - i;
-							var _v510 = _p314,
-								_v511 = lastEdit,
-								_v512 = A2(_elm_lang$core$List$drop, count, original),
-								_v513 = A2(_elm_lang$core$List$drop, count, modified),
-								_v514 = diffs,
-								_v515 = {ctor: '_Tuple2', _0: _p316, _1: _p315};
-							i = _v510;
-							lastEdit = _v511;
-							original = _v512;
-							modified = _v513;
-							diffs = _v514;
-							_p309 = _v515;
+						var _p312 = _p309._0._0;
+						if (_elm_lang$core$Native_Utils.cmp(_p312, i) > 0) {
+							var count = _p312 - i;
+							var _v496 = _p312,
+								_v497 = lastEdit,
+								_v498 = A2(_elm_lang$core$List$drop, count, original),
+								_v499 = A2(_elm_lang$core$List$drop, count, modified),
+								_v500 = diffs,
+								_v501 = {ctor: '_Tuple2', _0: _p314, _1: _p313};
+							i = _v496;
+							lastEdit = _v497;
+							original = _v498;
+							modified = _v499;
+							diffs = _v500;
+							_p307 = _v501;
 							continue aux;
 						} else {
-							if (_elm_lang$core$Native_Utils.eq(_p314, i)) {
-								var _p312 = {ctor: '_Tuple2', _0: original, _1: modified};
-								if (((_p312.ctor === '_Tuple2') && (_p312._0.ctor === '::')) && (_p312._1.ctor === '::')) {
-									var _p313 = A6(_user$project$UpdateUtils$eDiffsToStringPositions, renderingStyle, indent, lastEdit, _p312._0._0, _p312._1._0, _p311._0._1);
-									var incAcc = _p313._0;
-									var newLastEdit = _p313._1._0._0;
-									var newExps = _p313._1._1;
-									var _v517 = i + 1,
-										_v518 = newLastEdit,
-										_v519 = _p312._0._1,
-										_v520 = _p312._1._1,
-										_v521 = _p311._1,
-										_v522 = {
+							if (_elm_lang$core$Native_Utils.eq(_p312, i)) {
+								var _p310 = {ctor: '_Tuple2', _0: original, _1: modified};
+								if (((_p310.ctor === '_Tuple2') && (_p310._0.ctor === '::')) && (_p310._1.ctor === '::')) {
+									var _p311 = A6(_user$project$UpdateUtils$eDiffsToStringPositions, renderingStyle, indent, lastEdit, _p310._0._0, _p310._1._0, _p309._0._1);
+									var incAcc = _p311._0;
+									var newLastEdit = _p311._1._0._0;
+									var newExps = _p311._1._1;
+									var _v503 = i + 1,
+										_v504 = newLastEdit,
+										_v505 = _p310._0._1,
+										_v506 = _p310._1._1,
+										_v507 = _p309._1,
+										_v508 = {
 										ctor: '_Tuple2',
-										_0: A2(_elm_lang$core$Basics_ops['++'], _p316, incAcc),
-										_1: A2(_elm_lang$core$Basics_ops['++'], _p315, newExps)
+										_0: A2(_elm_lang$core$Basics_ops['++'], _p314, incAcc),
+										_1: A2(_elm_lang$core$Basics_ops['++'], _p313, newExps)
 									};
-									i = _v517;
-									lastEdit = _v518;
-									original = _v519;
-									modified = _v520;
-									diffs = _v521;
-									_p309 = _v522;
+									i = _v503;
+									lastEdit = _v504;
+									original = _v505;
+									modified = _v506;
+									diffs = _v507;
+									_p307 = _v508;
 									continue aux;
 								} else {
 									return {
@@ -62448,15 +62361,15 @@ var _user$project$UpdateUtils$tupleDiffsToString2 = F6(
 								return _elm_lang$core$Native_Utils.crash(
 									'UpdateUtils',
 									{
-										start: {line: 1232, column: 11},
-										end: {line: 1232, column: 22}
+										start: {line: 1297, column: 11},
+										end: {line: 1297, column: 22}
 									})('Changes does not match the expression');
 							}
 						}
 					}
 				}
 			});
-		var _p317 = A6(
+		var _p315 = A6(
 			aux,
 			0,
 			lastEdit,
@@ -62468,9 +62381,9 @@ var _user$project$UpdateUtils$tupleDiffsToString2 = F6(
 				_0: '',
 				_1: {ctor: '[]'}
 			});
-		var msg = _p317._0;
-		var newLastEdit = _p317._1._0;
-		var newExps = _p317._1._1;
+		var msg = _p315._0;
+		var newLastEdit = _p315._1._0;
+		var newExps = _p315._1._1;
 		return {
 			ctor: '_Tuple2',
 			_0: msg,
@@ -62512,14 +62425,14 @@ var _user$project$UpdateUtils$envDiffsToString_ = A2(
 	_user$project$UpdateUtils$tupleDiffsToString,
 	_elm_lang$core$Maybe$Just('environment'),
 	F4(
-		function (indent, _p319, _p318, change) {
-			var _p320 = _p319;
-			var _p323 = _p320._0;
-			var _p321 = _p318;
-			var _p322 = _p321._0;
+		function (indent, _p317, _p316, change) {
+			var _p318 = _p317;
+			var _p321 = _p318._0;
+			var _p319 = _p316;
+			var _p320 = _p319._0;
 			return A2(
 				_elm_lang$core$Basics_ops['++'],
-				(!_elm_lang$core$Native_Utils.eq(_p323, _p322)) ? A2(
+				(!_elm_lang$core$Native_Utils.eq(_p321, _p320)) ? A2(
 					_elm_lang$core$Basics_ops['++'],
 					'\n',
 					A2(
@@ -62530,8 +62443,8 @@ var _user$project$UpdateUtils$envDiffsToString_ = A2(
 							'Weird: a name changed from ',
 							A2(
 								_elm_lang$core$Basics_ops['++'],
-								_p323,
-								A2(_elm_lang$core$Basics_ops['++'], ' to ', _p322))))) : '',
+								_p321,
+								A2(_elm_lang$core$Basics_ops['++'], ' to ', _p320))))) : '',
 				A2(
 					_elm_lang$core$Basics_ops['++'],
 					'\n',
@@ -62543,24 +62456,24 @@ var _user$project$UpdateUtils$envDiffsToString_ = A2(
 							'Variable ',
 							A2(
 								_elm_lang$core$Basics_ops['++'],
-								_p323,
+								_p321,
 								A2(
 									_elm_lang$core$Basics_ops['++'],
 									' changes to value:',
 									A4(
 										_user$project$UpdateUtils$vDiffsToString_,
 										A2(_elm_lang$core$Basics_ops['++'], indent, '  '),
-										_p320._1,
-										_p321._1,
+										_p318._1,
+										_p319._1,
 										change)))))));
 		}));
 var _user$project$UpdateUtils$vDiffsToString_ = F4(
 	function (indent, vOriginal, vModified, vDiffs) {
-		var _p324 = vDiffs;
-		switch (_p324.ctor) {
+		var _p322 = vDiffs;
+		switch (_p322.ctor) {
 			case 'VListDiffs':
-				var _p325 = {ctor: '_Tuple2', _0: vOriginal.v_, _1: vModified.v_};
-				if (((_p325.ctor === '_Tuple2') && (_p325._0.ctor === 'VList')) && (_p325._1.ctor === 'VList')) {
+				var _p323 = {ctor: '_Tuple2', _0: vOriginal.v_, _1: vModified.v_};
+				if (((_p323.ctor === '_Tuple2') && (_p323._0.ctor === 'VList')) && (_p323._1.ctor === 'VList')) {
 					return A2(
 						_elm_lang$core$Basics_ops['++'],
 						'\n',
@@ -62570,7 +62483,7 @@ var _user$project$UpdateUtils$vDiffsToString_ = F4(
 							A2(
 								_elm_lang$core$Basics_ops['++'],
 								'A list was modified:',
-								A4(_user$project$UpdateUtils$vListDiffsToString, indent, _p325._0._0, _p325._1._0, _p324._0))));
+								A4(_user$project$UpdateUtils$vListDiffsToString, indent, _p323._0._0, _p323._1._0, _p322._0))));
 				} else {
 					return A2(
 						_elm_lang$core$Basics_ops['++'],
@@ -62590,9 +62503,9 @@ var _user$project$UpdateUtils$vDiffsToString_ = F4(
 										_user$project$LangUtils$valToString(vModified))))));
 				}
 			case 'VStringDiffs':
-				var _p326 = {ctor: '_Tuple2', _0: vOriginal.v_, _1: vModified.v_};
-				if (((((_p326.ctor === '_Tuple2') && (_p326._0.ctor === 'VBase')) && (_p326._0._0.ctor === 'VString')) && (_p326._1.ctor === 'VBase')) && (_p326._1._0.ctor === 'VString')) {
-					return A4(_user$project$UpdateUtils$stringDiffsToString, indent, _p326._0._0._0, _p326._1._0._0, _p324._0);
+				var _p324 = {ctor: '_Tuple2', _0: vOriginal.v_, _1: vModified.v_};
+				if (((((_p324.ctor === '_Tuple2') && (_p324._0.ctor === 'VBase')) && (_p324._0._0.ctor === 'VString')) && (_p324._1.ctor === 'VBase')) && (_p324._1._0.ctor === 'VString')) {
+					return A4(_user$project$UpdateUtils$stringDiffsToString, indent, _p324._0._0._0, _p324._1._0._0, _p322._0);
 				} else {
 					return A2(
 						_elm_lang$core$Basics_ops['++'],
@@ -62612,8 +62525,8 @@ var _user$project$UpdateUtils$vDiffsToString_ = F4(
 										_user$project$LangUtils$valToString(vModified))))));
 				}
 			case 'VDictDiffs':
-				var _p327 = {ctor: '_Tuple2', _0: vOriginal.v_, _1: vModified.v_};
-				if (((_p327.ctor === '_Tuple2') && (_p327._0.ctor === 'VDict')) && (_p327._1.ctor === 'VDict')) {
+				var _p325 = {ctor: '_Tuple2', _0: vOriginal.v_, _1: vModified.v_};
+				if (((_p325.ctor === '_Tuple2') && (_p325._0.ctor === 'VDict')) && (_p325._1.ctor === 'VDict')) {
 					return A2(
 						_elm_lang$core$Basics_ops['++'],
 						'\n',
@@ -62623,7 +62536,7 @@ var _user$project$UpdateUtils$vDiffsToString_ = F4(
 							A2(
 								_elm_lang$core$Basics_ops['++'],
 								'A dict was modified:',
-								A4(_user$project$UpdateUtils$vDictDiffsToString, indent, _p327._0._0, _p327._1._0, _p324._0))));
+								A4(_user$project$UpdateUtils$vDictDiffsToString, indent, _p325._0._0, _p325._1._0, _p322._0))));
 				} else {
 					return A2(
 						_elm_lang$core$Basics_ops['++'],
@@ -62643,8 +62556,8 @@ var _user$project$UpdateUtils$vDiffsToString_ = F4(
 										_user$project$LangUtils$valToString(vModified))))));
 				}
 			case 'VRecordDiffs':
-				var _p328 = {ctor: '_Tuple2', _0: vOriginal.v_, _1: vModified.v_};
-				if (((_p328.ctor === '_Tuple2') && (_p328._0.ctor === 'VRecord')) && (_p328._1.ctor === 'VRecord')) {
+				var _p326 = {ctor: '_Tuple2', _0: vOriginal.v_, _1: vModified.v_};
+				if (((_p326.ctor === '_Tuple2') && (_p326._0.ctor === 'VRecord')) && (_p326._1.ctor === 'VRecord')) {
 					return A2(
 						_elm_lang$core$Basics_ops['++'],
 						'\n',
@@ -62654,7 +62567,7 @@ var _user$project$UpdateUtils$vDiffsToString_ = F4(
 							A2(
 								_elm_lang$core$Basics_ops['++'],
 								'A record was modified:',
-								A4(_user$project$UpdateUtils$vRecordDiffsToString, indent, _p328._0._0, _p328._1._0, _p324._0))));
+								A4(_user$project$UpdateUtils$vRecordDiffsToString, indent, _p326._0._0, _p326._1._0, _p322._0))));
 				} else {
 					return A2(
 						_elm_lang$core$Basics_ops['++'],
@@ -62674,8 +62587,8 @@ var _user$project$UpdateUtils$vDiffsToString_ = F4(
 										_user$project$LangUtils$valToString(vModified))))));
 				}
 			case 'VClosureDiffs':
-				var _p329 = {ctor: '_Tuple2', _0: vOriginal.v_, _1: vModified.v_};
-				if (((_p329.ctor === '_Tuple2') && (_p329._0.ctor === 'VClosure')) && (_p329._1.ctor === 'VClosure')) {
+				var _p327 = {ctor: '_Tuple2', _0: vOriginal.v_, _1: vModified.v_};
+				if (((_p327.ctor === '_Tuple2') && (_p327._0.ctor === 'VClosure')) && (_p327._1.ctor === 'VClosure')) {
 					return A2(
 						_elm_lang$core$Basics_ops['++'],
 						'\n',
@@ -62685,7 +62598,7 @@ var _user$project$UpdateUtils$vDiffsToString_ = F4(
 							A2(
 								_elm_lang$core$Basics_ops['++'],
 								'A closure was modified:',
-								A7(_user$project$UpdateUtils$vClosureDiffsToString, indent, _p329._0._3, _p329._0._2, _p329._1._3, _p329._1._2, _p324._0, _p324._1))));
+								A7(_user$project$UpdateUtils$vClosureDiffsToString, indent, _p327._0._3, _p327._0._2, _p327._1._3, _p327._1._2, _p322._0, _p322._1))));
 				} else {
 					return A2(
 						_elm_lang$core$Basics_ops['++'],
@@ -62730,12 +62643,12 @@ var _user$project$UpdateUtils$vDictDiffsToString = F4(
 			indent,
 			F5(
 				function (indent, key, maybeOriginal, maybeModified, diff) {
-					var _p330 = {ctor: '_Tuple3', _0: diff, _1: maybeOriginal, _2: maybeModified};
-					_v531_3:
+					var _p328 = {ctor: '_Tuple3', _0: diff, _1: maybeOriginal, _2: maybeModified};
+					_v517_3:
 					do {
-						if (_p330.ctor === '_Tuple3') {
-							if (_p330._1.ctor === 'Nothing') {
-								if ((_p330._0.ctor === 'VDictElemInsert') && (_p330._2.ctor === 'Just')) {
+						if (_p328.ctor === '_Tuple3') {
+							if (_p328._1.ctor === 'Nothing') {
+								if ((_p328._0.ctor === 'VDictElemInsert') && (_p328._2.ctor === 'Just')) {
 									return A2(
 										_elm_lang$core$Basics_ops['++'],
 										'\n',
@@ -62751,13 +62664,13 @@ var _user$project$UpdateUtils$vDictDiffsToString = F4(
 													A2(
 														_elm_lang$core$Basics_ops['++'],
 														'\' was inserted: ',
-														_user$project$LangUtils$valToString(_p330._2._0))))));
+														_user$project$LangUtils$valToString(_p328._2._0))))));
 								} else {
-									break _v531_3;
+									break _v517_3;
 								}
 							} else {
-								if (_p330._2.ctor === 'Nothing') {
-									if (_p330._0.ctor === 'VDictElemDelete') {
+								if (_p328._2.ctor === 'Nothing') {
+									if (_p328._0.ctor === 'VDictElemDelete') {
 										return A2(
 											_elm_lang$core$Basics_ops['++'],
 											'\n',
@@ -62773,12 +62686,12 @@ var _user$project$UpdateUtils$vDictDiffsToString = F4(
 														A2(
 															_elm_lang$core$Basics_ops['++'],
 															'\' was removed: ',
-															_user$project$LangUtils$valToString(_p330._1._0))))));
+															_user$project$LangUtils$valToString(_p328._1._0))))));
 									} else {
-										break _v531_3;
+										break _v517_3;
 									}
 								} else {
-									if (_p330._0.ctor === 'VDictElemUpdate') {
+									if (_p328._0.ctor === 'VDictElemUpdate') {
 										return A2(
 											_elm_lang$core$Basics_ops['++'],
 											'\n',
@@ -62797,16 +62710,16 @@ var _user$project$UpdateUtils$vDictDiffsToString = F4(
 															A4(
 																_user$project$UpdateUtils$vDiffsToString_,
 																A2(_elm_lang$core$Basics_ops['++'], indent, '  '),
-																_p330._1._0,
-																_p330._2._0,
-																_p330._0._0))))));
+																_p328._1._0,
+																_p328._2._0,
+																_p328._0._0))))));
 									} else {
-										break _v531_3;
+										break _v517_3;
 									}
 								}
 							}
 						} else {
-							break _v531_3;
+							break _v517_3;
 						}
 					} while(false);
 					return A2(
@@ -62869,8 +62782,8 @@ var _user$project$UpdateUtils$vRecordDiffsToString = F4(
 			indent,
 			F5(
 				function (indent, key, maybeOriginal, maybeModified, diff) {
-					var _p331 = {ctor: '_Tuple2', _0: maybeOriginal, _1: maybeModified};
-					if (((_p331.ctor === '_Tuple2') && (_p331._0.ctor === 'Just')) && (_p331._1.ctor === 'Just')) {
+					var _p329 = {ctor: '_Tuple2', _0: maybeOriginal, _1: maybeModified};
+					if (((_p329.ctor === '_Tuple2') && (_p329._0.ctor === 'Just')) && (_p329._1.ctor === 'Just')) {
 						return A2(
 							_elm_lang$core$Basics_ops['++'],
 							'\n',
@@ -62889,8 +62802,8 @@ var _user$project$UpdateUtils$vRecordDiffsToString = F4(
 											A4(
 												_user$project$UpdateUtils$vDiffsToString_,
 												A2(_elm_lang$core$Basics_ops['++'], indent, '  '),
-												_p331._0._0,
-												_p331._1._0,
+												_p329._0._0,
+												_p329._1._0,
 												diff))))));
 					} else {
 						return A2(
@@ -62931,8 +62844,8 @@ var _user$project$UpdateUtils$displayDiff = F2(
 			A2(
 				_elm_lang$core$List$concatMap,
 				function (d) {
-					var _p332 = d;
-					switch (_p332.ctor) {
+					var _p330 = d;
+					switch (_p330.ctor) {
 						case 'DiffEqual':
 							return {ctor: '[]'};
 						case 'DiffRemoved':
@@ -62944,7 +62857,7 @@ var _user$project$UpdateUtils$displayDiff = F2(
 									A2(
 										_elm_lang$core$String$join,
 										'',
-										A2(_elm_lang$core$List$map, tos, _p332._0))),
+										A2(_elm_lang$core$List$map, tos, _p330._0))),
 								_1: {ctor: '[]'}
 							};
 						default:
@@ -62956,7 +62869,7 @@ var _user$project$UpdateUtils$displayDiff = F2(
 									A2(
 										_elm_lang$core$String$join,
 										'',
-										A2(_elm_lang$core$List$map, tos, _p332._0))),
+										A2(_elm_lang$core$List$map, tos, _p330._0))),
 								_1: {ctor: '[]'}
 							};
 					}
@@ -62982,17 +62895,17 @@ var _user$project$UpdateUtils$DiffEqual = function (a) {
 };
 var _user$project$UpdateUtils$diffChunkMap = F2(
 	function (f, d) {
-		var _p333 = d;
-		switch (_p333.ctor) {
+		var _p331 = d;
+		switch (_p331.ctor) {
 			case 'DiffEqual':
 				return _user$project$UpdateUtils$DiffEqual(
-					f(_p333._0));
+					f(_p331._0));
 			case 'DiffRemoved':
 				return _user$project$UpdateUtils$DiffRemoved(
-					f(_p333._0));
+					f(_p331._0));
 			default:
 				return _user$project$UpdateUtils$DiffAdded(
-					f(_p333._0));
+					f(_p331._0));
 		}
 	});
 var _user$project$UpdateUtils$diff = F3(
@@ -63000,22 +62913,22 @@ var _user$project$UpdateUtils$diff = F3(
 		var oldIndexMapRev = A3(
 			_elm_lang$core$List$foldl,
 			F2(
-				function (_p334, d) {
-					var _p335 = _p334;
-					var _p337 = _p335._1;
+				function (_p332, d) {
+					var _p333 = _p332;
+					var _p335 = _p333._1;
 					return A3(
 						_elm_lang$core$Dict$update,
-						keyOf(_p335._0),
+						keyOf(_p333._0),
 						function (mbv) {
-							var _p336 = mbv;
-							if (_p336.ctor === 'Just') {
+							var _p334 = mbv;
+							if (_p334.ctor === 'Just') {
 								return _elm_lang$core$Maybe$Just(
-									{ctor: '::', _0: _p337, _1: _p336._0});
+									{ctor: '::', _0: _p335, _1: _p334._0});
 							} else {
 								return _elm_lang$core$Maybe$Just(
 									{
 										ctor: '::',
-										_0: _p337,
+										_0: _p335,
 										_1: {ctor: '[]'}
 									});
 							}
@@ -63030,41 +62943,41 @@ var _user$project$UpdateUtils$diff = F3(
 				return _elm_lang$core$List$reverse;
 			},
 			oldIndexMapRev);
-		var _p338 = A3(
+		var _p336 = A3(
 			_elm_lang$core$List$foldl,
 			F2(
-				function (_p340, _p339) {
-					var _p341 = _p340;
-					var _p342 = _p339;
+				function (_p338, _p337) {
+					var _p339 = _p338;
+					var _p340 = _p337;
 					var oldIndexMapAfterInew = A2(
 						_elm_lang$core$Maybe$withDefault,
 						{ctor: '[]'},
 						A2(
 							_elm_lang$core$Dict$get,
-							keyOf(_p341._0),
+							keyOf(_p339._0),
 							oldIndexMap));
 					return A3(
 						_elm_lang$core$List$foldl,
 						F2(
-							function (iold, _p343) {
-								var _p344 = _p343;
-								var _p345 = _p344._3;
+							function (iold, _p341) {
+								var _p342 = _p341;
+								var _p343 = _p342._3;
 								var newIoldValue = ((!_elm_lang$core$Native_Utils.eq(iold, 0)) ? A2(
 									_elm_lang$core$Maybe$withDefault,
 									0,
-									A2(_elm_lang$core$Dict$get, iold - 1, _p342._0)) : 0) + 1;
-								var newOverlap_ = A3(_elm_lang$core$Dict$insert, iold, newIoldValue, _p344._0);
-								return (_elm_lang$core$Native_Utils.cmp(newIoldValue, _p345) > 0) ? {ctor: '_Tuple4', _0: newOverlap_, _1: (iold - newIoldValue) + 1, _2: (_p341._1 - newIoldValue) + 1, _3: newIoldValue} : {ctor: '_Tuple4', _0: newOverlap_, _1: _p344._1, _2: _p344._2, _3: _p345};
+									A2(_elm_lang$core$Dict$get, iold - 1, _p340._0)) : 0) + 1;
+								var newOverlap_ = A3(_elm_lang$core$Dict$insert, iold, newIoldValue, _p342._0);
+								return (_elm_lang$core$Native_Utils.cmp(newIoldValue, _p343) > 0) ? {ctor: '_Tuple4', _0: newOverlap_, _1: (iold - newIoldValue) + 1, _2: (_p339._1 - newIoldValue) + 1, _3: newIoldValue} : {ctor: '_Tuple4', _0: newOverlap_, _1: _p342._1, _2: _p342._2, _3: _p343};
 							}),
-						{ctor: '_Tuple4', _0: _elm_lang$core$Dict$empty, _1: _p342._1, _2: _p342._2, _3: _p342._3},
+						{ctor: '_Tuple4', _0: _elm_lang$core$Dict$empty, _1: _p340._1, _2: _p340._2, _3: _p340._3},
 						oldIndexMapAfterInew);
 				}),
 			{ctor: '_Tuple4', _0: _elm_lang$core$Dict$empty, _1: 0, _2: 0, _3: 0},
 			_user$project$Utils$zipWithIndex(after));
-		var overlap = _p338._0;
-		var startOld = _p338._1;
-		var startNew = _p338._2;
-		var subLength = _p338._3;
+		var overlap = _p336._0;
+		var startOld = _p336._1;
+		var startNew = _p336._2;
+		var subLength = _p336._3;
 		return _elm_lang$core$Native_Utils.eq(subLength, 0) ? A2(
 			_elm_lang$core$Basics_ops['++'],
 			_elm_lang$core$List$isEmpty(before) ? {ctor: '[]'} : {
@@ -63129,7 +63042,7 @@ var _user$project$UpdateUtils$diffExpWithPositions = F2(
 	});
 var _user$project$UpdateUtils$diffVals = F2(
 	function (before, after) {
-		var vToString = function (_p346) {
+		var vToString = function (_p344) {
 			return A2(
 				_user$project$Syntax$unparser,
 				_user$project$Syntax$Leo,
@@ -63137,7 +63050,7 @@ var _user$project$UpdateUtils$diffVals = F2(
 					_user$project$LangUtils$valToExp,
 					_user$project$Lang$ws(''),
 					_user$project$LangUtils$InlineSpace,
-					_p346));
+					_p344));
 		};
 		var beforeStrings = A2(
 			_elm_lang$core$List$map,
@@ -63177,7 +63090,7 @@ var _user$project$UpdateUtils$alldiffs = F3(
 					return A3(
 						_elm_lang$core$Dict$update,
 						keyOf(beforeValue),
-						function (_p347) {
+						function (_p345) {
 							return _elm_lang$core$Maybe$Just(
 								function (v) {
 									return {ctor: '::', _0: indexBeforeValue, _1: v};
@@ -63185,7 +63098,7 @@ var _user$project$UpdateUtils$alldiffs = F3(
 									A2(
 										_elm_lang$core$Maybe$withDefault,
 										{ctor: '[]'},
-										_p347)));
+										_p345)));
 						},
 						d);
 				}));
@@ -63198,7 +63111,7 @@ var _user$project$UpdateUtils$alldiffs = F3(
 			oldIndexMapRev);
 		var afterLength = _elm_lang$core$List$length(after);
 		var beforeLength = _elm_lang$core$List$length(before);
-		var _p348 = A3(
+		var _p346 = A3(
 			_user$project$Utils$foldLeftWithIndex,
 			{
 				ctor: '_Tuple4',
@@ -63209,10 +63122,10 @@ var _user$project$UpdateUtils$alldiffs = F3(
 			},
 			after,
 			F3(
-				function (_p349, afterIndex, afterValue) {
-					var _p350 = _p349;
-					var _p357 = _p350._3;
-					var _p356 = _p350._2;
+				function (_p347, afterIndex, afterValue) {
+					var _p348 = _p347;
+					var _p355 = _p348._3;
+					var _p354 = _p348._2;
 					var oldIndicesWhereAfterAppeared = A2(
 						_elm_lang$core$Maybe$withDefault,
 						{ctor: '[]'},
@@ -63222,30 +63135,30 @@ var _user$project$UpdateUtils$alldiffs = F3(
 							valueToIndexBefore));
 					return A3(
 						_user$project$Utils$foldLeft,
-						{ctor: '_Tuple4', _0: _elm_lang$core$Dict$empty, _1: _p350._1, _2: _p356, _3: _p357},
+						{ctor: '_Tuple4', _0: _elm_lang$core$Dict$empty, _1: _p348._1, _2: _p354, _3: _p355},
 						oldIndicesWhereAfterAppeared,
 						F2(
-							function (_p351, oldIdxAfterValue) {
-								var _p352 = _p351;
-								var _p355 = _p352._3;
-								var _p354 = _p352._2;
-								var _p353 = _p352._1;
+							function (_p349, oldIdxAfterValue) {
+								var _p350 = _p349;
+								var _p353 = _p350._3;
+								var _p352 = _p350._2;
+								var _p351 = _p350._1;
 								var newSubLength = (_elm_lang$core$Native_Utils.eq(oldIdxAfterValue, 0) ? 0 : A2(
 									_elm_lang$core$Maybe$withDefault,
 									0,
 									A2(
 										_elm_lang$core$Maybe$map,
 										_elm_lang$core$Tuple$first,
-										A2(_elm_lang$core$Dict$get, oldIdxAfterValue - 1, _p350._0)))) + 1;
+										A2(_elm_lang$core$Dict$get, oldIdxAfterValue - 1, _p348._0)))) + 1;
 								var newWeight = (0 - _elm_lang$core$Basics$abs((afterLength - afterIndex) - (beforeLength - oldIdxAfterValue))) - _elm_lang$core$Basics$abs(afterIndex - oldIdxAfterValue);
 								var newOverlap_ = A3(
 									_elm_lang$core$Dict$insert,
 									oldIdxAfterValue,
 									{ctor: '_Tuple2', _0: newSubLength, _1: newWeight},
-									_p352._0);
+									_p350._0);
 								return (_elm_lang$core$Native_Utils.cmp(
 									A2(_user$project$UpdateUtils$combineLengthWeight, newSubLength, newWeight),
-									A2(_user$project$UpdateUtils$combineLengthWeight, _p354, _p355)) > 0) ? {
+									A2(_user$project$UpdateUtils$combineLengthWeight, _p352, _p353)) > 0) ? {
 									ctor: '_Tuple4',
 									_0: newOverlap_,
 									_1: {
@@ -63257,25 +63170,25 @@ var _user$project$UpdateUtils$alldiffs = F3(
 									_3: newWeight
 								} : ((_elm_lang$core$Native_Utils.eq(
 									A2(_user$project$UpdateUtils$combineLengthWeight, newSubLength, newWeight),
-									A2(_user$project$UpdateUtils$combineLengthWeight, _p354, _p355)) && (_elm_lang$core$Native_Utils.cmp(
-									A2(_user$project$UpdateUtils$combineLengthWeight, _p354, _p355),
-									A2(_user$project$UpdateUtils$combineLengthWeight, _p356, _p357)) > 0)) ? {
+									A2(_user$project$UpdateUtils$combineLengthWeight, _p352, _p353)) && (_elm_lang$core$Native_Utils.cmp(
+									A2(_user$project$UpdateUtils$combineLengthWeight, _p352, _p353),
+									A2(_user$project$UpdateUtils$combineLengthWeight, _p354, _p355)) > 0)) ? {
 									ctor: '_Tuple4',
 									_0: newOverlap_,
 									_1: {
 										ctor: '::',
 										_0: {ctor: '_Tuple2', _0: (oldIdxAfterValue - newSubLength) + 1, _1: (afterIndex - newSubLength) + 1},
-										_1: _p353
+										_1: _p351
 									},
 									_2: newSubLength,
 									_3: newWeight
-								} : {ctor: '_Tuple4', _0: newOverlap_, _1: _p353, _2: _p354, _3: _p355});
+								} : {ctor: '_Tuple4', _0: newOverlap_, _1: _p351, _2: _p352, _3: _p353});
 							}));
 				}));
-		var overlap = _p348._0;
-		var startOldNew = _p348._1;
-		var subLength = _p348._2;
-		var weight = _p348._3;
+		var overlap = _p346._0;
+		var startOldNew = _p346._1;
+		var subLength = _p346._2;
+		var weight = _p346._3;
 		return _elm_lang$core$Native_Utils.eq(subLength, 0) ? _user$project$Results$ok1(
 			A2(
 				_elm_lang$core$Basics_ops['++'],
@@ -63293,20 +63206,20 @@ var _user$project$UpdateUtils$alldiffs = F3(
 			_user$project$Results$andThen,
 			_user$project$Results$oks(
 				_elm_lang$core$List$reverse(startOldNew)),
-			function (_p358) {
-				var _p359 = _p358;
-				var _p361 = _p359._0;
-				var _p360 = _p359._1;
+			function (_p356) {
+				var _p357 = _p356;
+				var _p359 = _p357._0;
+				var _p358 = _p357._1;
 				var left = A3(
 					_user$project$UpdateUtils$alldiffs,
 					keyOf,
-					A2(_elm_lang$core$List$take, _p361, before),
-					A2(_elm_lang$core$List$take, _p360, after));
+					A2(_elm_lang$core$List$take, _p359, before),
+					A2(_elm_lang$core$List$take, _p358, after));
 				var right = A3(
 					_user$project$UpdateUtils$alldiffs,
 					keyOf,
-					A2(_elm_lang$core$List$drop, _p361 + subLength, before),
-					A2(_elm_lang$core$List$drop, _p360 + subLength, after));
+					A2(_elm_lang$core$List$drop, _p359 + subLength, before),
+					A2(_elm_lang$core$List$drop, _p358 + subLength, after));
 				return A3(
 					_elm_lang$core$Basics$flip,
 					_user$project$Results$andThen,
@@ -63326,155 +63239,510 @@ var _user$project$UpdateUtils$alldiffs = F3(
 											A2(
 												_elm_lang$core$List$take,
 												subLength,
-												A2(_elm_lang$core$List$drop, _p360, after))),
+												A2(_elm_lang$core$List$drop, _p358, after))),
 										_1: rightDiffs
 									});
 							});
 					});
 			});
 	});
+var _user$project$UpdateUtils$fixStringDiffs = function (diffChunks) {
+	var _p360 = diffChunks;
+	_v529_3:
+	do {
+		if (_p360.ctor === '::') {
+			if (_p360._1.ctor === '::') {
+				switch (_p360._0.ctor) {
+					case 'DiffAdded':
+						if (_p360._1._0.ctor === 'DiffEqual') {
+							var _p363 = _p360._1._0._0;
+							var _p362 = _p360._0._0;
+							var _p361 = _p360._1._1;
+							return A5(
+								_user$project$UpdateUtils$otherSliceRight,
+								'',
+								_p362,
+								_p363,
+								_p361,
+								A2(
+									_elm_lang$core$List$map,
+									function (res) {
+										return {
+											ctor: '::',
+											_0: _user$project$UpdateUtils$DiffAdded(_p362),
+											_1: res
+										};
+									},
+									_user$project$UpdateUtils$fixStringDiffs(
+										{
+											ctor: '::',
+											_0: _user$project$UpdateUtils$DiffEqual(_p363),
+											_1: _p361
+										})));
+						} else {
+							break _v529_3;
+						}
+					case 'DiffEqual':
+						if (_p360._1._0.ctor === 'DiffAdded') {
+							if ((_p360._1._1.ctor === '::') && (_p360._1._1._0.ctor === 'DiffEqual')) {
+								var _p367 = _p360._1._1._0._0;
+								var _p366 = _p360._1._0._0;
+								var _p365 = _p360._0._0;
+								var _p364 = _p360._1._1._1;
+								return A5(
+									_user$project$UpdateUtils$otherSliceRight,
+									_p365,
+									_p366,
+									_p367,
+									_p364,
+									A5(
+										_user$project$UpdateUtils$otherSliceLeft,
+										_p365,
+										_p366,
+										_p367,
+										_p364,
+										A2(
+											_elm_lang$core$List$map,
+											function (res) {
+												return {
+													ctor: '::',
+													_0: _user$project$UpdateUtils$DiffEqual(_p365),
+													_1: {
+														ctor: '::',
+														_0: _user$project$UpdateUtils$DiffAdded(_p366),
+														_1: res
+													}
+												};
+											},
+											_user$project$UpdateUtils$fixStringDiffs(
+												{
+													ctor: '::',
+													_0: _user$project$UpdateUtils$DiffEqual(_p367),
+													_1: _p364
+												}))));
+							} else {
+								var _p370 = _p360._1._0._0;
+								var _p369 = _p360._0._0;
+								var _p368 = _p360._1._1;
+								return A5(
+									_user$project$UpdateUtils$otherSliceLeft,
+									_p369,
+									_p370,
+									'',
+									_p368,
+									A2(
+										_elm_lang$core$List$map,
+										function (res) {
+											return {
+												ctor: '::',
+												_0: _user$project$UpdateUtils$DiffEqual(_p369),
+												_1: {
+													ctor: '::',
+													_0: _user$project$UpdateUtils$DiffAdded(_p370),
+													_1: res
+												}
+											};
+										},
+										_user$project$UpdateUtils$fixStringDiffs(_p368)));
+							}
+						} else {
+							break _v529_3;
+						}
+					default:
+						break _v529_3;
+				}
+			} else {
+				break _v529_3;
+			}
+		} else {
+			return {
+				ctor: '::',
+				_0: {ctor: '[]'},
+				_1: {ctor: '[]'}
+			};
+		}
+	} while(false);
+	return A2(
+		_elm_lang$core$List$map,
+		F2(
+			function (x, y) {
+				return {ctor: '::', _0: x, _1: y};
+			})(_p360._0),
+		_user$project$UpdateUtils$fixStringDiffs(_p360._1));
+};
+var _user$project$UpdateUtils$otherSliceLeft = F5(
+	function (x, y, z, tail, acc) {
+		var aux = F2(
+			function (i, acc) {
+				aux:
+				while (true) {
+					if ((_elm_lang$core$Native_Utils.cmp(
+						i,
+						_elm_lang$core$String$length(y)) > 0) || (_elm_lang$core$Native_Utils.cmp(
+						i,
+						_elm_lang$core$String$length(x)) > 0)) {
+						return acc;
+					} else {
+						var rx = A2(_elm_lang$core$String$right, i, x);
+						var ry = A2(_elm_lang$core$String$right, i, y);
+						var rx1 = A3(_elm_lang$core$String$slice, 0, 1, rx);
+						if (_elm_lang$core$Native_Utils.eq(rx, ry)) {
+							var newX = A2(
+								_elm_lang$core$String$left,
+								_elm_lang$core$String$length(x) - i,
+								x);
+							var addNewX = _elm_lang$core$Native_Utils.eq(
+								_elm_lang$core$String$length(newX),
+								0) ? _elm_lang$core$Basics$identity : F2(
+								function (x, y) {
+									return {ctor: '::', _0: x, _1: y};
+								})(
+								_user$project$UpdateUtils$DiffEqual(newX));
+							var newY = A2(
+								_elm_lang$core$Basics_ops['++'],
+								rx,
+								A2(
+									_elm_lang$core$String$left,
+									_elm_lang$core$String$length(y) - i,
+									y));
+							var newZ = A2(_elm_lang$core$Basics_ops['++'], rx, z);
+							var newSolutions = A2(
+								_elm_lang$core$List$map,
+								function (res) {
+									return addNewX(
+										{
+											ctor: '::',
+											_0: _user$project$UpdateUtils$DiffAdded(newY),
+											_1: res
+										});
+								},
+								_user$project$UpdateUtils$fixStringDiffs(
+									{
+										ctor: '::',
+										_0: _user$project$UpdateUtils$DiffEqual(newZ),
+										_1: tail
+									}));
+							if (_elm_lang$core$Native_Utils.eq(rx1, '<') || (_elm_lang$core$Native_Utils.eq(rx1, '(') || (_elm_lang$core$Native_Utils.eq(rx1, '[') || _elm_lang$core$Native_Utils.eq(rx1, '{')))) {
+								var _v530 = i + 1,
+									_v531 = A2(_elm_lang$core$Basics_ops['++'], newSolutions, acc);
+								i = _v530;
+								acc = _v531;
+								continue aux;
+							} else {
+								var _v532 = i + 1,
+									_v533 = A2(_elm_lang$core$Basics_ops['++'], acc, newSolutions);
+								i = _v532;
+								acc = _v533;
+								continue aux;
+							}
+						} else {
+							return acc;
+						}
+					}
+				}
+			});
+		return A2(aux, 1, acc);
+	});
+var _user$project$UpdateUtils$otherSliceRight = F5(
+	function (x, y, z, tail, acc) {
+		var aux = F2(
+			function (i, acc) {
+				aux:
+				while (true) {
+					if ((_elm_lang$core$Native_Utils.cmp(
+						i,
+						_elm_lang$core$String$length(y)) > 0) || (_elm_lang$core$Native_Utils.cmp(
+						i,
+						_elm_lang$core$String$length(z)) > 0)) {
+						return acc;
+					} else {
+						var ry = A2(_elm_lang$core$String$left, i, y);
+						var rz = A2(_elm_lang$core$String$left, i, z);
+						var ry1 = A3(
+							_elm_lang$core$String$slice,
+							-1,
+							_elm_lang$core$String$length(ry),
+							ry);
+						if (_elm_lang$core$Native_Utils.eq(ry, rz)) {
+							var newX = A2(_elm_lang$core$Basics_ops['++'], x, ry);
+							var newY = A2(
+								_elm_lang$core$Basics_ops['++'],
+								A2(_elm_lang$core$String$dropLeft, i, y),
+								ry);
+							var newZ = A2(_elm_lang$core$String$dropLeft, i, z);
+							var addNewZ = _elm_lang$core$Native_Utils.eq(
+								_elm_lang$core$String$length(newZ),
+								0) ? _elm_lang$core$Basics$identity : F2(
+								function (x, y) {
+									return {ctor: '::', _0: x, _1: y};
+								})(
+								_user$project$UpdateUtils$DiffEqual(newZ));
+							var newSolutions = A2(
+								_elm_lang$core$List$map,
+								function (res) {
+									return {
+										ctor: '::',
+										_0: _user$project$UpdateUtils$DiffEqual(newX),
+										_1: {
+											ctor: '::',
+											_0: _user$project$UpdateUtils$DiffAdded(newY),
+											_1: res
+										}
+									};
+								},
+								_user$project$UpdateUtils$fixStringDiffs(
+									addNewZ(tail)));
+							if (_elm_lang$core$Native_Utils.eq(ry1, '>') || (_elm_lang$core$Native_Utils.eq(ry1, ')') || (_elm_lang$core$Native_Utils.eq(ry1, ']') || _elm_lang$core$Native_Utils.eq(ry1, '}')))) {
+								var _v534 = i + 1,
+									_v535 = A2(_elm_lang$core$Basics_ops['++'], newSolutions, acc);
+								i = _v534;
+								acc = _v535;
+								continue aux;
+							} else {
+								var _v536 = i + 1,
+									_v537 = A2(_elm_lang$core$Basics_ops['++'], acc, newSolutions);
+								i = _v536;
+								acc = _v537;
+								continue aux;
+							}
+						} else {
+							return acc;
+						}
+					}
+				}
+			});
+		return A2(aux, 1, acc);
+	});
+var _user$project$UpdateUtils$allStringDiffs = F2(
+	function (a, b) {
+		return _user$project$Results$oks(
+			_user$project$UpdateUtils$fixStringDiffs(
+				A2(_user$project$ImpureGoodies$diffString, a, b)));
+	});
+var _user$project$UpdateUtils$defaultStringDiffs = F2(
+	function (before, after) {
+		return _elm_lang$core$Native_Utils.eq(before, after) ? _user$project$Results$ok1(_elm_lang$core$Maybe$Nothing) : A2(
+			_user$project$Results$andThen,
+			function (difference) {
+				var aux = F3(
+					function (i, diffs, revAccDiffs) {
+						aux:
+						while (true) {
+							var _p371 = diffs;
+							if (_p371.ctor === '[]') {
+								var _p372 = _elm_lang$core$List$reverse(revAccDiffs);
+								if (_p372.ctor === '[]') {
+									return _user$project$Results$ok1(_elm_lang$core$Maybe$Nothing);
+								} else {
+									return _user$project$Results$ok1(
+										_elm_lang$core$Maybe$Just(_p372));
+								}
+							} else {
+								switch (_p371._0.ctor) {
+									case 'DiffEqual':
+										var _v540 = i + _elm_lang$core$String$length(_p371._0._0),
+											_v541 = _p371._1,
+											_v542 = revAccDiffs;
+										i = _v540;
+										diffs = _v541;
+										revAccDiffs = _v542;
+										continue aux;
+									case 'DiffRemoved':
+										if ((_p371._1.ctor === '::') && (_p371._1._0.ctor === 'DiffAdded')) {
+											var lengthRemoved = _elm_lang$core$String$length(_p371._0._0);
+											var lengthAdded = _elm_lang$core$String$length(_p371._1._0._0);
+											var _v543 = i + lengthRemoved,
+												_v544 = _p371._1._1,
+												_v545 = {
+												ctor: '::',
+												_0: A3(_user$project$Lang$StringUpdate, i, i + lengthRemoved, lengthAdded),
+												_1: revAccDiffs
+											};
+											i = _v543;
+											diffs = _v544;
+											revAccDiffs = _v545;
+											continue aux;
+										} else {
+											var lengthRemoved = _elm_lang$core$String$length(_p371._0._0);
+											var _v546 = i + lengthRemoved,
+												_v547 = _p371._1,
+												_v548 = {
+												ctor: '::',
+												_0: A3(_user$project$Lang$StringUpdate, i, i + lengthRemoved, 0),
+												_1: revAccDiffs
+											};
+											i = _v546;
+											diffs = _v547;
+											revAccDiffs = _v548;
+											continue aux;
+										}
+									default:
+										var lengthAdded = _elm_lang$core$String$length(_p371._0._0);
+										var _v549 = i,
+											_v550 = _p371._1,
+											_v551 = {
+											ctor: '::',
+											_0: A3(_user$project$Lang$StringUpdate, i, i, lengthAdded),
+											_1: revAccDiffs
+										};
+										i = _v549;
+										diffs = _v550;
+										revAccDiffs = _v551;
+										continue aux;
+								}
+							}
+						}
+					});
+				return A3(
+					aux,
+					0,
+					difference,
+					{ctor: '[]'});
+			},
+			A2(_user$project$UpdateUtils$allStringDiffs, before, after));
+	});
 var _user$project$UpdateUtils$regroupDiffs = function (diffs2) {
 	var assembleDiffs = F3(
 		function (acc, currentModif, thediffs) {
 			assembleDiffs:
 			while (true) {
-				var _p362 = {ctor: '_Tuple2', _0: currentModif, _1: thediffs};
-				_v543_3:
+				var _p373 = {ctor: '_Tuple2', _0: currentModif, _1: thediffs};
+				_v552_3:
 				do {
-					if (_p362._0.ctor === 'Just') {
-						if (_p362._1.ctor === '::') {
-							switch (_p362._0._0.ctor) {
+					if (_p373._0.ctor === 'Just') {
+						if (_p373._1.ctor === '::') {
+							switch (_p373._0._0.ctor) {
 								case 'DiffEqual':
-									if (_p362._1._0.ctor === 'DiffEqual') {
-										var _v544 = acc,
-											_v545 = _elm_lang$core$Maybe$Just(
+									if (_p373._1._0.ctor === 'DiffEqual') {
+										var _v553 = acc,
+											_v554 = _elm_lang$core$Maybe$Just(
 											_user$project$UpdateUtils$DiffEqual(
 												A2(
 													_elm_lang$core$Basics_ops['++'],
-													_p362._0._0._0,
+													_p373._0._0._0,
 													{
 														ctor: '::',
-														_0: _p362._1._0._0,
+														_0: _p373._1._0._0,
 														_1: {ctor: '[]'}
 													}))),
-											_v546 = _p362._1._1;
-										acc = _v544;
-										currentModif = _v545;
-										thediffs = _v546;
+											_v555 = _p373._1._1;
+										acc = _v553;
+										currentModif = _v554;
+										thediffs = _v555;
 										continue assembleDiffs;
 									} else {
-										break _v543_3;
+										break _v552_3;
 									}
 								case 'DiffRemoved':
-									if (_p362._1._0.ctor === 'DiffRemoved') {
-										var _v547 = acc,
-											_v548 = _elm_lang$core$Maybe$Just(
+									if (_p373._1._0.ctor === 'DiffRemoved') {
+										var _v556 = acc,
+											_v557 = _elm_lang$core$Maybe$Just(
 											_user$project$UpdateUtils$DiffRemoved(
 												A2(
 													_elm_lang$core$Basics_ops['++'],
-													_p362._0._0._0,
+													_p373._0._0._0,
 													{
 														ctor: '::',
-														_0: _p362._1._0._0,
+														_0: _p373._1._0._0,
 														_1: {ctor: '[]'}
 													}))),
-											_v549 = _p362._1._1;
-										acc = _v547;
-										currentModif = _v548;
-										thediffs = _v549;
+											_v558 = _p373._1._1;
+										acc = _v556;
+										currentModif = _v557;
+										thediffs = _v558;
 										continue assembleDiffs;
 									} else {
-										break _v543_3;
+										break _v552_3;
 									}
 								default:
-									if (_p362._1._0.ctor === 'DiffAdded') {
-										var _v550 = acc,
-											_v551 = _elm_lang$core$Maybe$Just(
+									if (_p373._1._0.ctor === 'DiffAdded') {
+										var _v559 = acc,
+											_v560 = _elm_lang$core$Maybe$Just(
 											_user$project$UpdateUtils$DiffAdded(
 												A2(
 													_elm_lang$core$Basics_ops['++'],
-													_p362._0._0._0,
+													_p373._0._0._0,
 													{
 														ctor: '::',
-														_0: _p362._1._0._0,
+														_0: _p373._1._0._0,
 														_1: {ctor: '[]'}
 													}))),
-											_v552 = _p362._1._1;
-										acc = _v550;
-										currentModif = _v551;
-										thediffs = _v552;
+											_v561 = _p373._1._1;
+										acc = _v559;
+										currentModif = _v560;
+										thediffs = _v561;
 										continue assembleDiffs;
 									} else {
-										break _v543_3;
+										break _v552_3;
 									}
 							}
 						} else {
-							break _v543_3;
+							break _v552_3;
 						}
 					} else {
-						if (_p362._1.ctor === '[]') {
+						if (_p373._1.ctor === '[]') {
 							return acc;
 						} else {
-							switch (_p362._1._0.ctor) {
+							switch (_p373._1._0.ctor) {
 								case 'DiffEqual':
-									var _v553 = acc,
-										_v554 = _elm_lang$core$Maybe$Just(
+									var _v562 = acc,
+										_v563 = _elm_lang$core$Maybe$Just(
 										_user$project$UpdateUtils$DiffEqual(
 											{
 												ctor: '::',
-												_0: _p362._1._0._0,
+												_0: _p373._1._0._0,
 												_1: {ctor: '[]'}
 											})),
-										_v555 = _p362._1._1;
-									acc = _v553;
-									currentModif = _v554;
-									thediffs = _v555;
+										_v564 = _p373._1._1;
+									acc = _v562;
+									currentModif = _v563;
+									thediffs = _v564;
 									continue assembleDiffs;
 								case 'DiffRemoved':
-									var _v556 = acc,
-										_v557 = _elm_lang$core$Maybe$Just(
+									var _v565 = acc,
+										_v566 = _elm_lang$core$Maybe$Just(
 										_user$project$UpdateUtils$DiffRemoved(
 											{
 												ctor: '::',
-												_0: _p362._1._0._0,
+												_0: _p373._1._0._0,
 												_1: {ctor: '[]'}
 											})),
-										_v558 = _p362._1._1;
-									acc = _v556;
-									currentModif = _v557;
-									thediffs = _v558;
+										_v567 = _p373._1._1;
+									acc = _v565;
+									currentModif = _v566;
+									thediffs = _v567;
 									continue assembleDiffs;
 								default:
-									var _v559 = acc,
-										_v560 = _elm_lang$core$Maybe$Just(
+									var _v568 = acc,
+										_v569 = _elm_lang$core$Maybe$Just(
 										_user$project$UpdateUtils$DiffAdded(
 											{
 												ctor: '::',
-												_0: _p362._1._0._0,
+												_0: _p373._1._0._0,
 												_1: {ctor: '[]'}
 											})),
-										_v561 = _p362._1._1;
-									acc = _v559;
-									currentModif = _v560;
-									thediffs = _v561;
+										_v570 = _p373._1._1;
+									acc = _v568;
+									currentModif = _v569;
+									thediffs = _v570;
 									continue assembleDiffs;
 							}
 						}
 					}
 				} while(false);
-				var _v562 = A2(
+				var _v571 = A2(
 					_elm_lang$core$Basics_ops['++'],
 					acc,
 					{
 						ctor: '::',
-						_0: _p362._0._0,
+						_0: _p373._0._0,
 						_1: {ctor: '[]'}
 					}),
-					_v563 = _elm_lang$core$Maybe$Nothing,
-					_v564 = _p362._1;
-				acc = _v562;
-				currentModif = _v563;
-				thediffs = _v564;
+					_v572 = _elm_lang$core$Maybe$Nothing,
+					_v573 = _p373._1;
+				acc = _v571;
+				currentModif = _v572;
+				thediffs = _v573;
 				continue assembleDiffs;
 			}
 		});
@@ -63500,14 +63768,14 @@ var _user$project$UpdateUtils$alignRecordDatatypes = F4(
 		};
 		var resDataTypeDifferences = A3(
 			_user$project$UpdateUtils$alldiffs,
-			function (_p363) {
-				var _p364 = _p363;
-				return A2(_elm_lang$core$Maybe$withDefault, '', _p364._1);
+			function (_p374) {
+				var _p375 = _p374;
+				return A2(_elm_lang$core$Maybe$withDefault, '', _p375._1);
 			},
 			withDatatypes(removed),
 			withDatatypes(added));
-		var _p365 = resDataTypeDifferences;
-		if (((((_p365.ctor === 'Ok') && (_p365._0.ctor === 'Cons')) && (_p365._0._0.ctor === '::')) && (_p365._0._0._0.ctor === 'DiffEqual')) && (_p365._0._0._1.ctor === '[]')) {
+		var _p376 = resDataTypeDifferences;
+		if (((((_p376.ctor === 'Ok') && (_p376._0.ctor === 'Cons')) && (_p376._0._0.ctor === '::')) && (_p376._0._0._0.ctor === 'DiffEqual')) && (_p376._0._0._1.ctor === '[]')) {
 			return _elm_lang$core$Maybe$Nothing;
 		} else {
 			return _elm_lang$core$Maybe$Just(
@@ -63518,23 +63786,23 @@ var _user$project$UpdateUtils$alignRecordDatatypes = F4(
 							function (diffs, removed, added, revAccDiffs) {
 								aux:
 								while (true) {
-									var _p366 = diffs;
-									if (_p366.ctor === '[]') {
+									var _p377 = diffs;
+									if (_p377.ctor === '[]') {
 										return A2(_user$project$Utils$reverseInsert, revAccDiffs, difftailglobal);
 									} else {
-										switch (_p366._0.ctor) {
+										switch (_p377._0.ctor) {
 											case 'DiffEqual':
-												var count = _elm_lang$core$List$length(_p366._0._0);
-												var _p367 = A2(_user$project$Utils$split, count, removed);
-												var removedTaken = _p367._0;
-												var removedRemaining = _p367._1;
-												var _p368 = A2(_user$project$Utils$split, count, added);
-												var addedTaken = _p368._0;
-												var addedRemaining = _p368._1;
-												var _v568 = _p366._1,
-													_v569 = removedRemaining,
-													_v570 = addedRemaining,
-													_v571 = {
+												var count = _elm_lang$core$List$length(_p377._0._0);
+												var _p378 = A2(_user$project$Utils$split, count, removed);
+												var removedTaken = _p378._0;
+												var removedRemaining = _p378._1;
+												var _p379 = A2(_user$project$Utils$split, count, added);
+												var addedTaken = _p379._0;
+												var addedRemaining = _p379._1;
+												var _v577 = _p377._1,
+													_v578 = removedRemaining,
+													_v579 = addedRemaining,
+													_v580 = {
 													ctor: '::',
 													_0: _user$project$UpdateUtils$DiffEqual(
 														{ctor: '[]'}),
@@ -63548,20 +63816,20 @@ var _user$project$UpdateUtils$alignRecordDatatypes = F4(
 														}
 													}
 												};
-												diffs = _v568;
-												removed = _v569;
-												added = _v570;
-												revAccDiffs = _v571;
+												diffs = _v577;
+												removed = _v578;
+												added = _v579;
+												revAccDiffs = _v580;
 												continue aux;
 											case 'DiffRemoved':
-												var count = _elm_lang$core$List$length(_p366._0._0);
-												var _p369 = A2(_user$project$Utils$split, count, removed);
-												var removedTaken = _p369._0;
-												var removedRemaining = _p369._1;
-												var _v572 = _p366._1,
-													_v573 = removedRemaining,
-													_v574 = added,
-													_v575 = {
+												var count = _elm_lang$core$List$length(_p377._0._0);
+												var _p380 = A2(_user$project$Utils$split, count, removed);
+												var removedTaken = _p380._0;
+												var removedRemaining = _p380._1;
+												var _v581 = _p377._1,
+													_v582 = removedRemaining,
+													_v583 = added,
+													_v584 = {
 													ctor: '::',
 													_0: _user$project$UpdateUtils$DiffEqual(
 														{ctor: '[]'}),
@@ -63571,20 +63839,20 @@ var _user$project$UpdateUtils$alignRecordDatatypes = F4(
 														_1: revAccDiffs
 													}
 												};
-												diffs = _v572;
-												removed = _v573;
-												added = _v574;
-												revAccDiffs = _v575;
+												diffs = _v581;
+												removed = _v582;
+												added = _v583;
+												revAccDiffs = _v584;
 												continue aux;
 											default:
-												var count = _elm_lang$core$List$length(_p366._0._0);
-												var _p370 = A2(_user$project$Utils$split, count, added);
-												var addedTaken = _p370._0;
-												var addedRemaining = _p370._1;
-												var _v576 = _p366._1,
-													_v577 = removed,
-													_v578 = addedRemaining,
-													_v579 = {
+												var count = _elm_lang$core$List$length(_p377._0._0);
+												var _p381 = A2(_user$project$Utils$split, count, added);
+												var addedTaken = _p381._0;
+												var addedRemaining = _p381._1;
+												var _v585 = _p377._1,
+													_v586 = removed,
+													_v587 = addedRemaining,
+													_v588 = {
 													ctor: '::',
 													_0: _user$project$UpdateUtils$DiffEqual(
 														{ctor: '[]'}),
@@ -63594,10 +63862,10 @@ var _user$project$UpdateUtils$alignRecordDatatypes = F4(
 														_1: revAccDiffs
 													}
 												};
-												diffs = _v576;
-												removed = _v577;
-												added = _v578;
-												revAccDiffs = _v579;
+												diffs = _v585;
+												removed = _v586;
+												added = _v587;
+												revAccDiffs = _v588;
 												continue aux;
 										}
 									}
@@ -63622,39 +63890,39 @@ var _user$project$UpdateUtils$defaultListDiffs = F5(
 					function (i, accDiffs, diffs) {
 						aux:
 						while (true) {
-							var _p371 = diffs;
-							if (_p371.ctor === '[]') {
-								var _p372 = _elm_lang$core$List$reverse(accDiffs);
-								if (_p372.ctor === '[]') {
+							var _p382 = diffs;
+							if (_p382.ctor === '[]') {
+								var _p383 = _elm_lang$core$List$reverse(accDiffs);
+								if (_p383.ctor === '[]') {
 									return _user$project$Results$ok1(_elm_lang$core$Maybe$Nothing);
 								} else {
 									return _user$project$Results$ok1(
-										_elm_lang$core$Maybe$Just(_p372));
+										_elm_lang$core$Maybe$Just(_p383));
 								}
 							} else {
-								switch (_p371._0.ctor) {
+								switch (_p382._0.ctor) {
 									case 'DiffEqual':
-										var _v582 = i + _elm_lang$core$List$length(_p371._0._0),
-											_v583 = accDiffs,
-											_v584 = _p371._1;
-										i = _v582;
-										accDiffs = _v583;
-										diffs = _v584;
+										var _v591 = i + _elm_lang$core$List$length(_p382._0._0),
+											_v592 = accDiffs,
+											_v593 = _p382._1;
+										i = _v591;
+										accDiffs = _v592;
+										diffs = _v593;
 										continue aux;
 									case 'DiffRemoved':
-										if ((_p371._1.ctor === '::') && (_p371._1._0.ctor === 'DiffAdded')) {
-											var _p376 = _p371._0._0;
-											var _p375 = _p371._1._1;
-											var _p374 = _p371._1._0._0;
-											var _p373 = A4(_user$project$UpdateUtils$alignRecordDatatypes, datatypeNameOf, _p376, _p374, _p375);
-											if (_p373.ctor === 'Just') {
+										if ((_p382._1.ctor === '::') && (_p382._1._0.ctor === 'DiffAdded')) {
+											var _p387 = _p382._0._0;
+											var _p386 = _p382._1._1;
+											var _p385 = _p382._1._0._0;
+											var _p384 = A4(_user$project$UpdateUtils$alignRecordDatatypes, datatypeNameOf, _p387, _p385, _p386);
+											if (_p384.ctor === 'Just') {
 												return A2(
 													_user$project$Results$andThen,
 													A2(aux, i, accDiffs),
-													_p373._0);
+													_p384._0);
 											} else {
-												var lengthRemoved = _elm_lang$core$List$length(_p376);
-												var lengthAdded = _elm_lang$core$List$length(_p374);
+												var lengthRemoved = _elm_lang$core$List$length(_p387);
+												var lengthAdded = _elm_lang$core$List$length(_p385);
 												var toInsertRes = A4(
 													_elm_lang$core$List$map3,
 													F3(
@@ -63672,8 +63940,8 @@ var _user$project$UpdateUtils$defaultListDiffs = F5(
 																A2(defaultElemModif, r, a));
 														}),
 													A2(_elm_lang$core$List$range, i, (i + lengthAdded) - 1),
-													_p376,
-													_p374);
+													_p387,
+													_p385);
 												return A2(
 													_user$project$Results$andThen,
 													A3(
@@ -63702,13 +63970,13 @@ var _user$project$UpdateUtils$defaultListDiffs = F5(
 															}),
 														i,
 														lengthRemoved,
-														_p375),
+														_p386),
 													_user$project$Results$projOk(toInsertRes));
 											}
 										} else {
-											var removedLength = _elm_lang$core$List$length(_p371._0._0);
-											var _v586 = i + removedLength,
-												_v587 = {
+											var removedLength = _elm_lang$core$List$length(_p382._0._0);
+											var _v595 = i + removedLength,
+												_v596 = {
 												ctor: '::',
 												_0: {
 													ctor: '_Tuple2',
@@ -63717,16 +63985,16 @@ var _user$project$UpdateUtils$defaultListDiffs = F5(
 												},
 												_1: accDiffs
 											},
-												_v588 = _p371._1;
-											i = _v586;
-											accDiffs = _v587;
-											diffs = _v588;
+												_v597 = _p382._1;
+											i = _v595;
+											accDiffs = _v596;
+											diffs = _v597;
 											continue aux;
 										}
 									default:
-										var addedLength = _elm_lang$core$List$length(_p371._0._0);
-										var _v589 = i,
-											_v590 = {
+										var addedLength = _elm_lang$core$List$length(_p382._0._0);
+										var _v598 = i,
+											_v599 = {
 											ctor: '::',
 											_0: {
 												ctor: '_Tuple2',
@@ -63735,10 +64003,10 @@ var _user$project$UpdateUtils$defaultListDiffs = F5(
 											},
 											_1: accDiffs
 										},
-											_v591 = _p371._1;
-										i = _v589;
-										accDiffs = _v590;
-										diffs = _v591;
+											_v600 = _p382._1;
+										i = _v598;
+										accDiffs = _v599;
+										diffs = _v600;
 										continue aux;
 								}
 							}
@@ -63754,56 +64022,56 @@ var _user$project$UpdateUtils$defaultListDiffs = F5(
 	});
 var _user$project$UpdateUtils$defaultEDiffs = F2(
 	function (e1, e2) {
-		var _p377 = {
+		var _p388 = {
 			ctor: '_Tuple2',
 			_0: _user$project$Lang$unwrapExp(e1),
 			_1: _user$project$Lang$unwrapExp(e2)
 		};
-		_v592_4:
+		_v601_4:
 		do {
-			switch (_p377._0.ctor) {
+			switch (_p388._0.ctor) {
 				case 'EConst':
-					if (_p377._1.ctor === 'EConst') {
-						return _elm_lang$core$Native_Utils.eq(_p377._0._1, _p377._1._1) ? _user$project$Results$ok1(_elm_lang$core$Maybe$Nothing) : _user$project$Results$ok1(
+					if (_p388._1.ctor === 'EConst') {
+						return _elm_lang$core$Native_Utils.eq(_p388._0._1, _p388._1._1) ? _user$project$Results$ok1(_elm_lang$core$Maybe$Nothing) : _user$project$Results$ok1(
 							_elm_lang$core$Maybe$Just(
 								_user$project$Lang$EConstDiffs(_user$project$Lang$EAnyDiffs)));
 					} else {
-						break _v592_4;
+						break _v601_4;
 					}
 				case 'EBase':
-					if (_p377._1.ctor === 'EBase') {
-						if ((_p377._0._1.ctor === 'EString') && (_p377._1._1.ctor === 'EString')) {
+					if (_p388._1.ctor === 'EBase') {
+						if ((_p388._0._1.ctor === 'EString') && (_p388._1._1.ctor === 'EString')) {
 							return A2(
 								_user$project$Results$map,
 								_elm_lang$core$Maybe$map(_user$project$Lang$EStringDiffs),
-								A2(_user$project$UpdateUtils$defaultStringDiffs, _p377._0._1._1, _p377._1._1._1));
+								A2(_user$project$UpdateUtils$defaultStringDiffs, _p388._0._1._1, _p388._1._1._1));
 						} else {
-							return _elm_lang$core$Native_Utils.eq(_p377._0._1, _p377._1._1) ? _user$project$Results$ok1(
+							return _elm_lang$core$Native_Utils.eq(_p388._0._1, _p388._1._1) ? _user$project$Results$ok1(
 								_elm_lang$core$Maybe$Just(
 									_user$project$Lang$EConstDiffs(_user$project$Lang$EAnyDiffs))) : _user$project$Results$ok1(_elm_lang$core$Maybe$Nothing);
 						}
 					} else {
-						break _v592_4;
+						break _v601_4;
 					}
 				case 'EList':
-					if (((_p377._0._3.ctor === 'Nothing') && (_p377._1.ctor === 'EList')) && (_p377._1._3.ctor === 'Nothing')) {
+					if (((_p388._0._3.ctor === 'Nothing') && (_p388._1.ctor === 'EList')) && (_p388._1._3.ctor === 'Nothing')) {
 						return A2(
 							_user$project$Results$map,
 							_elm_lang$core$Maybe$map(_user$project$Lang$EListDiffs),
 							A5(
 								_user$project$UpdateUtils$defaultListDiffs,
 								_user$project$Syntax$unparser(_user$project$Syntax$Leo),
-								function (_p378) {
+								function (_p389) {
 									return _elm_lang$core$Maybe$Nothing;
 								},
 								_user$project$UpdateUtils$defaultEDiffs,
-								_user$project$Utils$listValues(_p377._0._1),
-								_user$project$Utils$listValues(_p377._1._1)));
+								_user$project$Utils$listValues(_p388._0._1),
+								_user$project$Utils$listValues(_p388._1._1)));
 					} else {
-						break _v592_4;
+						break _v601_4;
 					}
 				default:
-					break _v592_4;
+					break _v601_4;
 			}
 		} while(false);
 		return A2(
@@ -63818,12 +64086,12 @@ var _user$project$UpdateUtils$defaultEDiffs = F2(
 	});
 var _user$project$UpdateUtils$defaultVDiffsRec = F4(
 	function (testEquality, recurse, original, modified) {
-		var _p379 = {ctor: '_Tuple2', _0: original.v_, _1: modified.v_};
-		_v593_5:
+		var _p390 = {ctor: '_Tuple2', _0: original.v_, _1: modified.v_};
+		_v602_5:
 		do {
-			switch (_p379._0.ctor) {
+			switch (_p390._0.ctor) {
 				case 'VList':
-					if (_p379._1.ctor === 'VList') {
+					if (_p390._1.ctor === 'VList') {
 						return A2(
 							_user$project$Results$map,
 							_elm_lang$core$Maybe$map(_user$project$Lang$VListDiffs),
@@ -63833,51 +64101,51 @@ var _user$project$UpdateUtils$defaultVDiffsRec = F4(
 								function (v) {
 									return A2(
 										_user$project$Utils$maybeOrElseLazy,
-										function (_p380) {
-											var _p381 = _p380;
+										function (_p391) {
+											var _p392 = _p391;
 											return _user$project$Lang$getViewDatatypeName(v);
 										},
 										_user$project$Lang$getDatatypeName(v));
 								},
 								recurse,
-								_p379._0._0,
-								_p379._1._0));
+								_p390._0._0,
+								_p390._1._0));
 					} else {
-						break _v593_5;
+						break _v602_5;
 					}
 				case 'VBase':
-					if (((_p379._0._0.ctor === 'VString') && (_p379._1.ctor === 'VBase')) && (_p379._1._0.ctor === 'VString')) {
+					if (((_p390._0._0.ctor === 'VString') && (_p390._1.ctor === 'VBase')) && (_p390._1._0.ctor === 'VString')) {
 						return A2(
 							_user$project$Results$map,
 							_elm_lang$core$Maybe$map(_user$project$Lang$VStringDiffs),
-							A2(_user$project$UpdateUtils$defaultStringDiffs, _p379._0._0._0, _p379._1._0._0));
+							A2(_user$project$UpdateUtils$defaultStringDiffs, _p390._0._0._0, _p390._1._0._0));
 					} else {
-						break _v593_5;
+						break _v602_5;
 					}
 				case 'VClosure':
-					if (_p379._1.ctor === 'VClosure') {
-						var _p385 = _p379._1._2;
-						var _p384 = _p379._0._2;
+					if (_p390._1.ctor === 'VClosure') {
+						var _p396 = _p390._1._2;
+						var _p395 = _p390._0._2;
 						var ids = A2(
 							_elm_lang$core$Set$union,
 							A2(
 								_elm_lang$core$Set$diff,
-								_user$project$Lang$identifiersSet(_p384),
-								_user$project$Lang$identifiersSetInPats(_p379._0._1)),
+								_user$project$Lang$identifiersSet(_p395),
+								_user$project$Lang$identifiersSetInPats(_p390._0._1)),
 							A2(
 								_elm_lang$core$Set$diff,
-								_user$project$Lang$identifiersSet(_p385),
-								_user$project$Lang$identifiersSetInPats(_p379._1._1)));
+								_user$project$Lang$identifiersSet(_p396),
+								_user$project$Lang$identifiersSetInPats(_p390._1._1)));
 						return A2(
 							_user$project$Results$andThen,
 							function (mbEnvDiff) {
 								return A2(
 									_user$project$Results$map,
 									function (mbEDiff) {
-										var _p382 = mbEnvDiff;
-										if (_p382.ctor === 'Nothing') {
-											var _p383 = mbEDiff;
-											if (_p383.ctor === 'Nothing') {
+										var _p393 = mbEnvDiff;
+										if (_p393.ctor === 'Nothing') {
+											var _p394 = mbEDiff;
+											if (_p394.ctor === 'Nothing') {
 												return _elm_lang$core$Maybe$Nothing;
 											} else {
 												return _elm_lang$core$Maybe$Just(
@@ -63888,56 +64156,56 @@ var _user$project$UpdateUtils$defaultVDiffsRec = F4(
 											}
 										} else {
 											return _elm_lang$core$Maybe$Just(
-												A2(_user$project$Lang$VClosureDiffs, _p382._0, mbEDiff));
+												A2(_user$project$Lang$VClosureDiffs, _p393._0, mbEDiff));
 										}
 									},
-									A2(_user$project$UpdateUtils$defaultEDiffs, _p384, _p385));
+									A2(_user$project$UpdateUtils$defaultEDiffs, _p395, _p396));
 							},
-							A5(_user$project$UpdateUtils$defaultEnvDiffsRec, testEquality, recurse, ids, _p379._0._3, _p379._1._3));
+							A5(_user$project$UpdateUtils$defaultEnvDiffsRec, testEquality, recurse, ids, _p390._0._3, _p390._1._3));
 					} else {
-						break _v593_5;
+						break _v602_5;
 					}
 				case 'VDict':
-					if (_p379._1.ctor === 'VDict') {
-						return A4(_user$project$UpdateUtils$defaultDictDiffs, _user$project$LangUtils$valToString, recurse, _p379._0._0, _p379._1._0);
+					if (_p390._1.ctor === 'VDict') {
+						return A4(_user$project$UpdateUtils$defaultDictDiffs, _user$project$LangUtils$valToString, recurse, _p390._0._0, _p390._1._0);
 					} else {
-						break _v593_5;
+						break _v602_5;
 					}
 				case 'VRecord':
-					if (_p379._1.ctor === 'VRecord') {
-						var _p389 = _p379._0._0;
-						var _p388 = _p379._1._0;
-						var _p386 = {
+					if (_p390._1.ctor === 'VRecord') {
+						var _p400 = _p390._0._0;
+						var _p399 = _p390._1._0;
+						var _p397 = {
 							ctor: '_Tuple2',
-							_0: A2(_elm_lang$core$Dict$get, _user$project$Lang$ctorDataType, _p389),
-							_1: A2(_elm_lang$core$Dict$get, _user$project$Lang$ctorDataType, _p388)
+							_0: A2(_elm_lang$core$Dict$get, _user$project$Lang$ctorDataType, _p400),
+							_1: A2(_elm_lang$core$Dict$get, _user$project$Lang$ctorDataType, _p399)
 						};
-						if (_p386._0.ctor === 'Just') {
-							if (_p386._1.ctor === 'Just') {
-								var _p387 = {ctor: '_Tuple2', _0: _p386._0._0.v_, _1: _p386._1._0.v_};
-								if (((((_p387.ctor === '_Tuple2') && (_p387._0.ctor === 'VBase')) && (_p387._0._0.ctor === 'VString')) && (_p387._1.ctor === 'VBase')) && (_p387._1._0.ctor === 'VString')) {
-									return _elm_lang$core$Native_Utils.eq(_p387._0._0._0, _p387._1._0._0) ? A4(_user$project$UpdateUtils$defaultRecordDiffs, _user$project$LangUtils$valToString, recurse, _p389, _p388) : _user$project$Results$ok1(
+						if (_p397._0.ctor === 'Just') {
+							if (_p397._1.ctor === 'Just') {
+								var _p398 = {ctor: '_Tuple2', _0: _p397._0._0.v_, _1: _p397._1._0.v_};
+								if (((((_p398.ctor === '_Tuple2') && (_p398._0.ctor === 'VBase')) && (_p398._0._0.ctor === 'VString')) && (_p398._1.ctor === 'VBase')) && (_p398._1._0.ctor === 'VString')) {
+									return _elm_lang$core$Native_Utils.eq(_p398._0._0._0, _p398._1._0._0) ? A4(_user$project$UpdateUtils$defaultRecordDiffs, _user$project$LangUtils$valToString, recurse, _p400, _p399) : _user$project$Results$ok1(
 										_elm_lang$core$Maybe$Just(_user$project$Lang$VConstDiffs));
 								} else {
-									return A4(_user$project$UpdateUtils$defaultRecordDiffs, _user$project$LangUtils$valToString, recurse, _p389, _p388);
+									return A4(_user$project$UpdateUtils$defaultRecordDiffs, _user$project$LangUtils$valToString, recurse, _p400, _p399);
 								}
 							} else {
 								return _user$project$Results$ok1(
 									_elm_lang$core$Maybe$Just(_user$project$Lang$VConstDiffs));
 							}
 						} else {
-							if (_p386._1.ctor === 'Just') {
+							if (_p397._1.ctor === 'Just') {
 								return _user$project$Results$ok1(
 									_elm_lang$core$Maybe$Just(_user$project$Lang$VConstDiffs));
 							} else {
-								return A4(_user$project$UpdateUtils$defaultRecordDiffs, _user$project$LangUtils$valToString, recurse, _p389, _p388);
+								return A4(_user$project$UpdateUtils$defaultRecordDiffs, _user$project$LangUtils$valToString, recurse, _p400, _p399);
 							}
 						}
 					} else {
-						break _v593_5;
+						break _v602_5;
 					}
 				default:
-					break _v593_5;
+					break _v602_5;
 			}
 		} while(false);
 		return A2(_user$project$LangUtils$valEqual, original, modified) ? _user$project$Results$ok1(_elm_lang$core$Maybe$Nothing) : _user$project$Results$ok1(
@@ -63950,72 +64218,72 @@ var _user$project$UpdateUtils$defaultEnvDiffsRec = F5(
 				aux:
 				while (true) {
 					if (_elm_lang$core$Set$isEmpty(identsToCompare)) {
-						var _p390 = _elm_lang$core$List$reverse(revEnvDiffs);
-						if (_p390.ctor === '[]') {
+						var _p401 = _elm_lang$core$List$reverse(revEnvDiffs);
+						if (_p401.ctor === '[]') {
 							return _user$project$Results$ok1(_elm_lang$core$Maybe$Nothing);
 						} else {
 							return _user$project$Results$ok1(
-								_elm_lang$core$Maybe$Just(_p390));
+								_elm_lang$core$Maybe$Just(_p401));
 						}
 					} else {
-						var _p391 = {ctor: '_Tuple2', _0: envToCollect1, _1: envToCollect2};
-						_v600_2:
+						var _p402 = {ctor: '_Tuple2', _0: envToCollect1, _1: envToCollect2};
+						_v609_2:
 						do {
-							if (_p391.ctor === '_Tuple2') {
-								if (_p391._0.ctor === '[]') {
-									if (_p391._1.ctor === '[]') {
-										var _p392 = _elm_lang$core$List$reverse(revEnvDiffs);
-										if (_p392.ctor === '[]') {
+							if (_p402.ctor === '_Tuple2') {
+								if (_p402._0.ctor === '[]') {
+									if (_p402._1.ctor === '[]') {
+										var _p403 = _elm_lang$core$List$reverse(revEnvDiffs);
+										if (_p403.ctor === '[]') {
 											return _user$project$Results$ok1(_elm_lang$core$Maybe$Nothing);
 										} else {
 											return _user$project$Results$ok1(
-												_elm_lang$core$Maybe$Just(_p392));
+												_elm_lang$core$Maybe$Just(_p403));
 										}
 									} else {
-										break _v600_2;
+										break _v609_2;
 									}
 								} else {
-									if (((_p391._0._0.ctor === '_Tuple2') && (_p391._1.ctor === '::')) && (_p391._1._0.ctor === '_Tuple2')) {
-										var _p399 = _p391._1._0._1;
-										var _p398 = _p391._0._0._1;
-										var _p397 = _p391._1._0._0;
-										var _p396 = _p391._0._0._0;
-										var _p395 = _p391._1._1;
-										var _p394 = _p391._0._1;
-										if (!_elm_lang$core$Native_Utils.eq(_p396, _p397)) {
+									if (((_p402._0._0.ctor === '_Tuple2') && (_p402._1.ctor === '::')) && (_p402._1._0.ctor === '_Tuple2')) {
+										var _p410 = _p402._1._0._1;
+										var _p409 = _p402._0._0._1;
+										var _p408 = _p402._1._0._0;
+										var _p407 = _p402._0._0._0;
+										var _p406 = _p402._1._1;
+										var _p405 = _p402._0._1;
+										if (!_elm_lang$core$Native_Utils.eq(_p407, _p408)) {
 											return _elm_lang$core$Result$Err(
 												A2(
 													_elm_lang$core$Basics_ops['++'],
 													'trying to compute a diff on unaligned environments ',
 													A2(
 														_elm_lang$core$Basics_ops['++'],
-														_p396,
-														A2(_elm_lang$core$Basics_ops['++'], ',', _p397))));
+														_p407,
+														A2(_elm_lang$core$Basics_ops['++'], ',', _p408))));
 										} else {
-											if (!A2(_elm_lang$core$Set$member, _p396, identsToCompare)) {
-												var _v602 = i + 1,
-													_v603 = identsToCompare,
-													_v604 = revEnvDiffs,
-													_v605 = _p394,
-													_v606 = _p395;
-												i = _v602;
-												identsToCompare = _v603;
-												revEnvDiffs = _v604;
-												envToCollect1 = _v605;
-												envToCollect2 = _v606;
+											if (!A2(_elm_lang$core$Set$member, _p407, identsToCompare)) {
+												var _v611 = i + 1,
+													_v612 = identsToCompare,
+													_v613 = revEnvDiffs,
+													_v614 = _p405,
+													_v615 = _p406;
+												i = _v611;
+												identsToCompare = _v612;
+												revEnvDiffs = _v613;
+												envToCollect1 = _v614;
+												envToCollect2 = _v615;
 												continue aux;
 											} else {
-												if (testEquality && A2(_user$project$UpdateUtils$valEqualDiff, _p398, _p399)) {
-													var _v607 = i + 1,
-														_v608 = A2(_elm_lang$core$Set$remove, _p396, identsToCompare),
-														_v609 = revEnvDiffs,
-														_v610 = _p394,
-														_v611 = _p395;
-													i = _v607;
-													identsToCompare = _v608;
-													revEnvDiffs = _v609;
-													envToCollect1 = _v610;
-													envToCollect2 = _v611;
+												if (testEquality && A2(_user$project$UpdateUtils$valEqualDiff, _p409, _p410)) {
+													var _v616 = i + 1,
+														_v617 = A2(_elm_lang$core$Set$remove, _p407, identsToCompare),
+														_v618 = revEnvDiffs,
+														_v619 = _p405,
+														_v620 = _p406;
+													i = _v616;
+													identsToCompare = _v617;
+													revEnvDiffs = _v618;
+													envToCollect1 = _v619;
+													envToCollect2 = _v620;
 													continue aux;
 												} else {
 													return A2(
@@ -64024,13 +64292,13 @@ var _user$project$UpdateUtils$defaultEnvDiffsRec = F5(
 															F7(
 																function (i, k1, identsToCompare, etl1, etl2, revEnvDiffs, mbv) {
 																	var newRevEnvDiffs = function () {
-																		var _p393 = mbv;
-																		if (_p393.ctor === 'Nothing') {
+																		var _p404 = mbv;
+																		if (_p404.ctor === 'Nothing') {
 																			return revEnvDiffs;
 																		} else {
 																			return {
 																				ctor: '::',
-																				_0: {ctor: '_Tuple2', _0: i, _1: _p393._0},
+																				_0: {ctor: '_Tuple2', _0: i, _1: _p404._0},
 																				_1: revEnvDiffs
 																			};
 																		}
@@ -64044,21 +64312,21 @@ var _user$project$UpdateUtils$defaultEnvDiffsRec = F5(
 																		etl2);
 																}),
 															i,
-															_p396,
+															_p407,
 															identsToCompare,
-															_p394,
-															_p395,
+															_p405,
+															_p406,
 															revEnvDiffs),
-														A2(recurse, _p398, _p399));
+														A2(recurse, _p409, _p410));
 												}
 											}
 										}
 									} else {
-										break _v600_2;
+										break _v609_2;
 									}
 								}
 							} else {
-								break _v600_2;
+								break _v609_2;
 							}
 						} while(false);
 						return _elm_lang$core$Result$Err(
@@ -64085,8 +64353,8 @@ var _user$project$UpdateUtils$defaultEnvDiffsRec = F5(
 	});
 var _user$project$UpdateUtils$valEqualDiff = F2(
 	function (original, modified) {
-		var _p400 = A2(_user$project$UpdateUtils$defaultVDiffs, original, modified);
-		if (((_p400.ctor === 'Ok') && (_p400._0.ctor === 'Cons')) && (_p400._0._0.ctor === 'Nothing')) {
+		var _p411 = A2(_user$project$UpdateUtils$defaultVDiffs, original, modified);
+		if (((_p411.ctor === 'Ok') && (_p411._0.ctor === 'Cons')) && (_p411._0._0.ctor === 'Nothing')) {
 			return true;
 		} else {
 			return false;
@@ -64106,21 +64374,21 @@ var _user$project$UpdateUtils$Diff3Merged = function (a) {
 };
 var _user$project$UpdateUtils$diff3ChunkMap = F2(
 	function (f, d) {
-		var _p401 = d;
-		if (_p401.ctor === 'Diff3Merged') {
+		var _p412 = d;
+		if (_p412.ctor === 'Diff3Merged') {
 			return _user$project$UpdateUtils$Diff3Merged(
-				A2(_user$project$UpdateUtils$diffChunkMap, f, _p401._0));
+				A2(_user$project$UpdateUtils$diffChunkMap, f, _p412._0));
 		} else {
 			return A2(
 				_user$project$UpdateUtils$Diff3Conflict,
 				A2(
 					_elm_lang$core$List$map,
 					_user$project$UpdateUtils$diffChunkMap(f),
-					_p401._0),
+					_p412._0),
 				A2(
 					_elm_lang$core$List$map,
 					_user$project$UpdateUtils$diffChunkMap(f),
-					_p401._1));
+					_p412._1));
 		}
 	});
 var _user$project$UpdateUtils$diff3 = F4(
@@ -64128,34 +64396,34 @@ var _user$project$UpdateUtils$diff3 = F4(
 		var modifs1 = A3(_user$project$UpdateUtils$diff, keyOf, original, update1);
 		var modifs2 = A3(_user$project$UpdateUtils$diff, keyOf, original, update2);
 		var flattenDiff = function (diff) {
-			var _p402 = diff;
-			switch (_p402.ctor) {
+			var _p413 = diff;
+			switch (_p413.ctor) {
 				case 'DiffEqual':
-					return A2(_elm_lang$core$List$map, _user$project$UpdateUtils$DiffEqual, _p402._0);
+					return A2(_elm_lang$core$List$map, _user$project$UpdateUtils$DiffEqual, _p413._0);
 				case 'DiffAdded':
-					return A2(_elm_lang$core$List$map, _user$project$UpdateUtils$DiffAdded, _p402._0);
+					return A2(_elm_lang$core$List$map, _user$project$UpdateUtils$DiffAdded, _p413._0);
 				default:
-					return A2(_elm_lang$core$List$map, _user$project$UpdateUtils$DiffRemoved, _p402._0);
+					return A2(_elm_lang$core$List$map, _user$project$UpdateUtils$DiffRemoved, _p413._0);
 			}
 		};
 		var newKeyOf = function (d) {
-			var _p403 = d;
-			switch (_p403.ctor) {
+			var _p414 = d;
+			switch (_p414.ctor) {
 				case 'DiffEqual':
 					return A2(
 						_elm_lang$core$Basics_ops['++'],
 						'=',
-						keyOf(_p403._0));
+						keyOf(_p414._0));
 				case 'DiffAdded':
 					return A2(
 						_elm_lang$core$Basics_ops['++'],
 						'+',
-						keyOf(_p403._0));
+						keyOf(_p414._0));
 				default:
 					return A2(
 						_elm_lang$core$Basics_ops['++'],
 						'-',
-						keyOf(_p403._0));
+						keyOf(_p414._0));
 			}
 		};
 		var diff1 = A2(_elm_lang$core$List$concatMap, flattenDiff, modifs1);
@@ -64165,52 +64433,52 @@ var _user$project$UpdateUtils$diff3 = F4(
 			function (acc, thediffs) {
 				convertDiffs:
 				while (true) {
-					var _p404 = thediffs;
-					if (_p404.ctor === '[]') {
+					var _p415 = thediffs;
+					if (_p415.ctor === '[]') {
 						return acc;
 					} else {
-						switch (_p404._0.ctor) {
+						switch (_p415._0.ctor) {
 							case 'DiffEqual':
-								var _v618 = A2(
+								var _v627 = A2(
 									_elm_lang$core$Basics_ops['++'],
 									acc,
-									A2(_elm_lang$core$List$map, _user$project$UpdateUtils$Diff3Merged, _p404._0._0)),
-									_v619 = _p404._1;
-								acc = _v618;
-								thediffs = _v619;
+									A2(_elm_lang$core$List$map, _user$project$UpdateUtils$Diff3Merged, _p415._0._0)),
+									_v628 = _p415._1;
+								acc = _v627;
+								thediffs = _v628;
 								continue convertDiffs;
 							case 'DiffRemoved':
-								if ((_p404._1.ctor === '::') && (_p404._1._0.ctor === 'DiffAdded')) {
-									var _v620 = A2(
+								if ((_p415._1.ctor === '::') && (_p415._1._0.ctor === 'DiffAdded')) {
+									var _v629 = A2(
 										_elm_lang$core$Basics_ops['++'],
 										acc,
 										{
 											ctor: '::',
-											_0: A2(_user$project$UpdateUtils$Diff3Conflict, _p404._0._0, _p404._1._0._0),
+											_0: A2(_user$project$UpdateUtils$Diff3Conflict, _p415._0._0, _p415._1._0._0),
 											_1: {ctor: '[]'}
 										}),
-										_v621 = _p404._1._1;
-									acc = _v620;
-									thediffs = _v621;
+										_v630 = _p415._1._1;
+									acc = _v629;
+									thediffs = _v630;
 									continue convertDiffs;
 								} else {
-									var _v622 = A2(
+									var _v631 = A2(
 										_elm_lang$core$Basics_ops['++'],
 										acc,
-										A2(_elm_lang$core$List$map, _user$project$UpdateUtils$Diff3Merged, _p404._0._0)),
-										_v623 = _p404._1;
-									acc = _v622;
-									thediffs = _v623;
+										A2(_elm_lang$core$List$map, _user$project$UpdateUtils$Diff3Merged, _p415._0._0)),
+										_v632 = _p415._1;
+									acc = _v631;
+									thediffs = _v632;
 									continue convertDiffs;
 								}
 							default:
-								var _v624 = A2(
+								var _v633 = A2(
 									_elm_lang$core$Basics_ops['++'],
 									acc,
-									A2(_elm_lang$core$List$map, _user$project$UpdateUtils$Diff3Merged, _p404._0._0)),
-									_v625 = _p404._1;
-								acc = _v624;
-								thediffs = _v625;
+									A2(_elm_lang$core$List$map, _user$project$UpdateUtils$Diff3Merged, _p415._0._0)),
+									_v634 = _p415._1;
+								acc = _v633;
+								thediffs = _v634;
 								continue convertDiffs;
 						}
 					}
@@ -64228,133 +64496,133 @@ var _user$project$UpdateUtils$autodiff3 = F5(
 			function (acc, currentModif, thediffs) {
 				assembleDiffs:
 				while (true) {
-					var _p405 = {ctor: '_Tuple2', _0: currentModif, _1: thediffs};
-					_v626_3:
+					var _p416 = {ctor: '_Tuple2', _0: currentModif, _1: thediffs};
+					_v635_3:
 					do {
-						if (_p405._0.ctor === 'Just') {
-							if ((_p405._1.ctor === '::') && (_p405._1._0.ctor === 'Diff3Merged')) {
-								switch (_p405._0._0.ctor) {
+						if (_p416._0.ctor === 'Just') {
+							if ((_p416._1.ctor === '::') && (_p416._1._0.ctor === 'Diff3Merged')) {
+								switch (_p416._0._0.ctor) {
 									case 'DiffEqual':
-										if (_p405._1._0._0.ctor === 'DiffEqual') {
-											var _v627 = acc,
-												_v628 = _elm_lang$core$Maybe$Just(
-												_user$project$UpdateUtils$DiffEqual(
-													A2(
-														_elm_lang$core$Basics_ops['++'],
-														_p405._0._0._0,
-														{
-															ctor: '::',
-															_0: _p405._1._0._0._0,
-															_1: {ctor: '[]'}
-														}))),
-												_v629 = _p405._1._1;
-											acc = _v627;
-											currentModif = _v628;
-											thediffs = _v629;
-											continue assembleDiffs;
-										} else {
-											break _v626_3;
-										}
-									case 'DiffRemoved':
-										if (_p405._1._0._0.ctor === 'DiffRemoved') {
-											var _v630 = acc,
-												_v631 = _elm_lang$core$Maybe$Just(
-												_user$project$UpdateUtils$DiffRemoved(
-													A2(
-														_elm_lang$core$Basics_ops['++'],
-														_p405._0._0._0,
-														{
-															ctor: '::',
-															_0: _p405._1._0._0._0,
-															_1: {ctor: '[]'}
-														}))),
-												_v632 = _p405._1._1;
-											acc = _v630;
-											currentModif = _v631;
-											thediffs = _v632;
-											continue assembleDiffs;
-										} else {
-											break _v626_3;
-										}
-									default:
-										if (_p405._1._0._0.ctor === 'DiffAdded') {
-											var _v633 = acc,
-												_v634 = _elm_lang$core$Maybe$Just(
-												_user$project$UpdateUtils$DiffAdded(
-													A2(
-														_elm_lang$core$Basics_ops['++'],
-														_p405._0._0._0,
-														{
-															ctor: '::',
-															_0: _p405._1._0._0._0,
-															_1: {ctor: '[]'}
-														}))),
-												_v635 = _p405._1._1;
-											acc = _v633;
-											currentModif = _v634;
-											thediffs = _v635;
-											continue assembleDiffs;
-										} else {
-											break _v626_3;
-										}
-								}
-							} else {
-								break _v626_3;
-							}
-						} else {
-							if (_p405._1.ctor === '[]') {
-								return acc;
-							} else {
-								if (_p405._1._0.ctor === 'Diff3Merged') {
-									switch (_p405._1._0._0.ctor) {
-										case 'DiffEqual':
+										if (_p416._1._0._0.ctor === 'DiffEqual') {
 											var _v636 = acc,
 												_v637 = _elm_lang$core$Maybe$Just(
 												_user$project$UpdateUtils$DiffEqual(
-													{
-														ctor: '::',
-														_0: _p405._1._0._0._0,
-														_1: {ctor: '[]'}
-													})),
-												_v638 = _p405._1._1;
+													A2(
+														_elm_lang$core$Basics_ops['++'],
+														_p416._0._0._0,
+														{
+															ctor: '::',
+															_0: _p416._1._0._0._0,
+															_1: {ctor: '[]'}
+														}))),
+												_v638 = _p416._1._1;
 											acc = _v636;
 											currentModif = _v637;
 											thediffs = _v638;
 											continue assembleDiffs;
-										case 'DiffRemoved':
+										} else {
+											break _v635_3;
+										}
+									case 'DiffRemoved':
+										if (_p416._1._0._0.ctor === 'DiffRemoved') {
 											var _v639 = acc,
 												_v640 = _elm_lang$core$Maybe$Just(
 												_user$project$UpdateUtils$DiffRemoved(
-													{
-														ctor: '::',
-														_0: _p405._1._0._0._0,
-														_1: {ctor: '[]'}
-													})),
-												_v641 = _p405._1._1;
+													A2(
+														_elm_lang$core$Basics_ops['++'],
+														_p416._0._0._0,
+														{
+															ctor: '::',
+															_0: _p416._1._0._0._0,
+															_1: {ctor: '[]'}
+														}))),
+												_v641 = _p416._1._1;
 											acc = _v639;
 											currentModif = _v640;
 											thediffs = _v641;
 											continue assembleDiffs;
-										default:
+										} else {
+											break _v635_3;
+										}
+									default:
+										if (_p416._1._0._0.ctor === 'DiffAdded') {
 											var _v642 = acc,
 												_v643 = _elm_lang$core$Maybe$Just(
 												_user$project$UpdateUtils$DiffAdded(
-													{
-														ctor: '::',
-														_0: _p405._1._0._0._0,
-														_1: {ctor: '[]'}
-													})),
-												_v644 = _p405._1._1;
+													A2(
+														_elm_lang$core$Basics_ops['++'],
+														_p416._0._0._0,
+														{
+															ctor: '::',
+															_0: _p416._1._0._0._0,
+															_1: {ctor: '[]'}
+														}))),
+												_v644 = _p416._1._1;
 											acc = _v642;
 											currentModif = _v643;
 											thediffs = _v644;
 											continue assembleDiffs;
+										} else {
+											break _v635_3;
+										}
+								}
+							} else {
+								break _v635_3;
+							}
+						} else {
+							if (_p416._1.ctor === '[]') {
+								return acc;
+							} else {
+								if (_p416._1._0.ctor === 'Diff3Merged') {
+									switch (_p416._1._0._0.ctor) {
+										case 'DiffEqual':
+											var _v645 = acc,
+												_v646 = _elm_lang$core$Maybe$Just(
+												_user$project$UpdateUtils$DiffEqual(
+													{
+														ctor: '::',
+														_0: _p416._1._0._0._0,
+														_1: {ctor: '[]'}
+													})),
+												_v647 = _p416._1._1;
+											acc = _v645;
+											currentModif = _v646;
+											thediffs = _v647;
+											continue assembleDiffs;
+										case 'DiffRemoved':
+											var _v648 = acc,
+												_v649 = _elm_lang$core$Maybe$Just(
+												_user$project$UpdateUtils$DiffRemoved(
+													{
+														ctor: '::',
+														_0: _p416._1._0._0._0,
+														_1: {ctor: '[]'}
+													})),
+												_v650 = _p416._1._1;
+											acc = _v648;
+											currentModif = _v649;
+											thediffs = _v650;
+											continue assembleDiffs;
+										default:
+											var _v651 = acc,
+												_v652 = _elm_lang$core$Maybe$Just(
+												_user$project$UpdateUtils$DiffAdded(
+													{
+														ctor: '::',
+														_0: _p416._1._0._0._0,
+														_1: {ctor: '[]'}
+													})),
+												_v653 = _p416._1._1;
+											acc = _v651;
+											currentModif = _v652;
+											thediffs = _v653;
+											continue assembleDiffs;
 									}
 								} else {
-									var _p406 = function () {
-										var _p407 = _user$project$Utils$snocUnapply(acc);
-										if (((_p407.ctor === 'Just') && (_p407._0.ctor === '_Tuple2')) && (_p407._0._1.ctor === 'DiffRemoved')) {
-											return {ctor: '_Tuple2', _0: _p407._0._0, _1: _p407._0._1._0};
+									var _p417 = function () {
+										var _p418 = _user$project$Utils$snocUnapply(acc);
+										if (((_p418.ctor === 'Just') && (_p418._0.ctor === '_Tuple2')) && (_p418._0._1.ctor === 'DiffRemoved')) {
+											return {ctor: '_Tuple2', _0: _p418._0._0, _1: _p418._0._1._0};
 										} else {
 											return {
 												ctor: '_Tuple2',
@@ -64363,36 +64631,36 @@ var _user$project$UpdateUtils$autodiff3 = F5(
 											};
 										}
 									}();
-									var accNotRemoved = _p406._0;
-									var accRemoved = _p406._1;
-									var _v646 = A2(
+									var accNotRemoved = _p417._0;
+									var accRemoved = _p417._1;
+									var _v655 = A2(
 										_elm_lang$core$Basics_ops['++'],
 										accNotRemoved,
 										_user$project$UpdateUtils$regroupDiffs(
-											A3(conflictPolicy, accRemoved, _p405._1._0._0, _p405._1._0._1))),
-										_v647 = _elm_lang$core$Maybe$Nothing,
-										_v648 = _p405._1._1;
-									acc = _v646;
-									currentModif = _v647;
-									thediffs = _v648;
+											A3(conflictPolicy, accRemoved, _p416._1._0._0, _p416._1._0._1))),
+										_v656 = _elm_lang$core$Maybe$Nothing,
+										_v657 = _p416._1._1;
+									acc = _v655;
+									currentModif = _v656;
+									thediffs = _v657;
 									continue assembleDiffs;
 								}
 							}
 						}
 					} while(false);
-					var _v649 = A2(
+					var _v658 = A2(
 						_elm_lang$core$Basics_ops['++'],
 						acc,
 						{
 							ctor: '::',
-							_0: _p405._0._0,
+							_0: _p416._0._0,
 							_1: {ctor: '[]'}
 						}),
-						_v650 = _elm_lang$core$Maybe$Nothing,
-						_v651 = _p405._1;
-					acc = _v649;
-					currentModif = _v650;
-					thediffs = _v651;
+						_v659 = _elm_lang$core$Maybe$Nothing,
+						_v660 = _p416._1;
+					acc = _v658;
+					currentModif = _v659;
+					thediffs = _v660;
 					continue assembleDiffs;
 				}
 			});
@@ -64409,108 +64677,108 @@ var _user$project$UpdateUtils$mergeListWithDiffs = F5(
 		};
 		var conflictPolicy = F3(
 			function (previouslyRemoved, ld1, ld2) {
-				var _p408 = {ctor: '_Tuple3', _0: previouslyRemoved, _1: ld1, _2: ld2};
-				_v652_5:
+				var _p419 = {ctor: '_Tuple3', _0: previouslyRemoved, _1: ld1, _2: ld2};
+				_v661_5:
 				do {
-					_v652_4:
+					_v661_4:
 					do {
-						if (_p408._1.ctor === '[]') {
+						if (_p419._1.ctor === '[]') {
 							return A2(
 								_elm_lang$core$Basics_ops['++'],
-								maybeRemoved(_p408._0),
-								_p408._2);
+								maybeRemoved(_p419._0),
+								_p419._2);
 						} else {
-							if (_p408._2.ctor === '[]') {
+							if (_p419._2.ctor === '[]') {
 								return A2(
 									_elm_lang$core$Basics_ops['++'],
-									maybeRemoved(_p408._0),
-									_p408._1);
+									maybeRemoved(_p419._0),
+									_p419._1);
 							} else {
-								switch (_p408._1._0.ctor) {
+								switch (_p419._1._0.ctor) {
 									case 'DiffRemoved':
-										switch (_p408._2._0.ctor) {
+										switch (_p419._2._0.ctor) {
 											case 'DiffRemoved':
 												return A2(
 													_elm_lang$core$Basics_ops['++'],
-													maybeRemoved(_p408._0),
+													maybeRemoved(_p419._0),
 													{
 														ctor: '::',
-														_0: _user$project$UpdateUtils$DiffRemoved(_p408._1._0._0),
+														_0: _user$project$UpdateUtils$DiffRemoved(_p419._1._0._0),
 														_1: A3(
 															conflictPolicy,
 															{ctor: '[]'},
-															_p408._1._1,
-															_p408._2._1)
+															_p419._1._1,
+															_p419._2._1)
 													});
 											case 'DiffEqual':
-												break _v652_4;
+												break _v661_4;
 											default:
-												break _v652_4;
+												break _v661_4;
 										}
 									case 'DiffEqual':
-										switch (_p408._2._0.ctor) {
+										switch (_p419._2._0.ctor) {
 											case 'DiffRemoved':
-												break _v652_5;
+												break _v661_5;
 											case 'DiffEqual':
 												return {
 													ctor: '::',
-													_0: _user$project$UpdateUtils$DiffEqual(_p408._1._0._0),
+													_0: _user$project$UpdateUtils$DiffEqual(_p419._1._0._0),
 													_1: A3(
 														conflictPolicy,
 														{ctor: '[]'},
-														_p408._1._1,
-														_p408._2._1)
+														_p419._1._1,
+														_p419._2._1)
 												};
 											default:
 												return {
 													ctor: '::',
-													_0: _p408._2._0,
+													_0: _p419._2._0,
 													_1: A3(
 														conflictPolicy,
 														{ctor: '[]'},
 														ld1,
-														_p408._2._1)
+														_p419._2._1)
 												};
 										}
 									default:
-										switch (_p408._2._0.ctor) {
+										switch (_p419._2._0.ctor) {
 											case 'DiffRemoved':
-												break _v652_5;
+												break _v661_5;
 											case 'DiffEqual':
 												return {
 													ctor: '::',
-													_0: _p408._1._0,
+													_0: _p419._1._0,
 													_1: A3(
 														conflictPolicy,
 														{ctor: '[]'},
-														_p408._1._1,
+														_p419._1._1,
 														ld2)
 												};
 											default:
-												if (_p408._0.ctor === '::') {
-													var _p409 = _p408._0._0;
+												if (_p419._0.ctor === '::') {
+													var _p420 = _p419._0._0;
 													return {
 														ctor: '::',
-														_0: _user$project$UpdateUtils$DiffRemoved(_p409),
+														_0: _user$project$UpdateUtils$DiffRemoved(_p420),
 														_1: {
 															ctor: '::',
 															_0: _user$project$UpdateUtils$DiffAdded(
-																A3(submerger, _p409, _p408._1._0._0, _p408._2._0._0)),
-															_1: A3(conflictPolicy, _p408._0._1, _p408._1._1, _p408._2._1)
+																A3(submerger, _p420, _p419._1._0._0, _p419._2._0._0)),
+															_1: A3(conflictPolicy, _p419._0._1, _p419._1._1, _p419._2._1)
 														}
 													};
 												} else {
 													return {
 														ctor: '::',
-														_0: _user$project$UpdateUtils$DiffAdded(_p408._1._0._0),
+														_0: _user$project$UpdateUtils$DiffAdded(_p419._1._0._0),
 														_1: {
 															ctor: '::',
-															_0: _user$project$UpdateUtils$DiffAdded(_p408._2._0._0),
+															_0: _user$project$UpdateUtils$DiffAdded(_p419._2._0._0),
 															_1: A3(
 																conflictPolicy,
 																{ctor: '[]'},
-																_p408._1._1,
-																_p408._2._1)
+																_p419._1._1,
+																_p419._2._1)
 														}
 													};
 												}
@@ -64521,27 +64789,27 @@ var _user$project$UpdateUtils$mergeListWithDiffs = F5(
 					} while(false);
 					return A2(
 						_elm_lang$core$Basics_ops['++'],
-						maybeRemoved(_p408._0),
+						maybeRemoved(_p419._0),
 						{
 							ctor: '::',
-							_0: _p408._2._0,
+							_0: _p419._2._0,
 							_1: A3(
 								conflictPolicy,
 								{ctor: '[]'},
 								ld1,
-								_p408._2._1)
+								_p419._2._1)
 						});
 				} while(false);
 				return A2(
 					_elm_lang$core$Basics_ops['++'],
-					maybeRemoved(_p408._0),
+					maybeRemoved(_p419._0),
 					{
 						ctor: '::',
-						_0: _p408._1._0,
+						_0: _p419._1._0,
 						_1: A3(
 							conflictPolicy,
 							{ctor: '[]'},
-							_p408._1._1,
+							_p419._1._1,
 							ld2)
 					});
 			});
@@ -64550,28 +64818,28 @@ var _user$project$UpdateUtils$mergeListWithDiffs = F5(
 			function (acc, thediff) {
 				aux:
 				while (true) {
-					var _p410 = thediff;
-					if (_p410.ctor === '[]') {
+					var _p421 = thediff;
+					if (_p421.ctor === '[]') {
 						return acc;
 					} else {
-						switch (_p410._0.ctor) {
+						switch (_p421._0.ctor) {
 							case 'DiffEqual':
-								var _v654 = A2(_elm_lang$core$Basics_ops['++'], acc, _p410._0._0),
-									_v655 = _p410._1;
-								acc = _v654;
-								thediff = _v655;
+								var _v663 = A2(_elm_lang$core$Basics_ops['++'], acc, _p421._0._0),
+									_v664 = _p421._1;
+								acc = _v663;
+								thediff = _v664;
 								continue aux;
 							case 'DiffRemoved':
-								var _v656 = acc,
-									_v657 = _p410._1;
-								acc = _v656;
-								thediff = _v657;
+								var _v665 = acc,
+									_v666 = _p421._1;
+								acc = _v665;
+								thediff = _v666;
 								continue aux;
 							default:
-								var _v658 = A2(_elm_lang$core$Basics_ops['++'], acc, _p410._0._0),
-									_v659 = _p410._1;
-								acc = _v658;
-								thediff = _v659;
+								var _v667 = A2(_elm_lang$core$Basics_ops['++'], acc, _p421._0._0),
+									_v668 = _p421._1;
+								acc = _v667;
+								thediff = _v668;
 								continue aux;
 						}
 					}
@@ -64616,132 +64884,132 @@ var _user$project$UpdateUtils$DoLeft = F4(
 var _user$project$UpdateUtils$mergeString = F5(
 	function (original, modified1, diffs1, modified2, diffs2) {
 		var aux = F6(
-			function (originalOffset, modified1Offset, modified2Offset, diffs1, diffs2, _p411) {
+			function (originalOffset, modified1Offset, modified2Offset, diffs1, diffs2, _p422) {
 				aux:
 				while (true) {
-					var _p412 = _p411;
-					var _p432 = _p412._0;
-					var _p431 = _p412._1;
-					var _p413 = {ctor: '_Tuple2', _0: diffs1, _1: diffs2};
-					if (((_p413.ctor === '_Tuple2') && (_p413._0.ctor === '[]')) && (_p413._1.ctor === '[]')) {
+					var _p423 = _p422;
+					var _p443 = _p423._0;
+					var _p442 = _p423._1;
+					var _p424 = {ctor: '_Tuple2', _0: diffs1, _1: diffs2};
+					if (((_p424.ctor === '_Tuple2') && (_p424._0.ctor === '[]')) && (_p424._1.ctor === '[]')) {
 						return {
 							ctor: '_Tuple2',
-							_0: _p432,
-							_1: _elm_lang$core$List$reverse(_p431)
+							_0: _p443,
+							_1: _elm_lang$core$List$reverse(_p442)
 						};
 					} else {
 						var mergeWay = function () {
-							var _p414 = {ctor: '_Tuple2', _0: diffs1, _1: diffs2};
-							if (_p414._0.ctor === '[]') {
-								if (_p414._1.ctor === '[]') {
+							var _p425 = {ctor: '_Tuple2', _0: diffs1, _1: diffs2};
+							if (_p425._0.ctor === '[]') {
+								if (_p425._1.ctor === '[]') {
 									return _elm_lang$core$Native_Utils.crashCase(
 										'UpdateUtils',
 										{
-											start: {line: 2070, column: 25},
-											end: {line: 2077, column: 83}
+											start: {line: 2135, column: 25},
+											end: {line: 2142, column: 83}
 										},
-										_p414)('impossible');
+										_p425)('impossible');
 								} else {
-									return A4(_user$project$UpdateUtils$DoRight, _p414._1._0._0, _p414._1._0._1, _p414._1._0._2, _p414._1._1);
+									return A4(_user$project$UpdateUtils$DoRight, _p425._1._0._0, _p425._1._0._1, _p425._1._0._2, _p425._1._1);
 								}
 							} else {
-								if (_p414._1.ctor === '[]') {
-									return A4(_user$project$UpdateUtils$DoLeft, _p414._0._0._0, _p414._0._0._1, _p414._0._0._2, _p414._0._1);
+								if (_p425._1.ctor === '[]') {
+									return A4(_user$project$UpdateUtils$DoLeft, _p425._0._0._0, _p425._0._0._1, _p425._0._0._2, _p425._0._1);
 								} else {
-									var _p423 = _p414._1._1;
-									var _p422 = _p414._0._1;
-									var _p421 = _p414._1._0._0;
-									var _p420 = _p414._0._0._0;
-									var _p419 = _p414._1._0._2;
-									var _p418 = _p414._0._0._2;
-									var _p417 = _p414._1._0._1;
-									var _p416 = _p414._0._0._1;
-									return (_elm_lang$core$Native_Utils.cmp(_p416, _p421) < 1) ? A4(_user$project$UpdateUtils$DoLeft, _p420, _p416, _p418, _p422) : ((_elm_lang$core$Native_Utils.cmp(_p417, _p420) < 1) ? A4(_user$project$UpdateUtils$DoRight, _p421, _p417, _p419, _p423) : A8(_user$project$UpdateUtils$DoMerge, _p420, _p416, _p418, _p422, _p421, _p417, _p419, _p423));
+									var _p434 = _p425._1._1;
+									var _p433 = _p425._0._1;
+									var _p432 = _p425._1._0._0;
+									var _p431 = _p425._0._0._0;
+									var _p430 = _p425._1._0._2;
+									var _p429 = _p425._0._0._2;
+									var _p428 = _p425._1._0._1;
+									var _p427 = _p425._0._0._1;
+									return (_elm_lang$core$Native_Utils.cmp(_p427, _p432) < 1) ? A4(_user$project$UpdateUtils$DoLeft, _p431, _p427, _p429, _p433) : ((_elm_lang$core$Native_Utils.cmp(_p428, _p431) < 1) ? A4(_user$project$UpdateUtils$DoRight, _p432, _p428, _p430, _p434) : A8(_user$project$UpdateUtils$DoMerge, _p431, _p427, _p429, _p433, _p432, _p428, _p430, _p434));
 								}
 							}
 						}();
-						var _p424 = mergeWay;
-						switch (_p424.ctor) {
+						var _p435 = mergeWay;
+						switch (_p435.ctor) {
 							case 'DoLeft':
-								var _p427 = _p424._0;
-								var _p426 = _p424._2;
-								var _p425 = _p424._1;
-								var insertedString = A3(_elm_lang$core$String$slice, _p427 + modified1Offset, (_p427 + modified1Offset) + _p426, modified1);
-								var offsetIncrease1 = _p426 - (_p425 - _p427);
-								var _v664 = originalOffset + offsetIncrease1,
-									_v665 = modified1Offset + offsetIncrease1,
-									_v666 = modified2Offset,
-									_v667 = _p424._3,
-									_v668 = diffs2,
-									_v669 = {
+								var _p438 = _p435._0;
+								var _p437 = _p435._2;
+								var _p436 = _p435._1;
+								var insertedString = A3(_elm_lang$core$String$slice, _p438 + modified1Offset, (_p438 + modified1Offset) + _p437, modified1);
+								var offsetIncrease1 = _p437 - (_p436 - _p438);
+								var _v673 = originalOffset + offsetIncrease1,
+									_v674 = modified1Offset + offsetIncrease1,
+									_v675 = modified2Offset,
+									_v676 = _p435._3,
+									_v677 = diffs2,
+									_v678 = {
 									ctor: '_Tuple2',
 									_0: A2(
 										_elm_lang$core$Basics_ops['++'],
-										A2(_elm_lang$core$String$left, _p427 + originalOffset, _p432),
+										A2(_elm_lang$core$String$left, _p438 + originalOffset, _p443),
 										A2(
 											_elm_lang$core$Basics_ops['++'],
 											insertedString,
-											A2(_elm_lang$core$String$dropLeft, _p425 + originalOffset, _p432))),
+											A2(_elm_lang$core$String$dropLeft, _p436 + originalOffset, _p443))),
 									_1: {
 										ctor: '::',
-										_0: A3(_user$project$Lang$StringUpdate, _p427, _p425, _p426),
-										_1: _p431
+										_0: A3(_user$project$Lang$StringUpdate, _p438, _p436, _p437),
+										_1: _p442
 									}
 								};
-								originalOffset = _v664;
-								modified1Offset = _v665;
-								modified2Offset = _v666;
-								diffs1 = _v667;
-								diffs2 = _v668;
-								_p411 = _v669;
+								originalOffset = _v673;
+								modified1Offset = _v674;
+								modified2Offset = _v675;
+								diffs1 = _v676;
+								diffs2 = _v677;
+								_p422 = _v678;
 								continue aux;
 							case 'DoRight':
-								var _p430 = _p424._0;
-								var _p429 = _p424._2;
-								var _p428 = _p424._1;
-								var insertedString = A3(_elm_lang$core$String$slice, _p430 + modified2Offset, (_p430 + modified2Offset) + _p429, modified2);
-								var offsetIncrease2 = _p429 - (_p428 - _p430);
-								var _v670 = originalOffset + offsetIncrease2,
-									_v671 = modified1Offset,
-									_v672 = modified2Offset + offsetIncrease2,
-									_v673 = diffs1,
-									_v674 = _p424._3,
-									_v675 = {
+								var _p441 = _p435._0;
+								var _p440 = _p435._2;
+								var _p439 = _p435._1;
+								var insertedString = A3(_elm_lang$core$String$slice, _p441 + modified2Offset, (_p441 + modified2Offset) + _p440, modified2);
+								var offsetIncrease2 = _p440 - (_p439 - _p441);
+								var _v679 = originalOffset + offsetIncrease2,
+									_v680 = modified1Offset,
+									_v681 = modified2Offset + offsetIncrease2,
+									_v682 = diffs1,
+									_v683 = _p435._3,
+									_v684 = {
 									ctor: '_Tuple2',
 									_0: A2(
 										_elm_lang$core$Basics_ops['++'],
-										A2(_elm_lang$core$String$left, _p430 + originalOffset, _p432),
+										A2(_elm_lang$core$String$left, _p441 + originalOffset, _p443),
 										A2(
 											_elm_lang$core$Basics_ops['++'],
 											insertedString,
-											A2(_elm_lang$core$String$dropLeft, _p428 + originalOffset, _p432))),
+											A2(_elm_lang$core$String$dropLeft, _p439 + originalOffset, _p443))),
 									_1: {
 										ctor: '::',
-										_0: A3(_user$project$Lang$StringUpdate, _p430, _p428, _p429),
-										_1: _p431
+										_0: A3(_user$project$Lang$StringUpdate, _p441, _p439, _p440),
+										_1: _p442
 									}
 								};
-								originalOffset = _v670;
-								modified1Offset = _v671;
-								modified2Offset = _v672;
-								diffs1 = _v673;
-								diffs2 = _v674;
-								_p411 = _v675;
+								originalOffset = _v679;
+								modified1Offset = _v680;
+								modified2Offset = _v681;
+								diffs1 = _v682;
+								diffs2 = _v683;
+								_p422 = _v684;
 								continue aux;
 							default:
-								var offsetIncrease1 = _p424._2 - (_p424._1 - _p424._0);
-								var _v676 = originalOffset,
-									_v677 = modified1Offset + offsetIncrease1,
-									_v678 = modified2Offset,
-									_v679 = _p424._3,
-									_v680 = diffs2,
-									_v681 = {ctor: '_Tuple2', _0: _p432, _1: _p431};
-								originalOffset = _v676;
-								modified1Offset = _v677;
-								modified2Offset = _v678;
-								diffs1 = _v679;
-								diffs2 = _v680;
-								_p411 = _v681;
+								var offsetIncrease1 = _p435._2 - (_p435._1 - _p435._0);
+								var _v685 = originalOffset,
+									_v686 = modified1Offset + offsetIncrease1,
+									_v687 = modified2Offset,
+									_v688 = _p435._3,
+									_v689 = diffs2,
+									_v690 = {ctor: '_Tuple2', _0: _p443, _1: _p442};
+								originalOffset = _v685;
+								modified1Offset = _v686;
+								modified2Offset = _v687;
+								diffs1 = _v688;
+								diffs2 = _v689;
+								_p422 = _v690;
 								continue aux;
 						}
 					}
@@ -64762,38 +65030,38 @@ var _user$project$UpdateUtils$mergeString = F5(
 	});
 var _user$project$UpdateUtils$mergeExp = F5(
 	function (o, e1, ediff1, e2, ediff2) {
-		var _p433 = {ctor: '_Tuple2', _0: ediff1, _1: ediff2};
-		_v682_6:
+		var _p444 = {ctor: '_Tuple2', _0: ediff1, _1: ediff2};
+		_v691_6:
 		do {
-			_v682_1:
+			_v691_1:
 			do {
-				if (_p433.ctor === '_Tuple2') {
-					switch (_p433._0.ctor) {
+				if (_p444.ctor === '_Tuple2') {
+					switch (_p444._0.ctor) {
 						case 'EConstDiffs':
-							if (_p433._1.ctor === 'EConstDiffs') {
-								if ((_p433._0._0.ctor === 'EAnyDiffs') && (_p433._1._0.ctor === 'EOnlyWhitespaceDiffs')) {
+							if (_p444._1.ctor === 'EConstDiffs') {
+								if ((_p444._0._0.ctor === 'EAnyDiffs') && (_p444._1._0.ctor === 'EOnlyWhitespaceDiffs')) {
 									return {ctor: '_Tuple2', _0: e1, _1: ediff1};
 								} else {
-									break _v682_1;
+									break _v691_1;
 								}
 							} else {
 								return {ctor: '_Tuple2', _0: e2, _1: ediff2};
 							}
 						case 'EStringDiffs':
-							switch (_p433._1.ctor) {
+							switch (_p444._1.ctor) {
 								case 'EConstDiffs':
-									break _v682_1;
+									break _v691_1;
 								case 'EStringDiffs':
-									var _p434 = {
+									var _p445 = {
 										ctor: '_Tuple3',
 										_0: _user$project$Lang$unwrapExp(o),
 										_1: _user$project$Lang$eStrUnapply(e1),
 										_2: _user$project$Lang$eStrUnapply(e2)
 									};
-									if (((((_p434.ctor === '_Tuple3') && (_p434._0.ctor === 'EBase')) && (_p434._0._1.ctor === 'EString')) && (_p434._1.ctor === 'Just')) && (_p434._2.ctor === 'Just')) {
-										var _p435 = A5(_user$project$UpdateUtils$mergeString, _p434._0._1._1, _p434._1._0, _p433._0._0, _p434._2._0, _p433._1._0);
-										var finalStr = _p435._0;
-										var finalDiffs = _p435._1;
+									if (((((_p445.ctor === '_Tuple3') && (_p445._0.ctor === 'EBase')) && (_p445._0._1.ctor === 'EString')) && (_p445._1.ctor === 'Just')) && (_p445._2.ctor === 'Just')) {
+										var _p446 = A5(_user$project$UpdateUtils$mergeString, _p445._0._1._1, _p445._1._0, _p444._0._0, _p445._2._0, _p444._1._0);
+										var finalStr = _p446._0;
+										var finalDiffs = _p446._1;
 										return {
 											ctor: '_Tuple2',
 											_0: A2(
@@ -64801,67 +65069,67 @@ var _user$project$UpdateUtils$mergeExp = F5(
 												o,
 												A2(
 													_user$project$Lang$EBase,
-													_p434._0._0,
-													A2(_user$project$Lang$EString, _p434._0._1._0, finalStr))),
+													_p445._0._0,
+													A2(_user$project$Lang$EString, _p445._0._1._0, finalStr))),
 											_1: _user$project$Lang$EStringDiffs(finalDiffs)
 										};
 									} else {
 										return {ctor: '_Tuple2', _0: e2, _1: ediff2};
 									}
 								default:
-									break _v682_6;
+									break _v691_6;
 							}
 						case 'EListDiffs':
-							switch (_p433._1.ctor) {
+							switch (_p444._1.ctor) {
 								case 'EConstDiffs':
-									break _v682_1;
+									break _v691_1;
 								case 'EListDiffs':
-									var _p436 = {
+									var _p447 = {
 										ctor: '_Tuple3',
 										_0: _user$project$Lang$unwrapExp(o),
 										_1: _user$project$Lang$eListUnapplyWS(e1),
 										_2: _user$project$Lang$eListUnapplyWS(e2)
 									};
-									if (((((_p436.ctor === '_Tuple3') && (_p436._0.ctor === 'EList')) && (_p436._0._3.ctor === 'Nothing')) && (_p436._1.ctor === 'Just')) && (_p436._2.ctor === 'Just')) {
-										var _p437 = A6(
+									if (((((_p447.ctor === '_Tuple3') && (_p447._0.ctor === 'EList')) && (_p447._0._3.ctor === 'Nothing')) && (_p447._1.ctor === 'Just')) && (_p447._2.ctor === 'Just')) {
+										var _p448 = A6(
 											_user$project$UpdateUtils$mergeList,
 											F5(
-												function (_p440, _p439, d1, _p438, d2) {
-													var _p441 = _p440;
-													var _p442 = _p439;
-													var _p443 = _p438;
-													var _p444 = A5(_user$project$UpdateUtils$mergeExp, _p441._1, _p442._1, d1, _p443._1, d2);
-													var finale = _p444._0;
-													var finald = _p444._1;
+												function (_p451, _p450, d1, _p449, d2) {
+													var _p452 = _p451;
+													var _p453 = _p450;
+													var _p454 = _p449;
+													var _p455 = A5(_user$project$UpdateUtils$mergeExp, _p452._1, _p453._1, d1, _p454._1, d2);
+													var finale = _p455._0;
+													var finald = _p455._1;
 													return {
 														ctor: '_Tuple2',
-														_0: {ctor: '_Tuple2', _0: _p441._0, _1: finale},
+														_0: {ctor: '_Tuple2', _0: _p452._0, _1: finale},
 														_1: finald
 													};
 												}),
-											_p436._0._1,
-											_p436._1._0,
-											_p433._0._0,
-											_p436._2._0,
-											_p433._1._0);
-										var finalelems = _p437._0;
-										var finaldiff = _p437._1;
+											_p447._0._1,
+											_p447._1._0,
+											_p444._0._0,
+											_p447._2._0,
+											_p444._1._0);
+										var finalelems = _p448._0;
+										var finaldiff = _p448._1;
 										return {
 											ctor: '_Tuple2',
 											_0: A2(
 												_user$project$Lang$replaceE__,
 												o,
-												A5(_user$project$Lang$EList, _p436._0._0, finalelems, _p436._0._2, _elm_lang$core$Maybe$Nothing, _p436._0._4)),
+												A5(_user$project$Lang$EList, _p447._0._0, finalelems, _p447._0._2, _elm_lang$core$Maybe$Nothing, _p447._0._4)),
 											_1: _user$project$Lang$EListDiffs(finaldiff)
 										};
 									} else {
 										return _elm_lang$core$Native_Utils.crashCase(
 											'UpdateUtils',
 											{
-												start: {line: 2014, column: 7},
-												end: {line: 2022, column: 84}
+												start: {line: 2079, column: 7},
+												end: {line: 2087, column: 84}
 											},
-											_p436)(
+											_p447)(
 											A2(
 												_elm_lang$core$Basics_ops['++'],
 												'unexpected EListDiffs without lists: ',
@@ -64880,33 +65148,33 @@ var _user$project$UpdateUtils$mergeExp = F5(
 																A2(_user$project$Syntax$unparser, _user$project$Syntax$Leo, e2)))))));
 									}
 								default:
-									break _v682_6;
+									break _v691_6;
 							}
 						default:
-							switch (_p433._1.ctor) {
+							switch (_p444._1.ctor) {
 								case 'EConstDiffs':
-									break _v682_1;
+									break _v691_1;
 								case 'EChildDiffs':
-									var _p446 = {
+									var _p457 = {
 										ctor: '_Tuple3',
 										_0: _user$project$Lang$childExpsExtractors(o),
 										_1: _user$project$Lang$childExpsExtractors(e1),
 										_2: _user$project$Lang$childExpsExtractors(e2)
 									};
-									var _p447 = A6(_user$project$UpdateUtils$mergeTuple, _user$project$UpdateUtils$mergeExp, _p446._0._0, _p446._1._0, _p433._0._0, _p446._2._0, _p433._1._0);
-									var finalelems = _p447._0;
-									var finalDiffs = _p447._1;
+									var _p458 = A6(_user$project$UpdateUtils$mergeTuple, _user$project$UpdateUtils$mergeExp, _p457._0._0, _p457._1._0, _p444._0._0, _p457._2._0, _p444._1._0);
+									var finalelems = _p458._0;
+									var finalDiffs = _p458._1;
 									return {
 										ctor: '_Tuple2',
-										_0: _p446._0._1(finalelems),
+										_0: _p457._0._1(finalelems),
 										_1: _user$project$Lang$EChildDiffs(finalDiffs)
 									};
 								default:
-									break _v682_6;
+									break _v691_6;
 							}
 					}
 				} else {
-					break _v682_6;
+					break _v691_6;
 				}
 			} while(false);
 			return {ctor: '_Tuple2', _0: e2, _1: ediff2};
@@ -64915,16 +65183,16 @@ var _user$project$UpdateUtils$mergeExp = F5(
 	});
 var _user$project$UpdateUtils$mergeVal = F5(
 	function (original, modified1, modifs1, modified2, modifs2) {
-		var _p448 = {ctor: '_Tuple5', _0: original.v_, _1: modified1.v_, _2: modifs1, _3: modified2.v_, _4: modifs2};
-		_v689_6:
+		var _p459 = {ctor: '_Tuple5', _0: original.v_, _1: modified1.v_, _2: modifs1, _3: modified2.v_, _4: modifs2};
+		_v698_6:
 		do {
-			if (_p448.ctor === '_Tuple5') {
-				switch (_p448._0.ctor) {
+			if (_p459.ctor === '_Tuple5') {
+				switch (_p459._0.ctor) {
 					case 'VBase':
-						if (((((_p448._0._0.ctor === 'VString') && (_p448._1.ctor === 'VBase')) && (_p448._1._0.ctor === 'VString')) && (_p448._3.ctor === 'VBase')) && (_p448._3._0.ctor === 'VString')) {
-							switch (_p448._2.ctor) {
+						if (((((_p459._0._0.ctor === 'VString') && (_p459._1.ctor === 'VBase')) && (_p459._1._0.ctor === 'VString')) && (_p459._3.ctor === 'VBase')) && (_p459._3._0.ctor === 'VString')) {
+							switch (_p459._2.ctor) {
 								case 'VConstDiffs':
-									if (_p448._4.ctor === 'VConstDiffs') {
+									if (_p459._4.ctor === 'VConstDiffs') {
 										return {
 											ctor: '_Tuple2',
 											_0: A2(
@@ -64932,17 +65200,17 @@ var _user$project$UpdateUtils$mergeVal = F5(
 												original,
 												_user$project$Lang$VBase(
 													_user$project$Lang$VString(
-														A3(_user$project$UpdateUtils$mergeStringHeuristic, _p448._0._0._0, _p448._1._0._0, _p448._3._0._0)))),
+														A3(_user$project$UpdateUtils$mergeStringHeuristic, _p459._0._0._0, _p459._1._0._0, _p459._3._0._0)))),
 											_1: _user$project$Lang$VConstDiffs
 										};
 									} else {
-										break _v689_6;
+										break _v698_6;
 									}
 								case 'VStringDiffs':
-									if (_p448._4.ctor === 'VStringDiffs') {
-										var _p449 = A5(_user$project$UpdateUtils$mergeString, _p448._0._0._0, _p448._1._0._0, _p448._2._0, _p448._3._0._0, _p448._4._0);
-										var newString = _p449._0;
-										var newDiffs = _p449._1;
+									if (_p459._4.ctor === 'VStringDiffs') {
+										var _p460 = A5(_user$project$UpdateUtils$mergeString, _p459._0._0._0, _p459._1._0._0, _p459._2._0, _p459._3._0._0, _p459._4._0);
+										var newString = _p460._0;
+										var newDiffs = _p460._1;
 										return {
 											ctor: '_Tuple2',
 											_0: A2(
@@ -64953,19 +65221,19 @@ var _user$project$UpdateUtils$mergeVal = F5(
 											_1: _user$project$Lang$VStringDiffs(newDiffs)
 										};
 									} else {
-										break _v689_6;
+										break _v698_6;
 									}
 								default:
-									break _v689_6;
+									break _v698_6;
 							}
 						} else {
-							break _v689_6;
+							break _v698_6;
 						}
 					case 'VList':
-						if ((((_p448._1.ctor === 'VList') && (_p448._2.ctor === 'VListDiffs')) && (_p448._3.ctor === 'VList')) && (_p448._4.ctor === 'VListDiffs')) {
-							var _p450 = A6(_user$project$UpdateUtils$mergeList, _user$project$UpdateUtils$mergeVal, _p448._0._0, _p448._1._0, _p448._2._0, _p448._3._0, _p448._4._0);
-							var newList = _p450._0;
-							var newDiffs = _p450._1;
+						if ((((_p459._1.ctor === 'VList') && (_p459._2.ctor === 'VListDiffs')) && (_p459._3.ctor === 'VList')) && (_p459._4.ctor === 'VListDiffs')) {
+							var _p461 = A6(_user$project$UpdateUtils$mergeList, _user$project$UpdateUtils$mergeVal, _p459._0._0, _p459._1._0, _p459._2._0, _p459._3._0, _p459._4._0);
+							var newList = _p461._0;
+							var newDiffs = _p461._1;
 							return {
 								ctor: '_Tuple2',
 								_0: A2(
@@ -64975,13 +65243,13 @@ var _user$project$UpdateUtils$mergeVal = F5(
 								_1: _user$project$Lang$VListDiffs(newDiffs)
 							};
 						} else {
-							break _v689_6;
+							break _v698_6;
 						}
 					case 'VRecord':
-						if ((((_p448._1.ctor === 'VRecord') && (_p448._2.ctor === 'VRecordDiffs')) && (_p448._3.ctor === 'VRecord')) && (_p448._4.ctor === 'VRecordDiffs')) {
-							var _p451 = A6(_user$project$UpdateUtils$mergeRecord, _user$project$UpdateUtils$mergeVal, _p448._0._0, _p448._1._0, _p448._2._0, _p448._3._0, _p448._4._0);
-							var newDict = _p451._0;
-							var newDiffs = _p451._1;
+						if ((((_p459._1.ctor === 'VRecord') && (_p459._2.ctor === 'VRecordDiffs')) && (_p459._3.ctor === 'VRecord')) && (_p459._4.ctor === 'VRecordDiffs')) {
+							var _p462 = A6(_user$project$UpdateUtils$mergeRecord, _user$project$UpdateUtils$mergeVal, _p459._0._0, _p459._1._0, _p459._2._0, _p459._3._0, _p459._4._0);
+							var newDict = _p462._0;
+							var newDiffs = _p462._1;
 							return {
 								ctor: '_Tuple2',
 								_0: A2(
@@ -64991,13 +65259,13 @@ var _user$project$UpdateUtils$mergeVal = F5(
 								_1: _user$project$Lang$VRecordDiffs(newDiffs)
 							};
 						} else {
-							break _v689_6;
+							break _v698_6;
 						}
 					case 'VDict':
-						if ((((_p448._1.ctor === 'VDict') && (_p448._2.ctor === 'VDictDiffs')) && (_p448._3.ctor === 'VDict')) && (_p448._4.ctor === 'VDictDiffs')) {
-							var _p452 = A6(_user$project$UpdateUtils$mergeDict, _user$project$UpdateUtils$mergeVal, _p448._0._0, _p448._1._0, _p448._2._0, _p448._3._0, _p448._4._0);
-							var newDict = _p452._0;
-							var newDiffs = _p452._1;
+						if ((((_p459._1.ctor === 'VDict') && (_p459._2.ctor === 'VDictDiffs')) && (_p459._3.ctor === 'VDict')) && (_p459._4.ctor === 'VDictDiffs')) {
+							var _p463 = A6(_user$project$UpdateUtils$mergeDict, _user$project$UpdateUtils$mergeVal, _p459._0._0, _p459._1._0, _p459._2._0, _p459._3._0, _p459._4._0);
+							var newDict = _p463._0;
+							var newDiffs = _p463._1;
 							return {
 								ctor: '_Tuple2',
 								_0: A2(
@@ -65007,45 +65275,45 @@ var _user$project$UpdateUtils$mergeVal = F5(
 								_1: _user$project$Lang$VDictDiffs(newDiffs)
 							};
 						} else {
-							break _v689_6;
+							break _v698_6;
 						}
 					case 'VClosure':
-						if ((((_p448._1.ctor === 'VClosure') && (_p448._2.ctor === 'VClosureDiffs')) && (_p448._3.ctor === 'VClosure')) && (_p448._4.ctor === 'VClosureDiffs')) {
-							var _p462 = _p448._1._0;
-							var _p461 = _p448._0._0;
-							var _p460 = _p448._0._1;
-							var _p459 = _p448._4._1;
-							var _p458 = _p448._2._1;
-							var _p457 = _p448._3._2;
-							var _p456 = _p448._1._2;
-							if (_elm_lang$core$Native_Utils.eq(_p461, _p462) && _elm_lang$core$Native_Utils.eq(_p462, _p448._3._0)) {
-								if (A3(_user$project$UpdateUtils$patsEqual, _p460, _p448._1._1, _p448._3._1)) {
-									var _p453 = A5(_user$project$UpdateUtils$mergeEnv, _p448._0._3, _p448._1._3, _p448._2._0, _p448._3._3, _p448._4._0);
-									var newEnv = _p453._0;
-									var newEnvDiffs = _p453._1;
-									var _p454 = function () {
-										var _p455 = {ctor: '_Tuple2', _0: _p458, _1: _p459};
-										if (_p455._0.ctor === 'Just') {
-											if (_p455._1.ctor === 'Just') {
+						if ((((_p459._1.ctor === 'VClosure') && (_p459._2.ctor === 'VClosureDiffs')) && (_p459._3.ctor === 'VClosure')) && (_p459._4.ctor === 'VClosureDiffs')) {
+							var _p473 = _p459._1._0;
+							var _p472 = _p459._0._0;
+							var _p471 = _p459._0._1;
+							var _p470 = _p459._4._1;
+							var _p469 = _p459._2._1;
+							var _p468 = _p459._3._2;
+							var _p467 = _p459._1._2;
+							if (_elm_lang$core$Native_Utils.eq(_p472, _p473) && _elm_lang$core$Native_Utils.eq(_p473, _p459._3._0)) {
+								if (A3(_user$project$UpdateUtils$patsEqual, _p471, _p459._1._1, _p459._3._1)) {
+									var _p464 = A5(_user$project$UpdateUtils$mergeEnv, _p459._0._3, _p459._1._3, _p459._2._0, _p459._3._3, _p459._4._0);
+									var newEnv = _p464._0;
+									var newEnvDiffs = _p464._1;
+									var _p465 = function () {
+										var _p466 = {ctor: '_Tuple2', _0: _p469, _1: _p470};
+										if (_p466._0.ctor === 'Just') {
+											if (_p466._1.ctor === 'Just') {
 												return A2(
 													_elm_lang$core$Tuple$mapSecond,
 													_elm_lang$core$Maybe$Just,
-													A5(_user$project$UpdateUtils$mergeExp, _p448._0._2, _p456, _p455._0._0, _p457, _p455._1._0));
+													A5(_user$project$UpdateUtils$mergeExp, _p459._0._2, _p467, _p466._0._0, _p468, _p466._1._0));
 											} else {
-												return {ctor: '_Tuple2', _0: _p456, _1: _p458};
+												return {ctor: '_Tuple2', _0: _p467, _1: _p469};
 											}
 										} else {
-											return {ctor: '_Tuple2', _0: _p457, _1: _p459};
+											return {ctor: '_Tuple2', _0: _p468, _1: _p470};
 										}
 									}();
-									var newBody = _p454._0;
-									var newBodyModifs = _p454._1;
+									var newBody = _p465._0;
+									var newBodyModifs = _p465._1;
 									return {
 										ctor: '_Tuple2',
 										_0: A2(
 											_user$project$Lang$replaceV_,
 											original,
-											A4(_user$project$Lang$VClosure, _p461, _p460, newBody, newEnv)),
+											A4(_user$project$Lang$VClosure, _p472, _p471, newBody, newEnv)),
 										_1: A2(_user$project$Lang$VClosureDiffs, newEnvDiffs, newBodyModifs)
 									};
 								} else {
@@ -65055,13 +65323,13 @@ var _user$project$UpdateUtils$mergeVal = F5(
 								return A5(_user$project$UpdateUtils$defaultMerge, original, modified1, modifs1, modified2, modifs2);
 							}
 						} else {
-							break _v689_6;
+							break _v698_6;
 						}
 					default:
-						break _v689_6;
+						break _v698_6;
 				}
 			} else {
-				break _v689_6;
+				break _v698_6;
 			}
 		} while(false);
 		return A5(_user$project$UpdateUtils$defaultMerge, original, modified1, modifs1, modified2, modifs2);
@@ -65072,12 +65340,12 @@ var _user$project$UpdateUtils$mergeEnv = F5(
 			function (i, accEnv, accDiffs, originalEnv, newEnv2, modifs2, newEnv3, modifs3) {
 				aux:
 				while (true) {
-					var _p463 = {ctor: '_Tuple5', _0: originalEnv, _1: newEnv2, _2: modifs2, _3: newEnv3, _4: modifs3};
-					_v691_4:
+					var _p474 = {ctor: '_Tuple5', _0: originalEnv, _1: newEnv2, _2: modifs2, _3: newEnv3, _4: modifs3};
+					_v700_4:
 					do {
-						if (_p463.ctor === '_Tuple5') {
-							if (_p463._2.ctor === '[]') {
-								if ((((_p463._4.ctor === '[]') && (_p463._0.ctor === '[]')) && (_p463._1.ctor === '[]')) && (_p463._3.ctor === '[]')) {
+						if (_p474.ctor === '_Tuple5') {
+							if (_p474._2.ctor === '[]') {
+								if ((((_p474._4.ctor === '[]') && (_p474._0.ctor === '[]')) && (_p474._1.ctor === '[]')) && (_p474._3.ctor === '[]')) {
 									return {
 										ctor: '_Tuple2',
 										_0: _elm_lang$core$List$reverse(accEnv),
@@ -65097,7 +65365,7 @@ var _user$project$UpdateUtils$mergeEnv = F5(
 									};
 								}
 							} else {
-								if (_p463._4.ctor === '[]') {
+								if (_p474._4.ctor === '[]') {
 									return {
 										ctor: '_Tuple2',
 										_0: A2(
@@ -65110,65 +65378,65 @@ var _user$project$UpdateUtils$mergeEnv = F5(
 											modifs2)
 									};
 								} else {
-									if ((((((((_p463._0.ctor === '::') && (_p463._0._0.ctor === '_Tuple2')) && (_p463._1.ctor === '::')) && (_p463._1._0.ctor === '_Tuple2')) && (_p463._2._0.ctor === '_Tuple2')) && (_p463._3.ctor === '::')) && (_p463._3._0.ctor === '_Tuple2')) && (_p463._4._0.ctor === '_Tuple2')) {
-										var _p480 = _p463._3._0._0;
-										var _p479 = _p463._1._0._0;
-										var _p478 = _p463._0._0._0;
-										var _p477 = _p463._3._0._1;
-										var _p476 = _p463._1._0._1;
-										var _p475 = _p463._0._0._1;
-										var _p474 = _p463._0._1;
-										var _p473 = _p463._3._1;
-										var _p472 = _p463._1._1;
-										var _p471 = _p463._4._0._1;
-										var _p470 = _p463._2._0._1;
-										var _p469 = _p463._4._1;
-										var _p468 = _p463._4._0._0;
-										var _p467 = _p463._2._1;
-										var _p466 = _p463._2._0._0;
-										if ((!_elm_lang$core$Native_Utils.eq(_p478, _p479)) || ((!_elm_lang$core$Native_Utils.eq(_p479, _p480)) || (!_elm_lang$core$Native_Utils.eq(_p478, _p480)))) {
+									if ((((((((_p474._0.ctor === '::') && (_p474._0._0.ctor === '_Tuple2')) && (_p474._1.ctor === '::')) && (_p474._1._0.ctor === '_Tuple2')) && (_p474._2._0.ctor === '_Tuple2')) && (_p474._3.ctor === '::')) && (_p474._3._0.ctor === '_Tuple2')) && (_p474._4._0.ctor === '_Tuple2')) {
+										var _p491 = _p474._3._0._0;
+										var _p490 = _p474._1._0._0;
+										var _p489 = _p474._0._0._0;
+										var _p488 = _p474._3._0._1;
+										var _p487 = _p474._1._0._1;
+										var _p486 = _p474._0._0._1;
+										var _p485 = _p474._0._1;
+										var _p484 = _p474._3._1;
+										var _p483 = _p474._1._1;
+										var _p482 = _p474._4._0._1;
+										var _p481 = _p474._2._0._1;
+										var _p480 = _p474._4._1;
+										var _p479 = _p474._4._0._0;
+										var _p478 = _p474._2._1;
+										var _p477 = _p474._2._0._0;
+										if ((!_elm_lang$core$Native_Utils.eq(_p489, _p490)) || ((!_elm_lang$core$Native_Utils.eq(_p490, _p491)) || (!_elm_lang$core$Native_Utils.eq(_p489, _p491)))) {
 											return _elm_lang$core$Native_Utils.crash(
 												'UpdateUtils',
 												{
-													start: {line: 1840, column: 12},
-													end: {line: 1840, column: 23}
+													start: {line: 1905, column: 12},
+													end: {line: 1905, column: 23}
 												})(
 												A2(
 													_elm_lang$core$Basics_ops['++'],
 													'Expected environments to have the same variables, got\n',
 													A2(
 														_elm_lang$core$Basics_ops['++'],
-														_p478,
+														_p489,
 														A2(
 															_elm_lang$core$Basics_ops['++'],
 															' = ',
 															A2(
 																_elm_lang$core$Basics_ops['++'],
-																_user$project$LangUtils$valToString(_p475),
+																_user$project$LangUtils$valToString(_p486),
 																A2(
 																	_elm_lang$core$Basics_ops['++'],
 																	'\n',
 																	A2(
 																		_elm_lang$core$Basics_ops['++'],
-																		_p479,
+																		_p490,
 																		A2(
 																			_elm_lang$core$Basics_ops['++'],
 																			' = ',
 																			A2(
 																				_elm_lang$core$Basics_ops['++'],
-																				_user$project$LangUtils$valToString(_p476),
+																				_user$project$LangUtils$valToString(_p487),
 																				A2(
 																					_elm_lang$core$Basics_ops['++'],
 																					'\n',
 																					A2(
 																						_elm_lang$core$Basics_ops['++'],
-																						_p480,
+																						_p491,
 																						A2(
 																							_elm_lang$core$Basics_ops['++'],
 																							' = ',
 																							A2(
 																								_elm_lang$core$Basics_ops['++'],
-																								_user$project$LangUtils$valToString(_p477),
+																								_user$project$LangUtils$valToString(_p488),
 																								A2(
 																									_elm_lang$core$Basics_ops['++'],
 																									'\n',
@@ -65237,131 +65505,131 @@ var _user$project$UpdateUtils$mergeEnv = F5(
 																																								'\n',
 																																								_elm_lang$core$Basics$toString(modifs3_))))))))))))))))))))))))))))));
 										} else {
-											if (_elm_lang$core$Native_Utils.eq(_p466, i) && _elm_lang$core$Native_Utils.eq(_p468, i)) {
-												var _p464 = A5(_user$project$UpdateUtils$mergeVal, _p475, _p476, _p470, _p477, _p471);
-												var newVal = _p464._0;
-												var newDiffs = _p464._1;
-												var _v692 = i + 1,
-													_v693 = {
+											if (_elm_lang$core$Native_Utils.eq(_p477, i) && _elm_lang$core$Native_Utils.eq(_p479, i)) {
+												var _p475 = A5(_user$project$UpdateUtils$mergeVal, _p486, _p487, _p481, _p488, _p482);
+												var newVal = _p475._0;
+												var newDiffs = _p475._1;
+												var _v701 = i + 1,
+													_v702 = {
 													ctor: '::',
-													_0: {ctor: '_Tuple2', _0: _p478, _1: newVal},
+													_0: {ctor: '_Tuple2', _0: _p489, _1: newVal},
 													_1: accEnv
 												},
-													_v694 = {
+													_v703 = {
 													ctor: '::',
 													_0: {ctor: '_Tuple2', _0: i, _1: newDiffs},
 													_1: accDiffs
 												},
-													_v695 = _p474,
-													_v696 = _p472,
-													_v697 = _p467,
-													_v698 = _p473,
-													_v699 = _p469;
-												i = _v692;
-												accEnv = _v693;
-												accDiffs = _v694;
-												originalEnv = _v695;
-												newEnv2 = _v696;
-												modifs2 = _v697;
-												newEnv3 = _v698;
-												modifs3 = _v699;
+													_v704 = _p485,
+													_v705 = _p483,
+													_v706 = _p478,
+													_v707 = _p484,
+													_v708 = _p480;
+												i = _v701;
+												accEnv = _v702;
+												accDiffs = _v703;
+												originalEnv = _v704;
+												newEnv2 = _v705;
+												modifs2 = _v706;
+												newEnv3 = _v707;
+												modifs3 = _v708;
 												continue aux;
 											} else {
-												if (_elm_lang$core$Native_Utils.eq(_p466, i)) {
-													var _v700 = i + 1,
-														_v701 = {
+												if (_elm_lang$core$Native_Utils.eq(_p477, i)) {
+													var _v709 = i + 1,
+														_v710 = {
 														ctor: '::',
-														_0: {ctor: '_Tuple2', _0: _p478, _1: _p476},
+														_0: {ctor: '_Tuple2', _0: _p489, _1: _p487},
 														_1: accEnv
 													},
-														_v702 = {
+														_v711 = {
 														ctor: '::',
-														_0: {ctor: '_Tuple2', _0: i, _1: _p470},
+														_0: {ctor: '_Tuple2', _0: i, _1: _p481},
 														_1: accDiffs
 													},
-														_v703 = _p474,
-														_v704 = _p472,
-														_v705 = _p467,
-														_v706 = _p473,
-														_v707 = modifs3;
-													i = _v700;
-													accEnv = _v701;
-													accDiffs = _v702;
-													originalEnv = _v703;
-													newEnv2 = _v704;
-													modifs2 = _v705;
-													newEnv3 = _v706;
-													modifs3 = _v707;
+														_v712 = _p485,
+														_v713 = _p483,
+														_v714 = _p478,
+														_v715 = _p484,
+														_v716 = modifs3;
+													i = _v709;
+													accEnv = _v710;
+													accDiffs = _v711;
+													originalEnv = _v712;
+													newEnv2 = _v713;
+													modifs2 = _v714;
+													newEnv3 = _v715;
+													modifs3 = _v716;
 													continue aux;
 												} else {
-													if (_elm_lang$core$Native_Utils.eq(_p468, i)) {
-														var _v708 = i + 1,
-															_v709 = {
+													if (_elm_lang$core$Native_Utils.eq(_p479, i)) {
+														var _v717 = i + 1,
+															_v718 = {
 															ctor: '::',
-															_0: {ctor: '_Tuple2', _0: _p478, _1: _p477},
+															_0: {ctor: '_Tuple2', _0: _p489, _1: _p488},
 															_1: accEnv
 														},
-															_v710 = {
+															_v719 = {
 															ctor: '::',
-															_0: {ctor: '_Tuple2', _0: i, _1: _p471},
+															_0: {ctor: '_Tuple2', _0: i, _1: _p482},
 															_1: accDiffs
 														},
-															_v711 = _p474,
-															_v712 = _p472,
-															_v713 = modifs2,
-															_v714 = _p473,
-															_v715 = _p469;
-														i = _v708;
-														accEnv = _v709;
-														accDiffs = _v710;
-														originalEnv = _v711;
-														newEnv2 = _v712;
-														modifs2 = _v713;
-														newEnv3 = _v714;
-														modifs3 = _v715;
+															_v720 = _p485,
+															_v721 = _p483,
+															_v722 = modifs2,
+															_v723 = _p484,
+															_v724 = _p480;
+														i = _v717;
+														accEnv = _v718;
+														accDiffs = _v719;
+														originalEnv = _v720;
+														newEnv2 = _v721;
+														modifs2 = _v722;
+														newEnv3 = _v723;
+														modifs3 = _v724;
 														continue aux;
 													} else {
-														var countToIgnore = A2(_elm_lang$core$Basics$min, _p468 - i, _p466 - i);
-														var _p465 = A2(_user$project$Utils$split, countToIgnore, originalEnv);
-														var toInsert = _p465._0;
-														var toRemain = _p465._1;
-														var _v716 = i + countToIgnore,
-															_v717 = A2(_user$project$Utils$reverseInsert, toInsert, accEnv),
-															_v718 = accDiffs,
-															_v719 = toRemain,
-															_v720 = A2(_elm_lang$core$List$drop, countToIgnore, newEnv2),
-															_v721 = modifs2,
-															_v722 = A2(_elm_lang$core$List$drop, countToIgnore, newEnv3),
-															_v723 = modifs3;
-														i = _v716;
-														accEnv = _v717;
-														accDiffs = _v718;
-														originalEnv = _v719;
-														newEnv2 = _v720;
-														modifs2 = _v721;
-														newEnv3 = _v722;
-														modifs3 = _v723;
+														var countToIgnore = A2(_elm_lang$core$Basics$min, _p479 - i, _p477 - i);
+														var _p476 = A2(_user$project$Utils$split, countToIgnore, originalEnv);
+														var toInsert = _p476._0;
+														var toRemain = _p476._1;
+														var _v725 = i + countToIgnore,
+															_v726 = A2(_user$project$Utils$reverseInsert, toInsert, accEnv),
+															_v727 = accDiffs,
+															_v728 = toRemain,
+															_v729 = A2(_elm_lang$core$List$drop, countToIgnore, newEnv2),
+															_v730 = modifs2,
+															_v731 = A2(_elm_lang$core$List$drop, countToIgnore, newEnv3),
+															_v732 = modifs3;
+														i = _v725;
+														accEnv = _v726;
+														accDiffs = _v727;
+														originalEnv = _v728;
+														newEnv2 = _v729;
+														modifs2 = _v730;
+														newEnv3 = _v731;
+														modifs3 = _v732;
 														continue aux;
 													}
 												}
 											}
 										}
 									} else {
-										break _v691_4;
+										break _v700_4;
 									}
 								}
 							}
 						} else {
-							break _v691_4;
+							break _v700_4;
 						}
 					} while(false);
 					return _elm_lang$core$Native_Utils.crashCase(
 						'UpdateUtils',
 						{
-							start: {line: 1834, column: 5},
-							end: {line: 1862, column: 110}
+							start: {line: 1899, column: 5},
+							end: {line: 1927, column: 110}
 						},
-						_p463)(
+						_p474)(
 						A2(
 							_elm_lang$core$Basics_ops['++'],
 							'Expected environments to have the same size, got\n',
@@ -65417,37 +65685,37 @@ var _user$project$UpdateUtils$recursiveMergeVal = F2(
 			original,
 			A2(
 				_elm_lang$core$List$filterMap,
-				function (_p482) {
-					var _p483 = _p482;
+				function (_p493) {
+					var _p494 = _p493;
 					return A2(
 						_elm_lang$core$Maybe$map,
 						F2(
 							function (v0, v1) {
 								return {ctor: '_Tuple2', _0: v0, _1: v1};
-							})(_p483._0),
-						_p483._1);
+							})(_p494._0),
+						_p494._1);
 				},
 				modifications));
 	});
 var _user$project$UpdateUtils$mergeValMaybe = F5(
 	function (original, modified1, modifs1, modified2, modifs2) {
-		var _p484 = modifs1;
-		if (_p484.ctor === 'Nothing') {
+		var _p495 = modifs1;
+		if (_p495.ctor === 'Nothing') {
 			return {ctor: '_Tuple2', _0: modified2, _1: modifs2};
 		} else {
-			var _p485 = modifs2;
-			if (_p485.ctor === 'Nothing') {
+			var _p496 = modifs2;
+			if (_p496.ctor === 'Nothing') {
 				return {ctor: '_Tuple2', _0: modified1, _1: modifs1};
 			} else {
-				return function (_p486) {
-					var _p487 = _p486;
+				return function (_p497) {
+					var _p498 = _p497;
 					return {
 						ctor: '_Tuple2',
-						_0: _p487._0,
-						_1: _elm_lang$core$Maybe$Just(_p487._1)
+						_0: _p498._0,
+						_1: _elm_lang$core$Maybe$Just(_p498._1)
 					};
 				}(
-					A5(_user$project$UpdateUtils$mergeVal, original, modified1, _p484._0, modified2, _p485._0));
+					A5(_user$project$UpdateUtils$mergeVal, original, modified1, _p495._0, modified2, _p496._0));
 			}
 		}
 	});
