@@ -54769,10 +54769,17 @@ var _user$project$LangUtils$valToExpFull = F4(
 			_elm_lang$core$Maybe$withDefault,
 			sp_,
 			A2(
-				_elm_lang$core$Maybe$map,
-				function (_p20) {
-					return _user$project$Lang$ws(
-						_user$project$Lang$precedingWhitespace(_p20));
+				_elm_lang$core$Maybe$andThen,
+				function (e) {
+					var _p20 = _user$project$Lang$unwrapExp(e);
+					if (_p20.ctor === 'EApp') {
+						return _elm_lang$core$Maybe$Just(
+							_user$project$Lang$ws(''));
+					} else {
+						return _elm_lang$core$Maybe$Just(
+							_user$project$Lang$ws(
+								_user$project$Lang$precedingWhitespace(e)));
+					}
 				},
 				copyFrom));
 		return _user$project$Lang$withDummyExpInfo(
@@ -55206,8 +55213,8 @@ var _user$project$LangUtils$valToExpFull = F4(
 										return _elm_lang$core$Native_Utils.crashCase(
 											'LangUtils',
 											{
-												start: {line: 192, column: 17},
-												end: {line: 198, column: 129}
+												start: {line: 195, column: 17},
+												end: {line: 201, column: 129}
 											},
 											_p50)('cannot convert back a VCLosure with multiple defs to an ELet. Need syntax support for that.');
 									}
@@ -55508,7 +55515,7 @@ var _user$project$LangUtils$dictKeyToVal = F2(
 var _user$project$LangUtils$simpleExpToVal = F2(
 	function (syntax, e) {
 		var _p81 = _user$project$Lang$unwrapExp(e);
-		_v50_7:
+		_v51_7:
 		do {
 			switch (_p81.ctor) {
 				case 'EConst':
@@ -55559,7 +55566,7 @@ var _user$project$LangUtils$simpleExpToVal = F2(
 									_user$project$LangUtils$simpleExpToVal(syntax),
 									_user$project$Utils$listValues(_p81._1))));
 					} else {
-						break _v50_7;
+						break _v51_7;
 					}
 				case 'ERecord':
 					if (_p81._1.ctor === 'Nothing') {
@@ -55594,7 +55601,7 @@ var _user$project$LangUtils$simpleExpToVal = F2(
 								'Record is not simple enough not to be computed',
 								_user$project$Lang$recordEntriesFromDeclarations(_p81._2)));
 					} else {
-						break _v50_7;
+						break _v51_7;
 					}
 				case 'EOp':
 					if ((_p81._3.ctor === '::') && (_p81._3._1.ctor === '[]')) {
@@ -55648,10 +55655,10 @@ var _user$project$LangUtils$simpleExpToVal = F2(
 									_elm_lang$core$Basics$toString(e)));
 						}
 					} else {
-						break _v50_7;
+						break _v51_7;
 					}
 				default:
-					break _v50_7;
+					break _v51_7;
 			}
 		} while(false);
 		return _elm_lang$core$Result$Err(
@@ -57784,8 +57791,8 @@ var _user$project$UpdateUtils$mergeDict = F6(
 										return _elm_lang$core$Native_Utils.crashCase(
 											'UpdateUtils',
 											{
-												start: {line: 2284, column: 11},
-												end: {line: 2295, column: 169}
+												start: {line: 2296, column: 11},
+												end: {line: 2307, column: 169}
 											},
 											_p32)(
 											A2(
@@ -57811,8 +57818,8 @@ var _user$project$UpdateUtils$mergeDict = F6(
 										return _elm_lang$core$Native_Utils.crashCase(
 											'UpdateUtils',
 											{
-												start: {line: 2284, column: 11},
-												end: {line: 2295, column: 169}
+												start: {line: 2296, column: 11},
+												end: {line: 2307, column: 169}
 											},
 											_p32)(
 											A2(
@@ -57919,8 +57926,8 @@ var _user$project$UpdateUtils$mergeList = function (submerger) {
 								return _elm_lang$core$Native_Utils.crash(
 									'UpdateUtils',
 									{
-										start: {line: 2180, column: 14},
-										end: {line: 2180, column: 25}
+										start: {line: 2192, column: 14},
+										end: {line: 2192, column: 25}
 									})(
 									A2(
 										_elm_lang$core$Basics_ops['++'],
@@ -57972,8 +57979,8 @@ var _user$project$UpdateUtils$mergeList = function (submerger) {
 									return _elm_lang$core$Native_Utils.crashCase(
 										'UpdateUtils',
 										{
-											start: {line: 2182, column: 14},
-											end: {line: 2187, column: 111}
+											start: {line: 2194, column: 14},
+											end: {line: 2199, column: 111}
 										},
 										_p46)(
 										A2(
@@ -58103,8 +58110,8 @@ var _user$project$UpdateUtils$mergeList = function (submerger) {
 														return _elm_lang$core$Native_Utils.crashCase(
 															'UpdateUtils',
 															{
-																start: {line: 2192, column: 19},
-																end: {line: 2196, column: 96}
+																start: {line: 2204, column: 19},
+																end: {line: 2208, column: 96}
 															},
 															_p57)('Expected non-empty modifications since they were updates');
 													}
@@ -58142,8 +58149,8 @@ var _user$project$UpdateUtils$mergeList = function (submerger) {
 															return _elm_lang$core$Native_Utils.crash(
 																'UpdateUtils',
 																{
-																	start: {line: 2220, column: 44},
-																	end: {line: 2220, column: 55}
+																	start: {line: 2232, column: 44},
+																	end: {line: 2232, column: 55}
 																})('Unexpected 0 here');
 														} else {
 															var _v59 = i,
@@ -58310,8 +58317,8 @@ var _user$project$UpdateUtils$mergeList = function (submerger) {
 															return _elm_lang$core$Native_Utils.crash(
 																'UpdateUtils',
 																{
-																	start: {line: 2227, column: 44},
-																	end: {line: 2227, column: 55}
+																	start: {line: 2239, column: 44},
+																	end: {line: 2239, column: 55}
 																})('Unexpected 0 here');
 														} else {
 															var _v94 = i,
@@ -58498,8 +58505,8 @@ var _user$project$UpdateUtils$mergeList = function (submerger) {
 												return _elm_lang$core$Native_Utils.crashCase(
 													'UpdateUtils',
 													{
-														start: {line: 2244, column: 19},
-														end: {line: 2247, column: 86}
+														start: {line: 2256, column: 19},
+														end: {line: 2259, column: 86}
 													},
 													_p73)('empty modified although it said it was updated');
 											}
@@ -58626,8 +58633,8 @@ var _user$project$UpdateUtils$mergeList = function (submerger) {
 													return _elm_lang$core$Native_Utils.crashCase(
 														'UpdateUtils',
 														{
-															start: {line: 2261, column: 18},
-															end: {line: 2264, column: 85}
+															start: {line: 2273, column: 18},
+															end: {line: 2276, column: 85}
 														},
 														_p78)('empty modified although it said it was updated');
 												}
@@ -58831,8 +58838,8 @@ var _user$project$UpdateUtils$mergeListDiffs = F3(
 									return _elm_lang$core$Native_Utils.crashCase(
 										'UpdateUtils',
 										{
-											start: {line: 2042, column: 13},
-											end: {line: 2052, column: 112}
+											start: {line: 2054, column: 13},
+											end: {line: 2064, column: 112}
 										},
 										_p91)(
 										A2(
@@ -58879,8 +58886,8 @@ var _user$project$UpdateUtils$mergeListDiffs = F3(
 											return _elm_lang$core$Native_Utils.crash(
 												'UpdateUtils',
 												{
-													start: {line: 2058, column: 13},
-													end: {line: 2058, column: 24}
+													start: {line: 2070, column: 13},
+													end: {line: 2070, column: 24}
 												})(
 												A2(
 													_elm_lang$core$Basics_ops['++'],
@@ -58995,8 +59002,8 @@ var _user$project$UpdateUtils$mergeTupleDiffs = F3(
 											return _elm_lang$core$Native_Utils.crash(
 												'UpdateUtils',
 												{
-													start: {line: 2029, column: 11},
-													end: {line: 2029, column: 22}
+													start: {line: 2041, column: 11},
+													end: {line: 2041, column: 22}
 												})(
 												A2(
 													_elm_lang$core$Basics_ops['++'],
@@ -59220,8 +59227,8 @@ var _user$project$UpdateUtils$mergeTuple = function (submerger) {
 				return _elm_lang$core$Native_Utils.crashCase(
 					'UpdateUtils',
 					{
-						start: {line: 1869, column: 8},
-						end: {line: 1887, column: 98}
+						start: {line: 1881, column: 8},
+						end: {line: 1899, column: 98}
 					},
 					_p108)(
 					A2(
@@ -59581,8 +59588,8 @@ var _user$project$UpdateUtils$zipDiffs = F2(
 									_elm_lang$core$Native_Utils.crash(
 										'UpdateUtils',
 										{
-											start: {line: 1518, column: 21},
-											end: {line: 1518, column: 32}
+											start: {line: 1530, column: 21},
+											end: {line: 1530, column: 32}
 										}),
 									'Malformed diffs',
 									{ctor: '_Tuple2', _0: diffs, _1: i}));
@@ -59645,8 +59652,8 @@ var _user$project$UpdateUtils$mapDiffs = F2(
 									_elm_lang$core$Native_Utils.crash(
 										'UpdateUtils',
 										{
-											start: {line: 1500, column: 21},
-											end: {line: 1500, column: 32}
+											start: {line: 1512, column: 21},
+											end: {line: 1512, column: 32}
 										}),
 									'Malformed diffs',
 									{ctor: '_Tuple2', _0: diffs, _1: i}));
@@ -60545,8 +60552,8 @@ var _user$project$UpdateUtils$tupleDiffsToString = F6(
 									return _elm_lang$core$Native_Utils.crashCase(
 										'UpdateUtils',
 										{
-											start: {line: 929, column: 11},
-											end: {line: 933, column: 104}
+											start: {line: 941, column: 11},
+											end: {line: 945, column: 104}
 										},
 										_p216)(
 										A2(
@@ -60558,8 +60565,8 @@ var _user$project$UpdateUtils$tupleDiffsToString = F6(
 								return _elm_lang$core$Native_Utils.crash(
 									'UpdateUtils',
 									{
-										start: {line: 935, column: 11},
-										end: {line: 935, column: 22}
+										start: {line: 947, column: 11},
+										end: {line: 947, column: 22}
 									})(
 									A2(
 										_elm_lang$core$Basics_ops['++'],
@@ -61892,8 +61899,8 @@ var _user$project$UpdateUtils$listDiffsToString2 = F9(
 												return _elm_lang$core$Native_Utils.crash(
 													'UpdateUtils',
 													{
-														start: {line: 1157, column: 16},
-														end: {line: 1157, column: 27}
+														start: {line: 1169, column: 16},
+														end: {line: 1169, column: 27}
 													})(
 													A2(
 														_elm_lang$core$Basics_ops['++'],
@@ -62361,8 +62368,8 @@ var _user$project$UpdateUtils$tupleDiffsToString2 = F6(
 								return _elm_lang$core$Native_Utils.crash(
 									'UpdateUtils',
 									{
-										start: {line: 1297, column: 11},
-										end: {line: 1297, column: 22}
+										start: {line: 1309, column: 11},
+										end: {line: 1309, column: 22}
 									})('Changes does not match the expression');
 							}
 						}
@@ -63248,7 +63255,7 @@ var _user$project$UpdateUtils$alldiffs = F3(
 	});
 var _user$project$UpdateUtils$fixStringDiffs = function (diffChunks) {
 	var _p360 = diffChunks;
-	_v529_3:
+	_v529_6:
 	do {
 		if (_p360.ctor === '::') {
 			if (_p360._1.ctor === '::') {
@@ -63259,7 +63266,7 @@ var _user$project$UpdateUtils$fixStringDiffs = function (diffChunks) {
 							var _p362 = _p360._0._0;
 							var _p361 = _p360._1._1;
 							return A5(
-								_user$project$UpdateUtils$otherSliceRight,
+								_user$project$UpdateUtils$shiftAddedRight,
 								'',
 								_p362,
 								_p363,
@@ -63280,79 +63287,169 @@ var _user$project$UpdateUtils$fixStringDiffs = function (diffChunks) {
 											_1: _p361
 										})));
 						} else {
-							break _v529_3;
+							break _v529_6;
 						}
-					case 'DiffEqual':
-						if (_p360._1._0.ctor === 'DiffAdded') {
-							if ((_p360._1._1.ctor === '::') && (_p360._1._1._0.ctor === 'DiffEqual')) {
-								var _p367 = _p360._1._1._0._0;
-								var _p366 = _p360._1._0._0;
-								var _p365 = _p360._0._0;
-								var _p364 = _p360._1._1._1;
-								return A5(
-									_user$project$UpdateUtils$otherSliceRight,
-									_p365,
-									_p366,
-									_p367,
-									_p364,
-									A5(
-										_user$project$UpdateUtils$otherSliceLeft,
+					case 'DiffRemoved':
+						if (_p360._1._0.ctor === 'DiffEqual') {
+							var _p373 = _p360._1._0._0;
+							var _p372 = _p360._0._0;
+							var _p371 = _p360._1._1;
+							return A5(
+								_user$project$UpdateUtils$shiftRemovedRight,
+								'',
+								_p372,
+								_p373,
+								_p371,
+								A2(
+									_elm_lang$core$List$map,
+									function (res) {
+										return {
+											ctor: '::',
+											_0: _user$project$UpdateUtils$DiffRemoved(_p372),
+											_1: res
+										};
+									},
+									_user$project$UpdateUtils$fixStringDiffs(
+										{
+											ctor: '::',
+											_0: _user$project$UpdateUtils$DiffEqual(_p373),
+											_1: _p371
+										})));
+						} else {
+							break _v529_6;
+						}
+					default:
+						switch (_p360._1._0.ctor) {
+							case 'DiffAdded':
+								if ((_p360._1._1.ctor === '::') && (_p360._1._1._0.ctor === 'DiffEqual')) {
+									var _p367 = _p360._1._1._0._0;
+									var _p366 = _p360._1._0._0;
+									var _p365 = _p360._0._0;
+									var _p364 = _p360._1._1._1;
+									return A5(
+										_user$project$UpdateUtils$shiftAddedRight,
 										_p365,
 										_p366,
 										_p367,
 										_p364,
+										A5(
+											_user$project$UpdateUtils$shiftAddedLeft,
+											_p365,
+											_p366,
+											_p367,
+											_p364,
+											A2(
+												_elm_lang$core$List$map,
+												function (res) {
+													return {
+														ctor: '::',
+														_0: _user$project$UpdateUtils$DiffEqual(_p365),
+														_1: {
+															ctor: '::',
+															_0: _user$project$UpdateUtils$DiffAdded(_p366),
+															_1: res
+														}
+													};
+												},
+												_user$project$UpdateUtils$fixStringDiffs(
+													{
+														ctor: '::',
+														_0: _user$project$UpdateUtils$DiffEqual(_p367),
+														_1: _p364
+													}))));
+								} else {
+									var _p370 = _p360._1._0._0;
+									var _p369 = _p360._0._0;
+									var _p368 = _p360._1._1;
+									return A5(
+										_user$project$UpdateUtils$shiftAddedLeft,
+										_p369,
+										_p370,
+										'',
+										_p368,
 										A2(
 											_elm_lang$core$List$map,
 											function (res) {
 												return {
 													ctor: '::',
-													_0: _user$project$UpdateUtils$DiffEqual(_p365),
+													_0: _user$project$UpdateUtils$DiffEqual(_p369),
 													_1: {
 														ctor: '::',
-														_0: _user$project$UpdateUtils$DiffAdded(_p366),
+														_0: _user$project$UpdateUtils$DiffAdded(_p370),
 														_1: res
 													}
 												};
 											},
-											_user$project$UpdateUtils$fixStringDiffs(
-												{
+											_user$project$UpdateUtils$fixStringDiffs(_p368)));
+								}
+							case 'DiffRemoved':
+								if ((_p360._1._1.ctor === '::') && (_p360._1._1._0.ctor === 'DiffEqual')) {
+									var _p377 = _p360._1._1._0._0;
+									var _p376 = _p360._1._0._0;
+									var _p375 = _p360._0._0;
+									var _p374 = _p360._1._1._1;
+									return A5(
+										_user$project$UpdateUtils$shiftRemovedRight,
+										_p375,
+										_p376,
+										_p377,
+										_p374,
+										A5(
+											_user$project$UpdateUtils$shiftRemovedLeft,
+											_p375,
+											_p376,
+											_p377,
+											_p374,
+											A2(
+												_elm_lang$core$List$map,
+												function (res) {
+													return {
+														ctor: '::',
+														_0: _user$project$UpdateUtils$DiffEqual(_p375),
+														_1: {
+															ctor: '::',
+															_0: _user$project$UpdateUtils$DiffRemoved(_p376),
+															_1: res
+														}
+													};
+												},
+												_user$project$UpdateUtils$fixStringDiffs(
+													{
+														ctor: '::',
+														_0: _user$project$UpdateUtils$DiffEqual(_p377),
+														_1: _p374
+													}))));
+								} else {
+									var _p380 = _p360._1._0._0;
+									var _p379 = _p360._0._0;
+									var _p378 = _p360._1._1;
+									return A5(
+										_user$project$UpdateUtils$shiftRemovedLeft,
+										_p379,
+										_p380,
+										'',
+										_p378,
+										A2(
+											_elm_lang$core$List$map,
+											function (res) {
+												return {
 													ctor: '::',
-													_0: _user$project$UpdateUtils$DiffEqual(_p367),
-													_1: _p364
-												}))));
-							} else {
-								var _p370 = _p360._1._0._0;
-								var _p369 = _p360._0._0;
-								var _p368 = _p360._1._1;
-								return A5(
-									_user$project$UpdateUtils$otherSliceLeft,
-									_p369,
-									_p370,
-									'',
-									_p368,
-									A2(
-										_elm_lang$core$List$map,
-										function (res) {
-											return {
-												ctor: '::',
-												_0: _user$project$UpdateUtils$DiffEqual(_p369),
-												_1: {
-													ctor: '::',
-													_0: _user$project$UpdateUtils$DiffAdded(_p370),
-													_1: res
-												}
-											};
-										},
-										_user$project$UpdateUtils$fixStringDiffs(_p368)));
-							}
-						} else {
-							break _v529_3;
+													_0: _user$project$UpdateUtils$DiffEqual(_p379),
+													_1: {
+														ctor: '::',
+														_0: _user$project$UpdateUtils$DiffRemoved(_p380),
+														_1: res
+													}
+												};
+											},
+											_user$project$UpdateUtils$fixStringDiffs(_p378)));
+								}
+							default:
+								break _v529_6;
 						}
-					default:
-						break _v529_3;
 				}
 			} else {
-				break _v529_3;
+				break _v529_6;
 			}
 		} else {
 			return {
@@ -63370,8 +63467,11 @@ var _user$project$UpdateUtils$fixStringDiffs = function (diffChunks) {
 			})(_p360._0),
 		_user$project$UpdateUtils$fixStringDiffs(_p360._1));
 };
-var _user$project$UpdateUtils$otherSliceLeft = F5(
-	function (x, y, z, tail, acc) {
+var _user$project$UpdateUtils$shiftAddedLeft = function (x) {
+	return A2(_user$project$UpdateUtils$shiftLeft, _user$project$UpdateUtils$DiffAdded, x);
+};
+var _user$project$UpdateUtils$shiftLeft = F6(
+	function (diffType, x, y, z, tail, acc) {
 		var aux = F2(
 			function (i, acc) {
 				aux:
@@ -63412,7 +63512,7 @@ var _user$project$UpdateUtils$otherSliceLeft = F5(
 									return addNewX(
 										{
 											ctor: '::',
-											_0: _user$project$UpdateUtils$DiffAdded(newY),
+											_0: diffType(newY),
 											_1: res
 										});
 								},
@@ -63443,8 +63543,11 @@ var _user$project$UpdateUtils$otherSliceLeft = F5(
 			});
 		return A2(aux, 1, acc);
 	});
-var _user$project$UpdateUtils$otherSliceRight = F5(
-	function (x, y, z, tail, acc) {
+var _user$project$UpdateUtils$shiftAddedRight = function (x) {
+	return A2(_user$project$UpdateUtils$shiftRight, _user$project$UpdateUtils$DiffAdded, x);
+};
+var _user$project$UpdateUtils$shiftRight = F6(
+	function (diffType, x, y, z, tail, acc) {
 		var aux = F2(
 			function (i, acc) {
 				aux:
@@ -63485,7 +63588,7 @@ var _user$project$UpdateUtils$otherSliceRight = F5(
 										_0: _user$project$UpdateUtils$DiffEqual(newX),
 										_1: {
 											ctor: '::',
-											_0: _user$project$UpdateUtils$DiffAdded(newY),
+											_0: diffType(newY),
 											_1: res
 										}
 									};
@@ -63513,6 +63616,12 @@ var _user$project$UpdateUtils$otherSliceRight = F5(
 			});
 		return A2(aux, 1, acc);
 	});
+var _user$project$UpdateUtils$shiftRemovedLeft = function (x) {
+	return A2(_user$project$UpdateUtils$shiftLeft, _user$project$UpdateUtils$DiffRemoved, x);
+};
+var _user$project$UpdateUtils$shiftRemovedRight = function (x) {
+	return A2(_user$project$UpdateUtils$shiftRight, _user$project$UpdateUtils$DiffRemoved, x);
+};
 var _user$project$UpdateUtils$allStringDiffs = F2(
 	function (a, b) {
 		return _user$project$Results$oks(
@@ -63528,31 +63637,31 @@ var _user$project$UpdateUtils$defaultStringDiffs = F2(
 					function (i, diffs, revAccDiffs) {
 						aux:
 						while (true) {
-							var _p371 = diffs;
-							if (_p371.ctor === '[]') {
-								var _p372 = _elm_lang$core$List$reverse(revAccDiffs);
-								if (_p372.ctor === '[]') {
+							var _p381 = diffs;
+							if (_p381.ctor === '[]') {
+								var _p382 = _elm_lang$core$List$reverse(revAccDiffs);
+								if (_p382.ctor === '[]') {
 									return _user$project$Results$ok1(_elm_lang$core$Maybe$Nothing);
 								} else {
 									return _user$project$Results$ok1(
-										_elm_lang$core$Maybe$Just(_p372));
+										_elm_lang$core$Maybe$Just(_p382));
 								}
 							} else {
-								switch (_p371._0.ctor) {
+								switch (_p381._0.ctor) {
 									case 'DiffEqual':
-										var _v540 = i + _elm_lang$core$String$length(_p371._0._0),
-											_v541 = _p371._1,
+										var _v540 = i + _elm_lang$core$String$length(_p381._0._0),
+											_v541 = _p381._1,
 											_v542 = revAccDiffs;
 										i = _v540;
 										diffs = _v541;
 										revAccDiffs = _v542;
 										continue aux;
 									case 'DiffRemoved':
-										if ((_p371._1.ctor === '::') && (_p371._1._0.ctor === 'DiffAdded')) {
-											var lengthRemoved = _elm_lang$core$String$length(_p371._0._0);
-											var lengthAdded = _elm_lang$core$String$length(_p371._1._0._0);
+										if ((_p381._1.ctor === '::') && (_p381._1._0.ctor === 'DiffAdded')) {
+											var lengthRemoved = _elm_lang$core$String$length(_p381._0._0);
+											var lengthAdded = _elm_lang$core$String$length(_p381._1._0._0);
 											var _v543 = i + lengthRemoved,
-												_v544 = _p371._1._1,
+												_v544 = _p381._1._1,
 												_v545 = {
 												ctor: '::',
 												_0: A3(_user$project$Lang$StringUpdate, i, i + lengthRemoved, lengthAdded),
@@ -63563,9 +63672,9 @@ var _user$project$UpdateUtils$defaultStringDiffs = F2(
 											revAccDiffs = _v545;
 											continue aux;
 										} else {
-											var lengthRemoved = _elm_lang$core$String$length(_p371._0._0);
+											var lengthRemoved = _elm_lang$core$String$length(_p381._0._0);
 											var _v546 = i + lengthRemoved,
-												_v547 = _p371._1,
+												_v547 = _p381._1,
 												_v548 = {
 												ctor: '::',
 												_0: A3(_user$project$Lang$StringUpdate, i, i + lengthRemoved, 0),
@@ -63577,9 +63686,9 @@ var _user$project$UpdateUtils$defaultStringDiffs = F2(
 											continue aux;
 										}
 									default:
-										var lengthAdded = _elm_lang$core$String$length(_p371._0._0);
+										var lengthAdded = _elm_lang$core$String$length(_p381._0._0);
 										var _v549 = i,
-											_v550 = _p371._1,
+											_v550 = _p381._1,
 											_v551 = {
 											ctor: '::',
 											_0: A3(_user$project$Lang$StringUpdate, i, i, lengthAdded),
@@ -63606,26 +63715,26 @@ var _user$project$UpdateUtils$regroupDiffs = function (diffs2) {
 		function (acc, currentModif, thediffs) {
 			assembleDiffs:
 			while (true) {
-				var _p373 = {ctor: '_Tuple2', _0: currentModif, _1: thediffs};
+				var _p383 = {ctor: '_Tuple2', _0: currentModif, _1: thediffs};
 				_v552_3:
 				do {
-					if (_p373._0.ctor === 'Just') {
-						if (_p373._1.ctor === '::') {
-							switch (_p373._0._0.ctor) {
+					if (_p383._0.ctor === 'Just') {
+						if (_p383._1.ctor === '::') {
+							switch (_p383._0._0.ctor) {
 								case 'DiffEqual':
-									if (_p373._1._0.ctor === 'DiffEqual') {
+									if (_p383._1._0.ctor === 'DiffEqual') {
 										var _v553 = acc,
 											_v554 = _elm_lang$core$Maybe$Just(
 											_user$project$UpdateUtils$DiffEqual(
 												A2(
 													_elm_lang$core$Basics_ops['++'],
-													_p373._0._0._0,
+													_p383._0._0._0,
 													{
 														ctor: '::',
-														_0: _p373._1._0._0,
+														_0: _p383._1._0._0,
 														_1: {ctor: '[]'}
 													}))),
-											_v555 = _p373._1._1;
+											_v555 = _p383._1._1;
 										acc = _v553;
 										currentModif = _v554;
 										thediffs = _v555;
@@ -63634,19 +63743,19 @@ var _user$project$UpdateUtils$regroupDiffs = function (diffs2) {
 										break _v552_3;
 									}
 								case 'DiffRemoved':
-									if (_p373._1._0.ctor === 'DiffRemoved') {
+									if (_p383._1._0.ctor === 'DiffRemoved') {
 										var _v556 = acc,
 											_v557 = _elm_lang$core$Maybe$Just(
 											_user$project$UpdateUtils$DiffRemoved(
 												A2(
 													_elm_lang$core$Basics_ops['++'],
-													_p373._0._0._0,
+													_p383._0._0._0,
 													{
 														ctor: '::',
-														_0: _p373._1._0._0,
+														_0: _p383._1._0._0,
 														_1: {ctor: '[]'}
 													}))),
-											_v558 = _p373._1._1;
+											_v558 = _p383._1._1;
 										acc = _v556;
 										currentModif = _v557;
 										thediffs = _v558;
@@ -63655,19 +63764,19 @@ var _user$project$UpdateUtils$regroupDiffs = function (diffs2) {
 										break _v552_3;
 									}
 								default:
-									if (_p373._1._0.ctor === 'DiffAdded') {
+									if (_p383._1._0.ctor === 'DiffAdded') {
 										var _v559 = acc,
 											_v560 = _elm_lang$core$Maybe$Just(
 											_user$project$UpdateUtils$DiffAdded(
 												A2(
 													_elm_lang$core$Basics_ops['++'],
-													_p373._0._0._0,
+													_p383._0._0._0,
 													{
 														ctor: '::',
-														_0: _p373._1._0._0,
+														_0: _p383._1._0._0,
 														_1: {ctor: '[]'}
 													}))),
-											_v561 = _p373._1._1;
+											_v561 = _p383._1._1;
 										acc = _v559;
 										currentModif = _v560;
 										thediffs = _v561;
@@ -63680,20 +63789,20 @@ var _user$project$UpdateUtils$regroupDiffs = function (diffs2) {
 							break _v552_3;
 						}
 					} else {
-						if (_p373._1.ctor === '[]') {
+						if (_p383._1.ctor === '[]') {
 							return acc;
 						} else {
-							switch (_p373._1._0.ctor) {
+							switch (_p383._1._0.ctor) {
 								case 'DiffEqual':
 									var _v562 = acc,
 										_v563 = _elm_lang$core$Maybe$Just(
 										_user$project$UpdateUtils$DiffEqual(
 											{
 												ctor: '::',
-												_0: _p373._1._0._0,
+												_0: _p383._1._0._0,
 												_1: {ctor: '[]'}
 											})),
-										_v564 = _p373._1._1;
+										_v564 = _p383._1._1;
 									acc = _v562;
 									currentModif = _v563;
 									thediffs = _v564;
@@ -63704,10 +63813,10 @@ var _user$project$UpdateUtils$regroupDiffs = function (diffs2) {
 										_user$project$UpdateUtils$DiffRemoved(
 											{
 												ctor: '::',
-												_0: _p373._1._0._0,
+												_0: _p383._1._0._0,
 												_1: {ctor: '[]'}
 											})),
-										_v567 = _p373._1._1;
+										_v567 = _p383._1._1;
 									acc = _v565;
 									currentModif = _v566;
 									thediffs = _v567;
@@ -63718,10 +63827,10 @@ var _user$project$UpdateUtils$regroupDiffs = function (diffs2) {
 										_user$project$UpdateUtils$DiffAdded(
 											{
 												ctor: '::',
-												_0: _p373._1._0._0,
+												_0: _p383._1._0._0,
 												_1: {ctor: '[]'}
 											})),
-										_v570 = _p373._1._1;
+										_v570 = _p383._1._1;
 									acc = _v568;
 									currentModif = _v569;
 									thediffs = _v570;
@@ -63735,11 +63844,11 @@ var _user$project$UpdateUtils$regroupDiffs = function (diffs2) {
 					acc,
 					{
 						ctor: '::',
-						_0: _p373._0._0,
+						_0: _p383._0._0,
 						_1: {ctor: '[]'}
 					}),
 					_v572 = _elm_lang$core$Maybe$Nothing,
-					_v573 = _p373._1;
+					_v573 = _p383._1;
 				acc = _v571;
 				currentModif = _v572;
 				thediffs = _v573;
@@ -63768,14 +63877,14 @@ var _user$project$UpdateUtils$alignRecordDatatypes = F4(
 		};
 		var resDataTypeDifferences = A3(
 			_user$project$UpdateUtils$alldiffs,
-			function (_p374) {
-				var _p375 = _p374;
-				return A2(_elm_lang$core$Maybe$withDefault, '', _p375._1);
+			function (_p384) {
+				var _p385 = _p384;
+				return A2(_elm_lang$core$Maybe$withDefault, '', _p385._1);
 			},
 			withDatatypes(removed),
 			withDatatypes(added));
-		var _p376 = resDataTypeDifferences;
-		if (((((_p376.ctor === 'Ok') && (_p376._0.ctor === 'Cons')) && (_p376._0._0.ctor === '::')) && (_p376._0._0._0.ctor === 'DiffEqual')) && (_p376._0._0._1.ctor === '[]')) {
+		var _p386 = resDataTypeDifferences;
+		if (((((_p386.ctor === 'Ok') && (_p386._0.ctor === 'Cons')) && (_p386._0._0.ctor === '::')) && (_p386._0._0._0.ctor === 'DiffEqual')) && (_p386._0._0._1.ctor === '[]')) {
 			return _elm_lang$core$Maybe$Nothing;
 		} else {
 			return _elm_lang$core$Maybe$Just(
@@ -63786,20 +63895,20 @@ var _user$project$UpdateUtils$alignRecordDatatypes = F4(
 							function (diffs, removed, added, revAccDiffs) {
 								aux:
 								while (true) {
-									var _p377 = diffs;
-									if (_p377.ctor === '[]') {
+									var _p387 = diffs;
+									if (_p387.ctor === '[]') {
 										return A2(_user$project$Utils$reverseInsert, revAccDiffs, difftailglobal);
 									} else {
-										switch (_p377._0.ctor) {
+										switch (_p387._0.ctor) {
 											case 'DiffEqual':
-												var count = _elm_lang$core$List$length(_p377._0._0);
-												var _p378 = A2(_user$project$Utils$split, count, removed);
-												var removedTaken = _p378._0;
-												var removedRemaining = _p378._1;
-												var _p379 = A2(_user$project$Utils$split, count, added);
-												var addedTaken = _p379._0;
-												var addedRemaining = _p379._1;
-												var _v577 = _p377._1,
+												var count = _elm_lang$core$List$length(_p387._0._0);
+												var _p388 = A2(_user$project$Utils$split, count, removed);
+												var removedTaken = _p388._0;
+												var removedRemaining = _p388._1;
+												var _p389 = A2(_user$project$Utils$split, count, added);
+												var addedTaken = _p389._0;
+												var addedRemaining = _p389._1;
+												var _v577 = _p387._1,
 													_v578 = removedRemaining,
 													_v579 = addedRemaining,
 													_v580 = {
@@ -63822,11 +63931,11 @@ var _user$project$UpdateUtils$alignRecordDatatypes = F4(
 												revAccDiffs = _v580;
 												continue aux;
 											case 'DiffRemoved':
-												var count = _elm_lang$core$List$length(_p377._0._0);
-												var _p380 = A2(_user$project$Utils$split, count, removed);
-												var removedTaken = _p380._0;
-												var removedRemaining = _p380._1;
-												var _v581 = _p377._1,
+												var count = _elm_lang$core$List$length(_p387._0._0);
+												var _p390 = A2(_user$project$Utils$split, count, removed);
+												var removedTaken = _p390._0;
+												var removedRemaining = _p390._1;
+												var _v581 = _p387._1,
 													_v582 = removedRemaining,
 													_v583 = added,
 													_v584 = {
@@ -63845,11 +63954,11 @@ var _user$project$UpdateUtils$alignRecordDatatypes = F4(
 												revAccDiffs = _v584;
 												continue aux;
 											default:
-												var count = _elm_lang$core$List$length(_p377._0._0);
-												var _p381 = A2(_user$project$Utils$split, count, added);
-												var addedTaken = _p381._0;
-												var addedRemaining = _p381._1;
-												var _v585 = _p377._1,
+												var count = _elm_lang$core$List$length(_p387._0._0);
+												var _p391 = A2(_user$project$Utils$split, count, added);
+												var addedTaken = _p391._0;
+												var addedRemaining = _p391._1;
+												var _v585 = _p387._1,
 													_v586 = removed,
 													_v587 = addedRemaining,
 													_v588 = {
@@ -63890,39 +63999,39 @@ var _user$project$UpdateUtils$defaultListDiffs = F5(
 					function (i, accDiffs, diffs) {
 						aux:
 						while (true) {
-							var _p382 = diffs;
-							if (_p382.ctor === '[]') {
-								var _p383 = _elm_lang$core$List$reverse(accDiffs);
-								if (_p383.ctor === '[]') {
+							var _p392 = diffs;
+							if (_p392.ctor === '[]') {
+								var _p393 = _elm_lang$core$List$reverse(accDiffs);
+								if (_p393.ctor === '[]') {
 									return _user$project$Results$ok1(_elm_lang$core$Maybe$Nothing);
 								} else {
 									return _user$project$Results$ok1(
-										_elm_lang$core$Maybe$Just(_p383));
+										_elm_lang$core$Maybe$Just(_p393));
 								}
 							} else {
-								switch (_p382._0.ctor) {
+								switch (_p392._0.ctor) {
 									case 'DiffEqual':
-										var _v591 = i + _elm_lang$core$List$length(_p382._0._0),
+										var _v591 = i + _elm_lang$core$List$length(_p392._0._0),
 											_v592 = accDiffs,
-											_v593 = _p382._1;
+											_v593 = _p392._1;
 										i = _v591;
 										accDiffs = _v592;
 										diffs = _v593;
 										continue aux;
 									case 'DiffRemoved':
-										if ((_p382._1.ctor === '::') && (_p382._1._0.ctor === 'DiffAdded')) {
-											var _p387 = _p382._0._0;
-											var _p386 = _p382._1._1;
-											var _p385 = _p382._1._0._0;
-											var _p384 = A4(_user$project$UpdateUtils$alignRecordDatatypes, datatypeNameOf, _p387, _p385, _p386);
-											if (_p384.ctor === 'Just') {
+										if ((_p392._1.ctor === '::') && (_p392._1._0.ctor === 'DiffAdded')) {
+											var _p397 = _p392._0._0;
+											var _p396 = _p392._1._1;
+											var _p395 = _p392._1._0._0;
+											var _p394 = A4(_user$project$UpdateUtils$alignRecordDatatypes, datatypeNameOf, _p397, _p395, _p396);
+											if (_p394.ctor === 'Just') {
 												return A2(
 													_user$project$Results$andThen,
 													A2(aux, i, accDiffs),
-													_p384._0);
+													_p394._0);
 											} else {
-												var lengthRemoved = _elm_lang$core$List$length(_p387);
-												var lengthAdded = _elm_lang$core$List$length(_p385);
+												var lengthRemoved = _elm_lang$core$List$length(_p397);
+												var lengthAdded = _elm_lang$core$List$length(_p395);
 												var toInsertRes = A4(
 													_elm_lang$core$List$map3,
 													F3(
@@ -63940,8 +64049,8 @@ var _user$project$UpdateUtils$defaultListDiffs = F5(
 																A2(defaultElemModif, r, a));
 														}),
 													A2(_elm_lang$core$List$range, i, (i + lengthAdded) - 1),
-													_p387,
-													_p385);
+													_p397,
+													_p395);
 												return A2(
 													_user$project$Results$andThen,
 													A3(
@@ -63970,11 +64079,11 @@ var _user$project$UpdateUtils$defaultListDiffs = F5(
 															}),
 														i,
 														lengthRemoved,
-														_p386),
+														_p396),
 													_user$project$Results$projOk(toInsertRes));
 											}
 										} else {
-											var removedLength = _elm_lang$core$List$length(_p382._0._0);
+											var removedLength = _elm_lang$core$List$length(_p392._0._0);
 											var _v595 = i + removedLength,
 												_v596 = {
 												ctor: '::',
@@ -63985,14 +64094,14 @@ var _user$project$UpdateUtils$defaultListDiffs = F5(
 												},
 												_1: accDiffs
 											},
-												_v597 = _p382._1;
+												_v597 = _p392._1;
 											i = _v595;
 											accDiffs = _v596;
 											diffs = _v597;
 											continue aux;
 										}
 									default:
-										var addedLength = _elm_lang$core$List$length(_p382._0._0);
+										var addedLength = _elm_lang$core$List$length(_p392._0._0);
 										var _v598 = i,
 											_v599 = {
 											ctor: '::',
@@ -64003,7 +64112,7 @@ var _user$project$UpdateUtils$defaultListDiffs = F5(
 											},
 											_1: accDiffs
 										},
-											_v600 = _p382._1;
+											_v600 = _p392._1;
 										i = _v598;
 										accDiffs = _v599;
 										diffs = _v600;
@@ -64022,31 +64131,31 @@ var _user$project$UpdateUtils$defaultListDiffs = F5(
 	});
 var _user$project$UpdateUtils$defaultEDiffs = F2(
 	function (e1, e2) {
-		var _p388 = {
+		var _p398 = {
 			ctor: '_Tuple2',
 			_0: _user$project$Lang$unwrapExp(e1),
 			_1: _user$project$Lang$unwrapExp(e2)
 		};
 		_v601_4:
 		do {
-			switch (_p388._0.ctor) {
+			switch (_p398._0.ctor) {
 				case 'EConst':
-					if (_p388._1.ctor === 'EConst') {
-						return _elm_lang$core$Native_Utils.eq(_p388._0._1, _p388._1._1) ? _user$project$Results$ok1(_elm_lang$core$Maybe$Nothing) : _user$project$Results$ok1(
+					if (_p398._1.ctor === 'EConst') {
+						return _elm_lang$core$Native_Utils.eq(_p398._0._1, _p398._1._1) ? _user$project$Results$ok1(_elm_lang$core$Maybe$Nothing) : _user$project$Results$ok1(
 							_elm_lang$core$Maybe$Just(
 								_user$project$Lang$EConstDiffs(_user$project$Lang$EAnyDiffs)));
 					} else {
 						break _v601_4;
 					}
 				case 'EBase':
-					if (_p388._1.ctor === 'EBase') {
-						if ((_p388._0._1.ctor === 'EString') && (_p388._1._1.ctor === 'EString')) {
+					if (_p398._1.ctor === 'EBase') {
+						if ((_p398._0._1.ctor === 'EString') && (_p398._1._1.ctor === 'EString')) {
 							return A2(
 								_user$project$Results$map,
 								_elm_lang$core$Maybe$map(_user$project$Lang$EStringDiffs),
-								A2(_user$project$UpdateUtils$defaultStringDiffs, _p388._0._1._1, _p388._1._1._1));
+								A2(_user$project$UpdateUtils$defaultStringDiffs, _p398._0._1._1, _p398._1._1._1));
 						} else {
-							return _elm_lang$core$Native_Utils.eq(_p388._0._1, _p388._1._1) ? _user$project$Results$ok1(
+							return _elm_lang$core$Native_Utils.eq(_p398._0._1, _p398._1._1) ? _user$project$Results$ok1(
 								_elm_lang$core$Maybe$Just(
 									_user$project$Lang$EConstDiffs(_user$project$Lang$EAnyDiffs))) : _user$project$Results$ok1(_elm_lang$core$Maybe$Nothing);
 						}
@@ -64054,19 +64163,19 @@ var _user$project$UpdateUtils$defaultEDiffs = F2(
 						break _v601_4;
 					}
 				case 'EList':
-					if (((_p388._0._3.ctor === 'Nothing') && (_p388._1.ctor === 'EList')) && (_p388._1._3.ctor === 'Nothing')) {
+					if (((_p398._0._3.ctor === 'Nothing') && (_p398._1.ctor === 'EList')) && (_p398._1._3.ctor === 'Nothing')) {
 						return A2(
 							_user$project$Results$map,
 							_elm_lang$core$Maybe$map(_user$project$Lang$EListDiffs),
 							A5(
 								_user$project$UpdateUtils$defaultListDiffs,
 								_user$project$Syntax$unparser(_user$project$Syntax$Leo),
-								function (_p389) {
+								function (_p399) {
 									return _elm_lang$core$Maybe$Nothing;
 								},
 								_user$project$UpdateUtils$defaultEDiffs,
-								_user$project$Utils$listValues(_p388._0._1),
-								_user$project$Utils$listValues(_p388._1._1)));
+								_user$project$Utils$listValues(_p398._0._1),
+								_user$project$Utils$listValues(_p398._1._1)));
 					} else {
 						break _v601_4;
 					}
@@ -64086,12 +64195,12 @@ var _user$project$UpdateUtils$defaultEDiffs = F2(
 	});
 var _user$project$UpdateUtils$defaultVDiffsRec = F4(
 	function (testEquality, recurse, original, modified) {
-		var _p390 = {ctor: '_Tuple2', _0: original.v_, _1: modified.v_};
+		var _p400 = {ctor: '_Tuple2', _0: original.v_, _1: modified.v_};
 		_v602_5:
 		do {
-			switch (_p390._0.ctor) {
+			switch (_p400._0.ctor) {
 				case 'VList':
-					if (_p390._1.ctor === 'VList') {
+					if (_p400._1.ctor === 'VList') {
 						return A2(
 							_user$project$Results$map,
 							_elm_lang$core$Maybe$map(_user$project$Lang$VListDiffs),
@@ -64101,51 +64210,51 @@ var _user$project$UpdateUtils$defaultVDiffsRec = F4(
 								function (v) {
 									return A2(
 										_user$project$Utils$maybeOrElseLazy,
-										function (_p391) {
-											var _p392 = _p391;
+										function (_p401) {
+											var _p402 = _p401;
 											return _user$project$Lang$getViewDatatypeName(v);
 										},
 										_user$project$Lang$getDatatypeName(v));
 								},
 								recurse,
-								_p390._0._0,
-								_p390._1._0));
+								_p400._0._0,
+								_p400._1._0));
 					} else {
 						break _v602_5;
 					}
 				case 'VBase':
-					if (((_p390._0._0.ctor === 'VString') && (_p390._1.ctor === 'VBase')) && (_p390._1._0.ctor === 'VString')) {
+					if (((_p400._0._0.ctor === 'VString') && (_p400._1.ctor === 'VBase')) && (_p400._1._0.ctor === 'VString')) {
 						return A2(
 							_user$project$Results$map,
 							_elm_lang$core$Maybe$map(_user$project$Lang$VStringDiffs),
-							A2(_user$project$UpdateUtils$defaultStringDiffs, _p390._0._0._0, _p390._1._0._0));
+							A2(_user$project$UpdateUtils$defaultStringDiffs, _p400._0._0._0, _p400._1._0._0));
 					} else {
 						break _v602_5;
 					}
 				case 'VClosure':
-					if (_p390._1.ctor === 'VClosure') {
-						var _p396 = _p390._1._2;
-						var _p395 = _p390._0._2;
+					if (_p400._1.ctor === 'VClosure') {
+						var _p406 = _p400._1._2;
+						var _p405 = _p400._0._2;
 						var ids = A2(
 							_elm_lang$core$Set$union,
 							A2(
 								_elm_lang$core$Set$diff,
-								_user$project$Lang$identifiersSet(_p395),
-								_user$project$Lang$identifiersSetInPats(_p390._0._1)),
+								_user$project$Lang$identifiersSet(_p405),
+								_user$project$Lang$identifiersSetInPats(_p400._0._1)),
 							A2(
 								_elm_lang$core$Set$diff,
-								_user$project$Lang$identifiersSet(_p396),
-								_user$project$Lang$identifiersSetInPats(_p390._1._1)));
+								_user$project$Lang$identifiersSet(_p406),
+								_user$project$Lang$identifiersSetInPats(_p400._1._1)));
 						return A2(
 							_user$project$Results$andThen,
 							function (mbEnvDiff) {
 								return A2(
 									_user$project$Results$map,
 									function (mbEDiff) {
-										var _p393 = mbEnvDiff;
-										if (_p393.ctor === 'Nothing') {
-											var _p394 = mbEDiff;
-											if (_p394.ctor === 'Nothing') {
+										var _p403 = mbEnvDiff;
+										if (_p403.ctor === 'Nothing') {
+											var _p404 = mbEDiff;
+											if (_p404.ctor === 'Nothing') {
 												return _elm_lang$core$Maybe$Nothing;
 											} else {
 												return _elm_lang$core$Maybe$Just(
@@ -64156,49 +64265,49 @@ var _user$project$UpdateUtils$defaultVDiffsRec = F4(
 											}
 										} else {
 											return _elm_lang$core$Maybe$Just(
-												A2(_user$project$Lang$VClosureDiffs, _p393._0, mbEDiff));
+												A2(_user$project$Lang$VClosureDiffs, _p403._0, mbEDiff));
 										}
 									},
-									A2(_user$project$UpdateUtils$defaultEDiffs, _p395, _p396));
+									A2(_user$project$UpdateUtils$defaultEDiffs, _p405, _p406));
 							},
-							A5(_user$project$UpdateUtils$defaultEnvDiffsRec, testEquality, recurse, ids, _p390._0._3, _p390._1._3));
+							A5(_user$project$UpdateUtils$defaultEnvDiffsRec, testEquality, recurse, ids, _p400._0._3, _p400._1._3));
 					} else {
 						break _v602_5;
 					}
 				case 'VDict':
-					if (_p390._1.ctor === 'VDict') {
-						return A4(_user$project$UpdateUtils$defaultDictDiffs, _user$project$LangUtils$valToString, recurse, _p390._0._0, _p390._1._0);
+					if (_p400._1.ctor === 'VDict') {
+						return A4(_user$project$UpdateUtils$defaultDictDiffs, _user$project$LangUtils$valToString, recurse, _p400._0._0, _p400._1._0);
 					} else {
 						break _v602_5;
 					}
 				case 'VRecord':
-					if (_p390._1.ctor === 'VRecord') {
-						var _p400 = _p390._0._0;
-						var _p399 = _p390._1._0;
-						var _p397 = {
+					if (_p400._1.ctor === 'VRecord') {
+						var _p410 = _p400._0._0;
+						var _p409 = _p400._1._0;
+						var _p407 = {
 							ctor: '_Tuple2',
-							_0: A2(_elm_lang$core$Dict$get, _user$project$Lang$ctorDataType, _p400),
-							_1: A2(_elm_lang$core$Dict$get, _user$project$Lang$ctorDataType, _p399)
+							_0: A2(_elm_lang$core$Dict$get, _user$project$Lang$ctorDataType, _p410),
+							_1: A2(_elm_lang$core$Dict$get, _user$project$Lang$ctorDataType, _p409)
 						};
-						if (_p397._0.ctor === 'Just') {
-							if (_p397._1.ctor === 'Just') {
-								var _p398 = {ctor: '_Tuple2', _0: _p397._0._0.v_, _1: _p397._1._0.v_};
-								if (((((_p398.ctor === '_Tuple2') && (_p398._0.ctor === 'VBase')) && (_p398._0._0.ctor === 'VString')) && (_p398._1.ctor === 'VBase')) && (_p398._1._0.ctor === 'VString')) {
-									return _elm_lang$core$Native_Utils.eq(_p398._0._0._0, _p398._1._0._0) ? A4(_user$project$UpdateUtils$defaultRecordDiffs, _user$project$LangUtils$valToString, recurse, _p400, _p399) : _user$project$Results$ok1(
+						if (_p407._0.ctor === 'Just') {
+							if (_p407._1.ctor === 'Just') {
+								var _p408 = {ctor: '_Tuple2', _0: _p407._0._0.v_, _1: _p407._1._0.v_};
+								if (((((_p408.ctor === '_Tuple2') && (_p408._0.ctor === 'VBase')) && (_p408._0._0.ctor === 'VString')) && (_p408._1.ctor === 'VBase')) && (_p408._1._0.ctor === 'VString')) {
+									return _elm_lang$core$Native_Utils.eq(_p408._0._0._0, _p408._1._0._0) ? A4(_user$project$UpdateUtils$defaultRecordDiffs, _user$project$LangUtils$valToString, recurse, _p410, _p409) : _user$project$Results$ok1(
 										_elm_lang$core$Maybe$Just(_user$project$Lang$VConstDiffs));
 								} else {
-									return A4(_user$project$UpdateUtils$defaultRecordDiffs, _user$project$LangUtils$valToString, recurse, _p400, _p399);
+									return A4(_user$project$UpdateUtils$defaultRecordDiffs, _user$project$LangUtils$valToString, recurse, _p410, _p409);
 								}
 							} else {
 								return _user$project$Results$ok1(
 									_elm_lang$core$Maybe$Just(_user$project$Lang$VConstDiffs));
 							}
 						} else {
-							if (_p397._1.ctor === 'Just') {
+							if (_p407._1.ctor === 'Just') {
 								return _user$project$Results$ok1(
 									_elm_lang$core$Maybe$Just(_user$project$Lang$VConstDiffs));
 							} else {
-								return A4(_user$project$UpdateUtils$defaultRecordDiffs, _user$project$LangUtils$valToString, recurse, _p400, _p399);
+								return A4(_user$project$UpdateUtils$defaultRecordDiffs, _user$project$LangUtils$valToString, recurse, _p410, _p409);
 							}
 						}
 					} else {
@@ -64218,54 +64327,54 @@ var _user$project$UpdateUtils$defaultEnvDiffsRec = F5(
 				aux:
 				while (true) {
 					if (_elm_lang$core$Set$isEmpty(identsToCompare)) {
-						var _p401 = _elm_lang$core$List$reverse(revEnvDiffs);
-						if (_p401.ctor === '[]') {
+						var _p411 = _elm_lang$core$List$reverse(revEnvDiffs);
+						if (_p411.ctor === '[]') {
 							return _user$project$Results$ok1(_elm_lang$core$Maybe$Nothing);
 						} else {
 							return _user$project$Results$ok1(
-								_elm_lang$core$Maybe$Just(_p401));
+								_elm_lang$core$Maybe$Just(_p411));
 						}
 					} else {
-						var _p402 = {ctor: '_Tuple2', _0: envToCollect1, _1: envToCollect2};
+						var _p412 = {ctor: '_Tuple2', _0: envToCollect1, _1: envToCollect2};
 						_v609_2:
 						do {
-							if (_p402.ctor === '_Tuple2') {
-								if (_p402._0.ctor === '[]') {
-									if (_p402._1.ctor === '[]') {
-										var _p403 = _elm_lang$core$List$reverse(revEnvDiffs);
-										if (_p403.ctor === '[]') {
+							if (_p412.ctor === '_Tuple2') {
+								if (_p412._0.ctor === '[]') {
+									if (_p412._1.ctor === '[]') {
+										var _p413 = _elm_lang$core$List$reverse(revEnvDiffs);
+										if (_p413.ctor === '[]') {
 											return _user$project$Results$ok1(_elm_lang$core$Maybe$Nothing);
 										} else {
 											return _user$project$Results$ok1(
-												_elm_lang$core$Maybe$Just(_p403));
+												_elm_lang$core$Maybe$Just(_p413));
 										}
 									} else {
 										break _v609_2;
 									}
 								} else {
-									if (((_p402._0._0.ctor === '_Tuple2') && (_p402._1.ctor === '::')) && (_p402._1._0.ctor === '_Tuple2')) {
-										var _p410 = _p402._1._0._1;
-										var _p409 = _p402._0._0._1;
-										var _p408 = _p402._1._0._0;
-										var _p407 = _p402._0._0._0;
-										var _p406 = _p402._1._1;
-										var _p405 = _p402._0._1;
-										if (!_elm_lang$core$Native_Utils.eq(_p407, _p408)) {
+									if (((_p412._0._0.ctor === '_Tuple2') && (_p412._1.ctor === '::')) && (_p412._1._0.ctor === '_Tuple2')) {
+										var _p420 = _p412._1._0._1;
+										var _p419 = _p412._0._0._1;
+										var _p418 = _p412._1._0._0;
+										var _p417 = _p412._0._0._0;
+										var _p416 = _p412._1._1;
+										var _p415 = _p412._0._1;
+										if (!_elm_lang$core$Native_Utils.eq(_p417, _p418)) {
 											return _elm_lang$core$Result$Err(
 												A2(
 													_elm_lang$core$Basics_ops['++'],
 													'trying to compute a diff on unaligned environments ',
 													A2(
 														_elm_lang$core$Basics_ops['++'],
-														_p407,
-														A2(_elm_lang$core$Basics_ops['++'], ',', _p408))));
+														_p417,
+														A2(_elm_lang$core$Basics_ops['++'], ',', _p418))));
 										} else {
-											if (!A2(_elm_lang$core$Set$member, _p407, identsToCompare)) {
+											if (!A2(_elm_lang$core$Set$member, _p417, identsToCompare)) {
 												var _v611 = i + 1,
 													_v612 = identsToCompare,
 													_v613 = revEnvDiffs,
-													_v614 = _p405,
-													_v615 = _p406;
+													_v614 = _p415,
+													_v615 = _p416;
 												i = _v611;
 												identsToCompare = _v612;
 												revEnvDiffs = _v613;
@@ -64273,12 +64382,12 @@ var _user$project$UpdateUtils$defaultEnvDiffsRec = F5(
 												envToCollect2 = _v615;
 												continue aux;
 											} else {
-												if (testEquality && A2(_user$project$UpdateUtils$valEqualDiff, _p409, _p410)) {
+												if (testEquality && A2(_user$project$UpdateUtils$valEqualDiff, _p419, _p420)) {
 													var _v616 = i + 1,
-														_v617 = A2(_elm_lang$core$Set$remove, _p407, identsToCompare),
+														_v617 = A2(_elm_lang$core$Set$remove, _p417, identsToCompare),
 														_v618 = revEnvDiffs,
-														_v619 = _p405,
-														_v620 = _p406;
+														_v619 = _p415,
+														_v620 = _p416;
 													i = _v616;
 													identsToCompare = _v617;
 													revEnvDiffs = _v618;
@@ -64292,13 +64401,13 @@ var _user$project$UpdateUtils$defaultEnvDiffsRec = F5(
 															F7(
 																function (i, k1, identsToCompare, etl1, etl2, revEnvDiffs, mbv) {
 																	var newRevEnvDiffs = function () {
-																		var _p404 = mbv;
-																		if (_p404.ctor === 'Nothing') {
+																		var _p414 = mbv;
+																		if (_p414.ctor === 'Nothing') {
 																			return revEnvDiffs;
 																		} else {
 																			return {
 																				ctor: '::',
-																				_0: {ctor: '_Tuple2', _0: i, _1: _p404._0},
+																				_0: {ctor: '_Tuple2', _0: i, _1: _p414._0},
 																				_1: revEnvDiffs
 																			};
 																		}
@@ -64312,12 +64421,12 @@ var _user$project$UpdateUtils$defaultEnvDiffsRec = F5(
 																		etl2);
 																}),
 															i,
-															_p407,
+															_p417,
 															identsToCompare,
-															_p405,
-															_p406,
+															_p415,
+															_p416,
 															revEnvDiffs),
-														A2(recurse, _p409, _p410));
+														A2(recurse, _p419, _p420));
 												}
 											}
 										}
@@ -64353,8 +64462,8 @@ var _user$project$UpdateUtils$defaultEnvDiffsRec = F5(
 	});
 var _user$project$UpdateUtils$valEqualDiff = F2(
 	function (original, modified) {
-		var _p411 = A2(_user$project$UpdateUtils$defaultVDiffs, original, modified);
-		if (((_p411.ctor === 'Ok') && (_p411._0.ctor === 'Cons')) && (_p411._0._0.ctor === 'Nothing')) {
+		var _p421 = A2(_user$project$UpdateUtils$defaultVDiffs, original, modified);
+		if (((_p421.ctor === 'Ok') && (_p421._0.ctor === 'Cons')) && (_p421._0._0.ctor === 'Nothing')) {
 			return true;
 		} else {
 			return false;
@@ -64374,21 +64483,21 @@ var _user$project$UpdateUtils$Diff3Merged = function (a) {
 };
 var _user$project$UpdateUtils$diff3ChunkMap = F2(
 	function (f, d) {
-		var _p412 = d;
-		if (_p412.ctor === 'Diff3Merged') {
+		var _p422 = d;
+		if (_p422.ctor === 'Diff3Merged') {
 			return _user$project$UpdateUtils$Diff3Merged(
-				A2(_user$project$UpdateUtils$diffChunkMap, f, _p412._0));
+				A2(_user$project$UpdateUtils$diffChunkMap, f, _p422._0));
 		} else {
 			return A2(
 				_user$project$UpdateUtils$Diff3Conflict,
 				A2(
 					_elm_lang$core$List$map,
 					_user$project$UpdateUtils$diffChunkMap(f),
-					_p412._0),
+					_p422._0),
 				A2(
 					_elm_lang$core$List$map,
 					_user$project$UpdateUtils$diffChunkMap(f),
-					_p412._1));
+					_p422._1));
 		}
 	});
 var _user$project$UpdateUtils$diff3 = F4(
@@ -64396,34 +64505,34 @@ var _user$project$UpdateUtils$diff3 = F4(
 		var modifs1 = A3(_user$project$UpdateUtils$diff, keyOf, original, update1);
 		var modifs2 = A3(_user$project$UpdateUtils$diff, keyOf, original, update2);
 		var flattenDiff = function (diff) {
-			var _p413 = diff;
-			switch (_p413.ctor) {
+			var _p423 = diff;
+			switch (_p423.ctor) {
 				case 'DiffEqual':
-					return A2(_elm_lang$core$List$map, _user$project$UpdateUtils$DiffEqual, _p413._0);
+					return A2(_elm_lang$core$List$map, _user$project$UpdateUtils$DiffEqual, _p423._0);
 				case 'DiffAdded':
-					return A2(_elm_lang$core$List$map, _user$project$UpdateUtils$DiffAdded, _p413._0);
+					return A2(_elm_lang$core$List$map, _user$project$UpdateUtils$DiffAdded, _p423._0);
 				default:
-					return A2(_elm_lang$core$List$map, _user$project$UpdateUtils$DiffRemoved, _p413._0);
+					return A2(_elm_lang$core$List$map, _user$project$UpdateUtils$DiffRemoved, _p423._0);
 			}
 		};
 		var newKeyOf = function (d) {
-			var _p414 = d;
-			switch (_p414.ctor) {
+			var _p424 = d;
+			switch (_p424.ctor) {
 				case 'DiffEqual':
 					return A2(
 						_elm_lang$core$Basics_ops['++'],
 						'=',
-						keyOf(_p414._0));
+						keyOf(_p424._0));
 				case 'DiffAdded':
 					return A2(
 						_elm_lang$core$Basics_ops['++'],
 						'+',
-						keyOf(_p414._0));
+						keyOf(_p424._0));
 				default:
 					return A2(
 						_elm_lang$core$Basics_ops['++'],
 						'-',
-						keyOf(_p414._0));
+						keyOf(_p424._0));
 			}
 		};
 		var diff1 = A2(_elm_lang$core$List$concatMap, flattenDiff, modifs1);
@@ -64433,31 +64542,31 @@ var _user$project$UpdateUtils$diff3 = F4(
 			function (acc, thediffs) {
 				convertDiffs:
 				while (true) {
-					var _p415 = thediffs;
-					if (_p415.ctor === '[]') {
+					var _p425 = thediffs;
+					if (_p425.ctor === '[]') {
 						return acc;
 					} else {
-						switch (_p415._0.ctor) {
+						switch (_p425._0.ctor) {
 							case 'DiffEqual':
 								var _v627 = A2(
 									_elm_lang$core$Basics_ops['++'],
 									acc,
-									A2(_elm_lang$core$List$map, _user$project$UpdateUtils$Diff3Merged, _p415._0._0)),
-									_v628 = _p415._1;
+									A2(_elm_lang$core$List$map, _user$project$UpdateUtils$Diff3Merged, _p425._0._0)),
+									_v628 = _p425._1;
 								acc = _v627;
 								thediffs = _v628;
 								continue convertDiffs;
 							case 'DiffRemoved':
-								if ((_p415._1.ctor === '::') && (_p415._1._0.ctor === 'DiffAdded')) {
+								if ((_p425._1.ctor === '::') && (_p425._1._0.ctor === 'DiffAdded')) {
 									var _v629 = A2(
 										_elm_lang$core$Basics_ops['++'],
 										acc,
 										{
 											ctor: '::',
-											_0: A2(_user$project$UpdateUtils$Diff3Conflict, _p415._0._0, _p415._1._0._0),
+											_0: A2(_user$project$UpdateUtils$Diff3Conflict, _p425._0._0, _p425._1._0._0),
 											_1: {ctor: '[]'}
 										}),
-										_v630 = _p415._1._1;
+										_v630 = _p425._1._1;
 									acc = _v629;
 									thediffs = _v630;
 									continue convertDiffs;
@@ -64465,8 +64574,8 @@ var _user$project$UpdateUtils$diff3 = F4(
 									var _v631 = A2(
 										_elm_lang$core$Basics_ops['++'],
 										acc,
-										A2(_elm_lang$core$List$map, _user$project$UpdateUtils$Diff3Merged, _p415._0._0)),
-										_v632 = _p415._1;
+										A2(_elm_lang$core$List$map, _user$project$UpdateUtils$Diff3Merged, _p425._0._0)),
+										_v632 = _p425._1;
 									acc = _v631;
 									thediffs = _v632;
 									continue convertDiffs;
@@ -64475,8 +64584,8 @@ var _user$project$UpdateUtils$diff3 = F4(
 								var _v633 = A2(
 									_elm_lang$core$Basics_ops['++'],
 									acc,
-									A2(_elm_lang$core$List$map, _user$project$UpdateUtils$Diff3Merged, _p415._0._0)),
-									_v634 = _p415._1;
+									A2(_elm_lang$core$List$map, _user$project$UpdateUtils$Diff3Merged, _p425._0._0)),
+									_v634 = _p425._1;
 								acc = _v633;
 								thediffs = _v634;
 								continue convertDiffs;
@@ -64496,26 +64605,26 @@ var _user$project$UpdateUtils$autodiff3 = F5(
 			function (acc, currentModif, thediffs) {
 				assembleDiffs:
 				while (true) {
-					var _p416 = {ctor: '_Tuple2', _0: currentModif, _1: thediffs};
+					var _p426 = {ctor: '_Tuple2', _0: currentModif, _1: thediffs};
 					_v635_3:
 					do {
-						if (_p416._0.ctor === 'Just') {
-							if ((_p416._1.ctor === '::') && (_p416._1._0.ctor === 'Diff3Merged')) {
-								switch (_p416._0._0.ctor) {
+						if (_p426._0.ctor === 'Just') {
+							if ((_p426._1.ctor === '::') && (_p426._1._0.ctor === 'Diff3Merged')) {
+								switch (_p426._0._0.ctor) {
 									case 'DiffEqual':
-										if (_p416._1._0._0.ctor === 'DiffEqual') {
+										if (_p426._1._0._0.ctor === 'DiffEqual') {
 											var _v636 = acc,
 												_v637 = _elm_lang$core$Maybe$Just(
 												_user$project$UpdateUtils$DiffEqual(
 													A2(
 														_elm_lang$core$Basics_ops['++'],
-														_p416._0._0._0,
+														_p426._0._0._0,
 														{
 															ctor: '::',
-															_0: _p416._1._0._0._0,
+															_0: _p426._1._0._0._0,
 															_1: {ctor: '[]'}
 														}))),
-												_v638 = _p416._1._1;
+												_v638 = _p426._1._1;
 											acc = _v636;
 											currentModif = _v637;
 											thediffs = _v638;
@@ -64524,19 +64633,19 @@ var _user$project$UpdateUtils$autodiff3 = F5(
 											break _v635_3;
 										}
 									case 'DiffRemoved':
-										if (_p416._1._0._0.ctor === 'DiffRemoved') {
+										if (_p426._1._0._0.ctor === 'DiffRemoved') {
 											var _v639 = acc,
 												_v640 = _elm_lang$core$Maybe$Just(
 												_user$project$UpdateUtils$DiffRemoved(
 													A2(
 														_elm_lang$core$Basics_ops['++'],
-														_p416._0._0._0,
+														_p426._0._0._0,
 														{
 															ctor: '::',
-															_0: _p416._1._0._0._0,
+															_0: _p426._1._0._0._0,
 															_1: {ctor: '[]'}
 														}))),
-												_v641 = _p416._1._1;
+												_v641 = _p426._1._1;
 											acc = _v639;
 											currentModif = _v640;
 											thediffs = _v641;
@@ -64545,19 +64654,19 @@ var _user$project$UpdateUtils$autodiff3 = F5(
 											break _v635_3;
 										}
 									default:
-										if (_p416._1._0._0.ctor === 'DiffAdded') {
+										if (_p426._1._0._0.ctor === 'DiffAdded') {
 											var _v642 = acc,
 												_v643 = _elm_lang$core$Maybe$Just(
 												_user$project$UpdateUtils$DiffAdded(
 													A2(
 														_elm_lang$core$Basics_ops['++'],
-														_p416._0._0._0,
+														_p426._0._0._0,
 														{
 															ctor: '::',
-															_0: _p416._1._0._0._0,
+															_0: _p426._1._0._0._0,
 															_1: {ctor: '[]'}
 														}))),
-												_v644 = _p416._1._1;
+												_v644 = _p426._1._1;
 											acc = _v642;
 											currentModif = _v643;
 											thediffs = _v644;
@@ -64570,21 +64679,21 @@ var _user$project$UpdateUtils$autodiff3 = F5(
 								break _v635_3;
 							}
 						} else {
-							if (_p416._1.ctor === '[]') {
+							if (_p426._1.ctor === '[]') {
 								return acc;
 							} else {
-								if (_p416._1._0.ctor === 'Diff3Merged') {
-									switch (_p416._1._0._0.ctor) {
+								if (_p426._1._0.ctor === 'Diff3Merged') {
+									switch (_p426._1._0._0.ctor) {
 										case 'DiffEqual':
 											var _v645 = acc,
 												_v646 = _elm_lang$core$Maybe$Just(
 												_user$project$UpdateUtils$DiffEqual(
 													{
 														ctor: '::',
-														_0: _p416._1._0._0._0,
+														_0: _p426._1._0._0._0,
 														_1: {ctor: '[]'}
 													})),
-												_v647 = _p416._1._1;
+												_v647 = _p426._1._1;
 											acc = _v645;
 											currentModif = _v646;
 											thediffs = _v647;
@@ -64595,10 +64704,10 @@ var _user$project$UpdateUtils$autodiff3 = F5(
 												_user$project$UpdateUtils$DiffRemoved(
 													{
 														ctor: '::',
-														_0: _p416._1._0._0._0,
+														_0: _p426._1._0._0._0,
 														_1: {ctor: '[]'}
 													})),
-												_v650 = _p416._1._1;
+												_v650 = _p426._1._1;
 											acc = _v648;
 											currentModif = _v649;
 											thediffs = _v650;
@@ -64609,20 +64718,20 @@ var _user$project$UpdateUtils$autodiff3 = F5(
 												_user$project$UpdateUtils$DiffAdded(
 													{
 														ctor: '::',
-														_0: _p416._1._0._0._0,
+														_0: _p426._1._0._0._0,
 														_1: {ctor: '[]'}
 													})),
-												_v653 = _p416._1._1;
+												_v653 = _p426._1._1;
 											acc = _v651;
 											currentModif = _v652;
 											thediffs = _v653;
 											continue assembleDiffs;
 									}
 								} else {
-									var _p417 = function () {
-										var _p418 = _user$project$Utils$snocUnapply(acc);
-										if (((_p418.ctor === 'Just') && (_p418._0.ctor === '_Tuple2')) && (_p418._0._1.ctor === 'DiffRemoved')) {
-											return {ctor: '_Tuple2', _0: _p418._0._0, _1: _p418._0._1._0};
+									var _p427 = function () {
+										var _p428 = _user$project$Utils$snocUnapply(acc);
+										if (((_p428.ctor === 'Just') && (_p428._0.ctor === '_Tuple2')) && (_p428._0._1.ctor === 'DiffRemoved')) {
+											return {ctor: '_Tuple2', _0: _p428._0._0, _1: _p428._0._1._0};
 										} else {
 											return {
 												ctor: '_Tuple2',
@@ -64631,15 +64740,15 @@ var _user$project$UpdateUtils$autodiff3 = F5(
 											};
 										}
 									}();
-									var accNotRemoved = _p417._0;
-									var accRemoved = _p417._1;
+									var accNotRemoved = _p427._0;
+									var accRemoved = _p427._1;
 									var _v655 = A2(
 										_elm_lang$core$Basics_ops['++'],
 										accNotRemoved,
 										_user$project$UpdateUtils$regroupDiffs(
-											A3(conflictPolicy, accRemoved, _p416._1._0._0, _p416._1._0._1))),
+											A3(conflictPolicy, accRemoved, _p426._1._0._0, _p426._1._0._1))),
 										_v656 = _elm_lang$core$Maybe$Nothing,
-										_v657 = _p416._1._1;
+										_v657 = _p426._1._1;
 									acc = _v655;
 									currentModif = _v656;
 									thediffs = _v657;
@@ -64653,11 +64762,11 @@ var _user$project$UpdateUtils$autodiff3 = F5(
 						acc,
 						{
 							ctor: '::',
-							_0: _p416._0._0,
+							_0: _p426._0._0,
 							_1: {ctor: '[]'}
 						}),
 						_v659 = _elm_lang$core$Maybe$Nothing,
-						_v660 = _p416._1;
+						_v660 = _p426._1;
 					acc = _v658;
 					currentModif = _v659;
 					thediffs = _v660;
@@ -64677,38 +64786,38 @@ var _user$project$UpdateUtils$mergeListWithDiffs = F5(
 		};
 		var conflictPolicy = F3(
 			function (previouslyRemoved, ld1, ld2) {
-				var _p419 = {ctor: '_Tuple3', _0: previouslyRemoved, _1: ld1, _2: ld2};
+				var _p429 = {ctor: '_Tuple3', _0: previouslyRemoved, _1: ld1, _2: ld2};
 				_v661_5:
 				do {
 					_v661_4:
 					do {
-						if (_p419._1.ctor === '[]') {
+						if (_p429._1.ctor === '[]') {
 							return A2(
 								_elm_lang$core$Basics_ops['++'],
-								maybeRemoved(_p419._0),
-								_p419._2);
+								maybeRemoved(_p429._0),
+								_p429._2);
 						} else {
-							if (_p419._2.ctor === '[]') {
+							if (_p429._2.ctor === '[]') {
 								return A2(
 									_elm_lang$core$Basics_ops['++'],
-									maybeRemoved(_p419._0),
-									_p419._1);
+									maybeRemoved(_p429._0),
+									_p429._1);
 							} else {
-								switch (_p419._1._0.ctor) {
+								switch (_p429._1._0.ctor) {
 									case 'DiffRemoved':
-										switch (_p419._2._0.ctor) {
+										switch (_p429._2._0.ctor) {
 											case 'DiffRemoved':
 												return A2(
 													_elm_lang$core$Basics_ops['++'],
-													maybeRemoved(_p419._0),
+													maybeRemoved(_p429._0),
 													{
 														ctor: '::',
-														_0: _user$project$UpdateUtils$DiffRemoved(_p419._1._0._0),
+														_0: _user$project$UpdateUtils$DiffRemoved(_p429._1._0._0),
 														_1: A3(
 															conflictPolicy,
 															{ctor: '[]'},
-															_p419._1._1,
-															_p419._2._1)
+															_p429._1._1,
+															_p429._2._1)
 													});
 											case 'DiffEqual':
 												break _v661_4;
@@ -64716,69 +64825,69 @@ var _user$project$UpdateUtils$mergeListWithDiffs = F5(
 												break _v661_4;
 										}
 									case 'DiffEqual':
-										switch (_p419._2._0.ctor) {
+										switch (_p429._2._0.ctor) {
 											case 'DiffRemoved':
 												break _v661_5;
 											case 'DiffEqual':
 												return {
 													ctor: '::',
-													_0: _user$project$UpdateUtils$DiffEqual(_p419._1._0._0),
+													_0: _user$project$UpdateUtils$DiffEqual(_p429._1._0._0),
 													_1: A3(
 														conflictPolicy,
 														{ctor: '[]'},
-														_p419._1._1,
-														_p419._2._1)
+														_p429._1._1,
+														_p429._2._1)
 												};
 											default:
 												return {
 													ctor: '::',
-													_0: _p419._2._0,
+													_0: _p429._2._0,
 													_1: A3(
 														conflictPolicy,
 														{ctor: '[]'},
 														ld1,
-														_p419._2._1)
+														_p429._2._1)
 												};
 										}
 									default:
-										switch (_p419._2._0.ctor) {
+										switch (_p429._2._0.ctor) {
 											case 'DiffRemoved':
 												break _v661_5;
 											case 'DiffEqual':
 												return {
 													ctor: '::',
-													_0: _p419._1._0,
+													_0: _p429._1._0,
 													_1: A3(
 														conflictPolicy,
 														{ctor: '[]'},
-														_p419._1._1,
+														_p429._1._1,
 														ld2)
 												};
 											default:
-												if (_p419._0.ctor === '::') {
-													var _p420 = _p419._0._0;
+												if (_p429._0.ctor === '::') {
+													var _p430 = _p429._0._0;
 													return {
 														ctor: '::',
-														_0: _user$project$UpdateUtils$DiffRemoved(_p420),
+														_0: _user$project$UpdateUtils$DiffRemoved(_p430),
 														_1: {
 															ctor: '::',
 															_0: _user$project$UpdateUtils$DiffAdded(
-																A3(submerger, _p420, _p419._1._0._0, _p419._2._0._0)),
-															_1: A3(conflictPolicy, _p419._0._1, _p419._1._1, _p419._2._1)
+																A3(submerger, _p430, _p429._1._0._0, _p429._2._0._0)),
+															_1: A3(conflictPolicy, _p429._0._1, _p429._1._1, _p429._2._1)
 														}
 													};
 												} else {
 													return {
 														ctor: '::',
-														_0: _user$project$UpdateUtils$DiffAdded(_p419._1._0._0),
+														_0: _user$project$UpdateUtils$DiffAdded(_p429._1._0._0),
 														_1: {
 															ctor: '::',
-															_0: _user$project$UpdateUtils$DiffAdded(_p419._2._0._0),
+															_0: _user$project$UpdateUtils$DiffAdded(_p429._2._0._0),
 															_1: A3(
 																conflictPolicy,
 																{ctor: '[]'},
-																_p419._1._1,
-																_p419._2._1)
+																_p429._1._1,
+																_p429._2._1)
 														}
 													};
 												}
@@ -64789,27 +64898,27 @@ var _user$project$UpdateUtils$mergeListWithDiffs = F5(
 					} while(false);
 					return A2(
 						_elm_lang$core$Basics_ops['++'],
-						maybeRemoved(_p419._0),
+						maybeRemoved(_p429._0),
 						{
 							ctor: '::',
-							_0: _p419._2._0,
+							_0: _p429._2._0,
 							_1: A3(
 								conflictPolicy,
 								{ctor: '[]'},
 								ld1,
-								_p419._2._1)
+								_p429._2._1)
 						});
 				} while(false);
 				return A2(
 					_elm_lang$core$Basics_ops['++'],
-					maybeRemoved(_p419._0),
+					maybeRemoved(_p429._0),
 					{
 						ctor: '::',
-						_0: _p419._1._0,
+						_0: _p429._1._0,
 						_1: A3(
 							conflictPolicy,
 							{ctor: '[]'},
-							_p419._1._1,
+							_p429._1._1,
 							ld2)
 					});
 			});
@@ -64818,26 +64927,26 @@ var _user$project$UpdateUtils$mergeListWithDiffs = F5(
 			function (acc, thediff) {
 				aux:
 				while (true) {
-					var _p421 = thediff;
-					if (_p421.ctor === '[]') {
+					var _p431 = thediff;
+					if (_p431.ctor === '[]') {
 						return acc;
 					} else {
-						switch (_p421._0.ctor) {
+						switch (_p431._0.ctor) {
 							case 'DiffEqual':
-								var _v663 = A2(_elm_lang$core$Basics_ops['++'], acc, _p421._0._0),
-									_v664 = _p421._1;
+								var _v663 = A2(_elm_lang$core$Basics_ops['++'], acc, _p431._0._0),
+									_v664 = _p431._1;
 								acc = _v663;
 								thediff = _v664;
 								continue aux;
 							case 'DiffRemoved':
 								var _v665 = acc,
-									_v666 = _p421._1;
+									_v666 = _p431._1;
 								acc = _v665;
 								thediff = _v666;
 								continue aux;
 							default:
-								var _v667 = A2(_elm_lang$core$Basics_ops['++'], acc, _p421._0._0),
-									_v668 = _p421._1;
+								var _v667 = A2(_elm_lang$core$Basics_ops['++'], acc, _p431._0._0),
+									_v668 = _p431._1;
 								acc = _v667;
 								thediff = _v668;
 								continue aux;
@@ -64884,76 +64993,76 @@ var _user$project$UpdateUtils$DoLeft = F4(
 var _user$project$UpdateUtils$mergeString = F5(
 	function (original, modified1, diffs1, modified2, diffs2) {
 		var aux = F6(
-			function (originalOffset, modified1Offset, modified2Offset, diffs1, diffs2, _p422) {
+			function (originalOffset, modified1Offset, modified2Offset, diffs1, diffs2, _p432) {
 				aux:
 				while (true) {
-					var _p423 = _p422;
-					var _p443 = _p423._0;
-					var _p442 = _p423._1;
-					var _p424 = {ctor: '_Tuple2', _0: diffs1, _1: diffs2};
-					if (((_p424.ctor === '_Tuple2') && (_p424._0.ctor === '[]')) && (_p424._1.ctor === '[]')) {
+					var _p433 = _p432;
+					var _p453 = _p433._0;
+					var _p452 = _p433._1;
+					var _p434 = {ctor: '_Tuple2', _0: diffs1, _1: diffs2};
+					if (((_p434.ctor === '_Tuple2') && (_p434._0.ctor === '[]')) && (_p434._1.ctor === '[]')) {
 						return {
 							ctor: '_Tuple2',
-							_0: _p443,
-							_1: _elm_lang$core$List$reverse(_p442)
+							_0: _p453,
+							_1: _elm_lang$core$List$reverse(_p452)
 						};
 					} else {
 						var mergeWay = function () {
-							var _p425 = {ctor: '_Tuple2', _0: diffs1, _1: diffs2};
-							if (_p425._0.ctor === '[]') {
-								if (_p425._1.ctor === '[]') {
+							var _p435 = {ctor: '_Tuple2', _0: diffs1, _1: diffs2};
+							if (_p435._0.ctor === '[]') {
+								if (_p435._1.ctor === '[]') {
 									return _elm_lang$core$Native_Utils.crashCase(
 										'UpdateUtils',
 										{
-											start: {line: 2135, column: 25},
-											end: {line: 2142, column: 83}
+											start: {line: 2147, column: 25},
+											end: {line: 2154, column: 83}
 										},
-										_p425)('impossible');
+										_p435)('impossible');
 								} else {
-									return A4(_user$project$UpdateUtils$DoRight, _p425._1._0._0, _p425._1._0._1, _p425._1._0._2, _p425._1._1);
+									return A4(_user$project$UpdateUtils$DoRight, _p435._1._0._0, _p435._1._0._1, _p435._1._0._2, _p435._1._1);
 								}
 							} else {
-								if (_p425._1.ctor === '[]') {
-									return A4(_user$project$UpdateUtils$DoLeft, _p425._0._0._0, _p425._0._0._1, _p425._0._0._2, _p425._0._1);
+								if (_p435._1.ctor === '[]') {
+									return A4(_user$project$UpdateUtils$DoLeft, _p435._0._0._0, _p435._0._0._1, _p435._0._0._2, _p435._0._1);
 								} else {
-									var _p434 = _p425._1._1;
-									var _p433 = _p425._0._1;
-									var _p432 = _p425._1._0._0;
-									var _p431 = _p425._0._0._0;
-									var _p430 = _p425._1._0._2;
-									var _p429 = _p425._0._0._2;
-									var _p428 = _p425._1._0._1;
-									var _p427 = _p425._0._0._1;
-									return (_elm_lang$core$Native_Utils.cmp(_p427, _p432) < 1) ? A4(_user$project$UpdateUtils$DoLeft, _p431, _p427, _p429, _p433) : ((_elm_lang$core$Native_Utils.cmp(_p428, _p431) < 1) ? A4(_user$project$UpdateUtils$DoRight, _p432, _p428, _p430, _p434) : A8(_user$project$UpdateUtils$DoMerge, _p431, _p427, _p429, _p433, _p432, _p428, _p430, _p434));
+									var _p444 = _p435._1._1;
+									var _p443 = _p435._0._1;
+									var _p442 = _p435._1._0._0;
+									var _p441 = _p435._0._0._0;
+									var _p440 = _p435._1._0._2;
+									var _p439 = _p435._0._0._2;
+									var _p438 = _p435._1._0._1;
+									var _p437 = _p435._0._0._1;
+									return (_elm_lang$core$Native_Utils.cmp(_p437, _p442) < 1) ? A4(_user$project$UpdateUtils$DoLeft, _p441, _p437, _p439, _p443) : ((_elm_lang$core$Native_Utils.cmp(_p438, _p441) < 1) ? A4(_user$project$UpdateUtils$DoRight, _p442, _p438, _p440, _p444) : A8(_user$project$UpdateUtils$DoMerge, _p441, _p437, _p439, _p443, _p442, _p438, _p440, _p444));
 								}
 							}
 						}();
-						var _p435 = mergeWay;
-						switch (_p435.ctor) {
+						var _p445 = mergeWay;
+						switch (_p445.ctor) {
 							case 'DoLeft':
-								var _p438 = _p435._0;
-								var _p437 = _p435._2;
-								var _p436 = _p435._1;
-								var insertedString = A3(_elm_lang$core$String$slice, _p438 + modified1Offset, (_p438 + modified1Offset) + _p437, modified1);
-								var offsetIncrease1 = _p437 - (_p436 - _p438);
+								var _p448 = _p445._0;
+								var _p447 = _p445._2;
+								var _p446 = _p445._1;
+								var insertedString = A3(_elm_lang$core$String$slice, _p448 + modified1Offset, (_p448 + modified1Offset) + _p447, modified1);
+								var offsetIncrease1 = _p447 - (_p446 - _p448);
 								var _v673 = originalOffset + offsetIncrease1,
 									_v674 = modified1Offset + offsetIncrease1,
 									_v675 = modified2Offset,
-									_v676 = _p435._3,
+									_v676 = _p445._3,
 									_v677 = diffs2,
 									_v678 = {
 									ctor: '_Tuple2',
 									_0: A2(
 										_elm_lang$core$Basics_ops['++'],
-										A2(_elm_lang$core$String$left, _p438 + originalOffset, _p443),
+										A2(_elm_lang$core$String$left, _p448 + originalOffset, _p453),
 										A2(
 											_elm_lang$core$Basics_ops['++'],
 											insertedString,
-											A2(_elm_lang$core$String$dropLeft, _p436 + originalOffset, _p443))),
+											A2(_elm_lang$core$String$dropLeft, _p446 + originalOffset, _p453))),
 									_1: {
 										ctor: '::',
-										_0: A3(_user$project$Lang$StringUpdate, _p438, _p436, _p437),
-										_1: _p442
+										_0: A3(_user$project$Lang$StringUpdate, _p448, _p446, _p447),
+										_1: _p452
 									}
 								};
 								originalOffset = _v673;
@@ -64961,32 +65070,32 @@ var _user$project$UpdateUtils$mergeString = F5(
 								modified2Offset = _v675;
 								diffs1 = _v676;
 								diffs2 = _v677;
-								_p422 = _v678;
+								_p432 = _v678;
 								continue aux;
 							case 'DoRight':
-								var _p441 = _p435._0;
-								var _p440 = _p435._2;
-								var _p439 = _p435._1;
-								var insertedString = A3(_elm_lang$core$String$slice, _p441 + modified2Offset, (_p441 + modified2Offset) + _p440, modified2);
-								var offsetIncrease2 = _p440 - (_p439 - _p441);
+								var _p451 = _p445._0;
+								var _p450 = _p445._2;
+								var _p449 = _p445._1;
+								var insertedString = A3(_elm_lang$core$String$slice, _p451 + modified2Offset, (_p451 + modified2Offset) + _p450, modified2);
+								var offsetIncrease2 = _p450 - (_p449 - _p451);
 								var _v679 = originalOffset + offsetIncrease2,
 									_v680 = modified1Offset,
 									_v681 = modified2Offset + offsetIncrease2,
 									_v682 = diffs1,
-									_v683 = _p435._3,
+									_v683 = _p445._3,
 									_v684 = {
 									ctor: '_Tuple2',
 									_0: A2(
 										_elm_lang$core$Basics_ops['++'],
-										A2(_elm_lang$core$String$left, _p441 + originalOffset, _p443),
+										A2(_elm_lang$core$String$left, _p451 + originalOffset, _p453),
 										A2(
 											_elm_lang$core$Basics_ops['++'],
 											insertedString,
-											A2(_elm_lang$core$String$dropLeft, _p439 + originalOffset, _p443))),
+											A2(_elm_lang$core$String$dropLeft, _p449 + originalOffset, _p453))),
 									_1: {
 										ctor: '::',
-										_0: A3(_user$project$Lang$StringUpdate, _p441, _p439, _p440),
-										_1: _p442
+										_0: A3(_user$project$Lang$StringUpdate, _p451, _p449, _p450),
+										_1: _p452
 									}
 								};
 								originalOffset = _v679;
@@ -64994,22 +65103,22 @@ var _user$project$UpdateUtils$mergeString = F5(
 								modified2Offset = _v681;
 								diffs1 = _v682;
 								diffs2 = _v683;
-								_p422 = _v684;
+								_p432 = _v684;
 								continue aux;
 							default:
-								var offsetIncrease1 = _p435._2 - (_p435._1 - _p435._0);
+								var offsetIncrease1 = _p445._2 - (_p445._1 - _p445._0);
 								var _v685 = originalOffset,
 									_v686 = modified1Offset + offsetIncrease1,
 									_v687 = modified2Offset,
-									_v688 = _p435._3,
+									_v688 = _p445._3,
 									_v689 = diffs2,
-									_v690 = {ctor: '_Tuple2', _0: _p443, _1: _p442};
+									_v690 = {ctor: '_Tuple2', _0: _p453, _1: _p452};
 								originalOffset = _v685;
 								modified1Offset = _v686;
 								modified2Offset = _v687;
 								diffs1 = _v688;
 								diffs2 = _v689;
-								_p422 = _v690;
+								_p432 = _v690;
 								continue aux;
 						}
 					}
@@ -65030,16 +65139,16 @@ var _user$project$UpdateUtils$mergeString = F5(
 	});
 var _user$project$UpdateUtils$mergeExp = F5(
 	function (o, e1, ediff1, e2, ediff2) {
-		var _p444 = {ctor: '_Tuple2', _0: ediff1, _1: ediff2};
+		var _p454 = {ctor: '_Tuple2', _0: ediff1, _1: ediff2};
 		_v691_6:
 		do {
 			_v691_1:
 			do {
-				if (_p444.ctor === '_Tuple2') {
-					switch (_p444._0.ctor) {
+				if (_p454.ctor === '_Tuple2') {
+					switch (_p454._0.ctor) {
 						case 'EConstDiffs':
-							if (_p444._1.ctor === 'EConstDiffs') {
-								if ((_p444._0._0.ctor === 'EAnyDiffs') && (_p444._1._0.ctor === 'EOnlyWhitespaceDiffs')) {
+							if (_p454._1.ctor === 'EConstDiffs') {
+								if ((_p454._0._0.ctor === 'EAnyDiffs') && (_p454._1._0.ctor === 'EOnlyWhitespaceDiffs')) {
 									return {ctor: '_Tuple2', _0: e1, _1: ediff1};
 								} else {
 									break _v691_1;
@@ -65048,20 +65157,20 @@ var _user$project$UpdateUtils$mergeExp = F5(
 								return {ctor: '_Tuple2', _0: e2, _1: ediff2};
 							}
 						case 'EStringDiffs':
-							switch (_p444._1.ctor) {
+							switch (_p454._1.ctor) {
 								case 'EConstDiffs':
 									break _v691_1;
 								case 'EStringDiffs':
-									var _p445 = {
+									var _p455 = {
 										ctor: '_Tuple3',
 										_0: _user$project$Lang$unwrapExp(o),
 										_1: _user$project$Lang$eStrUnapply(e1),
 										_2: _user$project$Lang$eStrUnapply(e2)
 									};
-									if (((((_p445.ctor === '_Tuple3') && (_p445._0.ctor === 'EBase')) && (_p445._0._1.ctor === 'EString')) && (_p445._1.ctor === 'Just')) && (_p445._2.ctor === 'Just')) {
-										var _p446 = A5(_user$project$UpdateUtils$mergeString, _p445._0._1._1, _p445._1._0, _p444._0._0, _p445._2._0, _p444._1._0);
-										var finalStr = _p446._0;
-										var finalDiffs = _p446._1;
+									if (((((_p455.ctor === '_Tuple3') && (_p455._0.ctor === 'EBase')) && (_p455._0._1.ctor === 'EString')) && (_p455._1.ctor === 'Just')) && (_p455._2.ctor === 'Just')) {
+										var _p456 = A5(_user$project$UpdateUtils$mergeString, _p455._0._1._1, _p455._1._0, _p454._0._0, _p455._2._0, _p454._1._0);
+										var finalStr = _p456._0;
+										var finalDiffs = _p456._1;
 										return {
 											ctor: '_Tuple2',
 											_0: A2(
@@ -65069,8 +65178,8 @@ var _user$project$UpdateUtils$mergeExp = F5(
 												o,
 												A2(
 													_user$project$Lang$EBase,
-													_p445._0._0,
-													A2(_user$project$Lang$EString, _p445._0._1._0, finalStr))),
+													_p455._0._0,
+													A2(_user$project$Lang$EString, _p455._0._1._0, finalStr))),
 											_1: _user$project$Lang$EStringDiffs(finalDiffs)
 										};
 									} else {
@@ -65080,56 +65189,56 @@ var _user$project$UpdateUtils$mergeExp = F5(
 									break _v691_6;
 							}
 						case 'EListDiffs':
-							switch (_p444._1.ctor) {
+							switch (_p454._1.ctor) {
 								case 'EConstDiffs':
 									break _v691_1;
 								case 'EListDiffs':
-									var _p447 = {
+									var _p457 = {
 										ctor: '_Tuple3',
 										_0: _user$project$Lang$unwrapExp(o),
 										_1: _user$project$Lang$eListUnapplyWS(e1),
 										_2: _user$project$Lang$eListUnapplyWS(e2)
 									};
-									if (((((_p447.ctor === '_Tuple3') && (_p447._0.ctor === 'EList')) && (_p447._0._3.ctor === 'Nothing')) && (_p447._1.ctor === 'Just')) && (_p447._2.ctor === 'Just')) {
-										var _p448 = A6(
+									if (((((_p457.ctor === '_Tuple3') && (_p457._0.ctor === 'EList')) && (_p457._0._3.ctor === 'Nothing')) && (_p457._1.ctor === 'Just')) && (_p457._2.ctor === 'Just')) {
+										var _p458 = A6(
 											_user$project$UpdateUtils$mergeList,
 											F5(
-												function (_p451, _p450, d1, _p449, d2) {
-													var _p452 = _p451;
-													var _p453 = _p450;
-													var _p454 = _p449;
-													var _p455 = A5(_user$project$UpdateUtils$mergeExp, _p452._1, _p453._1, d1, _p454._1, d2);
-													var finale = _p455._0;
-													var finald = _p455._1;
+												function (_p461, _p460, d1, _p459, d2) {
+													var _p462 = _p461;
+													var _p463 = _p460;
+													var _p464 = _p459;
+													var _p465 = A5(_user$project$UpdateUtils$mergeExp, _p462._1, _p463._1, d1, _p464._1, d2);
+													var finale = _p465._0;
+													var finald = _p465._1;
 													return {
 														ctor: '_Tuple2',
-														_0: {ctor: '_Tuple2', _0: _p452._0, _1: finale},
+														_0: {ctor: '_Tuple2', _0: _p462._0, _1: finale},
 														_1: finald
 													};
 												}),
-											_p447._0._1,
-											_p447._1._0,
-											_p444._0._0,
-											_p447._2._0,
-											_p444._1._0);
-										var finalelems = _p448._0;
-										var finaldiff = _p448._1;
+											_p457._0._1,
+											_p457._1._0,
+											_p454._0._0,
+											_p457._2._0,
+											_p454._1._0);
+										var finalelems = _p458._0;
+										var finaldiff = _p458._1;
 										return {
 											ctor: '_Tuple2',
 											_0: A2(
 												_user$project$Lang$replaceE__,
 												o,
-												A5(_user$project$Lang$EList, _p447._0._0, finalelems, _p447._0._2, _elm_lang$core$Maybe$Nothing, _p447._0._4)),
+												A5(_user$project$Lang$EList, _p457._0._0, finalelems, _p457._0._2, _elm_lang$core$Maybe$Nothing, _p457._0._4)),
 											_1: _user$project$Lang$EListDiffs(finaldiff)
 										};
 									} else {
 										return _elm_lang$core$Native_Utils.crashCase(
 											'UpdateUtils',
 											{
-												start: {line: 2079, column: 7},
-												end: {line: 2087, column: 84}
+												start: {line: 2091, column: 7},
+												end: {line: 2099, column: 84}
 											},
-											_p447)(
+											_p457)(
 											A2(
 												_elm_lang$core$Basics_ops['++'],
 												'unexpected EListDiffs without lists: ',
@@ -65151,22 +65260,22 @@ var _user$project$UpdateUtils$mergeExp = F5(
 									break _v691_6;
 							}
 						default:
-							switch (_p444._1.ctor) {
+							switch (_p454._1.ctor) {
 								case 'EConstDiffs':
 									break _v691_1;
 								case 'EChildDiffs':
-									var _p457 = {
+									var _p467 = {
 										ctor: '_Tuple3',
 										_0: _user$project$Lang$childExpsExtractors(o),
 										_1: _user$project$Lang$childExpsExtractors(e1),
 										_2: _user$project$Lang$childExpsExtractors(e2)
 									};
-									var _p458 = A6(_user$project$UpdateUtils$mergeTuple, _user$project$UpdateUtils$mergeExp, _p457._0._0, _p457._1._0, _p444._0._0, _p457._2._0, _p444._1._0);
-									var finalelems = _p458._0;
-									var finalDiffs = _p458._1;
+									var _p468 = A6(_user$project$UpdateUtils$mergeTuple, _user$project$UpdateUtils$mergeExp, _p467._0._0, _p467._1._0, _p454._0._0, _p467._2._0, _p454._1._0);
+									var finalelems = _p468._0;
+									var finalDiffs = _p468._1;
 									return {
 										ctor: '_Tuple2',
-										_0: _p457._0._1(finalelems),
+										_0: _p467._0._1(finalelems),
 										_1: _user$project$Lang$EChildDiffs(finalDiffs)
 									};
 								default:
@@ -65183,16 +65292,16 @@ var _user$project$UpdateUtils$mergeExp = F5(
 	});
 var _user$project$UpdateUtils$mergeVal = F5(
 	function (original, modified1, modifs1, modified2, modifs2) {
-		var _p459 = {ctor: '_Tuple5', _0: original.v_, _1: modified1.v_, _2: modifs1, _3: modified2.v_, _4: modifs2};
+		var _p469 = {ctor: '_Tuple5', _0: original.v_, _1: modified1.v_, _2: modifs1, _3: modified2.v_, _4: modifs2};
 		_v698_6:
 		do {
-			if (_p459.ctor === '_Tuple5') {
-				switch (_p459._0.ctor) {
+			if (_p469.ctor === '_Tuple5') {
+				switch (_p469._0.ctor) {
 					case 'VBase':
-						if (((((_p459._0._0.ctor === 'VString') && (_p459._1.ctor === 'VBase')) && (_p459._1._0.ctor === 'VString')) && (_p459._3.ctor === 'VBase')) && (_p459._3._0.ctor === 'VString')) {
-							switch (_p459._2.ctor) {
+						if (((((_p469._0._0.ctor === 'VString') && (_p469._1.ctor === 'VBase')) && (_p469._1._0.ctor === 'VString')) && (_p469._3.ctor === 'VBase')) && (_p469._3._0.ctor === 'VString')) {
+							switch (_p469._2.ctor) {
 								case 'VConstDiffs':
-									if (_p459._4.ctor === 'VConstDiffs') {
+									if (_p469._4.ctor === 'VConstDiffs') {
 										return {
 											ctor: '_Tuple2',
 											_0: A2(
@@ -65200,17 +65309,17 @@ var _user$project$UpdateUtils$mergeVal = F5(
 												original,
 												_user$project$Lang$VBase(
 													_user$project$Lang$VString(
-														A3(_user$project$UpdateUtils$mergeStringHeuristic, _p459._0._0._0, _p459._1._0._0, _p459._3._0._0)))),
+														A3(_user$project$UpdateUtils$mergeStringHeuristic, _p469._0._0._0, _p469._1._0._0, _p469._3._0._0)))),
 											_1: _user$project$Lang$VConstDiffs
 										};
 									} else {
 										break _v698_6;
 									}
 								case 'VStringDiffs':
-									if (_p459._4.ctor === 'VStringDiffs') {
-										var _p460 = A5(_user$project$UpdateUtils$mergeString, _p459._0._0._0, _p459._1._0._0, _p459._2._0, _p459._3._0._0, _p459._4._0);
-										var newString = _p460._0;
-										var newDiffs = _p460._1;
+									if (_p469._4.ctor === 'VStringDiffs') {
+										var _p470 = A5(_user$project$UpdateUtils$mergeString, _p469._0._0._0, _p469._1._0._0, _p469._2._0, _p469._3._0._0, _p469._4._0);
+										var newString = _p470._0;
+										var newDiffs = _p470._1;
 										return {
 											ctor: '_Tuple2',
 											_0: A2(
@@ -65230,10 +65339,10 @@ var _user$project$UpdateUtils$mergeVal = F5(
 							break _v698_6;
 						}
 					case 'VList':
-						if ((((_p459._1.ctor === 'VList') && (_p459._2.ctor === 'VListDiffs')) && (_p459._3.ctor === 'VList')) && (_p459._4.ctor === 'VListDiffs')) {
-							var _p461 = A6(_user$project$UpdateUtils$mergeList, _user$project$UpdateUtils$mergeVal, _p459._0._0, _p459._1._0, _p459._2._0, _p459._3._0, _p459._4._0);
-							var newList = _p461._0;
-							var newDiffs = _p461._1;
+						if ((((_p469._1.ctor === 'VList') && (_p469._2.ctor === 'VListDiffs')) && (_p469._3.ctor === 'VList')) && (_p469._4.ctor === 'VListDiffs')) {
+							var _p471 = A6(_user$project$UpdateUtils$mergeList, _user$project$UpdateUtils$mergeVal, _p469._0._0, _p469._1._0, _p469._2._0, _p469._3._0, _p469._4._0);
+							var newList = _p471._0;
+							var newDiffs = _p471._1;
 							return {
 								ctor: '_Tuple2',
 								_0: A2(
@@ -65246,10 +65355,10 @@ var _user$project$UpdateUtils$mergeVal = F5(
 							break _v698_6;
 						}
 					case 'VRecord':
-						if ((((_p459._1.ctor === 'VRecord') && (_p459._2.ctor === 'VRecordDiffs')) && (_p459._3.ctor === 'VRecord')) && (_p459._4.ctor === 'VRecordDiffs')) {
-							var _p462 = A6(_user$project$UpdateUtils$mergeRecord, _user$project$UpdateUtils$mergeVal, _p459._0._0, _p459._1._0, _p459._2._0, _p459._3._0, _p459._4._0);
-							var newDict = _p462._0;
-							var newDiffs = _p462._1;
+						if ((((_p469._1.ctor === 'VRecord') && (_p469._2.ctor === 'VRecordDiffs')) && (_p469._3.ctor === 'VRecord')) && (_p469._4.ctor === 'VRecordDiffs')) {
+							var _p472 = A6(_user$project$UpdateUtils$mergeRecord, _user$project$UpdateUtils$mergeVal, _p469._0._0, _p469._1._0, _p469._2._0, _p469._3._0, _p469._4._0);
+							var newDict = _p472._0;
+							var newDiffs = _p472._1;
 							return {
 								ctor: '_Tuple2',
 								_0: A2(
@@ -65262,10 +65371,10 @@ var _user$project$UpdateUtils$mergeVal = F5(
 							break _v698_6;
 						}
 					case 'VDict':
-						if ((((_p459._1.ctor === 'VDict') && (_p459._2.ctor === 'VDictDiffs')) && (_p459._3.ctor === 'VDict')) && (_p459._4.ctor === 'VDictDiffs')) {
-							var _p463 = A6(_user$project$UpdateUtils$mergeDict, _user$project$UpdateUtils$mergeVal, _p459._0._0, _p459._1._0, _p459._2._0, _p459._3._0, _p459._4._0);
-							var newDict = _p463._0;
-							var newDiffs = _p463._1;
+						if ((((_p469._1.ctor === 'VDict') && (_p469._2.ctor === 'VDictDiffs')) && (_p469._3.ctor === 'VDict')) && (_p469._4.ctor === 'VDictDiffs')) {
+							var _p473 = A6(_user$project$UpdateUtils$mergeDict, _user$project$UpdateUtils$mergeVal, _p469._0._0, _p469._1._0, _p469._2._0, _p469._3._0, _p469._4._0);
+							var newDict = _p473._0;
+							var newDiffs = _p473._1;
 							return {
 								ctor: '_Tuple2',
 								_0: A2(
@@ -65278,42 +65387,42 @@ var _user$project$UpdateUtils$mergeVal = F5(
 							break _v698_6;
 						}
 					case 'VClosure':
-						if ((((_p459._1.ctor === 'VClosure') && (_p459._2.ctor === 'VClosureDiffs')) && (_p459._3.ctor === 'VClosure')) && (_p459._4.ctor === 'VClosureDiffs')) {
-							var _p473 = _p459._1._0;
-							var _p472 = _p459._0._0;
-							var _p471 = _p459._0._1;
-							var _p470 = _p459._4._1;
-							var _p469 = _p459._2._1;
-							var _p468 = _p459._3._2;
-							var _p467 = _p459._1._2;
-							if (_elm_lang$core$Native_Utils.eq(_p472, _p473) && _elm_lang$core$Native_Utils.eq(_p473, _p459._3._0)) {
-								if (A3(_user$project$UpdateUtils$patsEqual, _p471, _p459._1._1, _p459._3._1)) {
-									var _p464 = A5(_user$project$UpdateUtils$mergeEnv, _p459._0._3, _p459._1._3, _p459._2._0, _p459._3._3, _p459._4._0);
-									var newEnv = _p464._0;
-									var newEnvDiffs = _p464._1;
-									var _p465 = function () {
-										var _p466 = {ctor: '_Tuple2', _0: _p469, _1: _p470};
-										if (_p466._0.ctor === 'Just') {
-											if (_p466._1.ctor === 'Just') {
+						if ((((_p469._1.ctor === 'VClosure') && (_p469._2.ctor === 'VClosureDiffs')) && (_p469._3.ctor === 'VClosure')) && (_p469._4.ctor === 'VClosureDiffs')) {
+							var _p483 = _p469._1._0;
+							var _p482 = _p469._0._0;
+							var _p481 = _p469._0._1;
+							var _p480 = _p469._4._1;
+							var _p479 = _p469._2._1;
+							var _p478 = _p469._3._2;
+							var _p477 = _p469._1._2;
+							if (_elm_lang$core$Native_Utils.eq(_p482, _p483) && _elm_lang$core$Native_Utils.eq(_p483, _p469._3._0)) {
+								if (A3(_user$project$UpdateUtils$patsEqual, _p481, _p469._1._1, _p469._3._1)) {
+									var _p474 = A5(_user$project$UpdateUtils$mergeEnv, _p469._0._3, _p469._1._3, _p469._2._0, _p469._3._3, _p469._4._0);
+									var newEnv = _p474._0;
+									var newEnvDiffs = _p474._1;
+									var _p475 = function () {
+										var _p476 = {ctor: '_Tuple2', _0: _p479, _1: _p480};
+										if (_p476._0.ctor === 'Just') {
+											if (_p476._1.ctor === 'Just') {
 												return A2(
 													_elm_lang$core$Tuple$mapSecond,
 													_elm_lang$core$Maybe$Just,
-													A5(_user$project$UpdateUtils$mergeExp, _p459._0._2, _p467, _p466._0._0, _p468, _p466._1._0));
+													A5(_user$project$UpdateUtils$mergeExp, _p469._0._2, _p477, _p476._0._0, _p478, _p476._1._0));
 											} else {
-												return {ctor: '_Tuple2', _0: _p467, _1: _p469};
+												return {ctor: '_Tuple2', _0: _p477, _1: _p479};
 											}
 										} else {
-											return {ctor: '_Tuple2', _0: _p468, _1: _p470};
+											return {ctor: '_Tuple2', _0: _p478, _1: _p480};
 										}
 									}();
-									var newBody = _p465._0;
-									var newBodyModifs = _p465._1;
+									var newBody = _p475._0;
+									var newBodyModifs = _p475._1;
 									return {
 										ctor: '_Tuple2',
 										_0: A2(
 											_user$project$Lang$replaceV_,
 											original,
-											A4(_user$project$Lang$VClosure, _p472, _p471, newBody, newEnv)),
+											A4(_user$project$Lang$VClosure, _p482, _p481, newBody, newEnv)),
 										_1: A2(_user$project$Lang$VClosureDiffs, newEnvDiffs, newBodyModifs)
 									};
 								} else {
@@ -65340,12 +65449,12 @@ var _user$project$UpdateUtils$mergeEnv = F5(
 			function (i, accEnv, accDiffs, originalEnv, newEnv2, modifs2, newEnv3, modifs3) {
 				aux:
 				while (true) {
-					var _p474 = {ctor: '_Tuple5', _0: originalEnv, _1: newEnv2, _2: modifs2, _3: newEnv3, _4: modifs3};
+					var _p484 = {ctor: '_Tuple5', _0: originalEnv, _1: newEnv2, _2: modifs2, _3: newEnv3, _4: modifs3};
 					_v700_4:
 					do {
-						if (_p474.ctor === '_Tuple5') {
-							if (_p474._2.ctor === '[]') {
-								if ((((_p474._4.ctor === '[]') && (_p474._0.ctor === '[]')) && (_p474._1.ctor === '[]')) && (_p474._3.ctor === '[]')) {
+						if (_p484.ctor === '_Tuple5') {
+							if (_p484._2.ctor === '[]') {
+								if ((((_p484._4.ctor === '[]') && (_p484._0.ctor === '[]')) && (_p484._1.ctor === '[]')) && (_p484._3.ctor === '[]')) {
 									return {
 										ctor: '_Tuple2',
 										_0: _elm_lang$core$List$reverse(accEnv),
@@ -65365,7 +65474,7 @@ var _user$project$UpdateUtils$mergeEnv = F5(
 									};
 								}
 							} else {
-								if (_p474._4.ctor === '[]') {
+								if (_p484._4.ctor === '[]') {
 									return {
 										ctor: '_Tuple2',
 										_0: A2(
@@ -65378,65 +65487,65 @@ var _user$project$UpdateUtils$mergeEnv = F5(
 											modifs2)
 									};
 								} else {
-									if ((((((((_p474._0.ctor === '::') && (_p474._0._0.ctor === '_Tuple2')) && (_p474._1.ctor === '::')) && (_p474._1._0.ctor === '_Tuple2')) && (_p474._2._0.ctor === '_Tuple2')) && (_p474._3.ctor === '::')) && (_p474._3._0.ctor === '_Tuple2')) && (_p474._4._0.ctor === '_Tuple2')) {
-										var _p491 = _p474._3._0._0;
-										var _p490 = _p474._1._0._0;
-										var _p489 = _p474._0._0._0;
-										var _p488 = _p474._3._0._1;
-										var _p487 = _p474._1._0._1;
-										var _p486 = _p474._0._0._1;
-										var _p485 = _p474._0._1;
-										var _p484 = _p474._3._1;
-										var _p483 = _p474._1._1;
-										var _p482 = _p474._4._0._1;
-										var _p481 = _p474._2._0._1;
-										var _p480 = _p474._4._1;
-										var _p479 = _p474._4._0._0;
-										var _p478 = _p474._2._1;
-										var _p477 = _p474._2._0._0;
-										if ((!_elm_lang$core$Native_Utils.eq(_p489, _p490)) || ((!_elm_lang$core$Native_Utils.eq(_p490, _p491)) || (!_elm_lang$core$Native_Utils.eq(_p489, _p491)))) {
+									if ((((((((_p484._0.ctor === '::') && (_p484._0._0.ctor === '_Tuple2')) && (_p484._1.ctor === '::')) && (_p484._1._0.ctor === '_Tuple2')) && (_p484._2._0.ctor === '_Tuple2')) && (_p484._3.ctor === '::')) && (_p484._3._0.ctor === '_Tuple2')) && (_p484._4._0.ctor === '_Tuple2')) {
+										var _p501 = _p484._3._0._0;
+										var _p500 = _p484._1._0._0;
+										var _p499 = _p484._0._0._0;
+										var _p498 = _p484._3._0._1;
+										var _p497 = _p484._1._0._1;
+										var _p496 = _p484._0._0._1;
+										var _p495 = _p484._0._1;
+										var _p494 = _p484._3._1;
+										var _p493 = _p484._1._1;
+										var _p492 = _p484._4._0._1;
+										var _p491 = _p484._2._0._1;
+										var _p490 = _p484._4._1;
+										var _p489 = _p484._4._0._0;
+										var _p488 = _p484._2._1;
+										var _p487 = _p484._2._0._0;
+										if ((!_elm_lang$core$Native_Utils.eq(_p499, _p500)) || ((!_elm_lang$core$Native_Utils.eq(_p500, _p501)) || (!_elm_lang$core$Native_Utils.eq(_p499, _p501)))) {
 											return _elm_lang$core$Native_Utils.crash(
 												'UpdateUtils',
 												{
-													start: {line: 1905, column: 12},
-													end: {line: 1905, column: 23}
+													start: {line: 1917, column: 12},
+													end: {line: 1917, column: 23}
 												})(
 												A2(
 													_elm_lang$core$Basics_ops['++'],
 													'Expected environments to have the same variables, got\n',
 													A2(
 														_elm_lang$core$Basics_ops['++'],
-														_p489,
+														_p499,
 														A2(
 															_elm_lang$core$Basics_ops['++'],
 															' = ',
 															A2(
 																_elm_lang$core$Basics_ops['++'],
-																_user$project$LangUtils$valToString(_p486),
+																_user$project$LangUtils$valToString(_p496),
 																A2(
 																	_elm_lang$core$Basics_ops['++'],
 																	'\n',
 																	A2(
 																		_elm_lang$core$Basics_ops['++'],
-																		_p490,
+																		_p500,
 																		A2(
 																			_elm_lang$core$Basics_ops['++'],
 																			' = ',
 																			A2(
 																				_elm_lang$core$Basics_ops['++'],
-																				_user$project$LangUtils$valToString(_p487),
+																				_user$project$LangUtils$valToString(_p497),
 																				A2(
 																					_elm_lang$core$Basics_ops['++'],
 																					'\n',
 																					A2(
 																						_elm_lang$core$Basics_ops['++'],
-																						_p491,
+																						_p501,
 																						A2(
 																							_elm_lang$core$Basics_ops['++'],
 																							' = ',
 																							A2(
 																								_elm_lang$core$Basics_ops['++'],
-																								_user$project$LangUtils$valToString(_p488),
+																								_user$project$LangUtils$valToString(_p498),
 																								A2(
 																									_elm_lang$core$Basics_ops['++'],
 																									'\n',
@@ -65505,14 +65614,14 @@ var _user$project$UpdateUtils$mergeEnv = F5(
 																																								'\n',
 																																								_elm_lang$core$Basics$toString(modifs3_))))))))))))))))))))))))))))));
 										} else {
-											if (_elm_lang$core$Native_Utils.eq(_p477, i) && _elm_lang$core$Native_Utils.eq(_p479, i)) {
-												var _p475 = A5(_user$project$UpdateUtils$mergeVal, _p486, _p487, _p481, _p488, _p482);
-												var newVal = _p475._0;
-												var newDiffs = _p475._1;
+											if (_elm_lang$core$Native_Utils.eq(_p487, i) && _elm_lang$core$Native_Utils.eq(_p489, i)) {
+												var _p485 = A5(_user$project$UpdateUtils$mergeVal, _p496, _p497, _p491, _p498, _p492);
+												var newVal = _p485._0;
+												var newDiffs = _p485._1;
 												var _v701 = i + 1,
 													_v702 = {
 													ctor: '::',
-													_0: {ctor: '_Tuple2', _0: _p489, _1: newVal},
+													_0: {ctor: '_Tuple2', _0: _p499, _1: newVal},
 													_1: accEnv
 												},
 													_v703 = {
@@ -65520,11 +65629,11 @@ var _user$project$UpdateUtils$mergeEnv = F5(
 													_0: {ctor: '_Tuple2', _0: i, _1: newDiffs},
 													_1: accDiffs
 												},
-													_v704 = _p485,
-													_v705 = _p483,
-													_v706 = _p478,
-													_v707 = _p484,
-													_v708 = _p480;
+													_v704 = _p495,
+													_v705 = _p493,
+													_v706 = _p488,
+													_v707 = _p494,
+													_v708 = _p490;
 												i = _v701;
 												accEnv = _v702;
 												accDiffs = _v703;
@@ -65535,22 +65644,22 @@ var _user$project$UpdateUtils$mergeEnv = F5(
 												modifs3 = _v708;
 												continue aux;
 											} else {
-												if (_elm_lang$core$Native_Utils.eq(_p477, i)) {
+												if (_elm_lang$core$Native_Utils.eq(_p487, i)) {
 													var _v709 = i + 1,
 														_v710 = {
 														ctor: '::',
-														_0: {ctor: '_Tuple2', _0: _p489, _1: _p487},
+														_0: {ctor: '_Tuple2', _0: _p499, _1: _p497},
 														_1: accEnv
 													},
 														_v711 = {
 														ctor: '::',
-														_0: {ctor: '_Tuple2', _0: i, _1: _p481},
+														_0: {ctor: '_Tuple2', _0: i, _1: _p491},
 														_1: accDiffs
 													},
-														_v712 = _p485,
-														_v713 = _p483,
-														_v714 = _p478,
-														_v715 = _p484,
+														_v712 = _p495,
+														_v713 = _p493,
+														_v714 = _p488,
+														_v715 = _p494,
 														_v716 = modifs3;
 													i = _v709;
 													accEnv = _v710;
@@ -65562,23 +65671,23 @@ var _user$project$UpdateUtils$mergeEnv = F5(
 													modifs3 = _v716;
 													continue aux;
 												} else {
-													if (_elm_lang$core$Native_Utils.eq(_p479, i)) {
+													if (_elm_lang$core$Native_Utils.eq(_p489, i)) {
 														var _v717 = i + 1,
 															_v718 = {
 															ctor: '::',
-															_0: {ctor: '_Tuple2', _0: _p489, _1: _p488},
+															_0: {ctor: '_Tuple2', _0: _p499, _1: _p498},
 															_1: accEnv
 														},
 															_v719 = {
 															ctor: '::',
-															_0: {ctor: '_Tuple2', _0: i, _1: _p482},
+															_0: {ctor: '_Tuple2', _0: i, _1: _p492},
 															_1: accDiffs
 														},
-															_v720 = _p485,
-															_v721 = _p483,
+															_v720 = _p495,
+															_v721 = _p493,
 															_v722 = modifs2,
-															_v723 = _p484,
-															_v724 = _p480;
+															_v723 = _p494,
+															_v724 = _p490;
 														i = _v717;
 														accEnv = _v718;
 														accDiffs = _v719;
@@ -65589,10 +65698,10 @@ var _user$project$UpdateUtils$mergeEnv = F5(
 														modifs3 = _v724;
 														continue aux;
 													} else {
-														var countToIgnore = A2(_elm_lang$core$Basics$min, _p479 - i, _p477 - i);
-														var _p476 = A2(_user$project$Utils$split, countToIgnore, originalEnv);
-														var toInsert = _p476._0;
-														var toRemain = _p476._1;
+														var countToIgnore = A2(_elm_lang$core$Basics$min, _p489 - i, _p487 - i);
+														var _p486 = A2(_user$project$Utils$split, countToIgnore, originalEnv);
+														var toInsert = _p486._0;
+														var toRemain = _p486._1;
 														var _v725 = i + countToIgnore,
 															_v726 = A2(_user$project$Utils$reverseInsert, toInsert, accEnv),
 															_v727 = accDiffs,
@@ -65626,10 +65735,10 @@ var _user$project$UpdateUtils$mergeEnv = F5(
 					return _elm_lang$core$Native_Utils.crashCase(
 						'UpdateUtils',
 						{
-							start: {line: 1899, column: 5},
-							end: {line: 1927, column: 110}
+							start: {line: 1911, column: 5},
+							end: {line: 1939, column: 110}
 						},
-						_p474)(
+						_p484)(
 						A2(
 							_elm_lang$core$Basics_ops['++'],
 							'Expected environments to have the same size, got\n',
@@ -65685,37 +65794,37 @@ var _user$project$UpdateUtils$recursiveMergeVal = F2(
 			original,
 			A2(
 				_elm_lang$core$List$filterMap,
-				function (_p493) {
-					var _p494 = _p493;
+				function (_p503) {
+					var _p504 = _p503;
 					return A2(
 						_elm_lang$core$Maybe$map,
 						F2(
 							function (v0, v1) {
 								return {ctor: '_Tuple2', _0: v0, _1: v1};
-							})(_p494._0),
-						_p494._1);
+							})(_p504._0),
+						_p504._1);
 				},
 				modifications));
 	});
 var _user$project$UpdateUtils$mergeValMaybe = F5(
 	function (original, modified1, modifs1, modified2, modifs2) {
-		var _p495 = modifs1;
-		if (_p495.ctor === 'Nothing') {
+		var _p505 = modifs1;
+		if (_p505.ctor === 'Nothing') {
 			return {ctor: '_Tuple2', _0: modified2, _1: modifs2};
 		} else {
-			var _p496 = modifs2;
-			if (_p496.ctor === 'Nothing') {
+			var _p506 = modifs2;
+			if (_p506.ctor === 'Nothing') {
 				return {ctor: '_Tuple2', _0: modified1, _1: modifs1};
 			} else {
-				return function (_p497) {
-					var _p498 = _p497;
+				return function (_p507) {
+					var _p508 = _p507;
 					return {
 						ctor: '_Tuple2',
-						_0: _p498._0,
-						_1: _elm_lang$core$Maybe$Just(_p498._1)
+						_0: _p508._0,
+						_1: _elm_lang$core$Maybe$Just(_p508._1)
 					};
 				}(
-					A5(_user$project$UpdateUtils$mergeVal, original, modified1, _p495._0, modified2, _p496._0));
+					A5(_user$project$UpdateUtils$mergeVal, original, modified1, _p505._0, modified2, _p506._0));
 			}
 		}
 	});
