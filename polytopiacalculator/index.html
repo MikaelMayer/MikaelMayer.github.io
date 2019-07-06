@@ -1,17 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<link rel="icon" href="SmallSwords.png?v=2" type="image/png" />
-	<link rel="apple-touch-icon" href="BigSwords.png?v=2" type="image/png" />
+	<link rel="icon" href="Other/SmallSwords.png?v=2" type="image/png" />
+	<link rel="apple-touch-icon" href="Other/BigSwords.png?v=2" type="image/png" />
 
 	<meta charset="UTF-8"/>
 	<meta name="description" content="Welcome to the unofficial Polytopia battle calculator! Try out a variety of combat situations and see what the end result is going to be." />
 	<meta name="author" content="FrothFrenzy" />
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
 
+	<meta property="og:url" content="https://frothfrenzy.github.io/polytopiacalculator/" />
+	<meta property="og:type" content="website" />
 	<meta property="og:title" content="Polytopia Battle Calculator" />
 	<meta property="og:description" content="Welcome to the unofficial Polytopia battle calculator! Try out a variety of combat situations and see what the end result is going to be." />
-	<meta property="og:image" content="https://frothfrenzy.github.io/polytopiacalculator/BigSwords.png" />
+	<meta property="og:image" content="https://frothfrenzy.github.io/polytopiacalculator/Other/BigSwords.png" />
 
 	<title>Polytopia Battle Calculator</title>
 
@@ -52,6 +54,12 @@ p
 {
 	max-height: 999999px;
 	font-size: 17px;
+	margin-top: 12px;
+	margin-bottom: 12px;
+}
+p.ext
+{
+	font-size: 16px;
 }
 p.i
 {
@@ -66,7 +74,7 @@ div.a
 }
 div.c
 {
-	font-size: 14px;
+	font-size: 13px;
 	max-height: 999999px;
 }
 div.ei
@@ -90,9 +98,10 @@ div.q
 	float: left;
 	width: 100%
 }
-input, button, select
+.textpress
 {
-	font-size: 16px;
+	padding-top: 4px;
+	padding-bottom: 4px;
 }
 .textpress:active
 {
@@ -106,11 +115,160 @@ input, button, select
 {
 	visibility: visible;
 }
+.container
+{
+	display: inline-block;
+	position: relative;
+	cursor: pointer;
+	height: 40px;
+	font-size: 17px;
+	border: 1px solid #A9A9A9;
+	padding-top: 10px;
+	padding-bottom: 6px;
+	padding-left: 2px;
+	padding-right: 2px;
+	box-sizing: border-box;
+	-moz-appearance:none;
+	-webkit-appearance: none;
+	appearance:none;
+}
+.container:active
+{
+	background-color: lightgray;
+}
+.shiphpcontainer
+{
+	display: inline-block;
+	cursor: pointer;
+	font-size: 17px;
+	border: 1px solid #A9A9A9;
+	width: 39px;
+	height: 40px;
+	padding-top: 10px;
+	padding-bottom: 6px;
+	padding-left: 2px;
+	padding-right: 2px;
+	text-align: center;
+	box-sizing: border-box;
+	-moz-appearance:none;
+	-webkit-appearance: none;
+	appearance:none;
+}
+.shiphpcontainer:active
+{
+	background-color: lightgray;
+}
+.creationcontainer
+{
+	display: inline-block;
+	cursor: pointer;
+	font-size: 17px;
+	border: 1px solid #A9A9A9;
+	width: 28px;
+	padding-top: 4px;
+	padding-bottom: 4px;
+	padding-left: 1px;
+	padding-right: 1px;
+	-moz-appearance:none;
+	-webkit-appearance: none;
+	appearance:none;
+}
+.container input
+{
+	position: absolute;
+	cursor: pointer;
+	height: 0;
+	width: 0;
+}
+.checkmark
+{
+	position: absolute;
+	height: 18px;
+	width: 18px;
+	top: 10px;
+	right: 2px;
+	background-color: #eee;
+	border: 1px solid #696969;
+	border-radius: 5px;
+}
+.checkmark:after
+{
+	content: "";
+	position: absolute;
+	display: none;
+}
+.container input:checked ~ .checkmark:after
+{
+	display: block;
+}
+.container .checkmark:after
+{
+	left: 6px;
+	top: 2px;
+	width: 4px;
+	height: 9px;
+	border: solid black;
+	border-width: 0 3px 3px 0;
+	transform: rotate(45deg);
+	-webkit-transform: rotate(45deg);
+	-ms-transform: rotate(45deg);
+}
+input[type=number]
+{
+	display: inline-block;
+	border: 1px solid #A9A9A9;
+	padding-top: 4px;
+	padding-bottom: 4px;
+	padding-left: 1px;
+	padding-right: 1px;
+	border-radius: 0;
+	font-size: 17px;
+	-moz-appearance:none;
+	-webkit-appearance: none;
+	appearance:none;
+}
+select
+{
+	position: relative;
+	width: 135px;
+	height: 40px;
+	font-size: 17px;
+	display: inline-block;
+	border: 1px solid #A9A9A9;
+	padding-left: 1px;
+	padding-right: 2px;
+	padding-top: 5px;
+	padding-bottom: 5px;
+	border-radius: 0;
+	background: url(Other/DownArrow.png) no-repeat right;
+	box-sizing: border-box;
+	-moz-appearance:none;
+	-webkit-appearance: none;
+	appearance:none;
+}
+select::-ms-expand
+{
+	display: none;
+}
+button
+{
+	font-size: 17px;
+	background-color: #eee;
+	color: black;
+	padding: 7px 11px;
+	border: 1px solid #696969;
+	border-radius: 5px;
+	cursor: pointer;
+}
+button:active
+{
+	background-color: lightgray;
+}
 </style>
 
 </head>
 
-<body onload="mobilescreen()">
+<body onload="loadelements()">
 <script>
 var extinfo = [];
 var tapcounter = 0;
@@ -120,6 +278,7 @@ var defenders = [];
 var attackerselected = -1;
 var defenderselected = -1;
 var prevattackerselected = -2;
+var prevdefenderselected = -2;
 var deleteselected = false;
 var backupattackers = [];
 var backupdefenders = [];
@@ -127,6 +286,13 @@ var firstbackup = false;
 var noretalswitch = true;
 var answersexpanded = 0;
 var refreshcounter = 0;
+var refatthpcounter = 0;
+var refdefhpcounter = 0;
+var shortparameter = false;
+var savednumber = 0;
+var prevattshiphp = 10;
+var prevdefshiphp = 10;
+var freezecounter = 0;
 
 function messageclear()
 {
@@ -134,6 +300,7 @@ function messageclear()
 	document.getElementById("resultdef").innerHTML = "";
 	document.getElementById("resultsplash").innerHTML = "";
 	document.getElementById("note").innerHTML = "";
+	document.getElementById("frozennote").innerHTML = "";
 }
 function calculate(mode)
 {
@@ -166,9 +333,38 @@ function calculate(mode)
 		var attname = document.getElementById("selectattacker").value;
 		var defname = document.getElementById("selectdefender").value;
 	}
-	tapcounter = 0;
-	refreshcounter = 0;
-	if (mode != "Multi")
+	resetcounters();
+	if (atthp == 123)
+	{
+		messageclear();
+		warning = true;
+		defhp = parseInt(document.getElementById("defensehp").value);
+		if (defhp == 0)
+		{
+			document.getElementById("resultatt").innerHTML = "Combat history must contain at least 1 entry!";
+			scrollanchor.scrollIntoView(false);
+		}
+		else
+		{
+			if (defhp == 1)
+			{
+				document.getElementById("resultatt").innerHTML = "Combat history limit set to 1 entry!";
+			}
+			else
+			{
+				document.getElementById("resultatt").innerHTML = "Combat history limit set to " +  defhp + " entries!";
+			}
+			extinfo.splice (defhp, (extinfo.length - 1));
+			document.getElementById("extendedinfo").innerHTML = extinfo.join("");
+			entries = defhp;
+			if (extinfo.length == 0)
+			{
+			document.getElementById("extendedinfo").innerHTML = "<span style='border-top: 1px dashed black; padding-top: 10px; display: block; max-width: 350px;'></span><span class='ext'>Battle history does not contain any entries yet.</span>";
+			}
+			scrollanchor.scrollIntoView(false);
+		}
+	}
+	if ((mode != "Multi") && (warning != true))
 	{
 		if (isNaN(att) == true || isNaN(def) == true || isNaN(atthp) == true ||
 			  isNaN(defhp) == true || isNaN(attmaxhp) == true || isNaN(defmaxhp) == true)
@@ -244,32 +440,6 @@ function calculate(mode)
 			scrollanchor.scrollIntoView(false);
 		}
 	}
-	if (warning != true && att == 123)
-	{
-		messageclear();
-		warning = true;
-		def = parseInt(document.getElementById("defense").value);
-		if (def == 0)
-		{
-			document.getElementById("resultatt").innerHTML = "Combat history must contain at least 1 entry!";
-			scrollanchor.scrollIntoView(false);
-		}
-		else
-		{
-			if (def == 1)
-			{
-				document.getElementById("resultatt").innerHTML = "Combat history limit set to 1 entry!";
-			}
-			else
-			{
-				document.getElementById("resultatt").innerHTML = "Combat history limit set to " +  def + " entries!";
-			}
-			extinfo.splice (def, (extinfo.length - 1));
-			document.getElementById("extendedinfo").innerHTML = extinfo.join("");
-			entries = def;
-			scrollanchor.scrollIntoView(false);
-		}
-	}
 	if (warning != true)
 	{
 		messageclear();
@@ -295,24 +465,63 @@ function calculate(mode)
 
 		if (testdef == true)
 		{
-			if (defname == "Amphibian")
+			if (defname == "Catapult")
+			{
+				document.getElementById("note").innerHTML = "Note: Catapults can't benefit any from defense bonuses due to their 0 defense value!";
+			}
+			else if (defname == "Mind Bender")
 			{
 				defforce = defforce * 1.5;
-				document.getElementById("note").innerHTML = "Note: Amphibians don't receive the defense bonus from cities!";
+				document.getElementById("note").innerHTML = "Note: Mind Benders don't receive the defense bonus from cities!";
+			}
+			else if (defname == "Giant")
+			{
+				defforce = defforce * 1.5;
+				document.getElementById("note").innerHTML = "Note: Giants don't receive the defense bonus from cities!";
+			}
+			else if (defname == "Navalon")
+			{
+				defforce = defforce * 1.5;
+				document.getElementById("note").innerHTML = "Note: Navalons don't receive the defense bonus from cities!";
+			}
+			else if (defname == "Baby Dragon")
+			{
+				defforce = defforce * 1.5;
+				document.getElementById("note").innerHTML = "Note: Baby Dragons don't receive the defense bonus from cities!";
+			}
+			else if (defname == "Fire Dragon")
+			{
+				defforce = defforce * 1.5;
+				document.getElementById("note").innerHTML = "Note: Fire Dragons don't receive the defense bonus from cities!";
 			}
 			else if (defname == "Crab")
 			{
 				defforce = defforce * 1.5;
 				document.getElementById("note").innerHTML = "Note: Crabs don't receive the defense bonus from cities!";
 			}
-			else if (defname == "Tridention")
+			else if (defname == "Mooni")
 			{
 				defforce = defforce * 1.5;
-				document.getElementById("note").innerHTML = "Note: Tridentions don't receive the defense bonus from cities!";
+				document.getElementById("note").innerHTML = "Note: Moonies don't receive the defense bonus from cities!";
+			}
+			else if (defname == "Battle Sled")
+			{
+				defforce = defforce * 1.5;
+				document.getElementById("note").innerHTML = "Note: Battle Sleds don't receive the defense bonus from cities!";
+			}
+			else if (defname == "Ice Fortress")
+			{
+				defforce = defforce * 1.5;
+				document.getElementById("note").innerHTML = "Note: Ice Fortresses don't receive the defense bonus from cities!";
+			}
+			else if (defname == "Gaami")
+			{
+				defforce = defforce * 1.5;
+				document.getElementById("note").innerHTML = "Note: Gaamis don't receive the defense bonus from cities!";
 			}
 			else if (defname == "Nature Bunny")
 			{
-				document.getElementById("note").innerHTML = "Note: Nature bunnies can't capture cities and don't have any defensive technologies! Defense bonus was disregarded in the result.";
+				document.getElementById("note").innerHTML = "Note: Nature Bunnies can't capture cities and don't have any defensive technologies! Defense bonus was disregarded in the result.";
 			}
 			else
 			{
@@ -339,25 +548,53 @@ function calculate(mode)
 			{
 				document.getElementById("note").innerHTML = "Note: Ships can't benefit from walls! Wall bonus was disregarded in the result.";
 			}
+			else if (defname == "Catapult")
+			{
+				document.getElementById("note").innerHTML = "Note: Catapults can't benefit from any defense bonuses due to their 0 defense value!";
+			}
+			else if (defname == "Mind Bender")
+			{
+				document.getElementById("note").innerHTML = "Note: Mind Benders don't receive the defense bonus from cities! Wall bonus was disregarded in the result.";
+			}
+			else if (defname == "Giant")
+			{
+				document.getElementById("note").innerHTML = "Note: Giants don't receive the defense bonus from cities! Wall bonus was disregarded in the result.";
+			}
 			else if (defname == "Navalon")
 			{
-				document.getElementById("note").innerHTML = "Note: Navalons can't benefit from walls! Wall bonus was disregarded in the result.";
+				document.getElementById("note").innerHTML = "Note: Navalons don't receive the defense bonus from cities! Wall bonus was disregarded in the result.";
 			}
-			else if (defname == "Amphibian")
+			else if (defname == "Baby Dragon")
 			{
-				document.getElementById("note").innerHTML = "Note: Amphibians don't receive the defense bonus from cities! Wall bonus was disregarded in the result.";
+				document.getElementById("note").innerHTML = "Note: Baby Dragons don't receive the defense bonus from cities! Wall bonus was disregarded in the result.";
+			}
+			else if (defname == "Fire Dragon")
+			{
+				document.getElementById("note").innerHTML = "Note: Fire Dragons don't receive the defense bonus from cities! Wall bonus was disregarded in the result.";
 			}
 			else if (defname == "Crab")
 			{
 				document.getElementById("note").innerHTML = "Note: Crabs don't receive the defense bonus from cities! Wall bonus was disregarded in the result.";
 			}
-			else if (defname == "Tridention")
+			else if (defname == "Mooni")
 			{
-				document.getElementById("note").innerHTML = "Note: Tridentions don't receive the defense bonus from cities! Wall bonus was disregarded in the result.";
+				document.getElementById("note").innerHTML = "Note: Moonies don't receive the defense bonus from cities! Wall bonus was disregarded in the result.";
+			}
+			else if (defname == "Battle Sled")
+			{
+				document.getElementById("note").innerHTML = "Note: Battle Sleds don't receive the defense bonus from cities! Wall bonus was disregarded in the result.";
+			}
+			else if (defname == "Ice Fortress")
+			{
+				document.getElementById("note").innerHTML = "Note: Ice Fortresses don't receive the defense bonus from cities! Wall bonus was disregarded in the result.";
+			}
+			else if (defname == "Gaami")
+			{
+				document.getElementById("note").innerHTML = "Note: Gaamis don't receive the defense bonus from cities! Wall bonus was disregarded in the result.";
 			}
 			else if (defname == "Nature Bunny")
 			{
-				document.getElementById("note").innerHTML = "Note: Nature bunnies can't capture cities! Wall bonus was disregarded in the result.";
+				document.getElementById("note").innerHTML = "Note: Nature Bunnies can't capture cities! Wall bonus was disregarded in the result.";
 			}
 			else
 			{
@@ -365,22 +602,10 @@ function calculate(mode)
 				defbonus = "|W";
 			}
 		}
-		if (attname == "Select Attacker")
-		{
-			unit1 = "Unit " + att + "|" + atthp + "|" + attmaxhp + " - ";
-		}
-		else
-		{
-			unit1 = attname + " " + att + "|" + atthp + "|" + attmaxhp + " - ";
-		}
-		if (defname == "Select Defender")
-		{
-			unit2 = "Unit " + def + "|" + defhp + "|" + defmaxhp + defbonus;
-		}
-		else
-		{
-			unit2 = defname + " " + def + "|" + defhp + "|" + defmaxhp + defbonus;
-		}
+		
+		unit1 = attname + " " + att + "|" + atthp + "|" + attmaxhp + " - ";
+		unit2 = defname + " " + def + "|" + defhp + "|" + defmaxhp + defbonus;
+			
 		totaldam = attforce + defforce;
 		res = Math.round(attforce / totaldam * att * 4.5);
 		if (isNaN(res) == true)
@@ -455,15 +680,34 @@ function calculate(mode)
 		{
 			if (defhp > 0) 
 			{
-				bstring = document.getElementById("resultdef").innerHTML = "Defender survives! Remaining HP:  " + defhp;
-				document.getElementById("defensehp").value = defhp;
+				if (attname == "Ice Archer")
+				{
+					bstring = document.getElementById("resultdef").innerHTML = "Defender is FROZEN! Remaining HP:  " + defhp;
+					document.getElementById("frozennote").innerHTML = "Frozen units can't retaliate!";
+				}
+				else
+				{
+					bstring = document.getElementById("resultdef").innerHTML = "Defender survives! Remaining HP:  " + defhp;
+					document.getElementById("defensehp").value = defhp;
+				}
 				res = Math.round(defforce / totaldam * def * 4.5);
 				if (isNaN(res) == true)
 				{
 					res = 0;
 				}
+				if (attname == "Ice Archer" || defname == "Mooni" || defname == "Ice Archer")
+				{
+					res = 0;
+					if (defname == "Mooni")
+					{
+						document.getElementById("note").innerHTML = "Moonies can't retaliate!";
+					}
+					if (defname == "Ice Archer")
+					{
+						document.getElementById("note").innerHTML = "Ice Archers can't retaliate!";
+					}
+				}
 				atthp = atthp - res;
-			
 				if (atthp > 0)
 				{
 					astring = document.getElementById("resultatt").innerHTML = "Attacker survives! Remaining HP:  " + atthp;
@@ -484,9 +728,43 @@ function calculate(mode)
 		{
 			if (defhp > 0) 
 			{
-				bstring = document.getElementById("resultdef").innerHTML = "Defender survives! Remaining HP:  " + defhp;
-				defenders[defenderselected].hp = defhp;
-				res = Math.round(defforce / totaldam * def * 4.5);
+				if (attname == "Ice Archer")
+				{
+					bstring = document.getElementById("resultdef").innerHTML = "Defender is FROZEN! Remaining HP:  " + defhp;
+					document.getElementById("frozennote").innerHTML = "Frozen units can't retaliate!";
+					defenders[defenderselected].frozen = true;
+				}
+				
+				else
+				{
+					if (defenders[defenderselected].frozen == true)
+					{
+						bstring = document.getElementById("resultdef").innerHTML = "Defender is FROZEN! Remaining HP:  " + defhp;
+					}
+					else
+					{
+						bstring = document.getElementById("resultdef").innerHTML = "Defender survives! Remaining HP:  " + defhp;
+					}
+					defenders[defenderselected].hp = defhp;
+					res = Math.round(defforce / totaldam * def * 4.5);
+					if (defenders[defenderselected].frozen == true)
+					{
+						res = 0;
+						document.getElementById("frozennote").innerHTML = "Frozen units can't retaliate!";
+					}
+					else if (defname == "Mooni" || defname == "Ice Archer")
+					{
+						res = 0;
+						if (defname == "Mooni" && attackers[attackerselected].defendersattacked.length == 0)
+						{
+							document.getElementById("note").innerHTML = "Moonies can't retaliate!";
+						}
+						if (defname == "Ice Archer" && attackers[attackerselected].defendersattacked.length == 0)
+						{
+							document.getElementById("note").innerHTML = "Ice Archers can't retaliate!";
+						}
+					}
+				}
 				if (isNaN(res) == true)
 				{
 					res = 0;
@@ -578,6 +856,10 @@ function calculate(mode)
 			{
 				color = "gray";
 			}
+			else if (defenders[defenderselected].frozen == true)
+			{
+				color = "blue";
+			}
 			document.getElementById("defender" + defenderselected).innerHTML ="<img src='Defenders/" + defenders[defenderselected].type + ".png' height='55' width='55'><div style='position: absolute; top: 1px; right: 1px'><b>" + defenders[defenderselected].defbonus + "</b></div><div style='position: absolute; width: 100%; bottom: 2px; text-align: center'>" + defenders[defenderselected].d + "/" + defenders[defenderselected].hp + "/" + defenders[defenderselected].maxhp + "</div>";
 			document.getElementById("defender" + defenderselected).style.borderColor = color;
 
@@ -588,7 +870,7 @@ function calculate(mode)
 		}
 		if (mode == "Multi")
 		{
-			if ((attackers[attackerselected].type == "Archer") || (attackers[attackerselected].type == "Catapult") || (attackers[attackerselected].type == "Boat") || (attackers[attackerselected].type == "Ship") || (attackers[attackerselected].type == "Battleship") || (attackers[attackerselected].type == "Tridention"))
+			if ((attackers[attackerselected].type == "Archer") || (attackers[attackerselected].type == "Catapult") || (attackers[attackerselected].type == "Boat") || (attackers[attackerselected].type == "Ship") || (attackers[attackerselected].type == "Battleship") || (attackers[attackerselected].type == "Tridention") || (attackers[attackerselected].type == "Ice Fortress"))
 			{
 				document.getElementById("noretalbox").checked = false;
 				document.getElementById("noretaltext").style.visibility = "hidden";
@@ -607,7 +889,7 @@ function calculate(mode)
 		{
 			extinfo.pop();
 		}
-		extinfo.splice(0, 0, "-------------------------------------------------------<p>" + unit1 + unit2 + "</p><p>" + astring + "</p><p>" + bstring + "</p><p>" + cstring + "</p>");
+		extinfo.splice(0, 0, "<span style='border-top: 1px dashed black; display: block; max-width: 350px;'></span><p class='ext'>" + unit1 + unit2 + "</p><p class='ext'>" + astring + "</p><p class='ext'>" + bstring + "</p><p class='ext'>" + cstring + "</p>");
 		document.getElementById("extendedinfo").innerHTML = extinfo.join("");
 
 		if (mode != "Multi")
@@ -657,21 +939,6 @@ function setwallbonus()
 		document.getElementById("def2").checked = true;
 	}
 	wallcheck();
-}
-function clearform()
-{
-	document.getElementById("values").reset();
-	document.getElementById("resultatt").innerHTML = "";
-	document.getElementById("resultdef").innerHTML = "";
-	document.getElementById("resultsplash").innerHTML = "";
-	document.getElementById("note").innerHTML = "";
-	document.getElementById("attveterancy").style.display='none';
-	document.getElementById("attshiphp").style.display='none';
-	document.getElementById("defveterancy").style.display='none';
-	document.getElementById("defshiphp").style.display='none';
-	document.getElementById("extendedinfo").style.display='none';
-	document.body.scrollTop = document.documentElement.scrollTop = 0;
-	tapcounter = 0;
 }
 function clickImage() {
   this.classList.add("selected");
@@ -785,18 +1052,43 @@ function attackerfill()
 			document.getElementById("attackhp").value = "20";
 			document.getElementById("attackmaxhp").value = "20";
 			break;
+		case "Ice Archer":
+			document.getElementById("attack").value = "0";
+			document.getElementById("attackhp").value = "10";
+			document.getElementById("attackmaxhp").value = "10";
+			break;
+		case "Battle Sled":
+			document.getElementById("attack").value = "3";
+			document.getElementById("attackhp").value = "15";
+			document.getElementById("attackmaxhp").value = "15";
+			break;
+		case "Ice Fortress":
+			document.getElementById("attack").value = "4";
+			document.getElementById("attackhp").value = "20";
+			document.getElementById("attackmaxhp").value = "20";
+			break;
+		case "Gaami":
+			document.getElementById("attack").value = "4";
+			document.getElementById("attackhp").value = "30";
+			document.getElementById("attackmaxhp").value = "30";
+			break;
 	}
-	if (getattacker == "Warrior" || getattacker == "Rider" || getattacker == "Defender" || getattacker == "Swordsman" || getattacker == "Archer" || getattacker == "Catapult" || getattacker == "Knight" || getattacker == "Amphibian" || getattacker == "Tridention")
+	document.getElementById("shortatt").innerText = "(" + document.getElementById("attack").value + ")";
+	if (getattacker == "Warrior" || getattacker == "Rider" || getattacker == "Defender" || getattacker == "Swordsman" || getattacker == "Archer" || getattacker == "Catapult" || getattacker == "Knight" || getattacker == "Amphibian" || getattacker == "Tridention" || getattacker == "Battle Sled" || getattacker == "Ice Fortress")
 	{
 		document.getElementById("attvetbox").checked = false;
-		document.getElementById("attveterancy").style.display='inline';
+		document.getElementById("attveterancy").style.display='inline-block';
 		document.getElementById("attshiphp").style.display='none';
 	}
 	else if (getattacker == "Boat" || getattacker == "Ship" || getattacker == "Battleship")
 	{
-		document.getElementById("attshiphp").selectedIndex = "0";
-		document.getElementById("attshiphp").style.display='inline';
+		document.getElementById("attshiphp").style.display='inline-block';
 		document.getElementById("attveterancy").style.display='none';
+		document.getElementById("attshiphp" + prevattshiphp).style.border = "1px solid #A9A9A9";
+		document.getElementById("attshiphp" + prevattshiphp).style.backgroundColor = "";
+		document.getElementById("attshiphp10").style.border = "1px solid black";
+		document.getElementById("attshiphp10").style.backgroundColor = "#eee";
+		prevattshiphp = 10;
 	}
 	else
 	{
@@ -917,16 +1209,42 @@ function defenderfill()
 			document.getElementById("defensehp").value = "20";
 			document.getElementById("defensemaxhp").value = "20";
 			break;
+		case "Mooni":
+			document.getElementById("defense").value = "2";
+			document.getElementById("defensehp").value = "10";
+			document.getElementById("defensemaxhp").value = "10";
+			break;
+		case "Ice Archer":
+			document.getElementById("defense").value = "1";
+			document.getElementById("defensehp").value = "10";
+			document.getElementById("defensemaxhp").value = "10";
+			break;
+		case "Battle Sled":
+			document.getElementById("defense").value = "2";
+			document.getElementById("defensehp").value = "15";
+			document.getElementById("defensemaxhp").value = "15";
+			break;
+		case "Ice Fortress":
+			document.getElementById("defense").value = "3";
+			document.getElementById("defensehp").value = "20";
+			document.getElementById("defensemaxhp").value = "20";
+			break;
+		case "Gaami":
+			document.getElementById("defense").value = "4";
+			document.getElementById("defensehp").value = "30";
+			document.getElementById("defensemaxhp").value = "30";
+			break;
 		case "Nature Bunny":
 			document.getElementById("defense").value = "1";
 			document.getElementById("defensehp").value = "20";
 			document.getElementById("defensemaxhp").value = "20";
 			break;
 	}
-	if (getdefender == "Warrior" || getdefender == "Rider" || getdefender == "Defender" || getdefender == "Swordsman" || getdefender == "Archer" || getdefender == "Catapult" || getdefender == "Knight" || getdefender == "Amphibian" || getdefender == "Tridention")
+	document.getElementById("shortdef").innerText = "(" + document.getElementById("defense").value + ")";
+	if (getdefender == "Warrior" || getdefender == "Rider" || getdefender == "Defender" || getdefender == "Swordsman" || getdefender == "Archer" || getdefender == "Catapult" || getdefender == "Knight" || getdefender == "Amphibian" || getdefender == "Tridention" || getdefender == "Battle Sled" || getdefender == "Ice Fortress")
 	{
 		document.getElementById("defvetbox").checked = false;
-		document.getElementById("defveterancy").style.display='inline';
+		document.getElementById("defveterancy").style.display='inline-block';
 		document.getElementById("defshiphp").style.display='none';
 	}
 	else if (getdefender == "Boat" || getdefender == "Ship" || getdefender == "Battleship")
@@ -934,6 +1252,11 @@ function defenderfill()
 		document.getElementById("defshiphp").selectedIndex = "0";
 		document.getElementById("defshiphp").style.display='inline';
 		document.getElementById("defveterancy").style.display='none';
+		document.getElementById("defshiphp" + prevdefshiphp).style.border = "1px solid #A9A9A9";
+		document.getElementById("defshiphp" + prevdefshiphp).style.backgroundColor = "";
+		document.getElementById("defshiphp10").style.border = "1px solid black";
+		document.getElementById("defshiphp10").style.backgroundColor = "#eee";
+		prevdefshiphp = 10;
 	}
 	else
 	{
@@ -948,32 +1271,6 @@ function egg(attack)
 		document.getElementById("resultatt").innerHTML = "It's over 9000!!!";
 		document.getElementById("note").innerHTML = "There's no way that can be right!";
 	}
-}
-function attvettest()
-{
-	var test = document.getElementById("attvetbox").checked;
-	if (test == true)
-	{
-		document.getElementById("attvetbox").checked = false;
-	}
-	else
-	{
-		document.getElementById("attvetbox").checked = true;
-	}
-	attackerveteran();
-}
-function defvettest()
-{
-	var test = document.getElementById("defvetbox").checked;
-	if (test == true)
-	{
-		document.getElementById("defvetbox").checked = false;
-	}
-	else
-	{
-		document.getElementById("defvetbox").checked = true;
-	}
-	defenderveteran();
 }
 function attackerveteran()
 {
@@ -1025,6 +1322,16 @@ function attackerveteran()
 			document.getElementById("attack").value = "3";
 			document.getElementById("attackhp").value = "15";
 			document.getElementById("attackmaxhp").value = "15";
+			break;
+		case "Battle Sled":
+			document.getElementById("attack").value = "3";
+			document.getElementById("attackhp").value = "15";
+			document.getElementById("attackmaxhp").value = "15";
+			break;
+		case "Ice Fortress":
+			document.getElementById("attack").value = "4";
+			document.getElementById("attackhp").value = "20";
+			document.getElementById("attackmaxhp").value = "20";
 			break;
 	}
 	var atthp = parseInt(document.getElementById("attackhp").value);
@@ -1086,6 +1393,16 @@ function defenderveteran()
 			document.getElementById("defensehp").value = "15";
 			document.getElementById("defensemaxhp").value = "15";
 			break;
+		case "Battle Sled":
+			document.getElementById("defense").value = "2";
+			document.getElementById("defensehp").value = "15";
+			document.getElementById("defensemaxhp").value = "15";
+			break;
+		case "Ice Fortress":
+			document.getElementById("defense").value = "3";
+			document.getElementById("defensehp").value = "20";
+			document.getElementById("defensemaxhp").value = "20";
+			break;
 	}
 	var defhp = parseInt(document.getElementById("defensehp").value);
 	var defmaxhp = parseInt(document.getElementById("defensemaxhp").value);
@@ -1095,10 +1412,18 @@ function defenderveteran()
 		document.getElementById("defensemaxhp").value = defmaxhp + 5;
 	}
 }
-function attackershiphp()
+function attackershiphp(selectattshiphp)
 {
 	var getattacker = document.getElementById("selectattacker").value;
-	var getattshiphp = document.getElementById("attshiphp").value;
+	var getattshiphp = selectattshiphp;
+	
+	document.getElementById("attshiphp" + prevattshiphp).style.border = "1px solid #A9A9A9";
+	document.getElementById("attshiphp" + prevattshiphp).style.backgroundColor = "";
+	document.getElementById("attshiphp" + selectattshiphp).style.border = "1px solid black";
+	document.getElementById("attshiphp" + prevattshiphp).style.backgroundColor = "";
+	document.getElementById("attshiphp" + selectattshiphp).style.backgroundColor = "#eee";
+	prevattshiphp = selectattshiphp;
+	
 	switch (getattacker)
 	{
 		case "Boat":
@@ -1117,26 +1442,34 @@ function attackershiphp()
 			document.getElementById("attackmaxhp").value = "10";
 			break;
 	}
+	
 	switch (getattshiphp)
 	{
-		case "HP 15":
+		case 15:
 			document.getElementById("attackhp").value = "15";
 			document.getElementById("attackmaxhp").value = "15";
 			break;
-		case "HP 20":
+		case 20:
 			document.getElementById("attackhp").value = "20";
 			document.getElementById("attackmaxhp").value = "20";
 			break;
-		case "HP 40":
+		case 40:
 			document.getElementById("attackhp").value = "40";
 			document.getElementById("attackmaxhp").value = "40";
 			break;
 	}
 }
-function defendershiphp()
+function defendershiphp(selectdefshiphp)
 {
 	var getdefender = document.getElementById("selectdefender").value;
-	var getdefshiphp = document.getElementById("defshiphp").value;
+	var getdefshiphp = selectdefshiphp;
+	
+	document.getElementById("defshiphp" + prevdefshiphp).style.border = "1px solid #A9A9A9";
+	document.getElementById("defshiphp" + prevdefshiphp).style.backgroundColor = "";
+	document.getElementById("defshiphp" + selectdefshiphp).style.border = "1px solid black";
+	document.getElementById("defshiphp" + selectdefshiphp).style.backgroundColor = "#eee";
+	prevdefshiphp = selectdefshiphp;
+	
 	switch (getdefender)
 	{
 		case "Boat":
@@ -1157,27 +1490,74 @@ function defendershiphp()
 	}
 	switch (getdefshiphp)
 	{
-		case "HP 15":
+		case 15:
 			document.getElementById("defensehp").value = "15";
 			document.getElementById("defensemaxhp").value = "15";
 			break;
-		case "HP 20":
+		case 20:
 			document.getElementById("defensehp").value = "20";
 			document.getElementById("defensemaxhp").value = "20";
 			break;
-		case "HP 40":
+		case 40:
 			document.getElementById("defensehp").value = "40";
 			document.getElementById("defensemaxhp").value = "40";
 			break;
 	}
+}
+function refreshatthp()
+{
+	refatthpcounter++;
+	if (refatthpcounter > 1)
+	{
+		refatthpcounter = 0;
+		document.getElementById("attackhp").value = document.getElementById("attackmaxhp").value;
+	}
+}
+function refreshdefhp()
+{
+	refdefhpcounter++;
+	if (refdefhpcounter > 1)
+	{
+		refdefhpcounter = 0;
+		document.getElementById("defensehp").value = document.getElementById("defensemaxhp").value;
+	}
+}
+function numberfocus(focusid)
+{
+	resetcounters();
+	savednumber = document.getElementById(focusid).value;
+	document.getElementById(focusid).value = "";
+	if ((shortparameter == true) || (document.getElementById("multibutton").innerText == "Single"))
+	{
+		if (focusid == "attackhp")
+		{
+			document.getElementById("attackhprem").innerText = "(" + savednumber + "/" + document.getElementById("attackmaxhp").value + ")";
+		}
+		else
+		{
+			document.getElementById("defensehprem").innerText = "(" + savednumber + "/" + document.getElementById("defensemaxhp").value + ")";
+		}
+	}
+	else
+	{
+		document.getElementById(focusid + "rem").innerText = "(" + savednumber + ")";
+	}
+	document.getElementById(focusid + "rem").style.visibility = "visible";
+}
+function numberfocusout (focusoutid)
+{
+	if (document.getElementById(focusoutid).value == "")
+	{
+		document.getElementById(focusoutid).value = savednumber;
+	}
+	document.getElementById(focusoutid + "rem").style.visibility = "hidden";
 }
 function show(shown, hidden)
 {
 	document.body.scrollTop = document.documentElement.scrollTop = 0;
 	document.getElementById(shown).style.display='block';
  	document.getElementById(hidden).style.display='none';
-	tapcounter = 0;
-	refreshcounter = 0;
+	resetcounters();
 	if ((document.getElementById("multibutton").innerText == "Single") && (deleteselected == true))
 	{
 		messageclear();
@@ -1209,9 +1589,31 @@ function displayextinfo()
 		scrollanchor.scrollIntoView(false);
 	}
 }
+function resetcounters()
+{
+	tapcounter = 0;
+	refreshcounter = 0;
+	refatthpcounter = 0;
+	refdefhpcounter = 0;
+	freezecounters = 0;
+	prevdefenderselected = -1;
+}
 function choosetype()
 {
-	var unittype = document.getElementById("unitselect").value;
+	if (document.getElementById("unitselect").innerText == "Create Attacker")
+	{
+		document.getElementById("unitselect").innerText = "Create Defender";
+		document.getElementById("switch1").style.visibility = "hidden";
+		document.getElementById("switch2").style.visibility = "visible";
+	}
+	else
+	{
+		document.getElementById("unitselect").innerText = "Create Attacker";
+		document.getElementById("switch1").style.visibility = "visible";
+		document.getElementById("switch2").style.visibility = "hidden";
+	}
+	
+	var unittype = document.getElementById("unitselect").innerText;
 	if (unittype == "Create Attacker")
 	{
 		document.getElementById("attvalues").style.display='block';
@@ -1240,11 +1642,10 @@ function multiswitch()
 		document.getElementById("submitbutton").style.display='none';
 		document.getElementById("createbutton").style.display='inline-block';
 		document.getElementById("multibutton").innerText = "Single";
-		document.getElementById("clearbutton").style.display='none';
 		document.getElementById("deletebutton").style.display='inline-block';
 		document.getElementById("singlefaq").style.display='none';
 		document.getElementById("result").innerText = "Feedback:";
-		document.getElementById("unitselect").style.display='block';
+		document.getElementById("createunitbutton").style.display='inline-block';
 		document.getElementById("attackerlist").style.display='block';
 		document.getElementById("defenderlist").style.display='block';
 		document.getElementById("attackersheader").style.display='block';
@@ -1253,32 +1654,31 @@ function multiswitch()
 		document.getElementById("def1").checked = false;
 		document.getElementById("def2").checked = false;
 		document.getElementById("selectattacker").firstElementChild.onclick();
+		document.getElementById("attshiphp" + prevattshiphp).style.border = "1px solid #A9A9A9";
+		document.getElementById("attshiphp" + prevattshiphp).style.backgroundColor = "";
+		prevattshiphp = 10;
+		document.getElementById("defshiphp" + prevdefshiphp).style.border = "1px solid #A9A9A9";
+		document.getElementById("defshiphp" + prevdefshiphp).style.backgroundColor = "";
+		prevdefshiphp = 10;
+		attackerfill.bind(document.querySelector("#selectattacker img"))();
 		document.getElementById("selectdefender").firstElementChild.onclick();
+		defenderfill.bind(document.querySelector("#selectdefender img"))();
+		document.getElementById("unitselect").innerText = "Create Defender";
 		choosetype();
 		document.body.scrollTop = document.documentElement.scrollTop = 0;
-		tapcounter = 0;
+		resetcounters();
 	}
 	else
 	{
 		document.getElementById("submitbutton").style.display='inline-block';
 		document.getElementById("createbutton").style.display='none';
 		document.getElementById("multibutton").innerText = "Multi";
-		document.getElementById("clearbutton").style.display='inline-block';
 		document.getElementById("deletebutton").style.display='none';
 		document.getElementById("singlefaq").style.display='inline-block';
 		document.getElementById("result").innerText = "Result:";
-		document.getElementById("unitselect").style.display='none';
+		document.getElementById("createunitbutton").style.display='none';
 		document.getElementById("attvalues").style.display='block';
-		document.getElementById("attvaluetext").style.display='block';
-		document.getElementById("attmaxhptext").style.display='block';
-		document.getElementById("attack").style.display='block';
-		document.getElementById("attackmaxhp").style.display='block';
 		document.getElementById("defvalues").style.display='block';
-		document.getElementById("defvalues").style.display='block';
-		document.getElementById("defvaluetext").style.display='block';
-		document.getElementById("defmaxhptext").style.display='block';
-		document.getElementById("defense").style.display='block';
-		document.getElementById("defensemaxhp").style.display='block';
 		document.getElementById("attvalues").style.display='block';
 		document.getElementById("attackerlist").style.display='none';
 		document.getElementById("defenderlist").style.display='none';
@@ -1286,8 +1686,18 @@ function multiswitch()
 		document.getElementById("defendersheader").style.display='none';
 		document.getElementById("states").style.display='none';
 		document.body.scrollTop = document.documentElement.scrollTop = 0;
-		tapcounter = 0;
-		refreshcounter = 0;
+		if (shortparameter == false)
+		{
+				document.getElementById("attvaluetext").style.display='block';
+				document.getElementById("attack").style.display='block';
+				document.getElementById("attmaxhptext").style.display='block';
+				document.getElementById("attackmaxhp").style.display='block';
+				document.getElementById("defvaluetext").style.display='block';
+				document.getElementById("defense").style.display='block';
+				document.getElementById("defmaxhptext").style.display='block';
+				document.getElementById("defensemaxhp").style.display='block';
+		}
+		resetcounters();
 		if (deleteselected == true)
 		{
 			messageclear();
@@ -1298,15 +1708,14 @@ function multiswitch()
 }
 function createunit()
 {
-	tapcounter = 0;
-	refreshcounter = 0;
+	resetcounters();
 	warning = false;
 	if (deleteselected == true)
 	{
 		deleteselected = false;
 		document.getElementById("deletebutton").innerText = "Delete Units";
 	}
-	if (document.getElementById("unitselect").value == "Create Attacker")
+	if (document.getElementById("unitselect").innerText == "Create Attacker")
 	{
 		var att = parseFloat(document.getElementById("attack").value);
 		var atthp = parseInt(document.getElementById("attackhp").value);
@@ -1314,15 +1723,11 @@ function createunit()
 		var attmaxhp = parseInt(document.getElementById("attackmaxhp").value);
 		var attname = document.getElementById("selectattacker").value;
 
-		if ((document.getElementById("selectattacker").value == "Select Attacker") || (atthp < 1) || ((document.getElementById("attackhp").value % atthp) != 0) || (atthp > attmaxhp))
+		if ((atthp < 1) || ((document.getElementById("attackhp").value % atthp) != 0) || (atthp > attmaxhp))
 		{
 			warning = true;
 			messageclear();
 			document.getElementById("resultatt").innerHTML = "One or more invalid inputs:<br/>";
-			if (document.getElementById("selectattacker").value == "Select Attacker")
-			{
-				resultatt.insertAdjacentHTML("beforeend", "<br/>- Attacker must be selected from the template list");
-			}
 			if (atthp < 1)
 			{
 				resultatt.insertAdjacentHTML("beforeend", "<br/>- Attacker current HP can't be lower than 1");
@@ -1338,22 +1743,18 @@ function createunit()
 			scrollanchor.scrollIntoView(false);
 		}
 	}	
-	else if (document.getElementById("unitselect").value == "Create Defender")
+	else if (document.getElementById("unitselect").innerText == "Create Defender")
 	{
 		var def = parseFloat(document.getElementById("defense").value);
 		var defhp = parseInt(document.getElementById("defensehp").value);
 		var defmaxhp = parseInt(document.getElementById("defensemaxhp").value);
 		var defname = document.getElementById("selectdefender").value;
 		
-		if ((document.getElementById("selectdefender").value == "Select Defender") || (defhp < 1) || ((document.getElementById("defensehp").value % defhp) != 0) || (defhp > defmaxhp))
+		if ((defhp < 1) || ((document.getElementById("defensehp").value % defhp) != 0) || (defhp > defmaxhp))
 		{
 			warning = true;
 			messageclear();
 			document.getElementById("resultatt").innerHTML = "One or more invalid inputs:<br/>";
-			if (document.getElementById("selectdefender").value == "Select Defender")
-			{
-				resultatt.insertAdjacentHTML("beforeend", "<br/>- Defender must be selected from the template list");
-			}
 			if (defhp < 1)
 			{
 				resultatt.insertAdjacentHTML("beforeend", "<br/>- Defender current HP can't be lower than 1");
@@ -1370,7 +1771,7 @@ function createunit()
 		}
 	}
 
-	if ((document.getElementById("unitselect").value == "Create Attacker") && (warning != true))
+	if ((document.getElementById("unitselect").innerText == "Create Attacker") && (warning != true))
 	{
 		attackers.push({type: attname, a: att, hp: atthp, maxhp: attmaxhp, unavailable: false, defendersattacked: [], originalhp: attorighp});
 		var i = attackers.length - 1;
@@ -1389,7 +1790,7 @@ function createunit()
 		messageclear();
 		document.getElementById("resultatt").innerHTML = "Attacker created!";
 	}
-	else if ((document.getElementById("unitselect").value == "Create Defender") && (warning != true))
+	else if ((document.getElementById("unitselect").innerText == "Create Defender") && (warning != true))
 	{
 		var defindicator = "";
 		var color = "black";
@@ -1403,7 +1804,7 @@ function createunit()
 		{
 			defindicator = "W";
 		}
-		if ((defname == "Boat") || (defname == "Ship") || (defname == "Battleship") || (defname == "Navalon"))
+		if ((defname == "Boat") || (defname == "Ship") || (defname == "Battleship"))
 		{
 			if (defindicator == "W")
 			{
@@ -1411,16 +1812,41 @@ function createunit()
 				defindicator = "";
 			}
 		}
-		else if ((defname == "Amphibian") || (defname == "Crab") || (defname == "Tridention"))
+		else if ((defname == "Catapult") || (defname == "Mind Bender") || (defname == "Giant") || (defname == "Navalon") || (defname == "Crab") || (defname == "Baby Dragon") || (defname == "Fire Dragon") || (defname == "Mooni") || (defname == "Battle Sled") || (defname == "Ice Fortress") || (defname == "Gaami"))
 		{
 			if (defindicator == "W")
 			{
-				document.getElementById("note").innerHTML = "Note: " + defname + "s don't receive the defense bonus from cities! Wall bonus was disregarded.";
-				defindicator = "";
+				if (defname == "Catapult")
+				{
+					document.getElementById("note").innerHTML ="Note: Catapults can't benefit any from defense bonuses due to their 0 defense value!";
+					defindicator = "";
+				}
+				else if ((defname == "Mooni") || (defname == "Ice Fortress"))
+				{
+					document.getElementById("note").innerHTML = "Note: " + defname + "es don't receive the defense bonus from cities! Wall bonus was disregarded.";
+					defindicator = "";
+				}
+				else
+				{
+					document.getElementById("note").innerHTML = "Note: " + defname + "s don't receive the defense bonus from cities! Wall bonus was disregarded.";
+					defindicator = "";
+				}
 			}
 			else if (defindicator == "D")
 			{
-				document.getElementById("note").innerHTML = "Note: " + defname + "s don't receive the defense bonus from cities!";
+				if (defname == "Catapult")
+				{
+					document.getElementById("note").innerHTML ="Note: Catapults can't benefit any from defense bonuses due to their 0 defense value!";
+					defindicator = "";
+				}
+				else if ((defname == "Mooni") || (defname == "Ice Fortress"))
+				{
+					document.getElementById("note").innerHTML = "Note: " + defname + "es don't receive the defense bonus from cities!";
+				}
+				else
+				{
+					document.getElementById("note").innerHTML = "Note: " + defname + "s don't receive the defense bonus from cities!";
+				}
 			}
 		}	
 		else if (defname == "Nature Bunny")
@@ -1436,7 +1862,7 @@ function createunit()
 				defindicator = "";
 			}
 		}
-		defenders.push({type: defname, d: def, hp: defhp, maxhp: defmaxhp, defbonus: defindicator});
+		defenders.push({type: defname, d: def, hp: defhp, maxhp: defmaxhp, defbonus: defindicator, frozen: false});
 		var i = defenders.length - 1;
 		defenderlist.insertAdjacentHTML("beforeend", "<div class ='c' id='defender" + i + "' style='width: 56px; height: 80px; border-style: solid; border-color: " + color + "; display: inline-block; position: relative' onclick='defenseselector(" + i + ")'><img src='Defenders/" + defenders[i].type + ".png' height='55' width='55'><div style='position: absolute; top: 1px; right: 1px'><b>" + defenders[i].defbonus + "</b></div><div style='position: absolute; width: 100%; bottom: 2px; text-align: center'>" + defenders[i].d + "/" + defenders[i].hp + "/" + defenders[i].maxhp + "</div></div>");
 		document.getElementById("resultatt").innerHTML = "Defender created!";
@@ -1444,8 +1870,7 @@ function createunit()
 }
 function deleteunitprompt()
 {
-	tapcounter = 0;
-	refreshcounter = 0;
+	resetcounters();
 	if ((attackers.length < 1) && (defenders.length < 1) && (deleteselected == false))
 	{
 		messageclear();
@@ -1493,6 +1918,7 @@ function deleteunitprompt()
 			attackerselected = -1;
 			defenderselected = -1;
 			prevattackerselected = -2;
+			prevdefenderselected = -1;
 		}
 	}
 	else
@@ -1508,8 +1934,7 @@ function deleteunit(type)
 	var selectedelement = "";
 	var elementid ="";
 	var test = "";
-	tapcounter = 0;
-	refreshcounter = 0;
+	resetcounters();
 	if (type == "Attacker")
 	{
 		attackers.splice(attackerselected, 1);
@@ -1548,6 +1973,7 @@ function deleteunit(type)
 	attackerselected = -1;
 	defenderselected = -1;
 	prevattackerselected = -2;
+	prevdefenderselected = -1;
 }
 function attackselector(attackernumber)
 {
@@ -1559,7 +1985,7 @@ function attackselector(attackernumber)
 	else
 	{
 		if ((attackers[attackerselected].type == "Archer") || (attackers[attackerselected].type == "Catapult") || (attackers[attackerselected].type == "Boat") || (attackers[attackerselected].type == "Ship") ||
-			(attackers[attackerselected].type == "Battleship") || (attackers[attackerselected].type == "Tridention") || (attackers[attackerselected].type == "Fire Dragon"))
+			(attackers[attackerselected].type == "Battleship") || (attackers[attackerselected].type == "Tridention") || (attackers[attackerselected].type == "Fire Dragon") || (attackers[attackerselected].type == "Ice Fortress"))
 		{
 			if ((attackers[attackerselected].type == "Fire Dragon") && (attackers[attackerselected].defendersattacked.length > 0))
 			{
@@ -1679,6 +2105,60 @@ function defenseselector(defendernumber)
 	}
 	else
 	{
+		if (attackerselected == -1 && defenders[defenderselected].hp > 0 && defenders[defenderselected].frozen == false)
+		{
+			if (prevdefenderselected != defenderselected)
+			{
+				freezecounter = 0;
+			}
+			freezecounter = freezecounter + 1;
+			if (freezecounter == 1)
+			{
+				messageclear();
+				document.getElementById("resultatt").innerHTML = 'Opting to freeze ' + defenders[defenderselected].type + ' [' + (defenderselected + 1) + ']. Press on the same defender two more times to confirm.';
+			}
+			else if (freezecounter == 2)
+			{
+				messageclear();
+				document.getElementById("resultatt").innerHTML = 'Opting to freeze ' + defenders[defenderselected].type + ' [' + (defenderselected + 1) + ']. Press on the same defender one more time to confirm.';
+			}
+			else if (freezecounter == 3)
+			{
+				messageclear();
+				freezecounter = 0;
+				document.getElementById("resultatt").innerHTML = 'Defender ' + defenders[defenderselected].type + ' [' + (defenderselected + 1) + '] frozen!';
+				defenders[defenderselected].frozen = true;
+				document.getElementById("defender" + defenderselected).style.borderColor = "blue";
+			}
+			prevdefenderselected = defenderselected;
+		}
+		else if (attackerselected == -1 && defenders[defenderselected].hp > 0 && defenders[defenderselected].frozen == true)
+		{
+			if (prevdefenderselected != defenderselected)
+			{
+				freezecounter = 0;
+			}
+			freezecounter = freezecounter + 1;
+			if (freezecounter == 1)
+			{
+				messageclear();
+				document.getElementById("resultatt").innerHTML = 'Opting to unfreeze ' + defenders[defenderselected].type + ' [' + (defenderselected + 1) + ']. Press on the same defender two more times to confirm.';
+			}
+			else if (freezecounter == 2)
+			{
+				messageclear();
+				document.getElementById("resultatt").innerHTML = 'Opting to unfreeze ' + defenders[defenderselected].type + ' [' + (defenderselected + 1) + ']. Press on the same defender one more time to confirm.';
+			}
+			else if (freezecounter == 3)
+			{
+				messageclear();
+				freezecounter = 0;
+				document.getElementById("resultatt").innerHTML = 'Defender ' + defenders[defenderselected].type + ' [' + (defenderselected + 1) + '] unfrozen!';
+				defenders[defenderselected].frozen = false;
+				document.getElementById("defender" + defenderselected).style.borderColor = "black";
+			}
+			prevdefenderselected = defenderselected;
+		}
 		if (attackerselected != -1)
 		{
 			if ((defenders[defenderselected].hp > 0) && (attackers[attackerselected].unavailable == false))
@@ -1706,6 +2186,7 @@ function defenseselector(defendernumber)
 				{
 					attackerselected = -1;
 					prevattackerselected = -2;
+					prevdefenderselected = -1;
 				}
 				else if (attackers[attackerselected].type == "Fire Dragon")
 				{
@@ -1718,6 +2199,7 @@ function defenseselector(defendernumber)
 					{
 						attackerselected = -1;
 						prevattackerselected = -2;
+						prevdefenderselected = -1;
 					}
 				}
 				else
@@ -1731,6 +2213,7 @@ function defenseselector(defendernumber)
 					{
 						attackerselected = -1;
 						prevattackerselected = -2;
+						prevdefenderselected = -1;
 					}
 				}
 			}
@@ -1739,8 +2222,7 @@ function defenseselector(defendernumber)
 }
 function createbackup()
 {
-	tapcounter = 0;
-	refreshcounter = 0;
+	resetcounters();
 	if (deleteselected == true)
 	{
 		deleteselected = false;
@@ -1777,7 +2259,7 @@ function createbackup()
 		}
 		for (i = 0; i < defenders.length; i++)
 		{
-			backupdefenders.push({type2: defenders[i].type, d2: defenders[i].d, hp2: defenders[i].hp, maxhp2: defenders[i].maxhp, defbonus2: defenders[i].defbonus});
+			backupdefenders.push({type2: defenders[i].type, d2: defenders[i].d, hp2: defenders[i].hp, maxhp2: defenders[i].maxhp, defbonus2: defenders[i].defbonus, frozen2: defenders[i].frozen});
 		}
 		messageclear();
 		document.getElementById("resultatt").innerHTML = "State saved!";
@@ -1786,8 +2268,7 @@ function createbackup()
 }
 function loadbackup()
 {
-	tapcounter = 0;
-	refreshcounter = 0;
+	resetcounters();
 	if (deleteselected == true)
 	{
 		deleteselected = false;
@@ -1811,7 +2292,7 @@ function loadbackup()
 		}
 		for (i = 0; i < backupdefenders.length; i++)
 		{
-			defenders.push({type: backupdefenders[i].type2, d: backupdefenders[i].d2, hp: backupdefenders[i].hp2, maxhp: backupdefenders[i].maxhp2, defbonus: backupdefenders[i].defbonus2});
+			defenders.push({type: backupdefenders[i].type2, d: backupdefenders[i].d2, hp: backupdefenders[i].hp2, maxhp: backupdefenders[i].maxhp2, defbonus: backupdefenders[i].defbonus2, frozen: backupdefenders[i].frozen2});
 		}
 		document.getElementById("attackerlist").innerHTML = "";
 		var decshort = "";
@@ -1847,6 +2328,10 @@ function loadbackup()
 			{
 				color = "gray";
 			}
+			else if (defenders[i].frozen == true)
+			{
+				color = "blue";
+			}
 			defenderlist.insertAdjacentHTML("beforeend", "<div class='c' id='defender" + i + "' style='width: 56px; height: 80px; border-style: solid; border-color: " + color + "; display: inline-block; position: relative' onclick='defenseselector(" + i + ")'><img src='Defenders/" + defenders[i].type + ".png' height='55' width='55'><div style='position: absolute; top: 1px; right: 1px'><b>" + defenders[i].defbonus + "</b></div><div style='position: absolute; width: 100%; bottom: 2px; text-align: center'>" + defenders[i].d + "/" + defenders[i].hp + "/" + defenders[i].maxhp + "</div></div>");
 		}
 		messageclear();
@@ -1869,33 +2354,26 @@ function noretaldefault()
 		document.getElementById("resultatt").innerHTML = "Setting changed. Enemy units WON'T retaliate on your ranged attacks by default.";
 	}
 }
-function mobilescreen()
+function loadelements()
 {
-	if ((document.documentElement.clientWidth < 500) || (document.documentElement.clientHeight < 400))
+	attackerfill.bind(document.querySelector("#selectattacker img"))();
+	defenderfill.bind(document.querySelector("#selectdefender img"))();
+	document.getElementById("main").style.visibility = "visible";
+	
+	var queryStr = window.location.search;
+	if (queryStr == "?short")
 	{
-		var classlist = document.getElementsByClassName("minput");
-		for (i = 0; i < classlist.length; i++)
+		var hiddenelements = document.getElementsByClassName("shorthide");
+		var i;
+		for (i = 0; i < hiddenelements.length; i++)
 		{
-			document.getElementsByClassName("minput")[i].style.height = "21px";
-			document.getElementsByClassName("minput")[i].style.fontSize = "17px";
+			hiddenelements[i].style.display = "none";
 		}
-		classlist = document.getElementsByClassName("mbutton");
-		for (i = 0; i < classlist.length; i++)
-		{
-			document.getElementsByClassName("mbutton")[i].style.height = "32px";
-			document.getElementsByClassName("mbutton")[i].style.fontSize = "17px";
-		}
-		classlist = document.getElementsByClassName("mselect");
-		for (i = 0; i < classlist.length; i++)
-		{
-			document.getElementsByClassName("mselect")[i].style.height = "30px";
-			document.getElementsByClassName("mselect")[i].style.fontSize = "17px";
-		}
-		document.getElementById("main").style.visibility = "visible";
-	}
-	else
-	{
-		document.getElementById("main").style.visibility = "visible";
+		shortparameter = true;
+		document.getElementById("shortatt").style.display = "inline";
+		document.getElementById("shortdef").style.display = "inline";
+		document.getElementById("shortlink").style.display = "none";
+		document.getElementById("shorttext").style.display = "none";
 	}
 }
 function expandcontainer(identifier)
@@ -1933,7 +2411,7 @@ function expandall(indicator)
 		var expandindicator = "";
 		var answercontainer = "";
 		
-		for (i = 0; i < 19; i++)
+		for (i = 0; i < 20; i++)
 		{
 			expandindicator = "expandindicator" + i;
 			answercontainer = "answercontainer" + i;
@@ -1943,7 +2421,7 @@ function expandall(indicator)
 				document.getElementById(answercontainer).style.display = "block";
 			}
 		}
-		answersexpanded = 19;
+		answersexpanded = 20;
 		document.getElementById("expandallindicator1").innerHTML = "- Collapse all";
 		document.getElementById("expandallindicator2").innerHTML = "- Collapse all";
 		if (indicator == 2)
@@ -1956,7 +2434,7 @@ function expandall(indicator)
 		var expandindicator = "";
 		var answercontainer = "";
 		
-		for (i = 0; i < 19; i++)
+		for (i = 0; i < 20; i++)
 		{
 			expandindicator = "expandindicator" + i;
 			answercontainer = "answercontainer" + i;
@@ -2056,15 +2534,15 @@ function refreshattackers()
 </noscript>
 <div id="main" style="visibility: hidden">
 	<h2>Polytopia Battle Calculator</h2>
-	<i style="display: inline-block">(by <a href="mailto:frothdiscord@gmail.com" target="_top">FrothFrenzy</a>)</i>
+	<span style="display: inline-block"><i>(by <a href="mailto:frothdiscord@gmail.com" target="_top">FrothFrenzy</a>)</i>
+	<i id="shortlink">[<a href="https://frothfrenzy.github.io/polytopiacalculator/?short">Short version</a>]</i></span>
 
 	<form id="values" onsubmit="return false" onkeypress="if (document.getElementById('multibutton').innerText == 'Single') {return event.keyCode != 13;}">
-	<p><select id="unitselect" class= "mselect" onchange="choosetype()" style="display:none">
-  		<option value="Create Attacker">Create Attacker
- 		<option value="Create Defender">Create Defender
-	</select></p>
-	<div id="attvalues" style="display: inline">
-		<p><div id="selectattacker" class= "dselect" tabindex="-1">
+	<p><label class="creationcontainer" id="createunitbutton" onclick="choosetype()" style="width: 185px; display: none; margin-bottom: 8px;">
+		<span id="unitselect" style="font-size: 17px; padding-left: 1px; padding-top: 4px; padding-bottom: 4px; width: 152px; float: left;">Create Attacker</span><img src="Other/Switch1.png" alt="Image Switcher" id="switch1" height="20" width="20" style="position: absolute; margin-left: 10px; padding-top: 4px; visibility: visible;"><img src="Other/Switch2.png" alt="Image Switcher" id="switch2" height="20" width="20" style="position: absolute; margin-left: 10px; padding-top: 4px; visibility: hidden;">
+	</label></p>
+	<div id="attvalues">
+		<div id="selectattacker" class= "dselect" style="position: relative" tabindex="-1">
   		<img alt="Warrior" title="Warrior" src="Attackers/Warrior.png" onclick="attackerfill.bind(this)()">
 		 	<img alt="Rider" title="Rider" src="Attackers/Rider.png" onclick="attackerfill.bind(this)()">
 			<img alt="Defender" title="Defender" src="Attackers/Defender.png" onclick="attackerfill.bind(this)()">
@@ -2083,23 +2561,40 @@ function refreshattackers()
 			<img alt="Navalon" title="Navalon" src="Attackers/Navalon.png" onclick="attackerfill.bind(this)()">
 			<img alt="Baby Dragon" title="Baby Dragon" src="Attackers/Baby Dragon.png" onclick="attackerfill.bind(this)()">
 			<img alt="Fire Dragon" title="Fire Dragon" src="Attackers/Fire Dragon.png" onclick="attackerfill.bind(this)()">
+			<img alt="Ice Archer" title="Ice Archer" src="Attackers/Ice Archer.png" onclick="attackerfill.bind(this)()">
+      <img alt="Battle Sled" title="Battle Sled" src="Attackers/Battle Sled.png" onclick="attackerfill.bind(this)()">
+      <img alt="Ice Fortress" title="Ice Fortress" src="Attackers/Ice Fortress.png" onclick="attackerfill.bind(this)()">
+      <img alt="Gaami" title="Gaami" src="Attackers/Gaami.png" onclick="attackerfill.bind(this)()">
 		</div>
 
-		<span id="attveterancy" style="display:none"><span class="textpress" onclick="attvettest()">Veteran? </span><input type="checkbox" id="attvetbox" onclick="attackerveteran()"></span>
+		<label class="container" id="attveterancy" onclick="attackerveteran()" style="display: none; margin-left: 4px;">
+			<span style="margin-right: 28px">Veteran?</span>
+			<input type="checkbox" id="attvetbox" style="visibility: hidden">
+			<span class="checkmark"></span>
+		</label>
 	
-		<select id="attshiphp" class= "mselect" onchange="attackershiphp()" style="display:none" tabindex="-3">
-  			<option value="HP 10">Max HP 10
- 			<option value="HP 15">Max HP 15
-  			<option value="HP 20">Max HP 20
- 			<option value="HP 40">Max HP 40
-		</select></p>
+		<span id="attshiphp" style="display: none; position: absolute; margin-left: 4px;">
+			<label id="attshiphp10" class="shiphpcontainer" onclick="attackershiphp(10)">
+				<span>10</span>
+			</label>
+			<label id="attshiphp15" class="shiphpcontainer" onclick="attackershiphp(15)">
+				<span>15</span>
+			</label>
+			<label id="attshiphp20" class="shiphpcontainer" onclick="attackershiphp(20)">
+				<span>20</span>
+			</label>
+			<label id="attshiphp40" class="shiphpcontainer" onclick="attackershiphp(40)">
+				<span>40</span>
+			</label>
+		</span>
 
-		<p id="attvaluetext">Attacker attack value<span class="attackhint"></span>:</p>
-		<input type="number" id="attack" class="minput" min="0" step="0.5" required tabindex="1">
-		<p>Attacker current HP:</p>
-		<input type="number" id="attackhp" class="minput" min="1" required tabindex="2">
-		<p id="attmaxhptext">Attacker max HP:</p>
-		<input type="number" id="attackmaxhp" class="minput" min="10" required tabindex="3">
+		<p class="shorthide" id="attvaluetext">Attacker attack value: <span id="attackrem" style="color: darkgray; visibility: hidden;"></span></p>
+		<input type="number" id="attack" class="minput shorthide" onfocusin="numberfocus('attack')" onfocusout="numberfocusout('attack')" min="0" step="0.5" required tabindex="1">
+		<p><span class="textpress" onclick="refreshatthp()">Attacker current HP: </span><span id="attackhprem" style="color: darkgray; visibility: hidden;"></span></p>
+		<input type="number" id="attackhp" class="minput" onfocusin="numberfocus('attackhp')" onfocusout="numberfocusout('attackhp')" min="1" required tabindex="2"><span id="shortatt" style="display: none; font-size: 17px; margin-left: 4px;"></span>
+		
+		<p class="shorthide" id="attmaxhptext">Attacker max HP: <span id="attackmaxhprem" style="color: darkgray; visibility: hidden;"></span></p>
+		<input type="number" id="attackmaxhp" class="minput shorthide" onfocusin="numberfocus('attackmaxhp')" onfocusout="numberfocusout('attackmaxhp')" min="10" required tabindex="3">
 	</div>
 
 	<div id="defvalues" style="display: inline;">
@@ -2124,69 +2619,103 @@ function refreshattackers()
 			<img alt="Dragon Egg" title="Dragon Egg" src="Defenders/Dragon Egg.png" onclick="defenderfill.bind(this)()">
 			<img alt="Baby Dragon" title="Baby Dragon" src="Defenders/Baby Dragon.png" onclick="defenderfill.bind(this)()">
 			<img alt="Fire Dragon" title="Fire Dragon" src="Defenders/Fire Dragon.png" onclick="defenderfill.bind(this)()">
+			<img alt="Mooni" title="Mooni" src="Defenders/Mooni.png" onclick="defenderfill.bind(this)()">
+			<img alt="Ice Archer" title="Ice Archer" src="Defenders/Ice Archer.png" onclick="defenderfill.bind(this)()">
+			<img alt="Battle Sled" title="Battle Sled" src="Defenders/Battle Sled.png" onclick="defenderfill.bind(this)()">
+			<img alt="Ice Fortress" title="Ice Fortress" src="Defenders/Ice Fortress.png" onclick="defenderfill.bind(this)()">
+			<img alt="Gaami" title="Gaami" src="Defenders/Gaami.png" onclick="defenderfill.bind(this)()">
 			<img alt="Nature Bunny" title="Nature Bunny" src="Defenders/Nature Bunny.png" onclick="defenderfill.bind(this)()">
 		</div>
 
-		<span id="defveterancy" style="display:none"><span class="textpress" onclick="defvettest()">Veteran? </span><input type="checkbox" id="defvetbox" onclick="defenderveteran()"></span>
+		<label class="container" id="defveterancy" onclick="defenderveteran()" style="display: none; margin-left: 4px;">
+			<span style="margin-right: 28px;">Veteran?</span>
+			<input type="checkbox" id="defvetbox" style="visibility: hidden">
+			<span class="checkmark"></span>
+		</label>
+		
+		<span id="defshiphp" style="display: none; position: absolute; margin-left: 4px;">
+			<label id="defshiphp10" class="shiphpcontainer" onclick="defendershiphp(10)">
+				<span>10</span>
+			</label>
+			<label id="defshiphp15" class="shiphpcontainer" onclick="defendershiphp(15)">
+				<span>15</span>
+			</label>
+			<label id="defshiphp20" class="shiphpcontainer" onclick="defendershiphp(20)">
+				<span>20</span>
+			</label>
+			<label id="defshiphp40" class="shiphpcontainer" onclick="defendershiphp(40)">
+				<span>40</span>
+			</label>
+		</span></p>
 
-		<select id="defshiphp" class= "mselect" onchange="defendershiphp()" style="display:none" tabindex="-6">
-  			<option value="HP 10">Max HP 10
- 			<option value="HP 15">Max HP 15
-  			<option value="HP 20">Max HP 20
- 			<option value="HP 40">Max HP 40
-		</select></p>
+		<p class="shorthide" id="defvaluetext">Defender defense value<span class="defensehint"></span>: <span id="defenserem" style="color: darkgray; visibility: hidden;"></span></p>
+		<input type="number" id="defense" class="minput shorthide" onfocusin="numberfocus('defense')" onfocusout="numberfocusout('defense')" min="0" step="0.5" required tabindex="4">
+		<p><span class="textpress" onclick="refreshdefhp()">Defender current HP: </span><span id="defensehprem" style="color: darkgray; visibility: hidden;"></span></p>
+		<input type="number" id="defensehp" class="minput" onfocusin="numberfocus('defensehp')" onfocusout="numberfocusout('defensehp')" min="1" required tabindex="5"><span id="shortdef" style="display: none; font-size: 17px; margin-left: 4px;"></span>
+		<p class="shorthide" id="defmaxhptext">Defender max HP: <span id="defensemaxhprem" style="color: darkgray; visibility: hidden;"></span></p>
+		<input type="number" id="defensemaxhp" class="minput shorthide" onfocusin="numberfocus('defensemaxhp')" onfocusout="numberfocusout('defensemaxhp')" min="10" required tabindex="6">
 
-		<p id="defvaluetext">Defender defense value<span class="defensehint"></span>:</p>
-		<input type="number" id="defense" class="minput" min="0" step="0.5" required tabindex="4">
-		<p>Defender current HP:</p>
-		<input type="number" id="defensehp" class="minput" min="1" required tabindex="5">
-		<p id="defmaxhptext">Defender max HP:</p>
-		<input type="number" id="defensemaxhp" class="minput" min="10" required tabindex="6">
-	
-
-		<p><span class="textpress" onclick="setdefbonus()">Defense bonus? </span><input type="checkbox" id="def1" onclick="defcheck()">&nbsp;
-		<span class="textpress" onclick="setwallbonus()">Wall bonus? </span><input type="checkbox" id="def2" onclick="wallcheck()"></p>
+		<p>
+		<label class="container" onclick="setdefbonus()">
+			<span style="margin-right: 28px">Defense bonus?</span>
+			<input type="checkbox" id="def1" onclick="defcheck()" style="visibility: hidden">
+			<span class="checkmark"></span>
+		</label>
+		<label class="container" onclick="setwallbonus()">
+			<span style="margin-right: 28px">Wall bonus?</span>
+			<input type="checkbox" id="def2" onclick="wallcheck()" style="visibility: hidden">
+			<span class="checkmark"></span>
+		</label>
+		</p>
 	</div>
 
 	<p><button id="submitbutton" type="submit" class="mbutton" onclick="calculate('Single')" tabindex="7">Calculate!</button>
 	<button id="createbutton" type="button" class="mbutton" onclick="createunit()" style="display:none">Create Unit!</button>
 	<button id="multibutton" type="button" class="mbutton" onclick="multiswitch()">Multi</button>
-	<button id ="clearbutton" type="button" class="mbutton" onclick="clearform()">Clear</button>
 	<button id="deletebutton" type="button" class="mbutton" onclick="deleteunitprompt()" style="display:none">Delete Units</button>
-	&nbsp;<a id="singlefaq" href="#top" onclick="return show('faq', 'main')" target="_top">FAQ</a></p>
+	<a class="textpress" id="singlefaq" href="#top" onclick="return show('faq', 'main')" target="_top" style="margin-left: 6px">FAQ</a></p>
 	</form>
 
 	<p id="attackersheader" style="display:none"><b class="textpress" onclick="refreshattackers()">Attackers:</b></p>
 	<div id="attackerlist" style="display:none; width: 325px;"></div>
-	<p id="defendersheader" style="display:none"><b class="textpress" onclick="noretaldefault()" style="margin-right: 101px">Defenders:</b><span id="noretaltext" style="visibility: hidden"><i class="textpress" onclick="noretalboxcheck()">No retaliation? </i><input type="checkbox" id="noretalbox"></span></p>
+	<p id="defendersheader" style="display:none"><b class="textpress" onclick="noretaldefault()" style="margin-right: 75px">Defenders:</b>
+		
+		<label class="container" id="noretaltext" onclick="noretalboxcheck()" style="visibility: hidden; position: relative;">
+			<span style="margin-right: 28px">No retaliation?</span>
+			<input type="checkbox" id="noretalbox" style="visibility: hidden">
+			<span class="checkmark"></span>
+		</label>
+		
+		</p>
 	<div id="defenderlist" style="display:none; width: 325px;"></div>
 
 	<p id="states" style="display: none"><button type="button" class="mbutton" onclick="createbackup()">Save State</button>
-	<button type="button" class="mbutton" onclick="loadbackup()">Load State</button>&nbsp;
-	<a href="#top" onclick="return show('faq', 'main')" target="_top">FAQ</a></p>
+	<button type="button" class="mbutton" onclick="loadbackup()">Load State</button>
+	<a href="#top" class="textpress" onclick="return show('faq', 'main')" target="_top" style="margin-left: 6px">FAQ</a></p>
 
 	<div id="resultcontainer" onclick="displayextinfo()" style="max-width: 800px">
 		<p><b id="result">Result:</b><span id="respressindicator">&#9679;</span></p>
-		<p id="resultatt"><b><i>New update!</i></b> Press the Multi button, recreate your current battle state and try a variety of calculations in consecution.</p>
-		<p id="resultdef">For more information, read the <a href="#top" onclick="return show('faq', 'main')" target="_top">FAQ</a>.</p>
+	<p id="resultatt"><b><i>New update!</i></b> Added support for Polaris units. To freeze/unfreeze a defender in Multi mode, press on it three times consecutively. Ice archers automatically freeze the units they attack. As always - bugs are possible. Do contact me if you find one so I can fix it as soon as possible.</p>
+		<p id="resultdef">For information on combat mechanics, calculator usage and useful guides or links, read the <a href="#top" onclick="return show('faq', 'main')" target="_top">FAQ</a>.</p>
 		<p id="resultsplash"></p>
+		<p id="frozennote" class="i"></p>
 		<p id="note" class="i"></p>
 		<span id="scrollanchor"></span>
-		<p id="extendedinfo" style="display:none">-------------------------------------------------------<br/><br/>Battle history does not contain any entries yet.</p><p>
+		<p id="extendedinfo" class="ext" style="display:none"><span style="border-top: 1px dashed black; padding-top: 10px; display: block; max-width: 350px;"></span>Battle history does not contain any entries yet.</p>
 	</div>
 </div>
 
 <div id="faq" style="display:none; max-width: 800px">
 	<h2>Frequently Asked Questions</h2><br/><br/>
 	
-	<p><a href="javascript:;" onclick="return show('main', 'faq')" target="_top">&lt;&lt;&lt; Back to the calculator!</a><a href="javascript:;" id="expandallindicator1" style="float: right" onclick="expandall(1)">+ Expand all</a></p>
+<p><a href="javascript:;" class="textpress" style="float: left" onclick="return show('main', 'faq')" target="_top">&lt;&lt;&lt; Back to the calculator!</a><a href="javascript:;" class="textpress" id="expandallindicator1" style="float: right" onclick="expandall(1)">+ Expand all</a></p>
 	
 	<div class="q" style="border-top: 1px solid; margin-top: 25px;" onclick="expandcontainer(0)">
 		<div class="p"><b>How to use the calculator?</b></div>
 		<div id="expandindicator0" class="ei">+</div>
 	</div>
 	<div id="answercontainer0" class="a">
-		<p>Simply input all of the fields, click the Calculate! button, and your battle result will pop up at the bottom. All of the fields are required because every variable affects the result. You can use drop-down unit templates to fill the fields quicker, although these can also be useful if you don't remember the unit stats. Additional details such as unit veterancy and variable ship HP will appear next to the template box once you have selected a relevant unit.<br/><br/>Defender's current HP is automatically updated if the defender survives, so you can keep pressing Calculate! repeatedly until it is destroyed. This is useful for quickly calculating how many units of the same power are needed to take down a stronger unit, and you don't need to manually change the defender's current HP every time you want to perform an attack with a different unit.<br/><br/>If checkboxes appear too small on your screen, you can instead click or tap on the text pertaining to the checkbox to activate it. This applies both to veterancy status and defense/wall bonus checkboxes.<br/><br/>Also note that you can access a history of all the recent battles you performed in the current session. Tap or click three times on "Result:" or any text that appears below it to activate the history. Likewise, you can turn it off by tapping or clicking three times in that same area. The history showcases 10 entries by default. If for some reason you would like to keep a bigger (or smaller) history for the current session, fill all the fields so there are no invalid values, set the attack value to 123, set the defense value to the number of entries you want to keep and then press the Calculate! button. A message will appear as a confirmation. All entries are formatted as Attacker (stats) - Defender (stats|D/W), where stats are shown in the same order as they appear on the calculator, and D/W representing the defense/wall bonus for the defender.</p>
+	<p>Simply input all of the fields, click the Calculate! button, and your battle result will pop up at the bottom. All of the fields are required because every variable affects the result. You can use drop-down unit templates to fill the fields quicker, although these can also be useful if you don't remember the unit stats. Additional details such as unit veterancy and variable ship HP will appear next to the template box once you have selected a relevant unit.<br/><br/>When tapping or clicking on number fields to change values, the original value will be deleted to allow for faster input. A reminder containing the previous value will appear next to the corresponding text above. If a new value isn't provided, the previous one is automatically reinstated upon leaving the field.<br/><br/>Defender's current HP is automatically updated if the defender survives, so you can keep pressing Calculate! repeatedly until it is destroyed. This is useful for quickly calculating how many units of the same power are needed to take down a stronger unit, and you don't need to manually change the defender's current HP every time you want to perform an attack with a different unit.<br/><br/>Current HP values can be quickly refreshed by tapping or clicking the text above the current HP box twice (Attacker/Defender current HP:). This will set the attacker's or defender's current HP value equal to its max HP value.<br/><br/>You can access a history of all the recent battles that were performed in the current session. Tap or click three times on "Result:" or any text that appears below it to activate the history. Likewise, you can turn it off by tapping or clicking three times in that same area. The history showcases 10 entries by default. If for some reason you would like to keep a bigger (or smaller) history for the current session, set the attacker current HP value to 123, set the defender current HP value to the number of entries you want to keep and then press the Calculate! button. A message will appear as a confirmation. All entries are formatted as Attacker (stats) - Defender (stats|D/W), where stats are shown in the same order as they appear on the calculator, and D/W representing the defense/wall bonus for the defender.<br/><br/>Also, you can run the shortened version of the calculator if you find the attack, defense and max HP prompts unnecessary, or if you feel they are taking up too much space. To activate the shortened version, simply add the parameter ?short to the end of the calculator's browser URL. Therefore, the end of the URL should look like this:<br/><br/><a href="https://frothfrenzy.github.io/polytopiacalculator/?short">.../polytopiacalculator/?short</a><br/><br/>This hides the redundant info. Attack and defense values will be shown in brackets just right of the current HP input boxes, while the current HP reminder when tapping or clicking to change values will also contain the max HP info. You can add this parameter even if you are running the calculator from a different location.</p>
 	</div>
 	
 	<div class="q" onclick="expandcontainer(1)">
@@ -2209,7 +2738,7 @@ function refreshattackers()
 		<div id="expandindicator2" class="ei">+</div>
 	</div>
 	<div id="answercontainer2" class="a">
-		<p>This option allows you to recreate a battle state so you can try a variety of approaches in order to achieve optimal results. To use it, press the Multi button. This makes the calculator switch modes. You can always return to the original mode by pressing the Single button.<br/><br/>When in Multi mode, do the following:<br/><br/>- Create a battlefield of attackers and defenders by selecting between Choose Attacker or Choose Defender at the top.<br/><br/>- Select a unit type from the unit template list, change its current HP if necessary and tick additional modifiers, if any.<br/><br/>- Press the Create Unit! button. This creates a unit on the battlefield. If you created a defender and ticked a defensive bonus, the unit will have a letter indicating the bonus type in their upper right corner (D/W for defense/wall bonus).<br/><br/>- Repeat this process until you create the desired battle situation. You can create any number of units this way.<br/><br/>- Before you start battling, it is recommended that you press the Save State button. This will preserve the current battle situation and whatever you do, you can always press Load State to reload the battle state you previously saved. This is very useful when you want to try out multiple methods to resolve the situation.<br/><br/>- You can start battling now. Simply press on an attacker to select it, and then press on a defender. If possible, the battle will automatically take place. As long as you keep creating new units and/or have units available, you can perform any number of calculations.<br/><br/>- To delete units, press the Delete Units button and select the attackers or defenders you want to delete. Units selected this way will instantly disappear. To stop deleting, press the Delete Units button again. Pressing other buttons such as Create Unit! or opening the FAQ also stops the deletion process. When active, the Delete Units button will have an (x) appear within it.<br/><br/>As per standard gameplay mechanics, most units can attack only once. Once a unit is either dead or unavailable for attack, its border is automatically grayed out and it cannot be selected again. There are some exceptions...<br/><br/>Knights and navalons will be able to continue attacking as long as they are destroying enemy units. They become unavailable once an attack doesn't destroy an enemy unit, but you can also do so manually by pressing on them again while they are selected. This usually just deselects any unit but if a knight or a navalon already performed an attack, it will become unavailable this way.<br/><br/>Fire dragon's first attack is always its main attack. Every subsequent attack is its splash attack, which is indicated by the letter S appearing in its upper right corner. If the fire dragon's main attack was retaliated against, splash attacks will still be calculated with its original HP in mind. This is true even if the fire dragon was destroyed by the retaliation, in which case it will be treated as available to perform splash attacks. Since the main attack and all of the collateral splash attacks happen at once, the fire dragon becomes unavailable once you deselect it or select any other attacker after performing its main attack. Saving a state or prompting to delete units also triggers this.<br/><br/>Other than the exceptions above, you can freely select and deselect your available attackers however you wish. The calculator remembers which units attacked and which did not.<br/><br/>Another thing to note about the attacker knight is that its attack value will show as a bolded 3 instead of a regular 3.5. This is deliberate because additional symbols didn't fit well into the unit container in some battle situations. It otherwise has no effect on the battle result.<br/><br/>You can refresh all of your attackers by pressing the "Attackers:" text three times repeatedly. This will make all non-destroyed, unavailable attackers able to attack again.<br/><br/>When selecting an available ranged unit, you are prompted with a No retaliation checkbox which prevents enemy units from retaliating. This setting is automatically ticked by default. However, if you have to perform a big number of calculations that take place between ranged units (such as in a sea battle), you can change this default setting by pressing on the "Defenders:" text. This will make enemy units retaliate by default. You can change back to the original setting by pressing the text again.<br/><br/>Since this mode uses some sprites from the game, the images won't appear if you download the calculator to use it offline. You'd have to download the image folders also while preserving the pathing context. Just in case, I'll be keeping the old calculator .html file on the Github repository if this update breaks anything (as <a href="https://frothfrenzy.github.io/polytopiacalculator/oldindex.html">oldindex.html</a>). Only Imperius and Xin-Xi sprites will be available out of respect for the developer.<br/><br/>The Multi mode uses the same code as the original single-battle calculator. This is why you will see the same values being filled and the same results being reported as before, even though most of them aren't visible in Multi mode. The battle history is also available while in Multi mode with additional info being preserved, including the No retaliation clause and the fire dragon's attack type.<br/><br/>To prevent accidental resets of huge battlefields, a button to clear everything isn't included. Simply refresh the calculator page if you want to start over, or delete the leftover units by pressing the Delete Units button.<br/><br/>It is also worth noting that Delete Units uses a method which is not supported by Internet Explorer versions below 8.0. If this is the case for you, it might be a sign you were waiting for that you need to upgrade.</p>
+		<p>This option allows you to recreate a battle state so you can try a variety of approaches in order to achieve optimal results. To use it, press the Multi button. This makes the calculator switch modes. You can always return to the original mode by pressing the Single button.<br/><br/>When in Multi mode, do the following:<br/><br/>- Create a battlefield of attackers and defenders by selecting between Choose Attacker or Choose Defender at the top.<br/><br/>- Select a unit type from the unit template list, change its current HP if necessary and tick additional modifiers, if any.<br/><br/>- Press the Create Unit! button. This creates a unit on the battlefield. If you created a defender and ticked a defensive bonus, the unit will have a letter indicating the bonus type in their upper right corner (D/W for defense/wall bonus).<br/><br/>- Repeat this process until you create the desired battle situation. You can create any number of units this way.<br/><br/>- Before you start battling, it is recommended that you press the Save State button. This will preserve the current battle situation and whatever you do, you can always press Load State to reload the battle state you previously saved. This is very useful when you want to try out multiple methods to resolve the situation.<br/><br/>- You can start battling now. Simply press on an attacker to select it, and then press on a defender. If possible, the battle will automatically take place. As long as you keep creating new units and/or have units available, you can perform any number of calculations.<br/><br/>- To delete units, press the Delete Units button and select the attackers or defenders you want to delete. Units selected this way will instantly disappear. To stop deleting, press the Delete Units button again. Pressing other buttons such as Create Unit! or opening the FAQ also stops the deletion process. When active, the Delete Units button will have an (x) appear within it.<br/><br/>As per standard gameplay mechanics, most units can attack only once. Once a unit is either dead or unavailable for attack, its border is automatically grayed out and it cannot be selected again. There are some exceptions...<br/><br/>Knights and navalons will be able to continue attacking as long as they are destroying enemy units. They become unavailable once an attack doesn't destroy an enemy unit, but you can also do so manually by pressing on them again while they are selected. This usually just deselects any unit but if a knight or a navalon already performed an attack, it will become unavailable this way.<br/><br/>Fire dragon's first attack is always its main attack. Every subsequent attack is its splash attack, which is indicated by the letter S appearing in its upper right corner. If the fire dragon's main attack was retaliated against, splash attacks will still be calculated with its original HP in mind. This is true even if the fire dragon was destroyed by the retaliation, in which case it will be treated as available to perform splash attacks. Since the main attack and all of the collateral splash attacks happen at once, the fire dragon becomes unavailable once you deselect it or select any other attacker after performing its main attack. Saving a state or prompting to delete units also triggers this.<br/><br/>Other than the exceptions above, you can freely select and deselect your available attackers however you wish. The calculator remembers which units attacked and which did not.<br/><br/>You can freeze defenders by pressing on a defender you want to freeze three times repeatedly. Confirmation messages will appear under the "Feedback:" text, with the unit name being shown and a number in brackets which denotes the unit's position in the defender list. Once the unit is frozen its border will turn blue. You can unfreeze units in the same way. Ice archers will automatically freeze units with their attacks.<br/><br/>Another thing to note about the attacker knight is that its attack value will show as a bolded 3 instead of a regular 3.5. This is deliberate because additional symbols didn't fit well into the unit container in some battle situations. It otherwise has no effect on the battle result.<br/><br/>You can refresh all of your attackers by pressing the "Attackers:" text three times repeatedly. This will make all non-destroyed, unavailable attackers able to attack again.<br/><br/>When selecting an available ranged unit, you are prompted with a No retaliation checkbox which prevents enemy units from retaliating. This setting is automatically ticked by default. However, if you have to perform a big number of calculations that take place between ranged units (such as in a sea battle), you can change this default setting by pressing on the "Defenders:" text. This will make enemy units retaliate by default. You can change back to the original setting by pressing the text again.<br/><br/>Since this mode uses some sprites from the game, the images won't appear if you download the calculator to use it offline. You'd have to download the image folders also while preserving the pathing context. Just in case, I'll be keeping the old calculator .html file on the Github repository if this update breaks anything (as <a href="https://frothfrenzy.github.io/polytopiacalculator/oldindex.html">oldindex.html</a>). Only Imperius and Xin-Xi sprites will be available out of respect for the developer.<br/><br/>The Multi mode uses the same code as the original single-battle calculator. This is why you will see the same values being filled and the same results being reported as before, even though most of them aren't visible in Multi mode. The battle history is also available while in Multi mode with additional info being preserved, including the No retaliation clause and the fire dragon's attack type.<br/><br/>To prevent accidental resets of huge battlefields, a button to clear everything isn't included. Simply refresh the calculator page if you want to start over, or delete the leftover units by pressing the Delete Units button.</p>
 	</div>
 	
 	<div class="q" onclick="expandcontainer(3)">
@@ -2225,7 +2754,7 @@ function refreshattackers()
 		<div id="expandindicator4" class="ei">+</div>
 	</div>
 	<div id="answercontainer4" class="a">
-		<p>The defenseForce variable is increased by a factor of 1.5 if the defender is on a tile that provides a standard defense bonus. If the defender is behind a wall, it's increased by a factor of 4. This happens just before attackForce and defenseForce variables are added together to form the totalDamage sum.<br/><br/>Because of how the formula works, defense bonuses have less effect on defenders with low HP. There is no effect on defenders with 0 defense value, which will always receive maximum damage regardless of where they are.<br/><br/>Only the defenseForce variable is affected by the increase, so you won't get the correct retaliation result if you were to apply the same factor to the defense value of the unit instead.</p>
+		<p>The defenseForce variable is increased by a factor of 1.5 if the defender is on a tile that provides a standard defense bonus. If the defender is behind a wall, it's increased by a factor of 4. This happens just before attackForce and defenseForce variables are added together to form the totalDamage sum.<br/><br/>Because of how the formula works, defense bonuses have less effect on defenders with low HP. There is no effect on defenders with 0 defense value, which will always receive maximum damage regardless of where they are.<br/><br/>Only the defenseForce variable is affected by the increase, so you won't get the correct retaliation result if you were to apply the same factor to the defense value of the unit instead.<br/><br/>Keep in mind that since the Polaris update, all units that can benefit from defense bonuses in cities have the Fortify skill. If a unit can occupy a city but doesn't have this skill - it can't benefit from that city's defense bonus. Units that don't have the Fortify skill are:<br/><br/>Catapults, mind benders, giants, crabs, navalons, baby dragons, fire dragons, moonies, battle sleds, ice fortresses and gaamis.<br/><br/>Perhaps surprisingly, dragon eggs do get the Fortify skill.</p>
 	</div>
 
 	<div class="q" onclick="expandcontainer(5)">
@@ -2233,7 +2762,7 @@ function refreshattackers()
 		<div id="expandindicator5" class="ei">+</div>
 	</div>
 	<div id="answercontainer5" class="a">
-		<p>Non-walled cities and defensive terrain for which you researched the relevant technology - Aquatism for water, Archery for forests and Meditation for mountains. If a player has any of these technologies, their units will have a shield appear around their HP when they are on tiles that provide the bonus. The shield will also appear on units that are in friendly cities, with a few exceptions - Aquarion amphibians, crabs and tridentions never receive the defense bonus from cities, even if they are walled.<br/><br/>Except for cities, friendly territory does not in itself grant additional defensive bonuses. It does, however, improve the unit's HP recovery rate (see "How does healing work?" further below).</p>
+		<p>Non-walled cities and defensive terrain for which you researched the relevant technology - Aquatism for water, Archery for forests and Meditation for mountains. If a player has any of these technologies, their units will have a shield appear around their HP when they are on tiles that provide the bonus. The shield will also appear on units that are in friendly cities, excepting units that don't have the Fortify skill. These units never benefit from defense bonuses in cities, even if they are walled.<br/><br/>For Polaris, the Polarism technology replaces Aquatism and provides the standard defense bonus for friendly units on water tiles that have been turned to ice.<br/><br/>Friendly territory does not in itself grant additional defensive bonuses. It does, however, improve the unit's HP recovery rate (see "How does healing work?" further below).</p>
 	</div>
 
 	<div class="q" onclick="expandcontainer(6)">
@@ -2273,7 +2802,7 @@ function refreshattackers()
 		<div id="expandindicator10" class="ei">+</div>
 	</div>
 	<div id="answercontainer10" class="a">
-		<p>Any damaged unit that does nothing during its turn can recover some of its lost HP instead. The amount is 4 HP if it is in friendly territory, and 2 HP if it is anywhere else. This happens automatically at the end of your turn, but you can choose to do so manually.<br/><br/>There is only one situation in the game where you can benefit from manually recovered HP - when the damaged unit is in a city which is about to be upgraded in order to activate the super unit reward, the damaged unit will be displaced from the city by the appearing super unit. This is treated as a regular move action, and the damaged unit will no longer be able to recover its HP as a result. Heal the unit first, then upgrade the city to prevent this.<br/><br/>Mind benders also have the Heal Others ability which allows them to restore 4 HP to all friendly units adjacent to them. This stacks with the intrinsic Recover ability and heals from other mind benders. You can unlock the mind bender unit by researching Philosophy.</p>
+		<p>Any damaged unit that does nothing during its turn can recover some of its lost HP instead. The amount is 4 HP if it is in friendly territory, and 2 HP if it is anywhere else. This happens automatically at the end of your turn, but you can choose to do so manually.<br/><br/>There are only two situations in the game where you can benefit from manually recovered HP. When the damaged unit is in a city which is about to be upgraded in order to activate the super unit reward, the damaged unit will be displaced from the city by the appearing super unit. This is treated as a regular move action, and the damaged unit will no longer be able to recover its HP as a result. Heal the unit first, then upgrade the city to prevent this. A similar thing happens when you're playing Elyrion and your damaged unit is on a tile where you're about to train a polytaur. It is solved in the same way - heal the unit first, then train the polytaur.<br/><br/>Mind benders also have the Heal Others ability which allows them to restore 4 HP to all friendly units adjacent to them. This stacks with the intrinsic Recover ability and heals from other mind benders. You can unlock the mind bender unit by researching Philosophy.</p>
 	</div>
 	
 	<div class="q" onclick="expandcontainer(11)">
@@ -2281,7 +2810,7 @@ function refreshattackers()
 		<div id="expandindicator11" class="ei">+</div>
 	</div>
 	<div id="answercontainer11" class="a">
-		<p>A unit can be promoted to veteran status once it has destroyed 3 or more units, either via attacks or retaliations. You can promote the unit at any time during your turn, and you can even carry over the reward into following turns. However, you can only promote a unit once this way.<br/><br/>Once promoted, the unit's maximum HP permanently increases by 5 and the unit heals up completely. No other stats are affected. Because of this, it is generally a good idea to hold on to the reward until the unit is seriously damaged in battle.<br/><br/>Some units can't be promoted. This includes all super units (giants, crabs, every form of dragon), mind benders, polytaurs and navalons. Boats, ships and battleships can be promoted, but only if the carried unit previously activated the reward on land. This is due to the unit's battle victories at sea not being counted towards achieving its veteran status.</p>
+		<p>A unit can be promoted to veteran status once it has destroyed 3 or more units, either via attacks or retaliations. You can promote the unit at any time during your turn, and you can even carry over the reward into following turns. However, you can only promote a unit once this way.<br/><br/>Once promoted, the unit's maximum HP permanently increases by 5 and the unit heals up completely. No other stats are affected. Because of this, it is generally a good idea to hold on to the reward until the unit is seriously damaged in battle.<br/><br/>Some units can't be promoted. This includes all super units (giants, crabs, every form of dragon, gaamis), mind benders, polytaurs, navalons, ice archers and moonies. Boats, ships and battleships can be promoted, but only if the carried unit previously activated the reward on land. This is due to the unit's battle victories at sea not being counted towards achieving its veteran status.<br/><br/>Interestingly, ice archers do have an option to track their battle victories for veteran status. However, their 0.1 attack value is not enough to deal damage, even in the worst case scenario where the defender's defense value is 0.</p>
 	</div>
 	
 	<div class="q" onclick="expandcontainer(12)">
@@ -2306,52 +2835,69 @@ function refreshattackers()
 	</div>
 	
 	<div class="q" onclick="expandcontainer(14)">
-		<div class="p"><b>Can I use the calculator offline?</b></div>
+		<div class="p"><b>How does the Polaris freezing mechanic work?</b></div>
 		<div id="expandindicator14" class="ei">+</div>
 	</div>
 	<div id="answercontainer14" class="a">
+		<p>The mechanic is unique to the Polaris tribe, with three of their special units being able to utilize the ability:<br/><br/>
+
+		Ice archers automatically freeze enemy units they attack. Frozen units cannot retaliate against the attack that freezes them nor against any subsequent attacks. The unit remains frozen until the Polaris player's next turn. None of its stats are affected. It's also worth noting that the ice archer itself can't retaliate at all, and its 0.1 attack value is not enough to destroy another unit or deal damage to it under any circumstances. This is why the calculator treats it as 0 instead.<br/><br/>
+		
+		Moonies can freeze terrain and enemy units adjacent to them as its action that turn, which means it can't both move and use its freeze area ability. This freezes the affected units in the same way as that of the ice archer, but also freezes the terrain. Moonies can't attack nor retaliate.<br/><br/>
+		
+		Gaami freezes the area around it in the same way as the mooni, but does so automatically after it moves. It can also choose to do so as an action.<br/><br/>
+		
+		Frozen terrain has several benefits for the Polaris. Refer to the game wikia below for additional details.</p>
+	</div>
+	
+	<div class="q" onclick="expandcontainer(15)">
+		<div class="p"><b>Can I use the calculator offline?</b></div>
+		<div id="expandindicator15" class="ei">+</div>
+	</div>
+	<div id="answercontainer15" class="a">
 		<p>Yes you can. Follow these instructions:<br/><br/>
+		<i>Any platform</i>: If you don't quit your browser app, you should be able to use the calculator without internet access as long as the browser stays in memory. The calculator is a static website and doesn't require the use of bandwith. Otherwise, most desktop browsers support saving pages so you can store them offline for later use. Some mobile browsers like Chrome also support this.<br/><br/>
 		<i>PC</i>: Go to the calculator website, right-click on any empty space and press Save as... or Save Page As... to get the index.html file. Alternatively, you can download the file from my <a href="https://drive.google.com/open?id=0B7HGBGCiKHGkSUExdEs3Q2J1UG8" target="_blank">Google Drive</a> or <a href="https://github.com/frothfrenzy/polytopiacalculator" target="_blank">GitHub</a>. After you downloaded it, simply drag the .html file into your browser to run the calculator.<br/><br/>
 		<i>iOS</i>: Repeat the PC process. Download an app called HTML Viewer Q by Spica. Connect your device to iTunes. In iTunes, select your device and go to File Sharing. Select HTML Viewer, press Add File and find the .html file you downloaded on your PC. Disconnect your device, run HTML Viewer and press on a book-like icon at the bottom right. Switch from Bookmarks to Files and select the downloaded .html file.<br/><br/>
 		<i>Android</i>: Either repeat the PC process, or download the Google Drive app to fetch the .html file from my <a href="https://drive.google.com/open?id=0B7HGBGCiKHGkSUExdEs3Q2J1UG8" target="_blank">Google Drive</a>. If you used the PC, connect your device and transfer the .html file to it. If you used Google Drive, the file should be in your Downloads folder. Download the HTML Viewer app by Yogev Haham and run it. Press the paper-like icon at the upper right. Find and select the downloaded .html file, then press the browser view icon in the upper right.</p>
 	</div>
 	
-	<div class="q" onclick="expandcontainer(15)">
-		<div class="p"><b>Who are you?</b></div>
-		<div id="expandindicator15" class="ei">+</div>
-	</div>
-	<div id="answercontainer15" class="a">
-		<p>I'm a big fan of the game and I've been playing it since early 2017. I have a tendency to learn every game I play in great detail as I'm hoping to pursue game design at some point. For about a year I was active over at the game's Discord server, which you should definitely join if you want to improve your game and meet other players. An invite to the server is posted at the bottom of this FAQ. I have since left Discord so I can focus on other things.</p>
-	</div>
-	
 	<div class="q" onclick="expandcontainer(16)">
-		<div class="p"><b>How can I contact you?</b></div>
+		<div class="p"><b>Who are you?</b></div>
 		<div id="expandindicator16" class="ei">+</div>
 	</div>
 	<div id="answercontainer16" class="a">
-		<p>You can contact me via <a href="mailto:frothdiscord@gmail.com" target="_top">e-mail</a>. By all means contact me if you have any suggestions or bug reports regarding the calculator.</p>
+		<p>I'm a big fan of the game and I've been playing it since early 2017. I have a tendency to learn every game I play in great detail as I'm hoping to pursue game design at some point. For about a year I was active over at the game's Discord server, which you should definitely join if you want to improve your game and meet other players. An invite to the server is posted at the bottom of this FAQ. I have since left Discord so I can focus on other things.</p>
 	</div>
 	
 	<div class="q" onclick="expandcontainer(17)">
-		<div class="p"><b>What are Discord challenges?</b></div>
+		<div class="p"><b>How can I contact you?</b></div>
 		<div id="expandindicator17" class="ei">+</div>
 	</div>
 	<div id="answercontainer17" class="a">
-		<p>These are player-made, self-imposed limitations that alter the gameplay in some fundamental way. You can find the challenge list at the bottom of this FAQ. To be eligible for the scoreboard, you have to join Discord and post your results in the appropriate channel.</p>
+		<p>You can contact me via <a href="mailto:frothdiscord@gmail.com" target="_top">e-mail</a>. By all means contact me if you have any suggestions or bug reports regarding the calculator.</p>
 	</div>
 	
 	<div class="q" onclick="expandcontainer(18)">
-		<div class="p"><b>How can I become a better player?</b></div>
+		<div class="p"><b>What are Discord challenges?</b></div>
 		<div id="expandindicator18" class="ei">+</div>
 	</div>
 	<div id="answercontainer18" class="a">
+		<p>These are player-made, self-imposed limitations that alter the gameplay in some fundamental way. You can find the challenge list at the bottom of this FAQ. To be eligible for the scoreboard, you have to join Discord and post your results in the appropriate channel.</p>
+	</div>
+	
+	<div class="q" onclick="expandcontainer(19)">
+		<div class="p"><b>How can I become a better player?</b></div>
+		<div id="expandindicator19" class="ei">+</div>
+	</div>
+	<div id="answercontainer19" class="a">
 		<p>Read through strategies on the game wikia, Reddit and Discord. Watch videos of experienced players on Youtube. Ask the player-base for help. Most important of all - play a lot, maximize your income and try to learn the mechanics behind the game. It will come in time. The links to help you with this are provided below.</p>
 	</div>
 	
 	<div style="float: left; position: relative; top: 6px; width: 100%">
-		<p><b>Links:</b><a href="javascript:;" id="expandallindicator2" style="float: right" onclick="expandall(2)">+ Expand all</a></p>
+		<p><b style="float: left; margin-top: 4px;">Links:</b><a href="javascript:;" class="textpress" id="expandallindicator2" style="float: right" onclick="expandall(2)">+ Expand all</a></p><br/>
 		
-		<p><a href="https://discord.gg/YTFTuAq?" target="_blank">Discord</a><br/>
+		<p style="margin-top: 16px"><a href="https://discord.gg/YTFTuAq?" target="_blank">Discord</a><br/>
 		<a href="http://polytopia.wikia.com/wiki/The_Battle_of_Polytopia_Wikia" target="_blank">Wikia</a><br/>
 		<a href="https://www.reddit.com/r/Polytopia/" target="_blank">Reddit</a><br/><br/>
 		
@@ -2368,12 +2914,13 @@ function refreshattackers()
 		<a href="https://drive.google.com/open?id=0B7HGBGCiKHGkSFN2clluYnM0QlU" target="_blank">My Screenshots</a><br/><br/>
 
 		<a href="https://www.youtube.com/playlist?list=PLQqaZ-kEj4Exd6EMDYTadaWbsFMoROwzw" target="_blank">My Videos</a><br/>
-		<a href="https://www.youtube.com/playlist?list=PLfTvLAe72_3j5OHnUiyc1Cwo3Z6uiFmeC" target="_blank">Tupp's Videos</a><br/>
-		<a href="https://www.youtube.com/channel/UCjwJEqv8LZOV6S12wAybURA" target="_blank">Dued03's Videos</a><br/>
+		<a href="https://www.youtube.com/channel/UCg0jaVEMIuy_sQ9t-VRuHXw/videos?disable_polymer=1" target="_blank">Tupp's Videos</a><span> (Recommended!)</span><br/>
 		<a href="https://www.youtube.com/channel/UCEmKzVafcBQauZylIoomojw/videos?disable_polymer=1" target="_blank">Ze Biggest Potato's Videos</a><br/><br/>
 
 		<a href="https://www.reddit.com/r/Polytopia/comments/6cjc4j/guide_quick_and_simple_guide_to_get_3_start_in/" target="_blank">Domination Guide by Airgibbo</a><br/>
 		<a href="https://www.reddit.com/r/Polytopia/comments/6fslca/bardur_100k_points_strategy_guide/" target="_blank">Perfection Guide by Tupp</a><br/>
+		<a href="https://www.reddit.com/r/Polytopia/comments/8b2f4s/guide_and_benchmarks_for_120k_in_perfection/" target="_blank">Perfection Guide by ameredit</a><br/>
+		<a href="https://www.reddit.com/r/Polytopia/comments/87urp6/consistently_over_100k_perfection_guide/" target="_blank">Perfection Guide by KiranKat</a><br/>
 		<a href="https://www.reddit.com/r/Polytopia/comments/5qbppw/my_guide_to_high_scores_in_perfection_mode_based/" target="_blank">Perfection Guide by Illinois_Jones</a><br/>
 		<a href="https://www.reddit.com/r/Polytopia/comments/85asn3/advanced_multiplayer_tribe_by_tribe_guide/" target="_blank">Multiplayer Guide by Will2Brown</a><br/><br/>
 		
@@ -2383,7 +2930,7 @@ function refreshattackers()
 		
 		<a href="https://github.com/frothfrenzy/polytopiacalculator/blob/master/Changelog.md" target="_blank">Changelog</a><br/><br/><br/>
 
-		<a href="javascript:;" onclick="return show('main', 'faq')" target="_top">&lt;&lt;&lt; Back to the calculator!</a></p><br/>
+		<a href="javascript:;" class="textpress" onclick="return show('main', 'faq')" target="_top">&lt;&lt;&lt; Back to the calculator!</a></p><br/>
 	</div>
 </div>
 </body>
