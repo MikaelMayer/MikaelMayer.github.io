@@ -35856,8 +35856,8 @@ var _user$project$LeoParser$substPlusOf_ = F2(
 						return _elm_lang$core$Native_Utils.eq(_p5, _p3._0.val) ? s : _elm_lang$core$Native_Utils.crash(
 							'LeoParser',
 							{
-								start: {line: 3105, column: 15},
-								end: {line: 3105, column: 26}
+								start: {line: 3106, column: 15},
+								end: {line: 3106, column: 26}
 							})(
 							A2(
 								_elm_lang$core$Basics_ops['++'],
@@ -38138,138 +38138,135 @@ var _user$project$LeoParser$htmlText = F2(
 				_user$project$Lang$space0));
 	});
 var _user$project$LeoParser$forbiddenTagsInHtmlInner = _elm_lang$core$Regex$regex('</[^>\n]*>');
-var _user$project$LeoParser$htmlToExp = function (node) {
-	var _p179 = node.val;
-	switch (_p179.ctor) {
-		case 'HTMLInner':
-			var _p182 = _p179._0;
-			var _p180 = A3(_elm_lang$core$Regex$find, _elm_lang$core$Regex$All, _user$project$LeoParser$forbiddenTagsInHtmlInner, _p182);
-			if (_p180.ctor === '[]') {
-				return _MikaelMayer$parser$Parser$succeed(
-					A2(_user$project$LeoParser$htmlText, node, _p182));
-			} else {
-				return _MikaelMayer$parser$Parser$succeed(
-					A2(
-						_user$project$LeoParser$htmlText,
-						node,
-						A4(
-							_elm_lang$core$Regex$replace,
-							_elm_lang$core$Regex$All,
-							_user$project$LeoParser$forbiddenTagsInHtmlInner,
-							function (_p181) {
-								return '';
-							},
-							_p182)));
-			}
-		case 'HTMLElement':
-			var _p191 = _p179._0;
-			var _p190 = _p179._2;
-			var _p189 = _p179._3;
-			var _p188 = _p179._5;
-			var _p183 = {ctor: '_Tuple2', _0: _p188, _1: _p189};
-			var endPos = function () {
-				var _p184 = _p191;
-				if (_p184.ctor === 'HTMLTagString') {
-					return _p184._0.end;
+var _user$project$LeoParser$htmlToExp = F2(
+	function (parentTag, node) {
+		var _p179 = node.val;
+		switch (_p179.ctor) {
+			case 'HTMLInner':
+				var _p182 = _p179._0;
+				if (_elm_lang$core$Native_Utils.eq(parentTag, 'script') || _elm_lang$core$Native_Utils.eq(parentTag, 'style')) {
+					return _MikaelMayer$parser$Parser$succeed(
+						A2(_user$project$LeoParser$htmlText, node, _p182));
 				} else {
-					return _p184._0.end;
+					var _p180 = A3(_elm_lang$core$Regex$find, _elm_lang$core$Regex$All, _user$project$LeoParser$forbiddenTagsInHtmlInner, _p182);
+					if (_p180.ctor === '[]') {
+						return _MikaelMayer$parser$Parser$succeed(
+							A2(_user$project$LeoParser$htmlText, node, _p182));
+					} else {
+						return _MikaelMayer$parser$Parser$succeed(
+							A2(
+								_user$project$LeoParser$htmlText,
+								node,
+								A4(
+									_elm_lang$core$Regex$replace,
+									_elm_lang$core$Regex$All,
+									_user$project$LeoParser$forbiddenTagsInHtmlInner,
+									function (_p181) {
+										return '';
+									},
+									_p182)));
+					}
 				}
-			}();
-			return A2(
-				_MikaelMayer$parser$Parser$andThen,
-				function (finalattrs) {
-					var start = {
-						line: _p190.end.line,
-						col: _p190.end.col + (_elm_lang$core$Native_Utils.eq(_p189, _user$project$HTMLParser$RegularEndOpening) ? 1 : 2)
-					};
-					return A2(
-						_MikaelMayer$parser$Parser$andThen,
-						function (_p185) {
-							var _p186 = _p185;
-							return _MikaelMayer$parser$Parser$succeed(
-								_user$project$LeoParser$htmlnode(node)(_p191)(
-									_user$project$Lang$Expr(finalattrs))(_p190)(
-									(_p186._1 ? A2(_user$project$LeoParser$eMergeTexts, start, _p186._0) : _elm_lang$core$Basics$identity)(
-										_user$project$Lang$Expr(_p186._2)))(
-									_elm_lang$core$Native_Utils.eq(_p188, _user$project$HTMLParser$AutoClosing))(
-									_elm_lang$core$Native_Utils.eq(_p188, _user$project$HTMLParser$VoidClosing))(
-									_elm_lang$core$Native_Utils.eq(_p188, _user$project$HTMLParser$ForgotClosing))(
-									_elm_lang$core$Native_Utils.eq(_p188, _user$project$HTMLParser$ImplicitElem))(
-									function () {
-										var _p187 = _p188;
-										if (_p187.ctor === 'RegularClosing') {
-											return _p187._0;
-										} else {
-											return _user$project$Lang$space0;
-										}
-									}()));
-						},
-						A3(_user$project$LeoParser$childrenToExp, start, false, _p179._4));
-				},
-				A2(_user$project$LeoParser$attrsToExp, endPos, _p179._1));
-		case 'HTMLComment':
-			return _MikaelMayer$parser$Parser$succeed(
-				A2(_user$project$LeoParser$htmlComment, node, _p179._0));
-		case 'HTMLEntity':
-			var appendFun = _user$project$Lang$Expr(
-				A3(
-					_user$project$Info$withInfo,
-					_user$project$Lang$exp_(
-						A2(_user$project$Lang$EVar, _user$project$Lang$space0, '++')),
-					node.start,
-					node.start));
-			return _MikaelMayer$parser$Parser$succeed(
-				A3(
-					_user$project$Info$withInfo,
-					_user$project$Lang$exp_(
-						A5(
-							_user$project$Lang$EApp,
-							_user$project$Lang$space0,
-							appendFun,
-							{
-								ctor: '::',
-								_0: _user$project$Lang$Expr(
-									A3(
-										_user$project$Info$withInfo,
-										_user$project$Lang$exp_(
-											A5(
-												_user$project$Lang$EList,
-												_user$project$Lang$space0,
-												{ctor: '[]'},
-												_user$project$Lang$space0,
-												_elm_lang$core$Maybe$Nothing,
-												_user$project$Lang$space0)),
-										node.start,
-										node.start)),
-								_1: {
+			case 'HTMLElement':
+				var _p193 = _p179._0;
+				var _p192 = _p179._2;
+				var _p191 = _p179._3;
+				var _p190 = _p179._5;
+				var _p183 = {ctor: '_Tuple2', _0: _p190, _1: _p191};
+				var _p184 = function () {
+					var _p185 = _p193;
+					if (_p185.ctor === 'HTMLTagString') {
+						var _p186 = _p185._0;
+						return {ctor: '_Tuple2', _0: _p186.end, _1: _p186.val};
+					} else {
+						return {ctor: '_Tuple2', _0: _p185._0.end, _1: '@'};
+					}
+				}();
+				var endPos = _p184._0;
+				var tagStr = _p184._1;
+				return A2(
+					_MikaelMayer$parser$Parser$andThen,
+					function (finalattrs) {
+						var start = {
+							line: _p192.end.line,
+							col: _p192.end.col + (_elm_lang$core$Native_Utils.eq(_p191, _user$project$HTMLParser$RegularEndOpening) ? 1 : 2)
+						};
+						return A2(
+							_MikaelMayer$parser$Parser$andThen,
+							function (_p187) {
+								var _p188 = _p187;
+								return _MikaelMayer$parser$Parser$succeed(
+									_user$project$LeoParser$htmlnode(node)(_p193)(
+										_user$project$Lang$Expr(finalattrs))(_p192)(
+										(_p188._1 ? A2(_user$project$LeoParser$eMergeTexts, start, _p188._0) : _elm_lang$core$Basics$identity)(
+											_user$project$Lang$Expr(_p188._2)))(
+										_elm_lang$core$Native_Utils.eq(_p190, _user$project$HTMLParser$AutoClosing))(
+										_elm_lang$core$Native_Utils.eq(_p190, _user$project$HTMLParser$VoidClosing))(
+										_elm_lang$core$Native_Utils.eq(_p190, _user$project$HTMLParser$ForgotClosing))(
+										_elm_lang$core$Native_Utils.eq(_p190, _user$project$HTMLParser$ImplicitElem))(
+										function () {
+											var _p189 = _p190;
+											if (_p189.ctor === 'RegularClosing') {
+												return _p189._0;
+											} else {
+												return _user$project$Lang$space0;
+											}
+										}()));
+							},
+							A4(_user$project$LeoParser$childrenToExp, tagStr, start, false, _p179._4));
+					},
+					A2(_user$project$LeoParser$attrsToExp, endPos, _p179._1));
+			case 'HTMLComment':
+				return _MikaelMayer$parser$Parser$succeed(
+					A2(_user$project$LeoParser$htmlComment, node, _p179._0));
+			case 'HTMLEntity':
+				var appendFun = _user$project$Lang$Expr(
+					A3(
+						_user$project$Info$withInfo,
+						_user$project$Lang$exp_(
+							A2(_user$project$Lang$EVar, _user$project$Lang$space0, '++')),
+						node.start,
+						node.start));
+				return _MikaelMayer$parser$Parser$succeed(
+					A3(
+						_user$project$Info$withInfo,
+						_user$project$Lang$exp_(
+							A5(
+								_user$project$Lang$EApp,
+								_user$project$Lang$space0,
+								appendFun,
+								{
 									ctor: '::',
 									_0: _user$project$Lang$Expr(
 										A3(
 											_user$project$Info$withInfo,
 											_user$project$Lang$exp_(
 												A5(
-													_user$project$Lang$EApp,
-													_user$project$Lang$space1,
-													_user$project$Lang$Expr(
-														A3(
-															_user$project$Info$withInfo,
-															_user$project$Lang$exp_(
-																A2(_user$project$Lang$EVar, _user$project$Lang$space1, '__htmlEntity__')),
-															node.start,
-															node.start)),
-													{
-														ctor: '::',
-														_0: _user$project$Lang$Expr(
+													_user$project$Lang$EList,
+													_user$project$Lang$space0,
+													{ctor: '[]'},
+													_user$project$Lang$space0,
+													_elm_lang$core$Maybe$Nothing,
+													_user$project$Lang$space0)),
+											node.start,
+											node.start)),
+									_1: {
+										ctor: '::',
+										_0: _user$project$Lang$Expr(
+											A3(
+												_user$project$Info$withInfo,
+												_user$project$Lang$exp_(
+													A5(
+														_user$project$Lang$EApp,
+														_user$project$Lang$space1,
+														_user$project$Lang$Expr(
 															A3(
 																_user$project$Info$withInfo,
 																_user$project$Lang$exp_(
-																	A2(
-																		_user$project$Lang$EBase,
-																		_user$project$Lang$space0,
-																		A2(_user$project$Lang$EString, '\"', _p179._0))),
+																	A2(_user$project$Lang$EVar, _user$project$Lang$space1, '__htmlEntity__')),
 																node.start,
 																node.start)),
-														_1: {
+														{
 															ctor: '::',
 															_0: _user$project$Lang$Expr(
 																A3(
@@ -38278,93 +38275,105 @@ var _user$project$LeoParser$htmlToExp = function (node) {
 																		A2(
 																			_user$project$Lang$EBase,
 																			_user$project$Lang$space0,
-																			A2(_user$project$Lang$EString, '\"', _p179._1))),
+																			A2(_user$project$Lang$EString, '\"', _p179._0))),
 																	node.start,
-																	node.end)),
-															_1: {ctor: '[]'}
-														}
-													},
-													_user$project$Lang$SpaceApp,
-													_user$project$Lang$space0)),
-											node.start,
-											node.end)),
-									_1: {ctor: '[]'}
-								}
-							},
-							_user$project$Lang$InfixApp,
-							_user$project$Lang$space0)),
-					node.start,
-					node.end));
-		default:
-			var _p192 = _p179._0;
-			var appendFun = _user$project$Lang$Expr(
-				A3(
-					_user$project$Info$withInfo,
-					_user$project$Lang$exp_(
-						A2(_user$project$Lang$EVar, _user$project$Lang$space0, '++')),
-					node.start,
-					node.start));
-			return _MikaelMayer$parser$Parser$succeed(
-				A3(
-					_user$project$Info$withInfo,
-					_user$project$Lang$exp_(
-						A5(
-							_user$project$Lang$EApp,
-							_user$project$Lang$space0,
-							appendFun,
-							{
-								ctor: '::',
-								_0: _user$project$Lang$Expr(
-									A3(
-										_user$project$Info$withInfo,
-										_user$project$Lang$exp_(
-											A5(
-												_user$project$Lang$EList,
-												_user$project$Lang$space0,
-												{ctor: '[]'},
-												_user$project$Lang$space0,
-												_elm_lang$core$Maybe$Nothing,
-												_user$project$Lang$space0)),
-										node.start,
-										node.start)),
-								_1: {
+																	node.start)),
+															_1: {
+																ctor: '::',
+																_0: _user$project$Lang$Expr(
+																	A3(
+																		_user$project$Info$withInfo,
+																		_user$project$Lang$exp_(
+																			A2(
+																				_user$project$Lang$EBase,
+																				_user$project$Lang$space0,
+																				A2(_user$project$Lang$EString, '\"', _p179._1))),
+																		node.start,
+																		node.end)),
+																_1: {ctor: '[]'}
+															}
+														},
+														_user$project$Lang$SpaceApp,
+														_user$project$Lang$space0)),
+												node.start,
+												node.end)),
+										_1: {ctor: '[]'}
+									}
+								},
+								_user$project$Lang$InfixApp,
+								_user$project$Lang$space0)),
+						node.start,
+						node.end));
+			default:
+				var _p194 = _p179._0;
+				var appendFun = _user$project$Lang$Expr(
+					A3(
+						_user$project$Info$withInfo,
+						_user$project$Lang$exp_(
+							A2(_user$project$Lang$EVar, _user$project$Lang$space0, '++')),
+						node.start,
+						node.start));
+				return _MikaelMayer$parser$Parser$succeed(
+					A3(
+						_user$project$Info$withInfo,
+						_user$project$Lang$exp_(
+							A5(
+								_user$project$Lang$EApp,
+								_user$project$Lang$space0,
+								appendFun,
+								{
 									ctor: '::',
 									_0: _user$project$Lang$Expr(
 										A3(
 											_user$project$Info$withInfo,
 											_user$project$Lang$exp_(
 												A5(
-													_user$project$Lang$EApp,
-													_user$project$Lang$space1,
-													_user$project$Lang$Expr(
-														A3(
-															_user$project$Info$withInfo,
-															_user$project$Lang$exp_(
-																A2(_user$project$Lang$EVar, _user$project$Lang$space1, '__mbwraphtmlnode__')),
-															_p192.start,
-															_p192.start)),
-													{
-														ctor: '::',
-														_0: _user$project$Lang$Expr(_p192),
-														_1: {ctor: '[]'}
-													},
-													_user$project$Lang$SpaceApp,
+													_user$project$Lang$EList,
+													_user$project$Lang$space0,
+													{ctor: '[]'},
+													_user$project$Lang$space0,
+													_elm_lang$core$Maybe$Nothing,
 													_user$project$Lang$space0)),
-											_p192.start,
-											_p192.end)),
-									_1: {ctor: '[]'}
-								}
-							},
-							_user$project$Lang$InfixApp,
-							_user$project$Lang$space0)),
-					node.start,
-					_p192.end));
-	}
-};
-var _user$project$LeoParser$childrenToExp = F3(
-	function (lastPos, wasInterpolated, children) {
-		var _p193 = children;
-		if (_p193.ctor === '[]') {
+											node.start,
+											node.start)),
+									_1: {
+										ctor: '::',
+										_0: _user$project$Lang$Expr(
+											A3(
+												_user$project$Info$withInfo,
+												_user$project$Lang$exp_(
+													A5(
+														_user$project$Lang$EApp,
+														_user$project$Lang$space1,
+														_user$project$Lang$Expr(
+															A3(
+																_user$project$Info$withInfo,
+																_user$project$Lang$exp_(
+																	A2(_user$project$Lang$EVar, _user$project$Lang$space1, '__mbwraphtmlnode__')),
+																_p194.start,
+																_p194.start)),
+														{
+															ctor: '::',
+															_0: _user$project$Lang$Expr(_p194),
+															_1: {ctor: '[]'}
+														},
+														_user$project$Lang$SpaceApp,
+														_user$project$Lang$space0)),
+												_p194.start,
+												_p194.end)),
+										_1: {ctor: '[]'}
+									}
+								},
+								_user$project$Lang$InfixApp,
+								_user$project$Lang$space0)),
+						node.start,
+						_p194.end));
+		}
+	});
+var _user$project$LeoParser$childrenToExp = F4(
+	function (parentTag, lastPos, wasInterpolated, children) {
+		var _p195 = children;
+		if (_p195.ctor === '[]') {
 			return _MikaelMayer$parser$Parser$succeed(
 				A3(
 					F3(
@@ -38386,10 +38395,10 @@ var _user$project$LeoParser$childrenToExp = F3(
 						lastPos,
 						lastPos)));
 		} else {
-			var _p202 = _p193._0;
+			var _p204 = _p195._0;
 			var newWasInterpolation = function () {
-				var _p194 = _p202.val;
-				switch (_p194.ctor) {
+				var _p196 = _p204.val;
+				switch (_p196.ctor) {
 					case 'HTMLListNodeExp':
 						return true;
 					case 'HTMLEntity':
@@ -38403,29 +38412,29 @@ var _user$project$LeoParser$childrenToExp = F3(
 				function (headExp) {
 					return A2(
 						_MikaelMayer$parser$Parser$andThen,
-						function (_p195) {
-							var _p196 = _p195;
-							var _p201 = _p196._2;
-							var _p200 = _p196._1;
-							var _p199 = _p196._0;
-							var _p197 = _user$project$Lang$unwrapExp(
+						function (_p197) {
+							var _p198 = _p197;
+							var _p203 = _p198._2;
+							var _p202 = _p198._1;
+							var _p201 = _p198._0;
+							var _p199 = _user$project$Lang$unwrapExp(
 								_user$project$Lang$Expr(headExp));
-							if (_p197.ctor === 'EApp') {
+							if (_p199.ctor === 'EApp') {
 								var appendFun = _user$project$Lang$Expr(
 									A3(
 										_user$project$Info$withInfo,
 										_user$project$Lang$exp_(
 											A2(_user$project$Lang$EVar, _user$project$Lang$space0, '++')),
 										headExp.end,
-										_p201.start));
+										_p203.start));
 								return _MikaelMayer$parser$Parser$succeed(
 									A3(
 										F3(
 											function (v0, v1, v2) {
 												return {ctor: '_Tuple3', _0: v0, _1: v1, _2: v2};
 											}),
-										_p199,
-										_p200,
+										_p201,
+										_p202,
 										A3(
 											_user$project$Info$withInfo,
 											_user$project$Lang$exp_(
@@ -38438,25 +38447,25 @@ var _user$project$LeoParser$childrenToExp = F3(
 														_0: _user$project$Lang$Expr(headExp),
 														_1: {
 															ctor: '::',
-															_0: _user$project$Lang$Expr(_p201),
+															_0: _user$project$Lang$Expr(_p203),
 															_1: {ctor: '[]'}
 														}
 													},
 													_user$project$Lang$InfixApp,
 													_user$project$Lang$space0)),
 											headExp.start,
-											_p201.end)));
+											_p203.end)));
 							} else {
-								var _p198 = A2(
+								var _p200 = A2(
 									_user$project$LeoParser$appendToLeft,
 									{
 										ctor: '_Tuple2',
 										_0: _user$project$Lang$space0,
 										_1: _user$project$Lang$Expr(headExp)
 									},
-									_user$project$Lang$Expr(_p201));
-								if (_p198.ctor === 'Err') {
-									return _MikaelMayer$parser$Parser$fail(_p198._0);
+									_user$project$Lang$Expr(_p203));
+								if (_p200.ctor === 'Err') {
+									return _MikaelMayer$parser$Parser$fail(_p200._0);
 								} else {
 									return _MikaelMayer$parser$Parser$succeed(
 										A3(
@@ -38464,49 +38473,49 @@ var _user$project$LeoParser$childrenToExp = F3(
 												function (v0, v1, v2) {
 													return {ctor: '_Tuple3', _0: v0, _1: v1, _2: v2};
 												}),
-											_p199,
-											_p200,
-											_p198._0._0));
+											_p201,
+											_p202,
+											_p200._0._0));
 								}
 							}
 						},
-						A3(_user$project$LeoParser$childrenToExp, _p202.end, newWasInterpolation, _p193._1));
+						A4(_user$project$LeoParser$childrenToExp, parentTag, _p204.end, newWasInterpolation, _p195._1));
 				},
-				_user$project$LeoParser$htmlToExp(_p202));
+				A2(_user$project$LeoParser$htmlToExp, parentTag, _p204));
 		}
 	});
 var _user$project$LeoParser$htmlEscape = _user$project$ImpureGoodies$htmlescape;
 var _user$project$LeoParser$multilineConcatExp = F2(
 	function (exps, startPosition) {
-		var _p203 = exps;
-		if (_p203.ctor === '[]') {
+		var _p205 = exps;
+		if (_p205.ctor === '[]') {
 			return _elm_lang$core$Native_Utils.crashCase(
 				'LeoParser',
 				{
 					start: {line: 677, column: 3},
 					end: {line: 688, column: 36}
 				},
-				_p203)('Internal error: No expression in longstring literal');
+				_p205)('Internal error: No expression in longstring literal');
 		} else {
-			if (_p203._1.ctor === '[]') {
-				return _p203._0._0;
+			if (_p205._1.ctor === '[]') {
+				return _p205._0._0;
 			} else {
-				var _p207 = _p203._0._0;
-				var tailPart = A2(_user$project$LeoParser$multilineConcatExp, _p203._1, _p207.end);
-				var _p205 = _user$project$Lang$unwrapExp(
-					_user$project$Lang$Expr(_p207));
-				if (_p205.ctor === 'ELet') {
-					var _p206 = A2(
+				var _p209 = _p205._0._0;
+				var tailPart = A2(_user$project$LeoParser$multilineConcatExp, _p205._1, _p209.end);
+				var _p207 = _user$project$Lang$unwrapExp(
+					_user$project$Lang$Expr(_p209));
+				if (_p207.ctor === 'ELet') {
+					var _p208 = A2(
 						_user$project$Lang$replaceE__,
-						_user$project$Lang$Expr(_p207),
+						_user$project$Lang$Expr(_p209),
 						A5(
 							_user$project$Lang$ELet,
-							_p205._0,
-							_p205._1,
-							_p205._2,
-							_p205._3,
+							_p207._0,
+							_p207._1,
+							_p207._2,
+							_p207._3,
 							_user$project$Lang$Expr(tailPart)));
-					var e = _p206._0;
+					var e = _p208._0;
 					return e;
 				} else {
 					return A3(
@@ -38516,10 +38525,10 @@ var _user$project$LeoParser$multilineConcatExp = F2(
 								_user$project$Lang$EOp,
 								_user$project$Lang$space0,
 								_user$project$Lang$space1,
-								A3(_user$project$Info$withInfo, _user$project$Lang$Plus, _p207.end, tailPart.start),
+								A3(_user$project$Info$withInfo, _user$project$Lang$Plus, _p209.end, tailPart.start),
 								{
 									ctor: '::',
-									_0: _user$project$Lang$Expr(_p207),
+									_0: _user$project$Lang$Expr(_p209),
 									_1: {
 										ctor: '::',
 										_0: _user$project$Lang$Expr(tailPart),
@@ -38527,7 +38536,7 @@ var _user$project$LeoParser$multilineConcatExp = F2(
 									}
 								},
 								_user$project$Lang$space0)),
-						_p207.start,
+						_p209.start,
 						tailPart.end);
 				}
 			}
@@ -38540,9 +38549,9 @@ var _user$project$LeoParser$eString = A2(
 	_user$project$ParserUtils$trackInfo(
 		A2(
 			_MikaelMayer$parser$Parser$map,
-			function (_p208) {
-				var _p209 = _p208;
-				return A2(_user$project$Lang$EString, _p209._0, _p209._1);
+			function (_p210) {
+				var _p211 = _p210;
+				return A2(_user$project$Lang$EString, _p211._0, _p211._1);
 			},
 			_user$project$ParserUtils$singleLineString)));
 var _user$project$LeoParser$bool = A2(
@@ -38722,22 +38731,22 @@ var _user$project$LeoParser$constantExpression = A2(
 	_user$project$LangParserUtils$mapWSExp_(
 		A2(
 			_MikaelMayer$parser$Parser$map,
-			function (_p210) {
-				var _p211 = _p210;
-				var _p213 = _p211._2;
-				var _p212 = _p211._0;
+			function (_p212) {
+				var _p213 = _p212;
+				var _p215 = _p213._2;
+				var _p214 = _p213._0;
 				return A3(
 					_user$project$Info$withInfo,
 					function (ws) {
 						return A4(
 							_user$project$Lang$EConst,
 							ws,
-							_p212.val,
-							A2(_user$project$Lang$dummyLocWithDebugInfo, _p211._1.val, _p212.val),
-							_p213);
+							_p214.val,
+							A2(_user$project$Lang$dummyLocWithDebugInfo, _p213._1.val, _p214.val),
+							_p215);
 					},
-					_p212.start,
-					_p213.end);
+					_p214.start,
+					_p215.end);
 			},
 			A2(
 				_MikaelMayer$parser$Parser_ops['|='],
@@ -38902,15 +38911,15 @@ var _user$project$LeoParser$operator = function (appargSpace) {
 		_user$project$LeoParser$symbolIdentifier);
 };
 var _user$project$LeoParser$implicitOp = _MikaelMayer$parser$Parser$lazy(
-	function (_p214) {
+	function (_p216) {
 		return A2(
 			_MikaelMayer$parser$Parser$andThen,
 			function (op) {
-				var _p215 = op.val;
-				var ws0 = _p215._0;
-				var identifier = _p215._1;
-				var _p216 = _user$project$LeoParser$opFromIdentifier(identifier);
-				if (_p216.ctor === 'Just') {
+				var _p217 = op.val;
+				var ws0 = _p217._0;
+				var identifier = _p217._1;
+				var _p218 = _user$project$LeoParser$opFromIdentifier(identifier);
+				if (_p218.ctor === 'Just') {
 					return _MikaelMayer$parser$Parser$succeed(
 						function (wsBefore) {
 							return A3(
@@ -38920,7 +38929,7 @@ var _user$project$LeoParser$implicitOp = _MikaelMayer$parser$Parser$lazy(
 										_user$project$Lang$EOp,
 										wsBefore,
 										_user$project$Lang$space0,
-										A3(_user$project$Info$withInfo, _p216._0, op.start, op.end),
+										A3(_user$project$Info$withInfo, _p218._0, op.start, op.end),
 										{ctor: '[]'},
 										_user$project$Lang$space0)),
 								op.start,
@@ -39020,13 +39029,13 @@ var _user$project$LeoParser$variableExpression = _user$project$LangParserUtils$m
 		_elm_lang$core$Basics$flip(_user$project$Lang$EVar),
 		_user$project$LeoParser$anyIdentifier));
 var _user$project$LeoParser$selection = _MikaelMayer$parser$Parser$lazy(
-	function (_p217) {
+	function (_p219) {
 		return A3(
 			_MikaelMayer$parser$Parser$delayedCommitMap,
 			F4(
-				function (wsBeforeDot, _p218, ws2Exp, wsBefore) {
-					var _p219 = _p218;
-					var _p220 = _p219._1;
+				function (wsBeforeDot, _p220, ws2Exp, wsBefore) {
+					var _p221 = _p220;
+					var _p222 = _p221._1;
 					var exp = ws2Exp(_user$project$Lang$space0);
 					return A3(
 						_user$project$Info$withInfo,
@@ -39036,10 +39045,10 @@ var _user$project$LeoParser$selection = _MikaelMayer$parser$Parser$lazy(
 								wsBefore,
 								_user$project$Lang$Expr(exp),
 								wsBeforeDot,
-								_p219._0,
-								_p220.val)),
+								_p221._0,
+								_p222.val)),
 						exp.start,
-						_p220.end);
+						_p222.end);
 				}),
 			A2(
 				_MikaelMayer$parser$Parser_ops['|.'],
@@ -39128,15 +39137,15 @@ var _user$project$LeoParser$block = F4(
 		return A3(
 			_MikaelMayer$parser$Parser$delayedCommitMap,
 			F2(
-				function (open, _p221) {
-					var _p222 = _p221;
+				function (open, _p223) {
+					var _p224 = _p223;
 					return A3(
 						_user$project$Info$withInfo,
 						function (wsBefore) {
-							return A3(combiner, wsBefore, _p222._0, _p222._1);
+							return A3(combiner, wsBefore, _p224._0, _p224._1);
 						},
 						open.start,
-						_p222._2.end);
+						_p224._2.end);
 				}),
 			_user$project$ParserUtils$trackInfo(
 				_MikaelMayer$parser$Parser$symbol(openSymbol)),
@@ -39168,11 +39177,11 @@ var _user$project$LeoParser$blockIgnoreWS = _user$project$LeoParser$block(
 			return x;
 		}));
 var _user$project$LeoParser$parenBlockIgnoreWS = A2(_user$project$LeoParser$blockIgnoreWS, '(', ')');
-var _user$project$LeoParser$genericNonEmptyRecordWithInit = function (_p223) {
-	var _p224 = _p223;
-	var _p240 = _p224.keyValue;
+var _user$project$LeoParser$genericNonEmptyRecordWithInit = function (_p225) {
+	var _p226 = _p225;
+	var _p242 = _p226.keyValue;
 	return _MikaelMayer$parser$Parser$lazy(
-		function (_p225) {
+		function (_p227) {
 			var keyValueSeqHelper = F2(
 				function (keys, revKeyValues) {
 					return _MikaelMayer$parser$Parser$oneOf(
@@ -39180,36 +39189,36 @@ var _user$project$LeoParser$genericNonEmptyRecordWithInit = function (_p223) {
 							ctor: '::',
 							_0: A2(
 								_MikaelMayer$parser$Parser$andThen,
-								function (_p226) {
-									var _p227 = _p226;
-									var _p228 = _p227._2;
-									return A2(_elm_lang$core$Set$member, _p228, keys) ? _MikaelMayer$parser$Parser$fail(
+								function (_p228) {
+									var _p229 = _p228;
+									var _p230 = _p229._2;
+									return A2(_elm_lang$core$Set$member, _p230, keys) ? _MikaelMayer$parser$Parser$fail(
 										A2(
 											_elm_lang$core$Basics_ops['++'],
 											'Records cannot have duplicate keys, but the key ',
-											A2(_elm_lang$core$Basics_ops['++'], _p228, ' appears at least twice'))) : A2(
+											A2(_elm_lang$core$Basics_ops['++'], _p230, ' appears at least twice'))) : A2(
 										keyValueSeqHelper,
-										A2(_elm_lang$core$Set$insert, _p228, keys),
-										{ctor: '::', _0: _p227, _1: revKeyValues});
+										A2(_elm_lang$core$Set$insert, _p230, keys),
+										{ctor: '::', _0: _p229, _1: revKeyValues});
 								},
 								A3(
 									_MikaelMayer$parser$Parser$delayedCommitMap,
 									F2(
-										function (ws, _p229) {
-											var _p230 = _p229;
-											var _p232 = _p230._0;
+										function (ws, _p231) {
+											var _p232 = _p231;
+											var _p234 = _p232._0;
 											return {
 												ctor: '_Tuple5',
 												_0: A2(
 													_elm_lang$core$Maybe$map,
-													function (_p231) {
+													function (_p233) {
 														return ws;
 													},
-													_p232),
-												_1: _elm_lang$core$Native_Utils.eq(_p232, _elm_lang$core$Maybe$Nothing) ? ws : _p230._1,
-												_2: _p230._2._0,
-												_3: _p230._2._1,
-												_4: _p230._2._2
+													_p234),
+												_1: _elm_lang$core$Native_Utils.eq(_p234, _elm_lang$core$Maybe$Nothing) ? ws : _p232._1,
+												_2: _p232._2._0,
+												_3: _p232._2._1,
+												_4: _p232._2._2
 											};
 										}),
 									_user$project$LangParserUtils$spaces,
@@ -39231,7 +39240,7 @@ var _user$project$LeoParser$genericNonEmptyRecordWithInit = function (_p223) {
 												_user$project$ParserUtils$optional(
 													_MikaelMayer$parser$Parser$symbol(','))),
 											_user$project$LangParserUtils$spaces),
-										_p240))),
+										_p242))),
 							_1: {
 								ctor: '::',
 								_0: _MikaelMayer$parser$Parser$succeed(
@@ -39247,10 +39256,10 @@ var _user$project$LeoParser$genericNonEmptyRecordWithInit = function (_p223) {
 					A3(
 						_MikaelMayer$parser$Parser$delayedCommitMap,
 						F3(
-							function (_p234, _p233, wsBefore) {
-								var _p235 = _p234;
-								var _p236 = _p233;
-								return A5(_p224.combinerInit, wsBefore, _p235._0, _p235._1, _p236._0, _p236._1);
+							function (_p236, _p235, wsBefore) {
+								var _p237 = _p236;
+								var _p238 = _p235;
+								return A5(_p226.combinerInit, wsBefore, _p237._0, _p237._1, _p238._0, _p238._1);
 							}),
 						A2(
 							_MikaelMayer$parser$Parser_ops['|='],
@@ -39264,7 +39273,7 @@ var _user$project$LeoParser$genericNonEmptyRecordWithInit = function (_p223) {
 												return {ctor: '_Tuple2', _0: init, _1: wsBeforeBar};
 											})),
 									_MikaelMayer$parser$Parser$symbol('{')),
-								_p224.initItem),
+								_p226.initItem),
 							_user$project$LangParserUtils$spaces),
 						A2(
 							_MikaelMayer$parser$Parser_ops['|.'],
@@ -39282,15 +39291,15 @@ var _user$project$LeoParser$genericNonEmptyRecordWithInit = function (_p223) {
 										_MikaelMayer$parser$Parser$symbol('|')),
 									A2(
 										_MikaelMayer$parser$Parser$andThen,
-										function (_p237) {
-											var _p238 = _p237;
-											var _p239 = _p238._1._0;
+										function (_p239) {
+											var _p240 = _p239;
+											var _p241 = _p240._1._0;
 											return A2(
 												keyValueSeqHelper,
-												_elm_lang$core$Set$singleton(_p239),
+												_elm_lang$core$Set$singleton(_p241),
 												{
 													ctor: '::',
-													_0: {ctor: '_Tuple5', _0: _elm_lang$core$Maybe$Nothing, _1: _p238._0, _2: _p239, _3: _p238._1._1, _4: _p238._1._2},
+													_0: {ctor: '_Tuple5', _0: _elm_lang$core$Maybe$Nothing, _1: _p240._0, _2: _p241, _3: _p240._1._1, _4: _p240._1._2},
 													_1: {ctor: '[]'}
 												});
 										},
@@ -39304,16 +39313,16 @@ var _user$project$LeoParser$genericNonEmptyRecordWithInit = function (_p223) {
 															return {ctor: '_Tuple2', _0: v0, _1: v1};
 														})),
 												_user$project$LangParserUtils$spaces),
-											_p240))),
+											_p242))),
 								_user$project$LangParserUtils$spaces),
 							_MikaelMayer$parser$Parser$symbol('}')))));
 		});
 };
-var _user$project$LeoParser$genericNonEmptyRecord = function (_p241) {
-	var _p242 = _p241;
-	var _p256 = _p242.keyValue;
+var _user$project$LeoParser$genericNonEmptyRecord = function (_p243) {
+	var _p244 = _p243;
+	var _p258 = _p244.keyValue;
 	return _MikaelMayer$parser$Parser$lazy(
-		function (_p243) {
+		function (_p245) {
 			var keyValueSeqHelper = F2(
 				function (keys, revKeyValues) {
 					return _MikaelMayer$parser$Parser$oneOf(
@@ -39321,36 +39330,36 @@ var _user$project$LeoParser$genericNonEmptyRecord = function (_p241) {
 							ctor: '::',
 							_0: A2(
 								_MikaelMayer$parser$Parser$andThen,
-								function (_p244) {
-									var _p245 = _p244;
-									var _p246 = _p245._2;
-									return A2(_elm_lang$core$Set$member, _p246, keys) ? _MikaelMayer$parser$Parser$fail(
+								function (_p246) {
+									var _p247 = _p246;
+									var _p248 = _p247._2;
+									return A2(_elm_lang$core$Set$member, _p248, keys) ? _MikaelMayer$parser$Parser$fail(
 										A2(
 											_elm_lang$core$Basics_ops['++'],
 											'Records cannot have duplicate keys, but the key ',
-											A2(_elm_lang$core$Basics_ops['++'], _p246, ' appears at least twice'))) : A2(
+											A2(_elm_lang$core$Basics_ops['++'], _p248, ' appears at least twice'))) : A2(
 										keyValueSeqHelper,
-										A2(_elm_lang$core$Set$insert, _p246, keys),
-										{ctor: '::', _0: _p245, _1: revKeyValues});
+										A2(_elm_lang$core$Set$insert, _p248, keys),
+										{ctor: '::', _0: _p247, _1: revKeyValues});
 								},
 								A3(
 									_MikaelMayer$parser$Parser$delayedCommitMap,
 									F2(
-										function (ws, _p247) {
-											var _p248 = _p247;
-											var _p250 = _p248._0;
+										function (ws, _p249) {
+											var _p250 = _p249;
+											var _p252 = _p250._0;
 											return {
 												ctor: '_Tuple5',
 												_0: A2(
 													_elm_lang$core$Maybe$map,
-													function (_p249) {
+													function (_p251) {
 														return ws;
 													},
-													_p250),
-												_1: _elm_lang$core$Native_Utils.eq(_p250, _elm_lang$core$Maybe$Nothing) ? ws : _p248._1,
-												_2: _p248._2._0,
-												_3: _p248._2._1,
-												_4: _p248._2._2
+													_p252),
+												_1: _elm_lang$core$Native_Utils.eq(_p252, _elm_lang$core$Maybe$Nothing) ? ws : _p250._1,
+												_2: _p250._2._0,
+												_3: _p250._2._1,
+												_4: _p250._2._2
 											};
 										}),
 									_user$project$LangParserUtils$spaces,
@@ -39372,7 +39381,7 @@ var _user$project$LeoParser$genericNonEmptyRecord = function (_p241) {
 												_user$project$ParserUtils$optional(
 													_MikaelMayer$parser$Parser$symbol(','))),
 											_user$project$LangParserUtils$spaces),
-										_p256))),
+										_p258))),
 							_1: {
 								ctor: '::',
 								_0: _MikaelMayer$parser$Parser$succeed(
@@ -39387,9 +39396,9 @@ var _user$project$LeoParser$genericNonEmptyRecord = function (_p241) {
 				A2(
 					_user$project$LangParserUtils$transferInfo,
 					F2(
-						function (_p251, spaceBefore) {
-							var _p252 = _p251;
-							return A3(_p242.combiner, spaceBefore, _p252._0, _p252._1);
+						function (_p253, spaceBefore) {
+							var _p254 = _p253;
+							return A3(_p244.combiner, spaceBefore, _p254._0, _p254._1);
 						}),
 					_user$project$ParserUtils$trackInfo(
 						A2(
@@ -39408,15 +39417,15 @@ var _user$project$LeoParser$genericNonEmptyRecord = function (_p241) {
 										_MikaelMayer$parser$Parser$symbol('{')),
 									A2(
 										_MikaelMayer$parser$Parser$andThen,
-										function (_p253) {
-											var _p254 = _p253;
-											var _p255 = _p254._1._0;
+										function (_p255) {
+											var _p256 = _p255;
+											var _p257 = _p256._1._0;
 											return A2(
 												keyValueSeqHelper,
-												_elm_lang$core$Set$singleton(_p255),
+												_elm_lang$core$Set$singleton(_p257),
 												{
 													ctor: '::',
-													_0: {ctor: '_Tuple5', _0: _elm_lang$core$Maybe$Nothing, _1: _p254._0, _2: _p255, _3: _p254._1._1, _4: _p254._1._2},
+													_0: {ctor: '_Tuple5', _0: _elm_lang$core$Maybe$Nothing, _1: _p256._0, _2: _p257, _3: _p256._1._1, _4: _p256._1._2},
 													_1: {ctor: '[]'}
 												});
 										},
@@ -39430,19 +39439,19 @@ var _user$project$LeoParser$genericNonEmptyRecord = function (_p241) {
 															return {ctor: '_Tuple2', _0: v0, _1: v1};
 														})),
 												_user$project$LangParserUtils$spaces),
-											_p256))),
+											_p258))),
 								_user$project$LangParserUtils$spaces),
 							_MikaelMayer$parser$Parser$symbol('}')))));
 		});
 };
-var _user$project$LeoParser$genericEmptyRecord = function (_p257) {
-	var _p258 = _p257;
+var _user$project$LeoParser$genericEmptyRecord = function (_p259) {
+	var _p260 = _p259;
 	return A2(
 		_MikaelMayer$parser$Parser$inContext,
 		'generic empty record',
 		A2(
 			_user$project$LangParserUtils$transferInfo,
-			_elm_lang$core$Basics$flip(_p258.combiner),
+			_elm_lang$core$Basics$flip(_p260.combiner),
 			_user$project$ParserUtils$trackInfo(
 				A2(
 					_MikaelMayer$parser$Parser_ops['|.'],
@@ -39455,9 +39464,9 @@ var _user$project$LeoParser$genericEmptyRecord = function (_p257) {
 						_user$project$LangParserUtils$spaces),
 					_MikaelMayer$parser$Parser$symbol('}')))));
 };
-var _user$project$LeoParser$genericRecord = function (_p259) {
-	var _p260 = _p259;
-	var _p269 = _p260.combiner;
+var _user$project$LeoParser$genericRecord = function (_p261) {
+	var _p262 = _p261;
+	var _p271 = _p262.combiner;
 	var keyValue = A2(
 		_MikaelMayer$parser$Parser$andThen,
 		function (keyWithInfos) {
@@ -39467,19 +39476,19 @@ var _user$project$LeoParser$genericRecord = function (_p259) {
 					_MikaelMayer$parser$Parser_ops['|='],
 					_MikaelMayer$parser$Parser$succeed(
 						F2(
-							function (argList, _p261) {
-								var _p262 = _p261;
-								var _p265 = _p262._0;
-								var _p264 = _p262._1;
-								var _p263 = argList;
-								if (_p263.ctor === 'Nothing') {
-									return {ctor: '_Tuple3', _0: keyWithInfos.val, _1: _p265, _2: _p264};
+							function (argList, _p263) {
+								var _p264 = _p263;
+								var _p267 = _p264._0;
+								var _p266 = _p264._1;
+								var _p265 = argList;
+								if (_p265.ctor === 'Nothing') {
+									return {ctor: '_Tuple3', _0: keyWithInfos.val, _1: _p267, _2: _p266};
 								} else {
 									return {
 										ctor: '_Tuple3',
 										_0: keyWithInfos.val,
-										_1: _p265,
-										_2: A2(_p263._0._0, _p263._0._1, _p264)
+										_1: _p267,
+										_2: A2(_p265._0._0, _p265._0._1, _p266)
 									};
 								}
 							})),
@@ -39497,7 +39506,7 @@ var _user$project$LeoParser$genericRecord = function (_p259) {
 									},
 									f.$arguments);
 							},
-							_p260.fundef))),
+							_p262.fundef))),
 				_MikaelMayer$parser$Parser$oneOf(
 					{
 						ctor: '::',
@@ -39517,16 +39526,16 @@ var _user$project$LeoParser$genericRecord = function (_p259) {
 											return a;
 										}),
 									_user$project$LangParserUtils$spaces,
-									_p260.equalSign)),
+									_p262.equalSign)),
 							A2(
 								_MikaelMayer$parser$Parser$inContext,
 								'record value',
-								A2(_p260.value, _user$project$LangParserUtils$spaces, keyWithInfos.start.col + 1))),
+								A2(_p262.value, _user$project$LangParserUtils$spaces, keyWithInfos.start.col + 1))),
 						_1: {
 							ctor: '::',
 							_0: function () {
-								var _p266 = _p260.optNoEqualSign;
-								if (_p266.ctor === 'Nothing') {
+								var _p268 = _p262.optNoEqualSign;
+								if (_p268.ctor === 'Nothing') {
 									return _MikaelMayer$parser$Parser$fail('Expected =');
 								} else {
 									return A3(
@@ -39564,7 +39573,7 @@ var _user$project$LeoParser$genericRecord = function (_p259) {
 														}
 													})),
 											_MikaelMayer$parser$Parser$succeed(
-												_p266._0(keyWithInfos.val))));
+												_p268._0(keyWithInfos.val))));
 								}
 							}(),
 							_1: {ctor: '[]'}
@@ -39574,9 +39583,9 @@ var _user$project$LeoParser$genericRecord = function (_p259) {
 		A2(
 			_MikaelMayer$parser$Parser$inContext,
 			'record key or }',
-			_user$project$ParserUtils$trackInfo(_p260.key)));
+			_user$project$ParserUtils$trackInfo(_p262.key)));
 	return _MikaelMayer$parser$Parser$lazy(
-		function (_p267) {
+		function (_p269) {
 			return A2(
 				_MikaelMayer$parser$Parser$inContext,
 				'generic record',
@@ -39591,7 +39600,7 @@ var _user$project$LeoParser$genericRecord = function (_p259) {
 										combiner: F2(
 											function (wsBefore, wsAfter) {
 												return A3(
-													_p269,
+													_p271,
 													wsBefore,
 													{ctor: '[]'},
 													wsAfter);
@@ -39602,14 +39611,14 @@ var _user$project$LeoParser$genericRecord = function (_p259) {
 						A2(
 							_elm_lang$core$Basics_ops['++'],
 							function () {
-								var _p268 = _p260.optionalInitParser;
-								if (_p268.ctor === 'Nothing') {
+								var _p270 = _p262.optionalInitParser;
+								if (_p270.ctor === 'Nothing') {
 									return {ctor: '[]'};
 								} else {
 									return {
 										ctor: '::',
 										_0: _user$project$LeoParser$genericNonEmptyRecordWithInit(
-											{keyValue: keyValue, combinerInit: _p268._0.combinerInit, initItem: _p268._0.initItem}),
+											{keyValue: keyValue, combinerInit: _p270._0.combinerInit, initItem: _p270._0.initItem}),
 										_1: {ctor: '[]'}
 									};
 								}
@@ -39617,16 +39626,16 @@ var _user$project$LeoParser$genericRecord = function (_p259) {
 							{
 								ctor: '::',
 								_0: _user$project$LeoParser$genericNonEmptyRecord(
-									{keyValue: keyValue, combiner: _p269}),
+									{keyValue: keyValue, combiner: _p271}),
 								_1: {ctor: '[]'}
 							}))));
 		});
 };
-var _user$project$LeoParser$genericNonEmptyListWithTail = function (_p270) {
-	var _p271 = _p270;
-	var _p275 = _p271.item;
+var _user$project$LeoParser$genericNonEmptyListWithTail = function (_p272) {
+	var _p273 = _p272;
+	var _p277 = _p273.item;
 	return _MikaelMayer$parser$Parser$lazy(
-		function (_p272) {
+		function (_p274) {
 			var anotherWsAndItem = A3(
 				_MikaelMayer$parser$Parser$delayedCommitMap,
 				F2(
@@ -39640,13 +39649,13 @@ var _user$project$LeoParser$genericNonEmptyListWithTail = function (_p270) {
 						_MikaelMayer$parser$Parser_ops['|.'],
 						_MikaelMayer$parser$Parser$succeed(_elm_lang$core$Basics$identity),
 						_MikaelMayer$parser$Parser$symbol(',')),
-					_p275));
+					_p277));
 			return A2(
 				_user$project$LangParserUtils$transferInfo,
 				F2(
-					function (_p273, spaceBefore) {
-						var _p274 = _p273;
-						return A5(_p271.combinerTail, spaceBefore, _p274._0, _p274._1, _p274._2, _p274._3);
+					function (_p275, spaceBefore) {
+						var _p276 = _p275;
+						return A5(_p273.combinerTail, spaceBefore, _p276._0, _p276._1, _p276._2, _p276._3);
 					}),
 				_user$project$ParserUtils$trackInfo(
 					A2(
@@ -39681,20 +39690,20 @@ var _user$project$LeoParser$genericNonEmptyListWithTail = function (_p270) {
 																};
 															})),
 													_MikaelMayer$parser$Parser$symbol('[')),
-												_p275),
+												_p277),
 											A2(_MikaelMayer$parser$Parser$repeat, _MikaelMayer$parser$Parser$zeroOrMore, anotherWsAndItem)),
 										_user$project$LangParserUtils$spaces),
 									_MikaelMayer$parser$Parser$symbol('|')),
-								_p271.tailItem),
+								_p273.tailItem),
 							_user$project$LangParserUtils$spaces),
 						_MikaelMayer$parser$Parser$symbol(']'))));
 		});
 };
-var _user$project$LeoParser$genericNonEmptyList = function (_p276) {
-	var _p277 = _p276;
-	var _p281 = _p277.item;
+var _user$project$LeoParser$genericNonEmptyList = function (_p278) {
+	var _p279 = _p278;
+	var _p283 = _p279.item;
 	return _MikaelMayer$parser$Parser$lazy(
-		function (_p278) {
+		function (_p280) {
 			var anotherWsAndItem = A3(
 				_MikaelMayer$parser$Parser$delayedCommitMap,
 				F2(
@@ -39708,13 +39717,13 @@ var _user$project$LeoParser$genericNonEmptyList = function (_p276) {
 						_MikaelMayer$parser$Parser_ops['|.'],
 						_MikaelMayer$parser$Parser$succeed(_elm_lang$core$Basics$identity),
 						_MikaelMayer$parser$Parser$symbol(',')),
-					_p281));
+					_p283));
 			return A2(
 				_user$project$LangParserUtils$transferInfo,
 				F2(
-					function (_p279, spaceBefore) {
-						var _p280 = _p279;
-						return A3(_p277.combiner, spaceBefore, _p280._0, _p280._1);
+					function (_p281, spaceBefore) {
+						var _p282 = _p281;
+						return A3(_p279.combiner, spaceBefore, _p282._0, _p282._1);
 					}),
 				_user$project$ParserUtils$trackInfo(
 					A2(
@@ -39741,17 +39750,17 @@ var _user$project$LeoParser$genericNonEmptyList = function (_p276) {
 													};
 												})),
 										_MikaelMayer$parser$Parser$symbol('[')),
-									_p281),
+									_p283),
 								A2(_MikaelMayer$parser$Parser$repeat, _MikaelMayer$parser$Parser$zeroOrMore, anotherWsAndItem)),
 							_user$project$LangParserUtils$spaces),
 						_MikaelMayer$parser$Parser$symbol(']'))));
 		});
 };
-var _user$project$LeoParser$genericEmptyList = function (_p282) {
-	var _p283 = _p282;
+var _user$project$LeoParser$genericEmptyList = function (_p284) {
+	var _p285 = _p284;
 	return A2(
 		_user$project$LangParserUtils$transferInfo,
-		_elm_lang$core$Basics$flip(_p283.combiner),
+		_elm_lang$core$Basics$flip(_p285.combiner),
 		_user$project$ParserUtils$trackInfo(
 			A2(
 				_MikaelMayer$parser$Parser_ops['|.'],
@@ -39764,12 +39773,12 @@ var _user$project$LeoParser$genericEmptyList = function (_p282) {
 					_user$project$LangParserUtils$spaces),
 				_MikaelMayer$parser$Parser$symbol(']'))));
 };
-var _user$project$LeoParser$genericList = function (_p284) {
-	var _p285 = _p284;
-	var _p288 = _p285.item;
-	var _p287 = _p285.combiner;
+var _user$project$LeoParser$genericList = function (_p286) {
+	var _p287 = _p286;
+	var _p290 = _p287.item;
+	var _p289 = _p287.combiner;
 	return _MikaelMayer$parser$Parser$lazy(
-		function (_p286) {
+		function (_p288) {
 			return _MikaelMayer$parser$Parser$oneOf(
 				{
 					ctor: '::',
@@ -39779,7 +39788,7 @@ var _user$project$LeoParser$genericList = function (_p284) {
 								combiner: F2(
 									function (wsBefore, wsAfter) {
 										return A3(
-											_p287,
+											_p289,
 											wsBefore,
 											{ctor: '[]'},
 											wsAfter);
@@ -39789,11 +39798,11 @@ var _user$project$LeoParser$genericList = function (_p284) {
 						ctor: '::',
 						_0: _user$project$ParserUtils$try(
 							_user$project$LeoParser$genericNonEmptyList(
-								{item: _p288, combiner: _p287})),
+								{item: _p290, combiner: _p289})),
 						_1: {
 							ctor: '::',
 							_0: _user$project$LeoParser$genericNonEmptyListWithTail(
-								{item: _p288, combinerTail: _p285.combinerTail, tailItem: _p285.tailItem}),
+								{item: _p290, combinerTail: _p287.combinerTail, tailItem: _p287.tailItem}),
 							_1: {ctor: '[]'}
 						}
 					}
@@ -39807,17 +39816,17 @@ var _user$project$LeoParser$wsExp_ParserToWsExpParser = _MikaelMayer$parser$Pars
 				wsToExp_(ws));
 		}));
 var _user$project$LeoParser$implicitVarName = ' i';
-var _user$project$LeoParser$genericTuple = function (_p289) {
-	var _p290 = _p289;
-	var _p306 = _p290.term;
-	var _p305 = _p290.tagger;
-	var _p304 = _p290.record;
+var _user$project$LeoParser$genericTuple = function (_p291) {
+	var _p292 = _p291;
+	var _p308 = _p292.term;
+	var _p307 = _p292.tagger;
+	var _p306 = _p292.record;
 	var combinerZero = F2(
 		function (wsBeforeEnd, wsBefore) {
 			var name = _user$project$Lang$ctorTupleName(0);
-			var ctorEntry = A3(_user$project$Lang$ctor, _p305, _user$project$Lang$TupleCtor, name);
+			var ctorEntry = A3(_user$project$Lang$ctor, _p307, _user$project$Lang$TupleCtor, name);
 			return A3(
-				_p304,
+				_p306,
 				wsBefore,
 				{
 					ctor: '::',
@@ -39827,48 +39836,48 @@ var _user$project$LeoParser$genericTuple = function (_p289) {
 				wsBeforeEnd);
 		});
 	var combiner = F2(
-		function (_p291, wsBefore) {
-			var _p292 = _p291;
-			var _p295 = _p292._2;
-			var _p294 = _p292._1;
-			var _p293 = _p292._0;
-			if (_elm_lang$core$List$isEmpty(_p294)) {
-				return A3(_p290.one, wsBefore, _p293, _p295);
+		function (_p293, wsBefore) {
+			var _p294 = _p293;
+			var _p297 = _p294._2;
+			var _p296 = _p294._1;
+			var _p295 = _p294._0;
+			if (_elm_lang$core$List$isEmpty(_p296)) {
+				return A3(_p292.one, wsBefore, _p295, _p297);
 			} else {
-				var restEntries = A3(_user$project$Utils$indexedMapFrom, 2, _user$project$Lang$numericalEntry, _p294);
+				var restEntries = A3(_user$project$Utils$indexedMapFrom, 2, _user$project$Lang$numericalEntry, _p296);
 				var firstEntry = A2(
 					_user$project$Lang$numericalEntry,
 					1,
-					{ctor: '_Tuple2', _0: _elm_lang$core$Maybe$Nothing, _1: _p293});
+					{ctor: '_Tuple2', _0: _elm_lang$core$Maybe$Nothing, _1: _p295});
 				var name = _user$project$Lang$ctorTupleName(
-					1 + _elm_lang$core$List$length(_p294));
-				var ctorEntry = A3(_user$project$Lang$ctor, _p305, _user$project$Lang$TupleCtor, name);
+					1 + _elm_lang$core$List$length(_p296));
+				var ctorEntry = A3(_user$project$Lang$ctor, _p307, _user$project$Lang$TupleCtor, name);
 				return A3(
-					_p304,
+					_p306,
 					wsBefore,
 					{
 						ctor: '::',
 						_0: ctorEntry,
 						_1: {ctor: '::', _0: firstEntry, _1: restEntries}
 					},
-					_p295);
+					_p297);
 			}
 		});
 	var implicitTupling = A3(
 		_elm_lang$core$Basics$flip,
 		_elm_lang$core$Maybe$map,
-		_p290.implicitFun,
+		_p292.implicitFun,
 		F3(
-			function (_p296, numberOfCommas, wsBefore) {
-				var _p297 = _p296;
-				var _p300 = _p297._0;
-				var _p298 = _p300(_user$project$LeoParser$implicitVarName);
-				var firstPvar = _p298._0;
-				var firstVar = _p298._1;
-				var _p299 = _elm_lang$core$List$unzip(
+			function (_p298, numberOfCommas, wsBefore) {
+				var _p299 = _p298;
+				var _p302 = _p299._0;
+				var _p300 = _p302(_user$project$LeoParser$implicitVarName);
+				var firstPvar = _p300._0;
+				var firstVar = _p300._1;
+				var _p301 = _elm_lang$core$List$unzip(
 					A2(
 						_elm_lang$core$List$map,
-						_p300,
+						_p302,
 						A2(
 							_elm_lang$core$List$map,
 							function (i) {
@@ -39878,10 +39887,10 @@ var _user$project$LeoParser$genericTuple = function (_p289) {
 									_elm_lang$core$Basics$toString(i));
 							},
 							A2(_elm_lang$core$List$range, 1, numberOfCommas))));
-				var restPvar = _p299._0;
-				var restVar = _p299._1;
+				var restPvar = _p301._0;
+				var restVar = _p301._1;
 				return A3(
-					_p297._1,
+					_p299._1,
 					wsBefore,
 					{ctor: '::', _0: firstPvar, _1: restPvar},
 					A2(
@@ -39902,7 +39911,7 @@ var _user$project$LeoParser$genericTuple = function (_p289) {
 						_user$project$Lang$space0));
 			}));
 	return _MikaelMayer$parser$Parser$lazy(
-		function (_p301) {
+		function (_p303) {
 			return A3(
 				_MikaelMayer$parser$Parser$delayedCommitMap,
 				F2(
@@ -39942,7 +39951,7 @@ var _user$project$LeoParser$genericTuple = function (_p289) {
 																			function (v0, v1, v2) {
 																				return {ctor: '_Tuple3', _0: v0, _1: v1, _2: v2};
 																			})),
-																	_p306),
+																	_p308),
 																A2(
 																	_MikaelMayer$parser$Parser$repeat,
 																	_MikaelMayer$parser$Parser$zeroOrMore,
@@ -39963,7 +39972,7 @@ var _user$project$LeoParser$genericTuple = function (_p289) {
 																				_MikaelMayer$parser$Parser_ops['|.'],
 																				_MikaelMayer$parser$Parser$succeed(_elm_lang$core$Basics$identity),
 																				_MikaelMayer$parser$Parser$symbol(',')),
-																			_p306)))),
+																			_p308)))),
 															_user$project$LangParserUtils$spaces),
 														_MikaelMayer$parser$Parser$symbol(')')))),
 											_1: {
@@ -39985,8 +39994,8 @@ var _user$project$LeoParser$genericTuple = function (_p289) {
 								_1: {ctor: '[]'}
 							},
 							function () {
-								var _p302 = implicitTupling;
-								if (_p302.ctor === 'Nothing') {
+								var _p304 = implicitTupling;
+								if (_p304.ctor === 'Nothing') {
 									return {ctor: '[]'};
 								} else {
 									return {
@@ -39995,9 +40004,9 @@ var _user$project$LeoParser$genericTuple = function (_p289) {
 											_user$project$ParserUtils$trackInfo(
 												A2(
 													_MikaelMayer$parser$Parser$map,
-													function (_p303) {
-														return _p302._0(
-															_elm_lang$core$String$length(_p303));
+													function (_p305) {
+														return _p304._0(
+															_elm_lang$core$String$length(_p305));
 													},
 													A2(
 														_MikaelMayer$parser$Parser_ops['|.'],
@@ -40020,16 +40029,16 @@ var _user$project$LeoParser$tupleType = A2(
 	_MikaelMayer$parser$Parser$inContext,
 	'tuple type',
 	_MikaelMayer$parser$Parser$lazy(
-		function (_p307) {
+		function (_p309) {
 			return _user$project$LangParserUtils$mapWSType_(
 				function () {
 					var t = _user$project$LeoParser$genericTuple;
 					return t(
 						{
 							term: A2(_user$project$LeoParser$typ, _user$project$LangParserUtils$spaces, 0),
-							tagger: function (_p308) {
+							tagger: function (_p310) {
 								return _user$project$Lang$withDummyTypeInfo(
-									A2(_user$project$Lang$TVar, _user$project$Lang$space0, _p308));
+									A2(_user$project$Lang$TVar, _user$project$Lang$space0, _p310));
 							},
 							record: F3(
 								function (ws1, entries, ws2) {
@@ -40070,7 +40079,7 @@ var _user$project$LeoParser$typ = F2(
 			_MikaelMayer$parser$Parser$inContext,
 			'type',
 			_MikaelMayer$parser$Parser$lazy(
-				function (_p309) {
+				function (_p311) {
 					var b = _user$project$BinaryOperatorParser$binaryOperator;
 					var operatorSpace = A2(_user$project$LangParserUtils$spaceSameLineOrNextAfter, minStartCol, _user$project$LangParserUtils$MinIndentSpace);
 					return A3(
@@ -40096,17 +40105,17 @@ var _user$project$LeoParser$typ = F2(
 								minimumPrecedence: 0,
 								expression: _user$project$LeoParser$simpleTypeWithPossibleArguments(minStartCol),
 								operator: _user$project$LeoParser$typeOperator(operatorSpace),
-								representation: function (_p310) {
+								representation: function (_p312) {
 									return _elm_lang$core$Tuple$second(
 										function (_) {
 											return _.val;
-										}(_p310));
+										}(_p312));
 								},
 								combine: F4(
 									function (wsBefore, left, operator, right) {
-										var _p311 = operator.val;
-										var wsBeforeOp = _p311._0;
-										var identifier = _p311._1;
+										var _p313 = operator.val;
+										var wsBeforeOp = _p313._0;
+										var identifier = _p313._1;
 										return A2(
 											_user$project$Info$mapInfo,
 											_user$project$Lang$type_,
@@ -40146,32 +40155,32 @@ var _user$project$LeoParser$simpleTypeWithPossibleArguments = function (minStart
 			_user$project$ParserUtils$trackInfo(
 				A2(
 					_MikaelMayer$parser$Parser$andThen,
-					function (_p312) {
-						var _p313 = _p312;
-						var _p319 = _p313._0;
-						var _p318 = _p313._1;
-						var f = _p319(_user$project$Lang$space0);
-						var _p314 = f.val.t__;
+					function (_p314) {
+						var _p315 = _p314;
+						var _p321 = _p315._0;
+						var _p320 = _p315._1;
+						var f = _p321(_user$project$Lang$space0);
+						var _p316 = f.val.t__;
 						_v116_2:
 						do {
-							if (_p314.ctor === 'TVar') {
-								switch (_p314._1) {
+							if (_p316.ctor === 'TVar') {
+								switch (_p316._1) {
 									case 'List':
-										var _p315 = _p318;
-										if ((_p315.ctor === '::') && (_p315._1.ctor === '[]')) {
+										var _p317 = _p320;
+										if ((_p317.ctor === '::') && (_p317._1.ctor === '[]')) {
 											return _MikaelMayer$parser$Parser$succeed(
 												function (spApp) {
-													return A3(_user$project$Lang$TList, spApp, _p315._0, _user$project$Lang$space0);
+													return A3(_user$project$Lang$TList, spApp, _p317._0, _user$project$Lang$space0);
 												});
 										} else {
 											return _MikaelMayer$parser$Parser$fail('List takes exactly one type argument');
 										}
 									case 'Dict':
-										var _p316 = _p318;
-										if (((_p316.ctor === '::') && (_p316._1.ctor === '::')) && (_p316._1._1.ctor === '[]')) {
+										var _p318 = _p320;
+										if (((_p318.ctor === '::') && (_p318._1.ctor === '::')) && (_p318._1._1.ctor === '[]')) {
 											return _MikaelMayer$parser$Parser$succeed(
 												function (spApp) {
-													return A4(_user$project$Lang$TDict, spApp, _p316._0, _p316._1._0, _user$project$Lang$space0);
+													return A4(_user$project$Lang$TDict, spApp, _p318._0, _p318._1._0, _user$project$Lang$space0);
 												});
 										} else {
 											return _MikaelMayer$parser$Parser$fail('Dict takes exactly two type arguments');
@@ -40183,16 +40192,16 @@ var _user$project$LeoParser$simpleTypeWithPossibleArguments = function (minStart
 								break _v116_2;
 							}
 						} while(false);
-						var _p317 = _p318;
-						if (_p317.ctor === '[]') {
+						var _p319 = _p320;
+						if (_p319.ctor === '[]') {
 							return _MikaelMayer$parser$Parser$succeed(
 								function (spApp) {
-									return _p319(spApp).val.t__;
+									return _p321(spApp).val.t__;
 								});
 						} else {
 							return _MikaelMayer$parser$Parser$succeed(
 								function (spApp) {
-									return A4(_user$project$Lang$TApp, spApp, f, _p318, _user$project$Lang$SpaceApp);
+									return A4(_user$project$Lang$TApp, spApp, f, _p320, _user$project$Lang$SpaceApp);
 								});
 						}
 					},
@@ -40229,7 +40238,7 @@ var _user$project$LeoParser$simpleType = function (minStartCol) {
 		_MikaelMayer$parser$Parser$inContext,
 		'type',
 		_MikaelMayer$parser$Parser$lazy(
-			function (_p320) {
+			function (_p322) {
 				return _MikaelMayer$parser$Parser$oneOf(
 					{
 						ctor: '::',
@@ -40252,19 +40261,19 @@ var _user$project$LeoParser$simpleType = function (minStartCol) {
 											_1: {
 												ctor: '::',
 												_0: _MikaelMayer$parser$Parser$lazy(
-													function (_p321) {
+													function (_p323) {
 														return _user$project$LeoParser$tupleType;
 													}),
 												_1: {
 													ctor: '::',
 													_0: _MikaelMayer$parser$Parser$lazy(
-														function (_p322) {
+														function (_p324) {
 															return _user$project$LeoParser$recordType;
 														}),
 													_1: {
 														ctor: '::',
 														_0: _MikaelMayer$parser$Parser$lazy(
-															function (_p323) {
+															function (_p325) {
 																return _user$project$LeoParser$forallType(minStartCol);
 															}),
 														_1: {ctor: '[]'}
@@ -40300,7 +40309,7 @@ var _user$project$LeoParser$forallType = function (minStartCol) {
 		_MikaelMayer$parser$Parser$inContext,
 		'forall type',
 		_MikaelMayer$parser$Parser$lazy(
-			function (_p324) {
+			function (_p326) {
 				return _user$project$LangParserUtils$mapWSType_(
 					_user$project$ParserUtils$trackInfo(
 						A2(
@@ -40329,7 +40338,7 @@ var _user$project$LeoParser$recordType = A2(
 	_MikaelMayer$parser$Parser$inContext,
 	'record type',
 	_MikaelMayer$parser$Parser$lazy(
-		function (_p325) {
+		function (_p327) {
 			return _user$project$LangParserUtils$mapWSType_(
 				_user$project$LeoParser$genericRecord(
 					{
@@ -40380,7 +40389,7 @@ var _user$project$LeoParser$unionType = function (minStartCol) {
 var _user$project$LeoParser$spaceColonType = F2(
 	function (minStartCol, spConstraint) {
 		return _MikaelMayer$parser$Parser$lazy(
-			function (_p326) {
+			function (_p328) {
 				return _user$project$ParserUtils$try(
 					A2(
 						_MikaelMayer$parser$Parser_ops['|='],
@@ -40402,7 +40411,7 @@ var _user$project$LeoParser$simplePatternWithMaybeColonType = A2(
 	_MikaelMayer$parser$Parser$inContext,
 	'simplePatternWithMaybeColonType',
 	_MikaelMayer$parser$Parser$lazy(
-		function (_p327) {
+		function (_p329) {
 			return A3(
 				_MikaelMayer$parser$Parser$delayedCommitMap,
 				F2(
@@ -40417,9 +40426,9 @@ var _user$project$LeoParser$simplePatternWithMaybeColonType = A2(
 						_MikaelMayer$parser$Parser$succeed(
 							F4(
 								function (wsToP, mbT, startPos, wsBefore) {
-									var _p328 = mbT;
-									if (_p328.ctor === 'Just') {
-										var _p329 = _p328._0._1;
+									var _p330 = mbT;
+									if (_p330.ctor === 'Just') {
+										var _p331 = _p330._0._1;
 										return A3(
 											_user$project$Info$withInfo,
 											_user$project$Lang$pat_(
@@ -40427,10 +40436,10 @@ var _user$project$LeoParser$simplePatternWithMaybeColonType = A2(
 													_user$project$Lang$PColonType,
 													wsBefore,
 													wsToP(_user$project$Lang$space0),
-													_p328._0._0,
-													_p329)),
+													_p330._0._0,
+													_p331)),
 											startPos,
-											_p329.end);
+											_p331.end);
 									} else {
 										return wsToP(wsBefore);
 									}
@@ -40443,7 +40452,7 @@ var _user$project$LeoParser$simplePattern = A2(
 	_MikaelMayer$parser$Parser$inContext,
 	'simple pattern',
 	_MikaelMayer$parser$Parser$lazy(
-		function (_p330) {
+		function (_p332) {
 			return _MikaelMayer$parser$Parser$oneOf(
 				{
 					ctor: '::',
@@ -40483,11 +40492,11 @@ var _user$project$LeoParser$dataConstructorPattern = A2(
 	_MikaelMayer$parser$Parser$inContext,
 	'data constructor pattern',
 	_MikaelMayer$parser$Parser$lazy(
-		function (_p331) {
+		function (_p333) {
 			var combiner = F3(
-				function (_p333, _p332, wsBefore) {
-					var _p334 = _p333;
-					var _p335 = _p332;
+				function (_p335, _p334, wsBefore) {
+					var _p336 = _p335;
+					var _p337 = _p334;
 					var insideArgsEntries = A3(
 						_user$project$Utils$indexedMapFrom,
 						1,
@@ -40501,7 +40510,7 @@ var _user$project$LeoParser$dataConstructorPattern = A2(
 									_1: p
 								};
 							},
-							_p335._0));
+							_p337._0));
 					var argsEntry = {
 						ctor: '_Tuple5',
 						_0: _elm_lang$core$Maybe$Just(_user$project$Lang$space0),
@@ -40513,15 +40522,15 @@ var _user$project$LeoParser$dataConstructorPattern = A2(
 					};
 					var ctorEntry = A3(
 						_user$project$Lang$ctor,
-						function (_p336) {
+						function (_p338) {
 							return _user$project$Lang$withDummyPatInfo(
 								A2(
 									_user$project$Lang$PBase,
 									_user$project$Lang$space0,
-									A2(_user$project$Lang$EString, _user$project$Lang$defaultQuoteChar, _p336)));
+									A2(_user$project$Lang$EString, _user$project$Lang$defaultQuoteChar, _p338)));
 						},
 						_user$project$Lang$DataTypeCtor,
-						_p334._1);
+						_p336._1);
 					return A3(
 						_user$project$Info$withInfo,
 						_user$project$Lang$pat_(
@@ -40538,8 +40547,8 @@ var _user$project$LeoParser$dataConstructorPattern = A2(
 									}
 								},
 								_user$project$Lang$space0)),
-						_p334._0,
-						_p335._1);
+						_p336._0,
+						_p337._1);
 				});
 			return A3(
 				_MikaelMayer$parser$Parser$delayedCommitMap,
@@ -40593,7 +40602,7 @@ var _user$project$LeoParser$listPattern = A2(
 	_MikaelMayer$parser$Parser$inContext,
 	'list pattern',
 	_MikaelMayer$parser$Parser$lazy(
-		function (_p337) {
+		function (_p339) {
 			return _user$project$LangParserUtils$mapWSPat_(
 				_user$project$LeoParser$genericList(
 					{
@@ -40631,7 +40640,7 @@ var _user$project$LeoParser$patternGeneral = F3(
 			_MikaelMayer$parser$Parser$inContext,
 			'pattern',
 			_MikaelMayer$parser$Parser$lazy(
-				function (_p338) {
+				function (_p340) {
 					var operatorSpace = A2(_user$project$LangParserUtils$spaceSameLineOrNextAfter, minStartCol, _user$project$LangParserUtils$MinIndentSpace);
 					return A3(
 						_MikaelMayer$parser$Parser$delayedCommitMap,
@@ -40656,19 +40665,19 @@ var _user$project$LeoParser$patternGeneral = F3(
 										finalPat);
 								},
 								operator: _user$project$LeoParser$patternOperator(operatorSpace),
-								representation: function (_p339) {
+								representation: function (_p341) {
 									return _elm_lang$core$Tuple$second(
 										function (_) {
 											return _.val;
-										}(_p339));
+										}(_p341));
 								},
 								combine: F4(
 									function (wsBeforeEverything, left, operator, right) {
-										var _p340 = operator.val;
-										var wsBefore = _p340._0;
-										var identifier = _p340._1;
-										var _p341 = identifier;
-										switch (_p341) {
+										var _p342 = operator.val;
+										var wsBefore = _p342._0;
+										var identifier = _p342._1;
+										var _p343 = identifier;
+										switch (_p343) {
 											case '::':
 												return A3(
 													_user$project$Info$withInfo,
@@ -40697,11 +40706,11 @@ var _user$project$LeoParser$patternGeneral = F3(
 												return _elm_lang$core$Native_Utils.crashCase(
 													'LeoParser',
 													{
-														start: {line: 1313, column: 17},
-														end: {line: 1324, column: 103}
+														start: {line: 1314, column: 17},
+														end: {line: 1325, column: 103}
 													},
-													_p341)(
-													A2(_elm_lang$core$Basics_ops['++'], 'Internal error: Got pattern operator other than :: or as ', _p341));
+													_p343)(
+													A2(_elm_lang$core$Basics_ops['++'], 'Internal error: Got pattern operator other than :: or as ', _p343));
 										}
 									})
 							}));
@@ -40711,7 +40720,7 @@ var _user$project$LeoParser$recordPattern = A2(
 	_MikaelMayer$parser$Parser$inContext,
 	'record pattern',
 	_MikaelMayer$parser$Parser$lazy(
-		function (_p343) {
+		function (_p345) {
 			return _user$project$LangParserUtils$mapWSPat_(
 				_user$project$LeoParser$genericRecord(
 					{
@@ -40735,17 +40744,17 @@ var _user$project$LeoParser$tuplePattern = A2(
 	_MikaelMayer$parser$Parser$inContext,
 	'tuple pattern',
 	_MikaelMayer$parser$Parser$lazy(
-		function (_p344) {
+		function (_p346) {
 			return _user$project$LangParserUtils$mapWSPat_(
 				_user$project$LeoParser$genericTuple(
 					{
 						term: A2(_user$project$LeoParser$pattern, _user$project$LangParserUtils$spaces, 0),
-						tagger: function (_p345) {
+						tagger: function (_p347) {
 							return _user$project$Lang$withDummyPatInfo(
 								A2(
 									_user$project$Lang$PBase,
 									_user$project$Lang$space0,
-									A2(_user$project$Lang$EString, _user$project$Lang$defaultQuoteChar, _p345)));
+									A2(_user$project$Lang$EString, _user$project$Lang$defaultQuoteChar, _p347)));
 						},
 						one: _user$project$Lang$PParens,
 						record: _user$project$Lang$PRecord,
@@ -40781,7 +40790,7 @@ var _user$project$LeoParser$typeDefOrAlias = function (minStartCol) {
 											_MikaelMayer$parser$Parser$succeed(
 												F8(
 													function (spAfterType, mbSpaceAfterAlias, wsToName, parameters, spEq, binding_, optCommaSpace, wsBeforeType) {
-														var _p346 = _elm_lang$core$List$isEmpty(parameters) ? {ctor: '_Tuple2', _0: binding_, _1: _user$project$Lang$FunArgsAfterEqual} : {
+														var _p348 = _elm_lang$core$List$isEmpty(parameters) ? {ctor: '_Tuple2', _0: binding_, _1: _user$project$Lang$FunArgsAfterEqual} : {
 															ctor: '_Tuple2',
 															_0: A2(
 																_user$project$Info$mapInfo,
@@ -40793,22 +40802,22 @@ var _user$project$LeoParser$typeDefOrAlias = function (minStartCol) {
 																	binding_.end)),
 															_1: _user$project$Lang$FunArgAsPats
 														};
-														var binding = _p346._0;
-														var funArgStyle = _p346._1;
-														var _p347 = function () {
-															var _p348 = mbSpaceAfterAlias;
-															if (_p348.ctor === 'Nothing') {
+														var binding = _p348._0;
+														var funArgStyle = _p348._1;
+														var _p349 = function () {
+															var _p350 = mbSpaceAfterAlias;
+															if (_p350.ctor === 'Nothing') {
 																return {ctor: '_Tuple2', _0: _elm_lang$core$Maybe$Nothing, _1: spAfterType};
 															} else {
 																return {
 																	ctor: '_Tuple2',
 																	_0: _elm_lang$core$Maybe$Just(spAfterType),
-																	_1: _p348._0
+																	_1: _p350._0
 																};
 															}
 														}();
-														var mbSpaceBeforeAlias = _p347._0;
-														var spaceBeforePattern = _p347._1;
+														var mbSpaceBeforeAlias = _p349._0;
+														var spaceBeforePattern = _p349._1;
 														return _user$project$Lang$DeclType(
 															A7(
 																_user$project$Lang$LetType,
@@ -40853,9 +40862,9 @@ var _user$project$LeoParser$implicitSelectionFun = A2(
 	_MikaelMayer$parser$Parser_ops['|='],
 	_MikaelMayer$parser$Parser$succeed(
 		F2(
-			function (_p349, initSpace) {
-				var _p350 = _p349;
-				var _p351 = _p350.start;
+			function (_p351, initSpace) {
+				var _p352 = _p351;
+				var _p353 = _p352.start;
 				return A3(
 					_user$project$Info$withInfo,
 					_user$project$Lang$exp_(
@@ -40868,8 +40877,8 @@ var _user$project$LeoParser$implicitSelectionFun = A2(
 									_user$project$Info$withInfo,
 									_user$project$Lang$pat_(
 										A3(_user$project$Lang$PVar, _user$project$Lang$space0, _user$project$LeoParser$implicitVarName, _user$project$Lang$noWidgetDecl)),
-									_p351,
-									_p351),
+									_p353,
+									_p353),
 								_1: {ctor: '[]'}
 							},
 							_user$project$Lang$Expr(
@@ -40884,14 +40893,14 @@ var _user$project$LeoParser$implicitSelectionFun = A2(
 											_user$project$Info$withInfo,
 											_user$project$Lang$exp_(
 												A2(_user$project$Lang$EVar, wsBefore, _user$project$LeoParser$implicitVarName)),
-											_p351,
-											_p351);
+											_p353,
+											_p353);
 									},
-									_p350.val,
+									_p352.val,
 									_user$project$Lang$space0)),
 							_user$project$Lang$space0)),
-					_p351,
-					_p350.end);
+					_p353,
+					_p352.end);
 			})),
 	_user$project$ParserUtils$trackInfo(
 		A2(_MikaelMayer$parser$Parser$repeat, _MikaelMayer$parser$Parser$oneOrMore, _user$project$LeoParser$selection)));
@@ -40907,7 +40916,7 @@ var _user$project$LeoParser$simpleExpression = F2(
 					_1: {
 						ctor: '::',
 						_0: _MikaelMayer$parser$Parser$lazy(
-							function (_p352) {
+							function (_p354) {
 								return _user$project$LeoParser$htmlliteral;
 							}),
 						_1: {
@@ -40922,7 +40931,7 @@ var _user$project$LeoParser$simpleExpression = F2(
 									_1: {
 										ctor: '::',
 										_0: _MikaelMayer$parser$Parser$lazy(
-											function (_p353) {
+											function (_p355) {
 												return _user$project$LeoParser$multiLineInterpolatedString;
 											}),
 										_1: {
@@ -40931,37 +40940,37 @@ var _user$project$LeoParser$simpleExpression = F2(
 											_1: {
 												ctor: '::',
 												_0: _MikaelMayer$parser$Parser$lazy(
-													function (_p354) {
+													function (_p356) {
 														return A2(_user$project$LeoParser$function, minStartCol, spConstraint);
 													}),
 												_1: {
 													ctor: '::',
 													_0: _MikaelMayer$parser$Parser$lazy(
-														function (_p355) {
+														function (_p357) {
 															return _user$project$LeoParser$implicitSelectionFun;
 														}),
 													_1: {
 														ctor: '::',
 														_0: _MikaelMayer$parser$Parser$lazy(
-															function (_p356) {
+															function (_p358) {
 																return _user$project$LeoParser$list;
 															}),
 														_1: {
 															ctor: '::',
 															_0: _MikaelMayer$parser$Parser$lazy(
-																function (_p357) {
+																function (_p359) {
 																	return _user$project$LeoParser$addSelections(_user$project$LeoParser$record);
 																}),
 															_1: {
 																ctor: '::',
 																_0: _MikaelMayer$parser$Parser$lazy(
-																	function (_p358) {
+																	function (_p360) {
 																		return _user$project$LeoParser$addSelections(_user$project$LeoParser$tuple);
 																	}),
 																_1: {
 																	ctor: '::',
 																	_0: _MikaelMayer$parser$Parser$lazy(
-																		function (_p359) {
+																		function (_p361) {
 																			return _user$project$LeoParser$addSelections(_user$project$LeoParser$hole);
 																		}),
 																	_1: {ctor: '[]'}
@@ -40986,25 +40995,25 @@ var _user$project$LeoParser$caseExpression = F2(
 			_MikaelMayer$parser$Parser$inContext,
 			'case expression',
 			_MikaelMayer$parser$Parser$lazy(
-				function (_p360) {
+				function (_p362) {
 					var branch = function (branchsp) {
 						return A3(
 							_MikaelMayer$parser$Parser$delayedCommitMap,
 							F2(
-								function (wsBefore, _p361) {
-									var _p362 = _p361;
-									var _p364 = _p362._0;
-									var _p363 = _p362._2._0;
+								function (wsBefore, _p363) {
+									var _p364 = _p363;
+									var _p366 = _p364._0;
+									var _p365 = _p364._2._0;
 									return A3(
 										_user$project$Info$withInfo,
 										A4(
 											_user$project$Lang$Branch_,
 											wsBefore,
-											_p364,
-											_user$project$Lang$Expr(_p363),
-											_p362._1),
-										_p364.start,
-										_p363.end);
+											_p366,
+											_user$project$Lang$Expr(_p365),
+											_p364._1),
+										_p366.start,
+										_p365.end);
 								}),
 							A2(
 								_MikaelMayer$parser$Parser$inContext,
@@ -41083,13 +41092,13 @@ var _user$project$LeoParser$caseExpression = F2(
 						A2(
 							_user$project$LangParserUtils$transferInfo,
 							F2(
-								function (_p365, wsBefore) {
-									var _p366 = _p365;
-									var _p369 = _p366._1;
-									var _p368 = _p366._0;
-									var _p367 = _p366._2;
+								function (_p367, wsBefore) {
+									var _p368 = _p367;
+									var _p371 = _p368._1;
+									var _p370 = _p368._0;
+									var _p369 = _p368._2;
 									return _elm_lang$core$Native_Utils.eq(
-										_user$project$Lang$eVarUnapply(_p368),
+										_user$project$Lang$eVarUnapply(_p370),
 										_elm_lang$core$Maybe$Just(_user$project$LeoParser$implicitVarName)) ? A4(
 										_user$project$Lang$EFun,
 										_user$project$Lang$space1,
@@ -41103,10 +41112,10 @@ var _user$project$LeoParser$caseExpression = F2(
 											A3(
 												_user$project$Info$withInfo,
 												_user$project$Lang$exp_(
-													A4(_user$project$Lang$ECase, wsBefore, _p368, _p367, _p369)),
+													A4(_user$project$Lang$ECase, wsBefore, _p370, _p369, _p371)),
 												wsBefore.start,
-												_p369.end)),
-										_user$project$Lang$space0) : A4(_user$project$Lang$ECase, wsBefore, _p368, _p367, _p369);
+												_p371.end)),
+										_user$project$Lang$space0) : A4(_user$project$Lang$ECase, wsBefore, _p370, _p369, _p371);
 								}),
 							_user$project$ParserUtils$trackInfo(
 								A2(
@@ -41142,8 +41151,8 @@ var _user$project$LeoParser$caseExpression = F2(
 										A2(
 											_MikaelMayer$parser$Parser$andThen,
 											function (b) {
-												var _p370 = b.val;
-												var branchIndentation = A2(_user$project$LeoParser$sameLineOrIndentedByExactly, 'for a branch after the first one', _p370._1.start.col - 1);
+												var _p372 = b.val;
+												var branchIndentation = A2(_user$project$LeoParser$sameLineOrIndentedByExactly, 'for a branch after the first one', _p372._1.start.col - 1);
 												return A2(
 													branchHelper,
 													{
@@ -41166,7 +41175,7 @@ var _user$project$LeoParser$expressionGeneral = F4(
 			_MikaelMayer$parser$Parser$inContext,
 			'expression',
 			_MikaelMayer$parser$Parser$lazy(
-				function (_p371) {
+				function (_p373) {
 					var operatorSpace = A2(_user$project$LangParserUtils$spaceSameLineOrNextAfter, minStartCol, spConstraint);
 					return A3(
 						_MikaelMayer$parser$Parser$delayedCommitMap,
@@ -41182,8 +41191,8 @@ var _user$project$LeoParser$expressionGeneral = F4(
 								minimumPrecedence: 0,
 								expression: A2(_user$project$LeoParser$simpleExpressionWithPossibleArgumentsMaybeTyped, minStartCol, spConstraint),
 								withZeroSpace: function (wsExp) {
-									var _p372 = wsExp(_user$project$Lang$space0);
-									var finalExp = _p372._0;
+									var _p374 = wsExp(_user$project$Lang$space0);
+									var finalExp = _p374._0;
 									return A2(
 										_user$project$Lang$mapPrecedingWhitespaceWS,
 										function (ws) {
@@ -41192,26 +41201,26 @@ var _user$project$LeoParser$expressionGeneral = F4(
 										_user$project$Lang$Expr(finalExp));
 								},
 								operator: isHtmlAttribute ? _user$project$LeoParser$htmlAttributeOperator(operatorSpace) : _user$project$LeoParser$operator(operatorSpace),
-								representation: function (_p373) {
+								representation: function (_p375) {
 									return _elm_lang$core$Tuple$second(
 										function (_) {
 											return _.val;
-										}(_p373));
+										}(_p375));
 								},
 								combine: F4(
-									function (wsBeforeEverything, _p375, operator, _p374) {
-										var _p376 = _p375;
-										var _p381 = _p376._0;
-										var _p377 = _p374;
-										var _p380 = _p377._0;
-										var _p378 = operator.val;
-										var wsBefore = _p378._0;
-										var identifier = _p378._1;
+									function (wsBeforeEverything, _p377, operator, _p376) {
+										var _p378 = _p377;
+										var _p383 = _p378._0;
+										var _p379 = _p376;
+										var _p382 = _p379._0;
+										var _p380 = operator.val;
+										var wsBefore = _p380._0;
+										var identifier = _p380._1;
 										return _user$project$Lang$Expr(
 											function () {
-												var _p379 = _user$project$LeoParser$opFromIdentifier(identifier);
-												if (_p379.ctor === 'Just') {
-													var op = A3(_user$project$Info$withInfo, _p379._0, operator.start, operator.end);
+												var _p381 = _user$project$LeoParser$opFromIdentifier(identifier);
+												if (_p381.ctor === 'Just') {
+													var op = A3(_user$project$Info$withInfo, _p381._0, operator.start, operator.end);
 													return A3(
 														_user$project$Info$withInfo,
 														_user$project$Lang$exp_(
@@ -41222,16 +41231,16 @@ var _user$project$LeoParser$expressionGeneral = F4(
 																op,
 																{
 																	ctor: '::',
-																	_0: _user$project$Lang$Expr(_p381),
+																	_0: _user$project$Lang$Expr(_p383),
 																	_1: {
 																		ctor: '::',
-																		_0: _user$project$Lang$Expr(_p380),
+																		_0: _user$project$Lang$Expr(_p382),
 																		_1: {ctor: '[]'}
 																	}
 																},
 																_user$project$Lang$space0)),
-														_p381.start,
-														_p380.end);
+														_p383.start,
+														_p382.end);
 												} else {
 													if (_elm_lang$core$Native_Utils.eq(identifier, '::')) {
 														return A3(
@@ -41245,16 +41254,16 @@ var _user$project$LeoParser$expressionGeneral = F4(
 																		_0: {
 																			ctor: '_Tuple2',
 																			_0: _user$project$Lang$space0,
-																			_1: _user$project$Lang$Expr(_p381)
+																			_1: _user$project$Lang$Expr(_p383)
 																		},
 																		_1: {ctor: '[]'}
 																	},
 																	wsBefore,
 																	_elm_lang$core$Maybe$Just(
-																		_user$project$Lang$Expr(_p380)),
+																		_user$project$Lang$Expr(_p382)),
 																	_user$project$Lang$space0)),
-															_p381.start,
-															_p380.end);
+															_p383.start,
+															_p382.end);
 													} else {
 														if (_elm_lang$core$Native_Utils.eq(identifier, '<|')) {
 															return A3(
@@ -41263,16 +41272,16 @@ var _user$project$LeoParser$expressionGeneral = F4(
 																	A5(
 																		_user$project$Lang$EApp,
 																		wsBeforeEverything,
-																		_user$project$Lang$Expr(_p381),
+																		_user$project$Lang$Expr(_p383),
 																		{
 																			ctor: '::',
-																			_0: _user$project$Lang$Expr(_p380),
+																			_0: _user$project$Lang$Expr(_p382),
 																			_1: {ctor: '[]'}
 																		},
 																		_user$project$Lang$LeftApp(wsBefore),
 																		_user$project$Lang$space0)),
-																_p381.start,
-																_p380.end);
+																_p383.start,
+																_p382.end);
 														} else {
 															if (_elm_lang$core$Native_Utils.eq(identifier, '|>')) {
 																return A3(
@@ -41281,16 +41290,16 @@ var _user$project$LeoParser$expressionGeneral = F4(
 																		A5(
 																			_user$project$Lang$EApp,
 																			wsBeforeEverything,
-																			_user$project$Lang$Expr(_p380),
+																			_user$project$Lang$Expr(_p382),
 																			{
 																				ctor: '::',
-																				_0: _user$project$Lang$Expr(_p381),
+																				_0: _user$project$Lang$Expr(_p383),
 																				_1: {ctor: '[]'}
 																			},
 																			_user$project$Lang$RightApp(wsBefore),
 																			_user$project$Lang$space0)),
-																	_p381.start,
-																	_p380.end);
+																	_p383.start,
+																	_p382.end);
 															} else {
 																var opExp = _user$project$Lang$Expr(
 																	A3(
@@ -41308,17 +41317,17 @@ var _user$project$LeoParser$expressionGeneral = F4(
 																			opExp,
 																			{
 																				ctor: '::',
-																				_0: _user$project$Lang$Expr(_p381),
+																				_0: _user$project$Lang$Expr(_p383),
 																				_1: {
 																					ctor: '::',
-																					_0: _user$project$Lang$Expr(_p380),
+																					_0: _user$project$Lang$Expr(_p382),
 																					_1: {ctor: '[]'}
 																				}
 																			},
 																			_user$project$Lang$InfixApp,
 																			_user$project$Lang$space0)),
-																	_p381.start,
-																	_p380.end);
+																	_p383.start,
+																	_p382.end);
 															}
 														}
 													}
@@ -41331,18 +41340,18 @@ var _user$project$LeoParser$expressionGeneral = F4(
 var _user$project$LeoParser$simpleExpressionWithPossibleArgumentsMaybeTyped = F2(
 	function (minStartCol, spConstraint) {
 		return _MikaelMayer$parser$Parser$lazy(
-			function (_p382) {
+			function (_p384) {
 				return A3(
 					_MikaelMayer$parser$Parser$delayedCommitMap,
 					F2(
-						function (startPos, _p383) {
-							var _p384 = _p383;
-							var _p387 = _p384._0;
-							var _p385 = _p384._1;
-							if (_p385.ctor === 'Nothing') {
-								return _p387;
+						function (startPos, _p385) {
+							var _p386 = _p385;
+							var _p389 = _p386._0;
+							var _p387 = _p386._1;
+							if (_p387.ctor === 'Nothing') {
+								return _p389;
 							} else {
-								var _p386 = _p385._0._1;
+								var _p388 = _p387._0._1;
 								return function (wsBefore) {
 									return _user$project$Lang$Expr(
 										A3(
@@ -41351,12 +41360,12 @@ var _user$project$LeoParser$simpleExpressionWithPossibleArgumentsMaybeTyped = F2
 												A5(
 													_user$project$Lang$EColonType,
 													wsBefore,
-													_p387(_user$project$Lang$space0),
-													_p385._0._0,
-													_p386,
+													_p389(_user$project$Lang$space0),
+													_p387._0._0,
+													_p388,
 													_user$project$Lang$space0)),
 											startPos,
-											_p386.end));
+											_p388.end));
 								};
 							}
 						}),
@@ -41379,22 +41388,22 @@ var _user$project$LeoParser$simpleExpressionWithPossibleArguments = F2(
 	function (minStartCol, spConstraint) {
 		var combine = F3(
 			function (wsToFirst, rest, wsBefore) {
-				var _p388 = wsToFirst(wsBefore);
-				var eFirst = _p388;
-				var first = _p388._0;
+				var _p390 = wsToFirst(wsBefore);
+				var eFirst = _p390;
+				var first = _p390._0;
 				var start = first.start;
 				var constructedRest = A3(
 					_elm_lang$core$Basics$flip,
 					_elm_lang$core$List$map,
 					rest,
-					function (_p389) {
-						var _p390 = _p389;
-						var _p395 = _p390;
-						var _p394 = _p390._0;
-						var _p391 = _user$project$Lang$unwrapExp(_p395);
-						if (_p391.ctor === 'EVar') {
-							var _p393 = _p391._1;
-							if (_user$project$LeoParser$isDataConstructor(_p393)) {
+					function (_p391) {
+						var _p392 = _p391;
+						var _p397 = _p392;
+						var _p396 = _p392._0;
+						var _p393 = _user$project$Lang$unwrapExp(_p397);
+						if (_p393.ctor === 'EVar') {
+							var _p395 = _p393._1;
+							if (_user$project$LeoParser$isDataConstructor(_p395)) {
 								var argsEntry = {
 									ctor: '_Tuple5',
 									_0: _elm_lang$core$Maybe$Just(_user$project$Lang$space0),
@@ -41411,22 +41420,22 @@ var _user$project$LeoParser$simpleExpressionWithPossibleArguments = F2(
 								};
 								var ctorEntry = A3(
 									_user$project$Lang$ctor,
-									function (_p392) {
+									function (_p394) {
 										return _user$project$Lang$withDummyExpInfo(
 											A2(
 												_user$project$Lang$EBase,
 												_user$project$Lang$space0,
-												A2(_user$project$Lang$EString, _user$project$Lang$defaultQuoteChar, _p392)));
+												A2(_user$project$Lang$EString, _user$project$Lang$defaultQuoteChar, _p394)));
 									},
 									_user$project$Lang$DataTypeCtor,
-									_p393);
+									_p395);
 								return _user$project$Lang$Expr(
 									A3(
 										_user$project$Info$withInfo,
 										_user$project$Lang$exp_(
 											A4(
 												_user$project$Lang$eRecord__,
-												_p391._0,
+												_p393._0,
 												_elm_lang$core$Maybe$Nothing,
 												{
 													ctor: '::',
@@ -41438,20 +41447,20 @@ var _user$project$LeoParser$simpleExpressionWithPossibleArguments = F2(
 													}
 												},
 												_user$project$Lang$space0)),
-										_p394.start,
-										_p394.end));
+										_p396.start,
+										_p396.end));
 							} else {
-								return _p395;
+								return _p397;
 							}
 						} else {
-							return _p395;
+							return _p397;
 						}
 					});
 				var maybeSpecial = function () {
-					var _p396 = _user$project$Lang$unwrapExp(eFirst);
-					if (_p396.ctor === 'EVar') {
-						var _p399 = _p396._1;
-						if (_user$project$LeoParser$isDataConstructor(_p399)) {
+					var _p398 = _user$project$Lang$unwrapExp(eFirst);
+					if (_p398.ctor === 'EVar') {
+						var _p401 = _p398._1;
+						if (_user$project$LeoParser$isDataConstructor(_p401)) {
 							var insideArgsEntries = A3(
 								_user$project$Utils$indexedMapFrom,
 								1,
@@ -41477,22 +41486,22 @@ var _user$project$LeoParser$simpleExpressionWithPossibleArguments = F2(
 							};
 							var ctorEntry = A3(
 								_user$project$Lang$ctor,
-								function (_p397) {
+								function (_p399) {
 									return _user$project$Lang$withDummyExpInfo(
 										A2(
 											_user$project$Lang$EBase,
 											_user$project$Lang$space0,
-											A2(_user$project$Lang$EString, _user$project$Lang$defaultQuoteChar, _p397)));
+											A2(_user$project$Lang$EString, _user$project$Lang$defaultQuoteChar, _p399)));
 								},
 								_user$project$Lang$DataTypeCtor,
-								_p399);
-							return function (_p398) {
+								_p401);
+							return function (_p400) {
 								return _elm_lang$core$Maybe$Just(
-									_user$project$Lang$exp_(_p398));
+									_user$project$Lang$exp_(_p400));
 							}(
 								A4(
 									_user$project$Lang$eRecord__,
-									_p396._0,
+									_p398._0,
 									_elm_lang$core$Maybe$Nothing,
 									{
 										ctor: '::',
@@ -41512,31 +41521,31 @@ var _user$project$LeoParser$simpleExpressionWithPossibleArguments = F2(
 					}
 				}();
 				var end = function () {
-					var _p400 = _user$project$Utils$maybeLast(constructedRest);
-					if (_p400.ctor === 'Nothing') {
-						return first.end;
-					} else {
-						return _p400._0._0.end;
-					}
-				}();
-				var _p401 = maybeSpecial;
-				if (_p401.ctor === 'Just') {
-					return _user$project$Lang$Expr(
-						A3(_user$project$Info$withInfo, _p401._0, start, end));
-				} else {
 					var _p402 = _user$project$Utils$maybeLast(constructedRest);
 					if (_p402.ctor === 'Nothing') {
+						return first.end;
+					} else {
+						return _p402._0._0.end;
+					}
+				}();
+				var _p403 = maybeSpecial;
+				if (_p403.ctor === 'Just') {
+					return _user$project$Lang$Expr(
+						A3(_user$project$Info$withInfo, _p403._0, start, end));
+				} else {
+					var _p404 = _user$project$Utils$maybeLast(constructedRest);
+					if (_p404.ctor === 'Nothing') {
 						return _user$project$LeoParser$maybeConvertToOp0(eFirst);
 					} else {
 						var e_ = _user$project$Lang$exp_(
 							A2(_user$project$LeoParser$maybeConvertToOpN, eFirst, constructedRest));
 						return _user$project$Lang$Expr(
-							A3(_user$project$Info$withInfo, e_, first.start, _p402._0._0.end));
+							A3(_user$project$Info$withInfo, e_, first.start, _p404._0._0.end));
 					}
 				}
 			});
 		return _MikaelMayer$parser$Parser$lazy(
-			function (_p403) {
+			function (_p405) {
 				return A2(
 					_MikaelMayer$parser$Parser$andThen,
 					function (wsToMainExp) {
@@ -41589,14 +41598,14 @@ var _user$project$LeoParser$conditional = F2(
 			_MikaelMayer$parser$Parser$inContext,
 			'conditional',
 			_MikaelMayer$parser$Parser$lazy(
-				function (_p404) {
+				function (_p406) {
 					return _user$project$LangParserUtils$mapWSExp_(
 						A2(
 							_user$project$LangParserUtils$transferInfo,
 							F2(
-								function (_p405, wsBefore) {
-									var _p406 = _p405;
-									return A7(_user$project$Lang$EIf, wsBefore, _p406._0, _p406._1, _p406._2, _p406._3, _p406._4, _user$project$Lang$space0);
+								function (_p407, wsBefore) {
+									var _p408 = _p407;
+									return A7(_user$project$Lang$EIf, wsBefore, _p408._0, _p408._1, _p408._2, _p408._3, _p408._4, _user$project$Lang$space0);
 								}),
 							_user$project$ParserUtils$trackInfo(
 								A2(
@@ -41639,9 +41648,9 @@ var _user$project$LeoParser$function = F2(
 				A2(
 					_user$project$LangParserUtils$transferInfo,
 					F2(
-						function (_p407, wsBefore) {
-							var _p408 = _p407;
-							return A4(_user$project$Lang$EFun, wsBefore, _p408._0, _p408._1, _user$project$Lang$space0);
+						function (_p409, wsBefore) {
+							var _p410 = _p409;
+							return A4(_user$project$Lang$EFun, wsBefore, _p410._0, _p410._1, _user$project$Lang$space0);
 						}),
 					_user$project$ParserUtils$trackInfo(
 						A2(
@@ -41672,7 +41681,7 @@ var _user$project$LeoParser$htmlliteral = A2(
 	_MikaelMayer$parser$Parser$inContext,
 	'html literal',
 	_MikaelMayer$parser$Parser$lazy(
-		function (_p409) {
+		function (_p411) {
 			return A2(
 				_MikaelMayer$parser$Parser_ops['|='],
 				_MikaelMayer$parser$Parser$succeed(
@@ -41692,7 +41701,7 @@ var _user$project$LeoParser$htmlliteral = A2(
 						})),
 				A2(
 					_MikaelMayer$parser$Parser$andThen,
-					_user$project$LeoParser$htmlToExp,
+					_user$project$LeoParser$htmlToExp('top level'),
 					A2(
 						_MikaelMayer$parser$Parser_ops['|='],
 						A2(
@@ -41716,7 +41725,7 @@ var _user$project$LeoParser$htmlliteral = A2(
 						_user$project$HTMLParser$parseOneNode(
 							_user$project$HTMLParser$Interpolation(
 								{
-									attributevalue: function (_p410) {
+									attributevalue: function (_p412) {
 										return A2(
 											_MikaelMayer$parser$Parser$inContext,
 											'HTML attribute value',
@@ -41728,7 +41737,7 @@ var _user$project$LeoParser$htmlliteral = A2(
 														_MikaelMayer$parser$Parser$map,
 														_elm_lang$core$Basics$always,
 														A3(_user$project$LeoParser$expressionWithoutGreater, _user$project$LangParserUtils$spaces, 0, _user$project$LangParserUtils$NoSpace));
-												}(_p410)));
+												}(_p412)));
 									},
 									attributerawvalue: _user$project$LeoParser$htmlAttribElemsToExp,
 									attributelist: A2(
@@ -41738,7 +41747,7 @@ var _user$project$LeoParser$htmlliteral = A2(
 											_user$project$LeoParser$wrapWithSyntax,
 											_user$project$Lang$LeoSyntax,
 											A2(_user$project$LeoParser$simpleExpression, 0, _user$project$LangParserUtils$NoSpace))),
-									childlist: function (_p411) {
+									childlist: function (_p413) {
 										return A2(
 											_MikaelMayer$parser$Parser$inContext,
 											'HTML special child list',
@@ -41758,7 +41767,7 @@ var _user$project$LeoParser$htmlliteral = A2(
 																_1: {
 																	ctor: '::',
 																	_0: _MikaelMayer$parser$Parser$lazy(
-																		function (_p412) {
+																		function (_p414) {
 																			return _user$project$LeoParser$multiLineInterpolatedString;
 																		}),
 																	_1: {
@@ -41777,7 +41786,7 @@ var _user$project$LeoParser$htmlliteral = A2(
 																}
 															}
 														});
-												}(_p411)));
+												}(_p413)));
 									},
 									tagName: A2(
 										_MikaelMayer$parser$Parser$inContext,
@@ -41852,7 +41861,7 @@ var _user$project$LeoParser$list = function () {
 		_MikaelMayer$parser$Parser$inContext,
 		'list',
 		_MikaelMayer$parser$Parser$lazy(
-			function (_p413) {
+			function (_p415) {
 				return _user$project$LangParserUtils$mapWSExp_(
 					_user$project$LeoParser$genericList(
 						{
@@ -41879,7 +41888,7 @@ var _user$project$LeoParser$record = A2(
 	_MikaelMayer$parser$Parser$inContext,
 	'record expression',
 	_MikaelMayer$parser$Parser$lazy(
-		function (_p414) {
+		function (_p416) {
 			return A3(
 				_MikaelMayer$parser$Parser$delayedCommitMap,
 				F2(
@@ -41954,15 +41963,15 @@ var _user$project$LeoParser$declarations = function (minStartCol) {
 		_MikaelMayer$parser$Parser$inContext,
 		'Declarations',
 		_MikaelMayer$parser$Parser$lazy(
-			function (_p415) {
+			function (_p417) {
 				return A2(
 					_MikaelMayer$parser$Parser$andThen,
 					function (definitions) {
-						var _p416 = _user$project$LeoParser$reorderDeclarations(definitions);
-						if (_p416.ctor === 'Ok') {
-							return _MikaelMayer$parser$Parser$succeed(_p416._0);
+						var _p418 = _user$project$LeoParser$reorderDeclarations(definitions);
+						if (_p418.ctor === 'Ok') {
+							return _MikaelMayer$parser$Parser$succeed(_p418._0);
 						} else {
-							return _MikaelMayer$parser$Parser$fail(_p416._0);
+							return _MikaelMayer$parser$Parser$fail(_p418._0);
 						}
 					},
 					A2(
@@ -41986,7 +41995,7 @@ var _user$project$LeoParser$headDeclaration = function (minStartCol) {
 		_MikaelMayer$parser$Parser$inContext,
 		'Declaration #1',
 		_MikaelMayer$parser$Parser$lazy(
-			function (_p417) {
+			function (_p419) {
 				return A3(
 					_MikaelMayer$parser$Parser$delayedCommitMap,
 					F2(
@@ -42016,9 +42025,9 @@ var _user$project$LeoParser$letExpOrAnnotation = function (minStartCol) {
 			A3(
 				_MikaelMayer$parser$Parser$delayedCommitAndThen,
 				F2(
-					function (_p418, $final) {
-						var _p419 = _p418;
-						return A3($final, _p419._0, _p419._1, _p419._2);
+					function (_p420, $final) {
+						var _p421 = _p420;
+						return A3($final, _p421._0, _p421._1, _p421._2);
 					}),
 				A2(
 					_MikaelMayer$parser$Parser_ops['|='],
@@ -42037,19 +42046,19 @@ var _user$project$LeoParser$letExpOrAnnotation = function (minStartCol) {
 							_MikaelMayer$parser$Parser$zeroOrMore,
 							A2(_user$project$LeoParser$patternLet, _user$project$LangParserUtils$spaces, minStartCol))),
 					_user$project$LangParserUtils$spaces),
-				function (_p420) {
-					var _p421 = _p420;
-					var _p428 = _p421._0;
+				function (_p422) {
+					var _p423 = _p422;
+					var _p430 = _p423._0;
 					return A2(
 						_MikaelMayer$parser$Parser$andThen,
 						function (eqSymbol) {
 							return _elm_lang$core$Native_Utils.eq(eqSymbol, '=') ? A2(
 								_MikaelMayer$parser$Parser$map,
 								F4(
-									function (_p422, pat, parameters, wsBeforeEq) {
-										var _p423 = _p422;
-										var _p425 = _p423._0;
-										var _p424 = _elm_lang$core$List$isEmpty(parameters) ? {ctor: '_Tuple2', _0: _p425, _1: _user$project$Lang$FunArgsAfterEqual} : {
+									function (_p424, pat, parameters, wsBeforeEq) {
+										var _p425 = _p424;
+										var _p427 = _p425._0;
+										var _p426 = _elm_lang$core$List$isEmpty(parameters) ? {ctor: '_Tuple2', _0: _p427, _1: _user$project$Lang$FunArgsAfterEqual} : {
 											ctor: '_Tuple2',
 											_0: A3(
 												_user$project$Info$withInfo,
@@ -42058,14 +42067,14 @@ var _user$project$LeoParser$letExpOrAnnotation = function (minStartCol) {
 														_user$project$Lang$EFun,
 														_user$project$Lang$space0,
 														parameters,
-														_user$project$Lang$Expr(_p425),
+														_user$project$Lang$Expr(_p427),
 														_user$project$Lang$space0)),
-												_p425.start,
-												_p425.end),
+												_p427.start,
+												_p427.end),
 											_1: _user$project$Lang$FunArgAsPats
 										};
-										var binding = _p424._0;
-										var funArgStyle = _p424._1;
+										var binding = _p426._0;
+										var funArgStyle = _p426._1;
 										return _MikaelMayer$parser$Parser$succeed(
 											F2(
 												function (optCommaSpace, wsBeforePat) {
@@ -42080,7 +42089,7 @@ var _user$project$LeoParser$letExpOrAnnotation = function (minStartCol) {
 															_user$project$Lang$Expr(binding)));
 												}));
 									}),
-								A3(_user$project$LeoParser$expression, _user$project$LangParserUtils$spaces, _p428.start.col + 1, _user$project$LangParserUtils$MinIndentSpace)) : A2(
+								A3(_user$project$LeoParser$expression, _user$project$LangParserUtils$spaces, _p430.start.col + 1, _user$project$LangParserUtils$MinIndentSpace)) : A2(
 								_MikaelMayer$parser$Parser$map,
 								F4(
 									function (binding_, pat, parameters, wsBeforeEq) {
@@ -42089,9 +42098,9 @@ var _user$project$LeoParser$letExpOrAnnotation = function (minStartCol) {
 												return _elm_lang$core$Result$Ok(
 													{ctor: '_Tuple2', _0: binding_, _1: _user$project$Lang$FunArgsAfterEqual});
 											} else {
-												var _p426 = _user$project$Utils$projJusts(
+												var _p428 = _user$project$Utils$projJusts(
 													A2(_elm_lang$core$List$map, _user$project$Lang$patToTPat, parameters));
-												if (_p426.ctor === 'Just') {
+												if (_p428.ctor === 'Just') {
 													return _elm_lang$core$Result$Ok(
 														{
 															ctor: '_Tuple2',
@@ -42100,7 +42109,7 @@ var _user$project$LeoParser$letExpOrAnnotation = function (minStartCol) {
 																_user$project$Lang$type_,
 																A3(
 																	_user$project$Info$withInfo,
-																	A4(_user$project$Lang$TForall, _user$project$Lang$space0, _p426._0, binding_, _user$project$Lang$space0),
+																	A4(_user$project$Lang$TForall, _user$project$Lang$space0, _p428._0, binding_, _user$project$Lang$space0),
 																	binding_.start,
 																	binding_.end)),
 															_1: _user$project$Lang$FunArgAsPats
@@ -42110,19 +42119,19 @@ var _user$project$LeoParser$letExpOrAnnotation = function (minStartCol) {
 												}
 											}
 										}();
-										var _p427 = mbBindingsFunArgStyles;
-										if (_p427.ctor === 'Ok') {
+										var _p429 = mbBindingsFunArgStyles;
+										if (_p429.ctor === 'Ok') {
 											return _MikaelMayer$parser$Parser$succeed(
 												F2(
 													function (optCommaSpace, wsBeforePat) {
 														return _user$project$Lang$DeclAnnotation(
-															A6(_user$project$Lang$LetAnnotation, optCommaSpace, wsBeforePat, pat, _p427._0._1, wsBeforeEq, _p427._0._0));
+															A6(_user$project$Lang$LetAnnotation, optCommaSpace, wsBeforePat, pat, _p429._0._1, wsBeforeEq, _p429._0._0));
 													}));
 										} else {
-											return _MikaelMayer$parser$Parser$fail(_p427._0);
+											return _MikaelMayer$parser$Parser$fail(_p429._0);
 										}
 									}),
-								A2(_user$project$LeoParser$typ, _user$project$LangParserUtils$spaces, _p428.start.col + 1));
+								A2(_user$project$LeoParser$typ, _user$project$LangParserUtils$spaces, _p430.start.col + 1));
 						},
 						_MikaelMayer$parser$Parser$oneOf(
 							{
@@ -42183,14 +42192,14 @@ var _user$project$LeoParser$tailDeclarations = F2(
 					ctor: '::',
 					_0: A3(
 						_MikaelMayer$parser$Parser$delayedCommitAndThen,
-						function (_p429) {
+						function (_p431) {
 							return _elm_lang$core$Basics$identity;
 						},
 						spaceBeforeNewDeclaration,
-						function (_p430) {
-							var _p431 = _p430;
-							var _p432 = _p431._1;
-							var newMinStartCol = (_elm_lang$core$Native_Utils.cmp(_p432.start.line + 1, _p432.end.line) < 0) ? _p432.end.col : minStartCol;
+						function (_p432) {
+							var _p433 = _p432;
+							var _p434 = _p433._1;
+							var newMinStartCol = (_elm_lang$core$Native_Utils.cmp(_p434.start.line + 1, _p434.end.line) < 0) ? _p434.end.col : minStartCol;
 							return A2(
 								_MikaelMayer$parser$Parser$andThen,
 								function ($final) {
@@ -42199,7 +42208,7 @@ var _user$project$LeoParser$tailDeclarations = F2(
 										newMinStartCol,
 										{
 											ctor: '::',
-											_0: A2($final, _p431._0, _p432),
+											_0: A2($final, _p433._0, _p434),
 											_1: revPrevDeclarations
 										});
 								},
@@ -42233,17 +42242,17 @@ var _user$project$LeoParser$tuple = A2(
 	_MikaelMayer$parser$Parser$inContext,
 	'tuple',
 	_MikaelMayer$parser$Parser$lazy(
-		function (_p433) {
+		function (_p435) {
 			return _user$project$LangParserUtils$mapWSExp_(
 				_user$project$LeoParser$genericTuple(
 					{
 						term: A3(_user$project$LeoParser$expression, _user$project$LangParserUtils$spaces, 0, _user$project$LangParserUtils$MinIndentSpace),
-						tagger: function (_p434) {
+						tagger: function (_p436) {
 							return _user$project$Lang$withDummyExpInfo(
 								A2(
 									_user$project$Lang$EBase,
 									_user$project$Lang$space0,
-									A2(_user$project$Lang$EString, _user$project$Lang$defaultQuoteChar, _p434)));
+									A2(_user$project$Lang$EString, _user$project$Lang$defaultQuoteChar, _p436)));
 						},
 						record: F3(
 							function (ws1, entries, ws2) {
@@ -42288,8 +42297,8 @@ var _user$project$LeoParser$addRightApplications = function (parser) {
 							_0: simpExp(wsBefore),
 							_1: apps
 						};
-						var _p435 = _user$project$Utils$maybeInitLast(finalExps);
-						if ((_p435.ctor === 'Just') && (_p435._0.ctor === '_Tuple2')) {
+						var _p437 = _user$project$Utils$maybeInitLast(finalExps);
+						if ((_p437.ctor === 'Just') && (_p437._0.ctor === '_Tuple2')) {
 							return A3(
 								_elm_lang$core$List$foldr,
 								F2(
@@ -42311,16 +42320,16 @@ var _user$project$LeoParser$addRightApplications = function (parser) {
 											simpExp.start,
 											argExp.end);
 									}),
-								_p435._0._1,
-								_p435._0._0);
+								_p437._0._1,
+								_p437._0._0);
 						} else {
 							return _elm_lang$core$Native_Utils.crashCase(
 								'LeoParser',
 								{
-									start: {line: 981, column: 6},
-									end: {line: 986, column: 43}
+									start: {line: 982, column: 6},
+									end: {line: 987, column: 43}
 								},
-								_p435)('Finally, P = NP.');
+								_p437)('Finally, P = NP.');
 						}
 					})),
 			parser),
@@ -42347,9 +42356,9 @@ var _user$project$LeoParser$expressionWithoutGreater = F3(
 	function (firstSpace, minStartCol, spConstraint) {
 		return A2(
 			_MikaelMayer$parser$Parser$map,
-			function (_p437) {
-				var _p438 = _p437;
-				return _p438._0;
+			function (_p439) {
+				var _p440 = _p439;
+				return _p440._0;
 			},
 			A4(_user$project$LeoParser$expressionGeneral, true, firstSpace, minStartCol, spConstraint));
 	});
@@ -42363,18 +42372,18 @@ var _user$project$LeoParser$letBinding = F2(
 	});
 var _user$project$LeoParser$genericLetBinding = function (bodyParser) {
 	return _MikaelMayer$parser$Parser$lazy(
-		function (_p439) {
+		function (_p441) {
 			return A3(
 				_MikaelMayer$parser$Parser$delayedCommitMap,
 				F3(
-					function (startPos, _p440, wsBefore) {
-						var _p441 = _p440;
+					function (startPos, _p442, wsBefore) {
+						var _p443 = _p442;
 						return A3(
 							_user$project$Info$withInfo,
 							_user$project$Lang$exp_(
-								A5(_user$project$Lang$ELet, wsBefore, _user$project$Lang$Let, _p441._0, _p441._1, _p441._2)),
+								A5(_user$project$Lang$ELet, wsBefore, _user$project$Lang$Let, _p443._0, _p443._1, _p443._2)),
 							startPos,
-							_p441._3);
+							_p443._3);
 					}),
 				_user$project$ParserUtils$getPos,
 				A2(
@@ -42411,7 +42420,7 @@ var _user$project$LeoParser$multiLineInterpolatedString = A2(
 	_MikaelMayer$parser$Parser$inContext,
 	'multi-line interpolated string',
 	_MikaelMayer$parser$Parser$lazy(
-		function (_p442) {
+		function (_p444) {
 			return _user$project$LangParserUtils$mapWSExp_(
 				_user$project$ParserUtils$trackInfo(
 					A2(
@@ -42481,22 +42490,22 @@ var _user$project$LeoParser$multilineContentParserHelp = function (prevExps) {
 					ctor: '::',
 					_0: A2(
 						_MikaelMayer$parser$Parser$andThen,
-						function (_p443) {
-							var _p444 = _p443;
-							var _p449 = _p444._1;
-							var stringExp = _user$project$Lang$Expr(_p449);
-							var potentialExp = _user$project$Lang$Expr(_p444._0);
-							var _p445 = prevExps;
-							if (_p445.ctor === '::') {
-								var _p447 = _p445._0._0;
-								var _p446 = {
+						function (_p445) {
+							var _p446 = _p445;
+							var _p451 = _p446._1;
+							var stringExp = _user$project$Lang$Expr(_p451);
+							var potentialExp = _user$project$Lang$Expr(_p446._0);
+							var _p447 = prevExps;
+							if (_p447.ctor === '::') {
+								var _p449 = _p447._0._0;
+								var _p448 = {
 									ctor: '_Tuple3',
 									_0: _user$project$Lang$unwrapExp(
-										_user$project$Lang$Expr(_p447)),
+										_user$project$Lang$Expr(_p449)),
 									_1: _user$project$Lang$unwrapExp(potentialExp),
 									_2: _user$project$Lang$unwrapExp(stringExp)
 								};
-								if (((((((_p446.ctor === '_Tuple3') && (_p446._0.ctor === 'EBase')) && (_p446._0._1.ctor === 'EString')) && (_p446._1.ctor === 'EBase')) && (_p446._1._1.ctor === 'EString')) && (_p446._2.ctor === 'EBase')) && (_p446._2._1.ctor === 'EString')) {
+								if (((((((_p448.ctor === '_Tuple3') && (_p448._0.ctor === 'EBase')) && (_p448._0._1.ctor === 'EString')) && (_p448._1.ctor === 'EBase')) && (_p448._1._1.ctor === 'EString')) && (_p448._2.ctor === 'EBase')) && (_p448._2._1.ctor === 'EString')) {
 									return _user$project$LeoParser$multilineContentParserHelp(
 										{
 											ctor: '::',
@@ -42506,17 +42515,17 @@ var _user$project$LeoParser$multilineContentParserHelp = function (prevExps) {
 													_user$project$Lang$exp_(
 														A2(
 															_user$project$Lang$EBase,
-															_p446._0._0,
+															_p448._0._0,
 															A2(
 																_user$project$Lang$EString,
-																_p446._0._1._0,
+																_p448._0._1._0,
 																A2(
 																	_elm_lang$core$Basics_ops['++'],
-																	_p446._0._1._1,
-																	A2(_elm_lang$core$Basics_ops['++'], _p446._1._1._1, _p446._2._1._1))))),
-													_p447.start,
-													_p449.end)),
-											_1: _p445._1
+																	_p448._0._1._1,
+																	A2(_elm_lang$core$Basics_ops['++'], _p448._1._1._1, _p448._2._1._1))))),
+													_p449.start,
+													_p451.end)),
+											_1: _p447._1
 										});
 								} else {
 									return _user$project$LeoParser$multilineContentParserHelp(
@@ -42533,7 +42542,7 @@ var _user$project$LeoParser$multilineContentParserHelp = function (prevExps) {
 										start: {line: 714, column: 9},
 										end: {line: 723, column: 118}
 									},
-									_p445)('Internal error: There should be always at least one expression in a longstring literal.');
+									_p447)('Internal error: There should be always at least one expression in a longstring literal.');
 							}
 						},
 						A2(
@@ -42555,7 +42564,7 @@ var _user$project$LeoParser$multilineContentParserHelp = function (prevExps) {
 												_user$project$ParserUtils$trackInfo(
 													A2(
 														_MikaelMayer$parser$Parser$map,
-														function (_p450) {
+														function (_p452) {
 															return A2(
 																_user$project$Lang$EBase,
 																_user$project$Lang$space0,
@@ -42571,7 +42580,7 @@ var _user$project$LeoParser$multilineContentParserHelp = function (prevExps) {
 														_MikaelMayer$parser$Parser$succeed(_elm_lang$core$Basics$identity),
 														_MikaelMayer$parser$Parser$symbol('@')),
 													_MikaelMayer$parser$Parser$lazy(
-														function (_p451) {
+														function (_p453) {
 															return _user$project$LeoParser$multilineEscapedElmExpression;
 														})),
 												_1: {ctor: '[]'}
@@ -42600,7 +42609,7 @@ var _user$project$LeoParser$multilineEscapedElmExpression = A2(
 		{
 			ctor: '::',
 			_0: _MikaelMayer$parser$Parser$lazy(
-				function (_p452) {
+				function (_p454) {
 					return _user$project$ParserUtils$trackInfo(
 						A2(
 							_MikaelMayer$parser$Parser_ops['|='],
@@ -42625,13 +42634,13 @@ var _user$project$LeoParser$multilineEscapedElmExpression = A2(
 			_1: {
 				ctor: '::',
 				_0: _MikaelMayer$parser$Parser$lazy(
-					function (_p453) {
+					function (_p455) {
 						return _user$project$LeoParser$multilineGenericLetBinding;
 					}),
 				_1: {
 					ctor: '::',
 					_0: _MikaelMayer$parser$Parser$lazy(
-						function (_p454) {
+						function (_p456) {
 							return _user$project$LangParserUtils$mapExp_(
 								_user$project$ParserUtils$trackInfo(
 									A2(
@@ -42689,21 +42698,21 @@ var _user$project$LeoParser$program = A2(
 	function (declsOpt) {
 		return A2(
 			_MikaelMayer$parser$Parser$map,
-			function (_p455) {
-				var _p456 = _p455;
-				var _p459 = _p456._0;
-				var _p457 = {ctor: '_Tuple2', _0: declsOpt, _1: _p459.val};
-				if (_p457._0.ctor === 'Nothing') {
-					return _p459.val;
+			function (_p457) {
+				var _p458 = _p457;
+				var _p461 = _p458._0;
+				var _p459 = {ctor: '_Tuple2', _0: declsOpt, _1: _p461.val};
+				if (_p459._0.ctor === 'Nothing') {
+					return _p461.val;
 				} else {
-					var _p458 = _p457._0._0;
+					var _p460 = _p459._0._0;
 					return _user$project$Lang$Expr(
 						A3(
 							_user$project$Info$withInfo,
 							_user$project$Lang$exp_(
-								A5(_user$project$Lang$ELet, _p456._1, _user$project$Lang$Def, _p458.val, _user$project$Lang$space0, _p459.val)),
-							_p458.start,
-							_p457._1._0.end));
+								A5(_user$project$Lang$ELet, _p458._1, _user$project$Lang$Def, _p460.val, _user$project$Lang$space0, _p461.val)),
+							_p460.start,
+							_p459._1._0.end));
 				}
 			},
 			A2(
@@ -42735,26 +42744,26 @@ var _user$project$LeoParser$program = A2(
 											false,
 											A2(
 												_elm_lang$core$Maybe$andThen,
-												function (_p460) {
-													var _p461 = _p460;
-													var _p462 = _p461.val;
-													var letexps = _p462._3;
+												function (_p462) {
+													var _p463 = _p462;
+													var _p464 = _p463.val;
+													var letexps = _p464._3;
 													return A2(
 														_user$project$Utils$mapFirstSuccess,
-														function (_p463) {
-															var _p464 = _p463;
+														function (_p465) {
+															var _p466 = _p465;
 															return A2(
 																_user$project$Utils$mapFirstSuccess,
-																function (_p465) {
-																	var _p466 = _p465;
+																function (_p467) {
+																	var _p468 = _p467;
 																	return A2(
 																		_user$project$Utils$mapFirstSuccess,
 																		function (i) {
 																			return _elm_lang$core$Native_Utils.eq(i, 'main') ? _elm_lang$core$Maybe$Just(true) : _elm_lang$core$Maybe$Nothing;
 																		},
-																		_user$project$Lang$identifiersListInPat(_p466._2));
+																		_user$project$Lang$identifiersListInPat(_p468._2));
 																},
-																_p464._1);
+																_p466._1);
 														},
 														letexps);
 												},
@@ -42771,47 +42780,47 @@ var _user$project$LeoParser$program = A2(
 	_user$project$ParserUtils$optional(
 		_user$project$ParserUtils$trackInfo(
 			_user$project$LeoParser$declarations(0))));
-var _user$project$LeoParser$_p467 = function () {
-	var _p468 = A2(_MikaelMayer$parser$Parser$run, _user$project$LeoParser$program, _user$project$PreludeGenerated$preludeLeo);
-	if (_p468.ctor === 'Ok') {
+var _user$project$LeoParser$_p469 = function () {
+	var _p470 = A2(_MikaelMayer$parser$Parser$run, _user$project$LeoParser$program, _user$project$PreludeGenerated$preludeLeo);
+	if (_p470.ctor === 'Ok') {
 		return {
 			ctor: '_Tuple2',
 			_0: _elm_lang$core$Maybe$Nothing,
-			_1: A2(_user$project$LeoParser$freshenClean, 1, _p468._0)
+			_1: A2(_user$project$LeoParser$freshenClean, 1, _p470._0)
 		};
 	} else {
-		var msg = _user$project$ParserUtils$showError(_p468._0);
-		var _p469 = A2(_MikaelMayer$parser$Parser$run, _user$project$LeoParser$program, '0');
-		if (_p469.ctor === 'Ok') {
+		var msg = _user$project$ParserUtils$showError(_p470._0);
+		var _p471 = A2(_MikaelMayer$parser$Parser$run, _user$project$LeoParser$program, '0');
+		if (_p471.ctor === 'Ok') {
 			return {
 				ctor: '_Tuple2',
 				_0: _elm_lang$core$Maybe$Just(msg),
-				_1: A2(_user$project$LeoParser$freshenClean, 1, _p469._0)
+				_1: A2(_user$project$LeoParser$freshenClean, 1, _p471._0)
 			};
 		} else {
 			return _elm_lang$core$Native_Utils.crashCase(
 				'LeoParser',
 				{
-					start: {line: 2812, column: 7},
-					end: {line: 2816, column: 79}
+					start: {line: 2813, column: 7},
+					end: {line: 2817, column: 79}
 				},
-				_p469)(
+				_p471)(
 				A2(
 					_elm_lang$core$Basics_ops['++'],
 					'LeoParser: \"0\" failed to parse?',
-					_user$project$ParserUtils$showError(_p469._0)));
+					_user$project$ParserUtils$showError(_p471._0)));
 		}
 	}
 }();
-var _user$project$LeoParser$preludeNotParsed = _user$project$LeoParser$_p467._0;
-var _user$project$LeoParser$prelude = _user$project$LeoParser$_p467._1._0;
-var _user$project$LeoParser$initK = _user$project$LeoParser$_p467._1._1;
+var _user$project$LeoParser$preludeNotParsed = _user$project$LeoParser$_p469._0;
+var _user$project$LeoParser$prelude = _user$project$LeoParser$_p469._1._0;
+var _user$project$LeoParser$initK = _user$project$LeoParser$_p469._1._1;
 var _user$project$LeoParser$isPreludeLocId = function (k) {
 	return _elm_lang$core$Native_Utils.cmp(k, _user$project$LeoParser$initK) < 0;
 };
-var _user$project$LeoParser$isPreludeLoc = function (_p471) {
-	var _p472 = _p471;
-	return _user$project$LeoParser$isPreludeLocId(_p472._0);
+var _user$project$LeoParser$isPreludeLoc = function (_p473) {
+	var _p474 = _p473;
+	return _user$project$LeoParser$isPreludeLocId(_p474._0);
 };
 var _user$project$LeoParser$isPreludeEId = function (k) {
 	return _elm_lang$core$Native_Utils.cmp(k, _user$project$LeoParser$initK) < 0;
@@ -42823,27 +42832,27 @@ var _user$project$LeoParser$duplicateAndAllIds = function (exp) {
 	return A3(
 		_elm_lang$core$List$foldl,
 		F2(
-			function (id, _p473) {
-				var _p474 = _p473;
-				var _p476 = _p474._1;
-				var _p475 = _p474._0;
-				return (_elm_lang$core$Native_Utils.cmp(id, _user$project$LeoParser$initK) > -1) ? (A2(_elm_lang$core$Set$member, id, _p476) ? {
+			function (id, _p475) {
+				var _p476 = _p475;
+				var _p478 = _p476._1;
+				var _p477 = _p476._0;
+				return (_elm_lang$core$Native_Utils.cmp(id, _user$project$LeoParser$initK) > -1) ? (A2(_elm_lang$core$Set$member, id, _p478) ? {
 					ctor: '_Tuple2',
-					_0: A2(_elm_lang$core$Set$insert, id, _p475),
-					_1: _p476
+					_0: A2(_elm_lang$core$Set$insert, id, _p477),
+					_1: _p478
 				} : {
 					ctor: '_Tuple2',
-					_0: _p475,
-					_1: A2(_elm_lang$core$Set$insert, id, _p476)
-				}) : {ctor: '_Tuple2', _0: _p475, _1: _p476};
+					_0: _p477,
+					_1: A2(_elm_lang$core$Set$insert, id, _p478)
+				}) : {ctor: '_Tuple2', _0: _p477, _1: _p478};
 			}),
 		{ctor: '_Tuple2', _0: _elm_lang$core$Set$empty, _1: _elm_lang$core$Set$empty},
 		_user$project$LeoParser$allIdsRaw(exp));
 };
 var _user$project$LeoParser$freshen = function (e) {
-	var _p477 = _user$project$LeoParser$duplicateAndAllIds(e);
-	var duplicateIds = _p477._0;
-	var allIds = _p477._1;
+	var _p479 = _user$project$LeoParser$duplicateAndAllIds(e);
+	var duplicateIds = _p479._0;
+	var allIds = _p479._1;
 	var idsToPreserve = A2(_elm_lang$core$Set$diff, allIds, duplicateIds);
 	var startK = A2(
 		_user$project$Utils$fromJust_,
@@ -42854,8 +42863,8 @@ var _user$project$LeoParser$freshen = function (e) {
 				_0: _user$project$LeoParser$initK,
 				_1: _elm_lang$core$Set$toList(allIds)
 			})) + 1;
-	var _p478 = A3(_user$project$LeoParser$freshenPreserving, idsToPreserve, startK, e);
-	var result = _p478._0;
+	var _p480 = A3(_user$project$LeoParser$freshenPreserving, idsToPreserve, startK, e);
+	var result = _p480._0;
 	return result;
 };
 var _user$project$LeoParser$parse = _MikaelMayer$parser$Parser$run(
@@ -42881,20 +42890,20 @@ var _user$project$LeoParser$preludeSubst = A2(_user$project$LeoParser$substPlusO
 var _user$project$LeoParser$substPlusOf = function (e) {
 	return A2(_user$project$LeoParser$substPlusOf_, _user$project$LeoParser$preludeSubst, e);
 };
-var _user$project$LeoParser$substOf = function (_p479) {
+var _user$project$LeoParser$substOf = function (_p481) {
 	return A2(
 		_elm_lang$core$Dict$map,
 		_elm_lang$core$Basics$always(
 			function (_) {
 				return _.val;
 			}),
-		_user$project$LeoParser$substPlusOf(_p479));
+		_user$project$LeoParser$substPlusOf(_p481));
 };
-var _user$project$LeoParser$substStrOf = function (_p480) {
+var _user$project$LeoParser$substStrOf = function (_p482) {
 	return A2(
 		_elm_lang$core$Dict$map,
 		_elm_lang$core$Basics$always(_elm_lang$core$Basics$toString),
-		_user$project$LeoParser$substOf(_p480));
+		_user$project$LeoParser$substOf(_p482));
 };
 
 var _user$project$TopLevelExp$fuseTopLevelExp = F2(
