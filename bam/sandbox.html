@@ -1,0 +1,143 @@
+<html>
+<head><title>BAM SandBox</title>
+<script src="https://tharzen.com/Thaditor/bam.js"></script>
+<style>
+div.separation {
+  width: 30%;
+  display: inline-block;
+  text-align: center;
+}
+
+textarea, div.textarea {
+  width: 30%;
+  min-height: 200px;
+  padding: 5px;
+  vertical-align: middle;
+  display: inline-block;
+}
+div.textarea {
+  padding: 0px;
+  text-align: center;
+}
+.invisible {
+  opacity: 0;
+}
+</style>
+</head>
+<body>
+<script src="sandbox.js"></script>
+<script>
+var toSave = {};
+function save(self) {
+  toSave[self.getAttribute("id")] = self.value;
+  localStorage.setItem("saved", JSON.stringify(toSave));
+}
+function reset() {
+  for(let k in toSave) {
+    let e = document.getElementById(k);
+    if(e) {
+      e.value = "";
+    }
+  }
+}
+function restore() {
+  toSave = JSON.parse(localStorage.getItem("saved") || "{}");
+  for(let k in toSave) {
+    let e = document.getElementById(k);
+    if(e) {
+      e.value = toSave[k];
+    } else {
+      delete toSave[k];
+      console.log(k + " does not exist in document. Removing it");
+    }
+  }
+}
+</script>
+<h1>Try BAM</h1>
+<p>Look at <a href="https://github.com/MikaelMayer/bam-for-js#language-example">the documentation</a></p>
+<input type="button" value="Reset" onclick="reset();"><br>
+<div class="separation">program</div><span class="invisible">→</span><div class="separation">evaluation step:</div><span class="invisible"></span><div class="separation"><input type="button" value="bam.apply(evaluation step, program)" onclick="runBamApply()"></div><br>
+
+<textarea title="The original program" id="originalprog" oninput="save(this)">{b: 1}</textarea>→<textarea title="The edit action, evaluation step" id="editaction" oninput="save(this)">New({ a: Reuse(), c: Reuse('b') })</textarea>→<textarea title="The computed program" id="computedProg" readonly></textarea><br>
+
+<div class="separation">↓ user step'  </div><span class="invisible">→</span><div class="separation">&nbsp;</div><span class="invisible">→</span><div class="separation">↓ user step</div><br>
+
+<textarea id="updatedEditAction" title="Resulting edit action on original program" readonly></textarea>←<div class="textarea"><input type="button" value="user step' = bam.backPropagate(evaluation step, user step)" onclick="backprop()"></div>←<textarea title="The diff from originally computed program" id="newProgEdit" oninput="computeNewProg(); save(this);"></textarea><br>
+
+<div class="separation">↓ =bam.backPropagate(user step', program)</div><span class="invisible">→</span><div class="separation"></div><span class="invisible">→</span><div class="separation">↓</div><br>
+
+<textarea id="updatedProg" title="The program after applying the back-propagated edit action" readonly></textarea><span class="invisible">→</span><div class="textarea"></div><span class="invisible">→</span><textarea title="The new program" id="newComputedProg" oninput="computeDiff()"></textarea>
+
+<script>
+function runBamApply() {
+  let step = "Evaluating edit action";
+  try {
+    let evalStep = eval(editaction.value);
+    step = "Evaluating program";
+    let prog = eval("(" + originalprog.value + ")");
+    step = "Applying the edit action";
+    let result = bam.apply(evalStep, prog)
+    let resultStr = bam.uneval(result, "");
+    computedProg.value = resultStr;
+    computedProg.originalValue = result;
+    newComputedProg.value = resultStr;
+    computeDiff();
+  } catch(e) {
+    computedProg.value = "["+step+"]\n" + e.stack
+  }
+}
+function backprop() {
+  let step = "Evaluating eval step";
+  let updatedProgStep = false;
+  try {
+    let evalStep = eval(editaction.value);
+    step = "Evaluating user step";
+    let userAction = eval(newProgEdit.value);
+    step = "Back-propagating user step";
+    let initAction = bam.backPropagate(evalStep, userAction);
+    step = "rendering step";
+    let resultStr = bam.stringOf(initAction);
+    updatedEditAction.value = resultStr;
+    updatedProgStep = true;
+    step = "Getting original program";
+    let prog = eval("(" + originalprog.value + ")");
+    step = "Applying to original program";
+    let initProgUpdated = bam.apply(initAction, prog);
+    step = "rendering updated original program";
+    let initProgUpdatedStr = bam.uneval(initProgUpdated, "");
+    updatedProg.value = initProgUpdatedStr;
+  } catch(e) {
+    let x = updatedProgStep ? updatedProg : updatedEditAction;
+    x.value = "["+step+"]\n" + e.stack
+  }
+}
+function computeDiff() {
+  let step = "computeDiff - evaluate new program";
+  try {
+    let newProgVal = eval("(" + newComputedProg.value + ")");
+    step = "computeDiff - diffing";
+    let d = bam.diff(computedProg.originalValue, newProgVal);
+    step = "computeDiff - stringify";
+    newProgEdit.value = bam.stringOf(d);
+  } catch(e) {
+    newProgEdit.value = "["+step+"]\n" + e.stack
+  }
+}
+function computeNewProg() {
+  let step = "computeNewProg - read prog edit";
+  try {
+    let ed = eval(newProgEdit.value);
+    step = "computeNewProg - apply prog edit";
+    console.log(ed, computedProg.originalValue);
+    let result = bam.apply(ed, computedProg.originalValue);
+    step = "computeNewProg - rendering result";
+    newComputedProg.value = bam.uneval(result, "");
+  } catch(e) {
+    newComputedProg.value = "["+step+"]\n" + e.stack
+  }
+}
+
+restore();
+</script>
+</body>
+</html>
