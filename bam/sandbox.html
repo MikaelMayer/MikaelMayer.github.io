@@ -64,7 +64,7 @@ function restore() {
 
 <textarea id="updatedEditAction" title="Resulting edit action on original program" readonly></textarea>←<div class="textarea"><input type="button" value="user step' = bam.backPropagate(evaluation step, user step)" onclick="backprop()"></div>←<textarea title="The diff from originally computed program" id="newProgEdit" oninput="computeNewProg(); save(this);"></textarea><br>
 
-<div class="separation">↓ =bam.backPropagate(user step', program)</div><span class="invisible">→</span><div class="separation"></div><span class="invisible">→</span><div class="separation">↓</div><br>
+<div class="separation">↓ =bam.apply(user step', program)</div><span class="invisible">→</span><div class="separation"></div><span class="invisible">→</span><div class="separation">↓</div><br>
 
 <textarea id="updatedProg" title="The program after applying the back-propagated edit action" readonly></textarea><span class="invisible">→</span><div class="textarea"></div><span class="invisible">→</span><textarea title="The new program" id="newComputedProg" oninput="computeDiff()"></textarea>
 
