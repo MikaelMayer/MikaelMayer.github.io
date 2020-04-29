@@ -393,6 +393,24 @@ function stringUpdate(source, newVal) {
 <tr><td><textarea id="updateTest5" class="update-test" dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" placeholder="your own test" oninput="save(self)">stringUpdate("(\\x -> x) 1", {ctor: "const", value: 2})</textarea>
 </td><td><textarea id="updateTest5result"></textarea></td></tr></table>
 </section>
+<article>
+With the tests above passing, this means that you can now create two boxes, one the left the program, and on the right the value. Modifying one modifies the other. Try it! Change the number in the text area above or below.
+</article>
+<section>
+<aside>
+<textarea id="finalprogram" class="inputholder" placeholder="Your expression" oninput="save(this); G('#finalvalue').value = bam.uneval(eval(S('#evaluateCode, #mergeCode, #unparseCode, #updateCode') + '\n\nevaluate({exp: parse(' + JSON.stringify(this.value) + '), env: undefined})'))">(\f -> f 1) (\x -> x)</textarea></aside>
+<aside>
+<textarea id="finalvalue" placeholder="The parsed expression" oninput="backProp(this)"></textarea>
+</aside>
+<script>
+function backProp(self) {
+  let newVal = eval("(" + self.value + ")");
+  let newSrc = eval(S('#evaluateCode, #mergeCode, #unparseCode, #updateCode') +
+               '\n\nunparse(update({exp: parse(' + JSON.stringify(S("#finalprogram")) + '), env: undefined}, '+self.value+').exp)');
+  G("#finalprogram").value = newSrc;
+}
+</script>
+</section>
 </main>
 </body>
 </html>

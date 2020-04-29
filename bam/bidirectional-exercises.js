@@ -115,14 +115,18 @@ function onInit() {
 
 document.addEventListener("DOMContentLoaded", onInit);
 
+var S = dependencies => {
+  let dependenciesNodes = document.querySelectorAll(dependencies);
+  let dependenciesContent = [...dependenciesNodes].map(x => x.value).join("\n\n");
+  return dependenciesContent;
+}
+
 function runTests(selector, rawValue) {
   var tests = document.querySelectorAll(selector);
   for(var i = 0; i < tests.length; i++) {
     let test = tests[i];
     let dependencies = test.getAttribute("dependencies");
-    let dependenciesNodes = document.querySelectorAll(dependencies);
-    let dependenciesContent = [...dependenciesNodes].map(x => x.value).join("\n\n");
-    let whatToExecute = dependenciesContent + "\n\n" + test.value;
+    let whatToExecute = S(dependencies) + "\n\n" + test.value;
     let id = test.getAttribute("id");
     let zoneResult = document.querySelector("#" + id + "result");
     zoneResult.value = evalOrError(whatToExecute, !rawValue);
