@@ -28,8 +28,9 @@ textarea {
 <a href=""><img></a>
 <ul>
 <li title="Bidirectional Evaluation from Scratch">Part 1</li>
-<li title="Custom Operators"><a href="02-custom-operators.html">Part 2</a></li>
-<li title="Edit actions"><a href="03-edit-actions.html">Part 3</a></li>
+<li title="Custom Operators"><a href="02-CustomOperators.html">Part 2</a></li>
+<li title="Tail recursion"><a href="03-TailRecursion.html">Part 3</a></li>
+<li title="Edit actions"><a href="04-EditActions.html">Part 4</a></li>
 </ul>
 </nav>
 </header>
@@ -45,7 +46,7 @@ Its data is automatically stored in your browser, so that you can return to this
 <hr>
 <article>
 <h2>Language description</h2>
-<p>Let's define our minimalistic language, in text format. Our language consists of expressions, which can be constants, anonymous functions, variables, or function applications:</p>
+<p>Let's define our minimalist language, in text format. Our language consists of expressions, which can be constants, anonymous functions, variables, or function applications:</p>
 <pre><code>Exp =  1, 2, "abc"... // Constants
      | \arg -> Exp    // Anonymous Function
      | x, y, z        // Variables
@@ -103,12 +104,12 @@ Now the fun part. We'll implement an evaluator or interpreter of our language.
 There are several evaluation standards.
 </p>
 <ul>
-<li>The argument of a function application could be computed every time it is needed (call my name), only the first time when it is needed (call-by-need) or once when the function call happens (call-by-value).
+<li>The argument of a function application could be computed every time it is needed (call by name), only the first time when it is needed (call-by-need) or once when the function call happens (call-by-value).
 <li>Function application could be performed as replacement (substitution-based), or the value of the argument could be stored in an environment (environment-based)<li>The evaluation rules can be described by sub-term rewriting (small step) or global computation (big step)
 </ul>
 <p>
 In this intro, we'll focus on a call-by-value environment-based big-step calculus.<br>Here are some new constructs that will be useful to describe how to compute and what would the result look like.
-<code>Prog</code> is the type of the input for the evaluator, and <code>Val</code> is the type of the output.
+<code>Prog</code> is the type of the input for the interpreter, and <code>Val</code> is the type of the output.
 </p>
 <pre><code>Prog = Env |- Exp
 Env = []
@@ -186,7 +187,7 @@ function evaluate(prog) {
 </section>
 <article>
 <h1>Exercise: Complete <code>unparse</code></h1>
-<p> Great ! So now, we want to modify the code by modifying the value.
+<p> Great! So now, we want to modify the code by modifying the value.
 For example, in each of the cases  above, we want to change the value and have it back-propagated to the source code.
 We will do this in two steps. First, we reverse the evaluate function, and second, we reverse the parse function.
 Let's start with the second function, the "unparse" function. It takes an AST and outputs the new source code.
@@ -217,7 +218,7 @@ function unparse(exp) {
 <textarea id="unparseTest1result"
           title='Result should be >>>  (17 )  <<<' readonly=""></textarea></td></tr>
 <tr><td
-><textarea id="unparseTest2" class="unparse-test" dependencies="#unparseCode" readonly="">unparse({ctor: "fun", format: {wsBefore: "  (", wsAfter: " )  ", wsAfterArg: " ", arrow: "->"},
+><textarea id="unparseTest2" class="unparse-test" dependencies="#unparseCode" readonly="">unparse({ctor: "fun", format: {wsBefore: "  (", wsAfter: " )  ", wsAfterArg: " ", arrow: "-&gt;"},
                       arg: "x", body: {ctor: "var", format: {wsBefore: " ", wsAfter: " "}, name: "x"}})</textarea>
 </td><td><textarea id="unparseTest2result" title='Result should be >>>  (\x -> x  )  <<<' readonly=""></textarea></td></tr>
 <tr><td><textarea id="unparseTest3" class="unparse-test" dependencies="#unparseCode" readonly="">unparse({ctor: "app", format: {wsBefore: "  ", wsAfter: "  "},
@@ -251,7 +252,7 @@ input#merge-option3:checked + label::before {
 </style>
 <h1>Exercise: Complete <code>merge3</code></h1>
 <p>
-Consider the program <code>(\z -> ((\x -> \w -> w) z) 2)</code>. What does it evaluate to, according to the evaluator we wrote?<br>
+Consider the program <code>(\z -> (\x -> \w -> w) z) 2</code>. What does it evaluate to, according to the evaluator we wrote?<br>
 <input type="radio" id="merge-option1" name="merge-option"><label for="merge-option1"><code>{ctor: "const", value: 2}</code></label><br>
 <input type="radio" id="merge-option2" name="merge-option"><label for="merge-option2"><code>{ctor: "closure",
      body: {ctor: "var", format: {wsBefore: " ", wsAfter: ""}, name: "z"},
@@ -271,7 +272,7 @@ Consider the program <code>(\z -> ((\x -> \w -> w) z) 2)</code>. What does it ev
      env: {head: {name: "z", val: {ctor: "const", value: 2}},
            tail: {head: {name: "x", val: {ctor: "const", value: 2}},
                   tail: undefined}}}</code></label><br>
-After you identified the answer to the above quizz, here is an interesting question.<br>
+After you identified the answer to the above quiz, here is an interesting question.<br>
 We want to update the program above if we modify this output value;<br>
 However, what should happen if we changed one of the 2 to 3, and the other 2 to 5? Raise an error? Take the mean of the two new values?<br>
 In the sequel, we are going to consider that merging values will take the newest of them, and for conflicted updates, the leftmost value.<br>
@@ -376,9 +377,9 @@ function stringUpdate(source, newVal) {
 <tr><td>
 <textarea id="updateTest1"
           class="update-test"
-          dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" readonly>stringUpdate("(\\first-> first(\\z -> z 3 2)) (\\pair->pair(\\f -> \\s -> f))", {ctor: "const", value: 5})</textarea></td><td>
+          dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" readonly>stringUpdate("(\\first-> first(\\z -> z 3 2)) (\\pair-&gt;pair(\\f -> \\s -> f))", {ctor: "const", value: 5})</textarea></td><td>
 <textarea id="updateTest1result"
-          title='Result should be (\\first-> first(\\z -> z 5 2)) (\\pair->pair(\\f -> \\s -> f))' readonly=""></textarea></td></tr>
+          title='Result should be (\first-> first(\z -> z 5 2)) (\pair->pair(\f -> \s -> f))' readonly=""></textarea></td></tr>
 <tr><td
 ><textarea id="updateTest2" class="update-test" dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" readonly="">stringUpdate("(\\z -> ((\\x -> \\w -> w) z)) 2",
    {ctor: "closure",
@@ -400,7 +401,7 @@ With the tests above passing, this means that you can now create two boxes, one 
 <aside>
 <textarea id="finalprogram" class="inputholder" placeholder="Your expression" oninput="save(this); G('#finalvalue').value = bam.uneval(eval(S('#evaluateCode, #mergeCode, #unparseCode, #updateCode') + '\n\nevaluate({exp: parse(' + JSON.stringify(this.value) + '), env: undefined})'))">(\f -> f 1) (\x -> x)</textarea></aside>
 <aside>
-<textarea id="finalvalue" placeholder="The parsed expression" oninput="backProp(this)"></textarea>
+<textarea id="finalvalue" placeholder="The result of evaluating your program" oninput="backProp(this)"></textarea>
 </aside>
 <script>
 function backProp(self) {
