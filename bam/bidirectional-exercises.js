@@ -132,6 +132,20 @@ function runTests(selector, rawValue) {
     zoneResult.value = evalOrError(whatToExecute, !rawValue);
     
     // Check if the result is the one we wanted.
-    //let solution = zoneResult.getAttibute("title");
+    let solution = zoneResult.getAttribute("title");
+    let obtainedSolution, expectedSolutionStr;
+    if(solution.startsWith("Result should be raw ")) {
+      expectedSolutionStr = solution.substring("Result should be raw \"".length)
+      if(expectedSolutionStr[expectedSolutionStr.length - 1] == "\"") {
+        expectedSolutionStr = expectedSolutionStr.substring(0, expectedSolutionStr.length - 1);
+      }
+      obtainedSolution = zoneResult.value;
+    } else if(solution.startsWith("Result should be ")) {
+      let expectedSolution = "(" + solution.substring("Result should be ".length) + ")";
+      expectedSolutionStr = bam.uneval(eval(expectedSolution));
+      obtainedSolution = bam.uneval(eval("(" + zoneResult.value + ")"));
+    }
+    zoneResult.classList.toggle("correct", expectedSolutionStr == obtainedSolution);
+    zoneResult.classList.toggle("incorrect", expectedSolutionStr != obtainedSolution);
   }
 }

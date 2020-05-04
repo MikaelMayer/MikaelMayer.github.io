@@ -1,6 +1,6 @@
 <html>
 <head>
-<title>01 - Bidirectional Evaluation from scratch</title>
+<title>1/4 - Bidirectional Evaluation from scratch</title>
 <link rel="stylesheet" href="mvp.css">
 <meta name="description" content="The interactive course to learn Bidirectional Evaluation">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,6 +17,12 @@ textarea {
 }
 :root {
   --width-content: 800px;
+}
+.correct {
+  outline: 3px solid lightgreen;
+}
+.incorrect {
+  outline: 3px solid red;
 }
 </style>
 <script src="https://tharzen.com/Thaditor/bam.js"></script>
@@ -37,7 +43,7 @@ textarea {
 <main>
 <section>
 <header>
-<h2>Bidirectional Evaluation from scratch</h2>
+<h2>Part 1/4 - Bidirectional Evaluation from scratch</h2>
 <p>This interactive tutorial introduces you to the world of reversible interpreters.<br>
 Its data is automatically stored in your browser, so that you can return to this page anytime, even after a session crash.
 </p>
@@ -178,6 +184,12 @@ function evaluate(prog) {
 <tr><td
 ><textarea id="evaluateTest2" class="evaluate-test" dependencies="#evaluateCode" readonly="">evaluate({exp: parse("(\\ x-> 1) 2"), env: undefined})</textarea>
 </td><td><textarea id="evaluateTest2result" title='Result should be { ctor: "const", value: 1}' readonly=""></textarea></td></tr>
+<tr><td>
+<textarea id="evaluateTest2b"
+          class="evaluate-test"
+          dependencies="#evaluateCode" readonly>evaluate({exp: parse("(\\f -> \\x -> 1) 0"), env: undefined})</textarea></td><td>
+<textarea id="evaluateTest2bresult"
+          title='Result should be { ctor: "closure", arg: "x", body: { ctor: "const", format: { wsBefore: " ", wsAfter: ""}, value: 1}, env: { head: { name: "f", val: { ctor: "const", value: 0}}, tail: undefined}}' readonly=""></textarea></td></tr>
 <tr><td><textarea id="evaluateTest3" class="evaluate-test" dependencies="#evaluateCode" readonly="">evaluate({exp: parse("(\\x ->  x) 2"), env: undefined})</textarea>
 </td><td><textarea id="evaluateTest3result" title='Result should be { ctor: "const", value: 2}' readonly=""></textarea></td></tr>
 <tr><td><textarea id="evaluateTest4" class="evaluate-test" dependencies="#evaluateCode" readonly="">evaluate({exp: parse("(\\first-> first(\\z -> z 3 2)) (\\pair -> pair(\\f -> \\s -> f))"), env: undefined})</textarea>
@@ -216,15 +228,15 @@ function unparse(exp) {
           class="unparse-test"
           dependencies="#unparseCode" readonly>unparse({ctor: "const", format: {wsBefore: "  (", wsAfter: " )  "}, value: 17})</textarea></td><td>
 <textarea id="unparseTest1result"
-          title='Result should be >>>  (17 )  <<<' readonly=""></textarea></td></tr>
+          title='Result should be raw "  (17 )  "' readonly=""></textarea></td></tr>
 <tr><td
 ><textarea id="unparseTest2" class="unparse-test" dependencies="#unparseCode" readonly="">unparse({ctor: "fun", format: {wsBefore: "  (", wsAfter: " )  ", wsAfterArg: " ", arrow: "-&gt;"},
                       arg: "x", body: {ctor: "var", format: {wsBefore: " ", wsAfter: " "}, name: "x"}})</textarea>
-</td><td><textarea id="unparseTest2result" title='Result should be >>>  (\x -> x  )  <<<' readonly=""></textarea></td></tr>
+</td><td><textarea id="unparseTest2result" title='Result should be raw "  (\x -> x  )  "' readonly=""></textarea></td></tr>
 <tr><td><textarea id="unparseTest3" class="unparse-test" dependencies="#unparseCode" readonly="">unparse({ctor: "app", format: {wsBefore: "  ", wsAfter: "  "},
 				fun: {ctor: "var", format: {wsBefore: "", wsAfter: ""}, name: "f"},
 				arg: {ctor: "const", format: {wsBefore: " ", wsAfter: ""}, value: 2}})</textarea>
-</td><td><textarea id="unparseTest3result" title='Result should be >>>  f 2  <<<' readonly=""></textarea></td></tr>
+</td><td><textarea id="unparseTest3result" title='Result should be raw "  f 2  "' readonly=""></textarea></td></tr>
 <tr><td><textarea id="unparseTest5" class="unparse-test" dependencies="#unparseCode" placeholder="your own test" oninput="save(self)"></textarea>
 </td><td><textarea id="unparseTest5result"></textarea></td></tr></table>
 </section>
@@ -312,7 +324,7 @@ function merge3(original, modified1, modified2) {
 <tr><td><textarea id="mergeTest3" class="merge-test" dependencies="#mergeCode" readonly="">merge3(0, 8, 0)</textarea>
 </td><td><textarea id="mergeTest3result" title='Result should be 8' readonly=""></textarea></td></tr>
 <tr><td><textarea id="mergeTest4" class="merge-test" dependencies="#mergeCode" readonly="">merge3("original", "m1", "m2")</textarea>
-</td><td><textarea id="mergeTest4result" title='Result should be m1' readonly=""></textarea></td></tr>
+</td><td><textarea id="mergeTest4result" title='Result should be "m1"' readonly=""></textarea></td></tr>
 <tr><td><textarea id="mergeTest5" class="merge-test" dependencies="#mergeCode" placeholder="your own test" oninput="save(self)">merge3({a: 1}, {a: 2}, {a: 4})</textarea>
 </td><td><textarea id="mergeTest5result"></textarea></td></tr></table>
 </section>
@@ -379,7 +391,7 @@ function stringUpdate(source, newVal) {
           class="update-test"
           dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" readonly>stringUpdate("(\\first-> first(\\z -> z 3 2)) (\\pair-&gt;pair(\\f -> \\s -> f))", {ctor: "const", value: 5})</textarea></td><td>
 <textarea id="updateTest1result"
-          title='Result should be (\first-> first(\z -> z 5 2)) (\pair->pair(\f -> \s -> f))' readonly=""></textarea></td></tr>
+          title='Result should be raw "(\first-> first(\z -> z 5 2)) (\pair->pair(\f -> \s -> f))"' readonly=""></textarea></td></tr>
 <tr><td
 ><textarea id="updateTest2" class="update-test" dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" readonly="">stringUpdate("(\\z -> ((\\x -> \\w -> w) z)) 2",
    {ctor: "closure",
@@ -390,7 +402,7 @@ function stringUpdate(source, newVal) {
                      tail: undefined}}}
 )</textarea>
 </td><td><textarea id="updateTest2result"
-          title='Result should be (\z -> ((\x -> \w -> w) z)) 4' readonly=""></textarea></td></tr>
+          title='Result should be raw "(\z -> ((\x -> \w -> w) z)) 4"' readonly=""></textarea></td></tr>
 <tr><td><textarea id="updateTest5" class="update-test" dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" placeholder="your own test" oninput="save(self)">stringUpdate("(\\x -> x) 1", {ctor: "const", value: 2})</textarea>
 </td><td><textarea id="updateTest5result"></textarea></td></tr></table>
 </section>
