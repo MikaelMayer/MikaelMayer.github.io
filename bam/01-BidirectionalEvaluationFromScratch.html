@@ -141,7 +141,9 @@ function evaluate(prog) {
       return env.head.val;
     case "app":
       // We first evaluate the function to apply
-      let {argName, body, env: envFun} = evaluate({env: prog.env, exp: prog.exp.fun});
+      let funVal = evaluate({env: prog.env, exp: prog.exp.fun});
+      let {argName, body, env: envFun} = funVal;
+      
       // Then we evaluate the argument
       let argVal         = evaluate({env: prog.env, exp: prog.exp.arg});
       // And we finish by evaluating the body by adding the argument value to it.

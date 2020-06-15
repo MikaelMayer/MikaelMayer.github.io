@@ -115,7 +115,7 @@ Now is the time to modify the evaluate function you wrote in the previous page, 
 <li>When evaluating an <code>app</code>, we check if the function is either a <code>closure</code> or an <code>opClosure</code>. If the latter, we look at the name, and either store partially computed arguments, or compute the result. See how to incorporate the following snippet:<pre><code>
   if(funVal.ctor === "closure") {
     ...
-  } else {
+  } else if(funVal.ctor === "opClosure") {
     // Oh so the function of the application is an operator. What operator?
     switch(funVal.name) {
       case "+": // Plus or string concatenation
@@ -225,10 +225,9 @@ For that, we need to insert the following code in update. Find where to insert i
           }
           else {
             // We propagate the difference in output to the argument.
-            TODO5;
-            let newArgVal         = TODO6;
+            let newArgVal         = TODO5;
             let {env: newEnv2, exp: newAppArg} = update({env: prog.env, exp: prog.exp.arg}, newArgVal);
-            return {exp: {ctor: "app", format: prog.exp.format, fun: TODO7, arg: TODO8}, env: TODO9};
+            return {exp: {ctor: "app", format: prog.exp.format, fun: TODO6, arg: TODO7}, env: TODO8};
           }
       }
 </code></pre>
@@ -263,8 +262,26 @@ For that, we need to insert the following code in update. Find where to insert i
           dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" readonly>stringUpdate("(\\f -> f 1 2) +", {ctor: "const", value: 6})</textarea></td><td>
 <textarea id="updateTest4result"
           title='Result should be raw "(\f -> f 1 5) +"' readonly=""></textarea></td></tr>
-<tr><td><textarea id="updateTest6" class="update-test" dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" placeholder="your own test" oninput="save(self)">stringUpdate("(\\x -> x) 1", {ctor: "const", value: 2})</textarea>
-</td><td><textarea id="updateTest6result"></textarea></td></tr></table>
+<tr><td>
+<textarea id="updateTest5"
+          class="update-test"
+          dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" readonly>stringUpdate("+ 2", {ctor: "opClosure", name: "+", arg: {ctor: "const", value: 5}})</textarea></td><td>
+<textarea id="updateTest5result"
+          title='Result should be raw "+ 5"' readonly=""></textarea></td></tr>
+<tr><td>
+<textarea id="updateTest6"
+          class="update-test"
+          dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" readonly>stringUpdate("+ (+ 5 2)", {ctor: "opClosure", name: "+", arg: {ctor: "const", value: 8}})</textarea></td><td>
+<textarea id="updateTest6result"
+          title='Result should be raw "+ (+ 5 3)"' readonly=""></textarea></td></tr>
+<tr><td>
+<textarea id="updateTest7"
+          class="update-test"
+          dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" readonly>stringUpdate("(\\x -> + (+ 5 x)) 2", {ctor: "opClosure", name: "+", arg: {ctor: "const", value: 8}})</textarea></td><td>
+<textarea id="updateTest7result"
+          title='Result should be raw "(\x -> + (+ 5 x)) 3"' readonly=""></textarea></td></tr>
+<tr><td><textarea id="updateTest8" class="update-test" dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" placeholder="your own test" oninput="save(self)">stringUpdate("(\\x -> x) 1", {ctor: "const", value: 2})</textarea>
+</td><td><textarea id="updateTest8result"></textarea></td></tr></table>
 </section>
 <article>
 <h2>Exercise 3: From <code>opClosure</code> to <code>customFun</code></h2>
