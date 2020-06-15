@@ -275,14 +275,14 @@ Let's do the following:
 <ul>
 <li>We first add in the environment the binding of "+" to a special value <code>{ctor: "customFun", eval: input => output, update: (newOutput, oldInput) => newInput}</code> that contains the code for evaluation and for update.
 <li>Then we remove the code that short-circuits the evaluation of the variable "+", since it's now a regular variable
-<li>We add a new case for the app in the case the function is now a <code>"customFun"</code>.
+<li>We add a new case for the app in the case the function is now a <code>"customFun"</code> and return <code>return funVal.eval(argVal);</code>.
 </ul>
 <p>
-First, import your current evaluate function below so that you can do these breaking changes: <button onclick="G('#evaluateCode2').value = G('#evaluateCode').value">Copy evaluate code</button>
+First, import your current evaluate function below so that you can do these breaking changes: <button onclick="if(confirm('Do you want to import your evaluate function?')) G('#evaluateCode2').value = G('#evaluateCode').value">Copy evaluate code</button>
 </p>
 <textarea id="evaluateCode2" class="inputholder" style="min-height: 200px" oninput="save(this);">Please click on "Copy evaluate code" to implement the changes</textarea><br>
 <p>
-We included a definition of '+' and 'min' that you will also improve later, as they modify only the second argument:
+We included a definition of '+' and 'min' that you will also improve later, as they modify only the second argument on update:
 </p>
 <textarea id="opDefinitions" class="inputholder" style="min-height: 200px" oninput="save(this);">plus = {
   ctor: "customFun",
@@ -302,7 +302,7 @@ min = {
     ctor: "customFun",
     eval: argVal2 => (argVal.value &lt;= argVal2.value ? argVal : argVal2),
     update: (newOut, oldArgVal2) => (
-      argVal.value &lt;= argVal2.value ? 
+      argVal.value &lt;= oldArgVal2.value ? 
       oldArgVal2 : newOut
     )
   }),
@@ -316,32 +316,84 @@ min = {
 <tr><td>
 <textarea id="evaluate2Test1"
           class="evaluate2-test"
-          dependencies="#evaluateCode2, #opDefinitions" readonly>evaluate({exp: parse("+ 1 2"), env: {head: {name: "+", val: plus}, tail: undefined}})</textarea></td><td>
+          dependencies="#evaluateCode2, #opDefinitions, #unparseCode" readonly>evaluate({exp: parse("+ 1 2"), env: {head: {name: "+", val: plus}, tail: undefined}})</textarea></td><td>
 <textarea id="evaluate2Test1result"
           title='Result should be { ctor: "const", value: 3}' readonly=""></textarea></td></tr>
 <tr><td
-><textarea id="evaluate2Test2" class="evaluate2-test" dependencies="#evaluateCode2" readonly="">evaluate({exp: parse("min 6 4"), env: undefined})</textarea>
+><textarea id="evaluate2Test2" class="evaluate2-test" dependencies="#evaluateCode2, #opDefinitions, #unparseCode" readonly="">evaluate({exp: parse("min 6 4"), env: {head: {name: "min", val: min}, tail: undefined}})</textarea>
 </td><td><textarea id="evaluate2Test2result" title='Result should be { ctor: "const", value: 4}' readonly=""></textarea></td></tr>
 <tr><td>
 <textarea id="evaluate2Test2b"
           class="evaluate2-test"
-          dependencies="#evaluateCode2" readonly>evaluate({exp: parse("min 4 6"), env: undefined})</textarea></td><td>
+          dependencies="#evaluateCode2" readonly>evaluate({exp: parse("min 4 6"), env: {head: {name: "min", val: min}, tail: undefined}})</textarea></td><td>
 <textarea id="evaluate2Test2bresult"
           title='Result should be { ctor: "const", value: 4}' readonly=""></textarea></td></tr>
-<tr><td><textarea id="evaluate2Test3" class="evaluate2-test" dependencies="#evaluateCode2" readonly="">evaluate({exp: parse("(\\op -> op 3 4) +"), env: undefined})</textarea>
-</td><td><textarea id="evaluate2Test3result" title='Result should be { ctor: "const"
-  , value: 7}' readonly=""></textarea></td></tr>
-<tr><td><textarea id="evaluate2Test4" class="evaluate2-test" dependencies="#evaluateCode2" readonly="">evaluate({exp: parse("(\\op -> op 5) (+ 1)"), env: undefined})</textarea>
-</td><td><textarea id="evaluate2Test4result" title='Result should be { ctor: "const", value: 6}' readonly=""></textarea></td></tr>
 <tr><td><textarea id="evaluate2Test5" class="evaluate2-test" dependencies="#evaluateCode2" placeholder="your own test" oninput="save(self)"></textarea>
 </td><td><textarea id="evaluate2Test5result"></textarea></td></tr></table>
 </section>
 <article>
-<h2>Exercise 4: Modify the <code>update</code> function (full version)</h2>
+<h2>Exercise 4: Modify the <code>update</code> function to call <code>.update</code></h2>
+<p>
+Now, let's do the same transformation for the update part. Since this will be a breaking change as well, let's copy the function <code>update</code> below so that we can implement it.
+</p>
+<ul><li>Instead of switching on the name of the operation, we simply call <code>funVal.update(newVal, argVal)</code> and get an <code>newArgVal</code>
+<li>We back-propagate this <code>newArgVal</code> to get a new environment and a new <code>newArgApp</code> expression
+<li>We combine everything to rebuild the correct function application.
+</ul>
+First, import your current update function below so that you can do these breaking changes: <button onclick="if(confirm('Do you want to import your update function?')) G('#updateCode2').value = G('#updateCode').value">Copy update code</button>
+<br>
+</p>
+<textarea id="updateCode2" class="inputholder" style="min-height: 200px" oninput="save(this);">Please click on "Copy update code" to implement the changes</textarea>
+<button onclick="runTests('.update2-test', true)">Run tests</button>&nbsp;Only the first two tests can work at this point. You'll see how to make work the last two in the next exercise.
+</article>
+<section><table><thead>
+<tr> <td style="width:300px">Test</td><td>Result</td></tr>
+</thead>
+<tr><td>
+<textarea id="update2Test1"
+          class="update2-test"
+          dependencies="#evaluateCode2, #mergeCode, #unparseCode, #opDefinitions, #updateCode2" readonly>stringUpdate({exp: parse("min 6 4"), env: {head: {name: "min", val: min}, tail: undefined}}, {ctor: "const", value: 5})</textarea></td><td>
+<textarea id="update2Test1result"
+          title='Result should be raw "min 6 5"' readonly=""></textarea></td></tr>
+<tr><td>
+<textarea id="update2Test2"
+          class="update2-test"
+          dependencies="#evaluateCode2, #mergeCode, #unparseCode, #opDefinitions, #updateCode2" readonly>stringUpdate({exp: parse("min 6 (min 4 2)"), env: {head: {name: "min", val: min}, tail: undefined}}, {ctor: "const", value: 3})</textarea></td><td>
+<textarea id="update2Test2result"
+          title='Result should be raw "min 6 (min 4 3)"' readonly=""></textarea></td></tr>
+<tr><td>
+<textarea id="update2Test3"
+          class="update2-test"
+          dependencies="#evaluateCode2, #mergeCode, #unparseCode, #opDefinitions, #updateCode2" readonly>stringUpdate({exp: parse("min 4 6"), env: {head: {name: "min", val: min}, tail: undefined}}, {ctor: "const", value: 5})</textarea></td><td>
+<textarea id="update2Test3result"
+          title='Result should be raw "min 5 6"' readonly=""></textarea></td></tr>
+<tr><td>
+<textarea id="update2Test4"
+          class="update2-test"
+          dependencies="#evaluateCode2, #mergeCode, #unparseCode, #opDefinitions, #updateCode2" readonly>stringUpdate({exp: parse("min 4 4"), env: {head: {name: "min", val: min}, tail: undefined}}, {ctor: "const", value: 5})</textarea></td><td>
+<textarea id="update2Test4result"
+          title='Result should be raw "min 5 5"' readonly=""></textarea></td></tr>
+<tr><td>
+<textarea id="update2Test5"
+          class="update2-test"
+          dependencies="#evaluateCode2, #mergeCode, #unparseCode, #opDefinitions, #updateCode2" readonly>stringUpdate({exp: parse("min (min 3 8) (min 6 3)"), env: {head: {name: "min", val: min}, tail: undefined}}, {ctor: "const", value: 5})</textarea></td><td>
+<textarea id="update2Test5result"
+          title='Result should be raw "min (min 5 8) (min 6 5)"' readonly=""></textarea></td></tr>
+<tr><td><textarea id="update2Test6" class="update2-test" dependencies="#evaluateCode2, #mergeCode, #unparseCode, #updateCode2" placeholder="your own test" oninput="save(self)">stringUpdate("(\\x -> x) 1", {ctor: "const", value: 2})</textarea>
+</td><td><textarea id="update2Test6result"></textarea></td></tr></table>
+</section>
+<article>
+<h2>Exercise 5: Modify the <code>update</code> function to update the function itself</code></h2>
 <p>
 Just updating the second argument is not enough in certain cases.
-For example, consider the <code>min</code> function. If we modify its result, either the first or the second.
+For example, consider the <code>min</code> function. If we modify its result, either the first or the second should be updated. Let's fix that.
 </p>
+<ol>
+<li>In <code>update</code>, instead of calling <code>funVal.update(newVal, argVal)</code>, we call <code>funVal.update(newVal, argVal, funVal)</code>, passing the function value itself as a third argument.
+<li>In the definition of <code>.update</code> method, we enable the definition of update to return <code>{ctor: "compositeResult", fun: ..., arg: ...}</code> so that the update can return both the new function and the new argument.
+<li>In <code>update</code>, we now branch on the result of <code>funVal.update</code>. If it's a <code>compositeResult</code>, we also recursively update the function along with the argument and merge the environment like for the case of "closure". Else, we only update the argument.
+</ol>
+<p>Go ahead an implement the changes mentioned above</p>
 </article>
 </main>
 </body>
