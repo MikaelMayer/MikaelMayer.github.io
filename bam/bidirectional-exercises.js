@@ -6,7 +6,10 @@ function saveAll() {
   localStorage.setItem("saved", JSON.stringify(toSave));
 }
 function save(self) {
-  toSave[self.getAttribute("id")] = self.value;
+  let value = self.value;
+  if(value.indexOf("IF YOU CAN READ THIS TEXT") == -1) {
+    toSave[self.getAttribute("id")] = self.value;
+  }
   saveAll();
 }
 function reset() {
@@ -49,7 +52,7 @@ parse = (() => {
       let [body, newIndex] = parseAux(source, index + m[1].length);
       let wsAfter = new RegExp(`^.{${newIndex}}(\\s*)`).exec(source)[1];
       newIndex = newIndex + wsAfter.length;
-      return [{ctor: "fun", format: {wsBefore: wsBefore, wsBeforeArg: m[2], wsAfterArg: m[4], wsAfter: wsAfter, arrow: m[5]}, arg: m[3], body: body}, newIndex];
+      return [{ctor: "fun", format: {wsBefore: wsBefore, wsBeforeArgName: m[2], wsAfterArgName: m[4], wsAfter: wsAfter, arrow: m[5]}, argName: m[3], body: body}, newIndex];
     }
     let fun, newIndex, exp;
     while(index < source.length && source[index] != ")") {
@@ -73,6 +76,10 @@ parse = (() => {
         let value = eval(valueStr);
         exp = {ctor: "const", format: {wsBefore: wsBefore, wsAfter: ""}, value: value};
         newIndex = index + valueStr.length;
+      } else if(source[index].match(/[\+-^\*\$\#\~\&\|\@=<>%!]/)) {
+        let name = new RegExp(`^.{${index}}([\\+-^\\*\\$\\#\\~\\&\\|\\@=<>%!_]+)`).exec(source)[1];
+          exp = {ctor: "var", format: {wsBefore: wsBefore, wsAfter: ""}, name: name};
+        newIndex = index + name.length;
       } else break;
       fun = fun ? { ctor: "app", format: {wsBefore: "", wsAfter: ""}, fun: fun, arg: exp} : exp;
       wsBefore = new RegExp(`^.{${newIndex}}(\\s*)`).exec(source)[1];
@@ -133,6 +140,7 @@ function runTests(selector, rawValue) {
     
     // Check if the result is the one we wanted.
     let solution = zoneResult.getAttribute("title");
+    if(!solution) return;
     let obtainedSolution, expectedSolutionStr;
     if(solution.startsWith("Result should be raw ")) {
       expectedSolutionStr = solution.substring("Result should be raw \"".length)
@@ -142,8 +150,12 @@ function runTests(selector, rawValue) {
       obtainedSolution = zoneResult.value;
     } else if(solution.startsWith("Result should be ")) {
       let expectedSolution = "(" + solution.substring("Result should be ".length) + ")";
+      try {
       expectedSolutionStr = bam.uneval(eval(expectedSolution));
       obtainedSolution = bam.uneval(eval("(" + zoneResult.value + ")"));
+      } catch (e) {
+        obtainedSolution = "???";
+      }
     }
     zoneResult.classList.toggle("correct", expectedSolutionStr == obtainedSolution);
     zoneResult.classList.toggle("incorrect", expectedSolutionStr != obtainedSolution);

@@ -4,27 +4,7 @@
 <link rel="stylesheet" href="mvp.css">
 <meta name="description" content="The interactive course to learn Bidirectional Evaluation">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-pre {
-  white-space: pre;
-}
-table td {
-  text-align: var(--justify-normal);;
-}
-textarea {
-  width: 100%;
-  min-height: 100px;
-}
-:root {
-  --width-content: 800px;
-}
-.correct {
-  outline: 3px solid lightgreen;
-}
-.incorrect {
-  outline: 3px solid red;
-}
-</style>
+<link rel="stylesheet" href="bidirectional-exercises.css">
 <script src="https://tharzen.com/Thaditor/bam.js"></script>
 <script src="bidirectional-exercises.js"></script>
 </head>
@@ -54,7 +34,7 @@ Its data is automatically stored in your browser, so that you can return to this
 <h2>Language description</h2>
 <p>Let's define our minimalist language, in text format. Our language consists of expressions, which can be constants, anonymous functions, variables, or function applications:</p>
 <pre><code>Exp =  1, 2, "abc"... // Constants
-     | \arg -> Exp    // Anonymous Function
+     | \argName -> Exp    // Anonymous Function
      | x, y, z        // Variables
      | Exp Exp        // Function Application</code></pre>
 <p>Let's see some examples on how we can encode various natural expressions in this format, using the famous <a href="https://en.wikipedia.org/wiki/Church_encoding">Church Encoding</a>:</p>
@@ -142,7 +122,7 @@ then     E |- e1 e2          ==> v
 Env     = undefined | {head: Binding, tail: Env}
 Binding = {name: String, val: Val }
 Val     = {ctor: “const”, value: Any}
-        | {ctor: “closure”, arg: String, body: Exp, env: Env}</code></pre>
+        | {ctor: “closure”, argName: String, body: Exp, env: Env}</code></pre>
 <p>So the <code>evaluate</code> function takes a <code>Prog</code> with an initially empty environment, and returns a <code>Val</code>.
 </p>
 <h1>Exercise: Complete <code>evaluate</code></h1>
@@ -153,7 +133,7 @@ function evaluate(prog) {
     case "const":
       return {ctor: "const", value: TODO1}	
     case "fun":
-      return {ctor: "closure", arg: TODO2, body: TODO3, env: TODO4};
+      return {ctor: "closure", argName: TODO2, body: TODO3, env: TODO4};
     case "var":
       let env = prog.env;
       while(TODO5) env = env.tail;
@@ -161,11 +141,11 @@ function evaluate(prog) {
       return env.head.val;
     case "app":
       // We first evaluate the function to apply
-      let {arg, body, env: envFun} = evaluate({env: prog.env, exp: prog.exp.fun});
+      let {argName, body, env: envFun} = evaluate({env: prog.env, exp: prog.exp.fun});
       // Then we evaluate the argument
       let argVal         = evaluate({env: prog.env, exp: prog.exp.arg});
       // And we finish by evaluating the body by adding the argument value to it.
-      // Where do you place arg, body and argVal?
+      // Where do you place argName, body and argVal?
       return evaluate({env: {head: {name: TODO6, val: TODO7}, tail: envFun}, exp: TODO8});
   }
 }
@@ -189,7 +169,7 @@ function evaluate(prog) {
           class="evaluate-test"
           dependencies="#evaluateCode" readonly>evaluate({exp: parse("(\\f -> \\x -> 1) 0"), env: undefined})</textarea></td><td>
 <textarea id="evaluateTest2bresult"
-          title='Result should be { ctor: "closure", arg: "x", body: { ctor: "const", format: { wsBefore: " ", wsAfter: ""}, value: 1}, env: { head: { name: "f", val: { ctor: "const", value: 0}}, tail: undefined}}' readonly=""></textarea></td></tr>
+          title='Result should be { ctor: "closure", argName: "x", body: { ctor: "const", format: { wsBefore: " ", wsAfter: ""}, value: 1}, env: { head: { name: "f", val: { ctor: "const", value: 0}}, tail: undefined}}' readonly=""></textarea></td></tr>
 <tr><td><textarea id="evaluateTest3" class="evaluate-test" dependencies="#evaluateCode" readonly="">evaluate({exp: parse("(\\x ->  x) 2"), env: undefined})</textarea>
 </td><td><textarea id="evaluateTest3result" title='Result should be { ctor: "const", value: 2}' readonly=""></textarea></td></tr>
 <tr><td><textarea id="evaluateTest4" class="evaluate-test" dependencies="#evaluateCode" readonly="">evaluate({exp: parse("(\\first-> first(\\z -> z 3 2)) (\\pair -> pair(\\f -> \\s -> f))"), env: undefined})</textarea>
@@ -208,7 +188,7 @@ Please complete the holes:</p>
 function unparse(exp) {
   switch(exp.ctor) {
     case "fun":
-      return exp.format.wsBefore + "\\" + exp.arg + exp.format.wsAfterArg + exp.format.arrow + TODO1 + exp.format.wsAfter;
+      return exp.format.wsBefore + "\\" + exp.format.wsBeforeArgName + exp.argName + exp.format.wsAfterArgName + exp.format.arrow + TODO1 + exp.format.wsAfter;
     case "const":
        return TODO2;
     case "var":
@@ -230,8 +210,8 @@ function unparse(exp) {
 <textarea id="unparseTest1result"
           title='Result should be raw "  (17 )  "' readonly=""></textarea></td></tr>
 <tr><td
-><textarea id="unparseTest2" class="unparse-test" dependencies="#unparseCode" readonly="">unparse({ctor: "fun", format: {wsBefore: "  (", wsAfter: " )  ", wsAfterArg: " ", arrow: "-&gt;"},
-                      arg: "x", body: {ctor: "var", format: {wsBefore: " ", wsAfter: " "}, name: "x"}})</textarea>
+><textarea id="unparseTest2" class="unparse-test" dependencies="#unparseCode" readonly="">unparse({ctor: "fun", format: {wsBefore: "  (", wsAfter: " )  ", wsBeforeArgName: "", wsAfterArgName: " ", arrow: "-&gt;"},
+                      argName: "x", body: {ctor: "var", format: {wsBefore: " ", wsAfter: " "}, name: "x"}})</textarea>
 </td><td><textarea id="unparseTest2result" title='Result should be raw "  (\x -> x  )  "' readonly=""></textarea></td></tr>
 <tr><td><textarea id="unparseTest3" class="unparse-test" dependencies="#unparseCode" readonly="">unparse({ctor: "app", format: {wsBefore: "  ", wsAfter: "  "},
 				fun: {ctor: "var", format: {wsBefore: "", wsAfter: ""}, name: "f"},
@@ -268,19 +248,19 @@ Consider the program <code>(\z -> (\x -> \w -> w) z) 2</code>. What does it eval
 <input type="radio" id="merge-option1" name="merge-option"><label for="merge-option1"><code>{ctor: "const", value: 2}</code></label><br>
 <input type="radio" id="merge-option2" name="merge-option"><label for="merge-option2"><code>{ctor: "closure",
      body: {ctor: "var", format: {wsBefore: " ", wsAfter: ""}, name: "z"},
-     arg: "z",
+     argName: "z",
      env: {head: {name: "x", val: {ctor: "const", value: 2}},
            tail: {head: {name: "z", val: {ctor: "const", value: 2}},
                   tail: undefined}}}</code></label><br>
 <input type="radio" id="merge-option3" name="merge-option"><label for="merge-option3"><code>{ctor: "closure",
      body: {ctor: "var", format: {wsBefore: " ", wsAfter: ""}, name: "w"},
-     arg: "w",
+     argName: "w",
      env: {head: {name: "x", val: {ctor: "const", value: 2}},
            tail: {head: {name: "z", val: {ctor: "const", value: 2}},
                   tail: undefined}}}</code></label><br>
 <input type="radio" id="merge-option4" name="merge-option"><label for="merge-option4"><code>{ctor: "closure",
      body: {ctor: "var", format: {wsBefore: " ", wsAfter: ""}, name: "w"},
-     arg: "w",
+     argName: "w",
      env: {head: {name: "z", val: {ctor: "const", value: 2}},
            tail: {head: {name: "x", val: {ctor: "const", value: 2}},
                   tail: undefined}}}</code></label><br>
@@ -337,10 +317,10 @@ function update(prog, newVal) {
   switch(prog.exp.ctor) {
     case "const":
       // Assume the newVal is a value constant.
-      return {exp: {ctor: "const", format: prog.exp.format, value: newVal.???}, env: prog.env}
+      return {exp: {ctor: "const", format: prog.exp.format, value: /*newVal.???*/TODO1}, env: prog.env}
     case "fun":
       // Assume the newVal is a value closure.
-      return {exp: {ctor: "fun", format: prog.exp.format, arg: newVal.???, body: newVal.???}, env: newVal.???}
+      return {exp: {ctor: "fun", format: prog.exp.format, argName: /*newVal.???*/TODO2, body: /*newVal.???*/TODO3}, env: /*newVal.???*/TODO3}
     case "var": {
       // Let's back-propagate the change on the variable to the environment
       let env = prog.env;
@@ -349,7 +329,7 @@ function update(prog, newVal) {
         init = {head: env.head, tail: init};
         env = env.tail;
       }
-      let newEnv = { head: {name: env.head.name, val: ???}, tail: env.tail}; // The updated environment;
+      let newEnv = { head: {name: env.head.name, val: TODO4}, tail: env.tail}; // The updated environment;
       while(typeof init != "undefined") {
         newEnv = {head: init.head, tail: newEnv}
         init = init.tail;
@@ -358,26 +338,31 @@ function update(prog, newVal) {
     }
     case "app": {
       // We first evaluate the function to apply
-      let {arg, body, env} = evaluate({env: prog.env, exp: prog.exp.fun});
+      let {argName, body, env} = evaluate({env: prog.env, exp: prog.exp.fun});
       // Then we evaluate the argument
       let argVal         = evaluate({env: prog.env, exp: prog.exp.arg});
       // Now we update what we evaluated last
       let {env: {head: {name: newArgName, val: newArgVal}, tail: newEnv}, exp: newBody} =
-             update({env: {head: {name: arg, val: argVal}, tail: env}, exp: body}, newVal);
+             update({env: {head: {name: argName, val: argVal}, tail: env}, exp: body}, newVal);
       // Using this information, we can update the original function and the argument.
       let {env: newEnv1, exp: newAppFun} =
-            update({env: prog.env, exp: prog.exp.fun}, {ctor: "closure", arg: newArgName, body: newBody, env: newEnv});
+            update({env: prog.env, exp: prog.exp.fun}, {ctor: "closure", argName: newArgName, body: newBody, env: newEnv});
       let {env: newEnv2, exp: newAppArg} =
             update({env: prog.env, exp: prog.exp.arg}, newArgVal);
       let finalEnv = merge3(prog.env, newEnv1, newEnv2);
-      return {env: ???, exp: {ctor: "app", format: prog.exp.format, fun: newAppFun, arg: newAppArg}};
+      return {env: TODO5, exp: {ctor: "app", format: prog.exp.format, fun: newAppFun, arg: newAppArg}};
     }
   }
 }
 // Helper to try the function
-function stringUpdate(source, newVal) {
-  let exp = parse(source);
-  let {exp: newExp} = update({env: undefined, exp: exp}, newVal);
+stringUpdate = (source, newVal) => {
+  let exp;
+  if (typeof source == "string") {
+      exp = parse(source);
+  } else {
+      exp = source.exp;
+  }
+  let {exp: newExp} = update({env: source.env, exp: exp}, newVal);
   return unparse(newExp);
 }
 </textarea><br>
@@ -389,22 +374,40 @@ function stringUpdate(source, newVal) {
 <tr><td>
 <textarea id="updateTest1"
           class="update-test"
-          dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" readonly>stringUpdate("(\\first-> first(\\z -> z 3 2)) (\\pair-&gt;pair(\\f -> \\s -> f))", {ctor: "const", value: 5})</textarea></td><td>
+          dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" readonly>stringUpdate("  ( 2)", {ctor: "const", value: 5})</textarea></td><td>
 <textarea id="updateTest1result"
+          title='Result should be raw "  ( 5)"' readonly=""></textarea></td></tr>
+<tr><td>
+<textarea id="updateTest2"
+          class="update-test"
+          dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" readonly>stringUpdate("  \\ x-> 1", {ctor: "closure", argName: "y", body: { ctor: "const", format: { wsBefore: "  "  , wsAfter: ""}, value: 3}, env: undefined})</textarea></td><td>
+<textarea id="updateTest2result"
+          title='Result should be raw "  \ y->  3"' readonly=""></textarea></td></tr>
+<tr><td>
+<textarea id="updateTest3"
+          class="update-test"
+          dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" readonly>stringUpdate("(\\ x-> x) 1", { ctor: "const", value: 3})</textarea></td><td>
+<textarea id="updateTest3result"
+          title='Result should be raw "(\ x-> x) 3"' readonly=""></textarea></td></tr>
+          <tr><td>
+<textarea id="updateTest4"
+          class="update-test"
+          dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" readonly>stringUpdate("(\\first-> first(\\z -> z 3 2)) (\\pair-&gt;pair(\\f -> \\s -> f))", {ctor: "const", value: 5})</textarea></td><td>
+<textarea id="updateTest4result"
           title='Result should be raw "(\first-> first(\z -> z 5 2)) (\pair->pair(\f -> \s -> f))"' readonly=""></textarea></td></tr>
 <tr><td
-><textarea id="updateTest2" class="update-test" dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" readonly="">stringUpdate("(\\z -> ((\\x -> \\w -> w) z)) 2",
+><textarea id="updateTest5" class="update-test" dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" readonly="">stringUpdate("(\\z -> ((\\x -> \\w -> w) z)) 2",
    {ctor: "closure",
         body: {ctor: "var", format: {wsBefore: " ", wsAfter: ""}, name: "w"},
-        arg: "w",
+        argName: "w",
         env: {head: {name: "x", val: {ctor: "const", value: 3}},
               tail: {head: {name: "z", val: {ctor: "const", value: 5}},
                      tail: undefined}}}
 )</textarea>
-</td><td><textarea id="updateTest2result"
+</td><td><textarea id="updateTest5result"
           title='Result should be raw "(\z -> ((\x -> \w -> w) z)) 4"' readonly=""></textarea></td></tr>
-<tr><td><textarea id="updateTest5" class="update-test" dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" placeholder="your own test" oninput="save(self)">stringUpdate("(\\x -> x) 1", {ctor: "const", value: 2})</textarea>
-</td><td><textarea id="updateTest5result"></textarea></td></tr></table>
+<tr><td><textarea id="updateTest6" class="update-test" dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" placeholder="your own test" oninput="save(self)">stringUpdate("(\\x -> x) 1", {ctor: "const", value: 2})</textarea>
+</td><td><textarea id="updateTest6result"></textarea></td></tr></table>
 </section>
 <article>
 With the tests above passing, this means that you can now create two boxes, one the left the program, and on the right the value. Modifying one modifies the other. Try it! Change the number in the text area above or below.

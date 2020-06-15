@@ -1,0 +1,19 @@
+pre {
+  white-space: pre;
+}
+table td {
+  text-align: var(--justify-normal);;
+}
+textarea {
+  width: 100%;
+  min-height: 100px;
+}
+:root {
+  --width-content: 800px;
+}
+.correct {
+  outline: 3px solid lightgreen;
+}
+.incorrect {
+  outline: 3px solid red;
+}
