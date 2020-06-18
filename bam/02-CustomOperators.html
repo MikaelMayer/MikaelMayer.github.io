@@ -292,7 +292,7 @@ Let's do the following:
 <ul>
 <li>We first add in the environment the binding of "+" to a special value <code>{ctor: "customFun", eval: input => output, update: (newOutput, oldInput) => newInput}</code> that contains the code for evaluation and for update.
 <li>Then we remove the code that short-circuits the evaluation of the variable "+", since it's now a regular variable
-<li>We add a new case for the app in the case the function is now a <code>"customFun"</code> and return <code>return funVal.eval(argVal);</code>.
+<li>In the case when <code>exp.ctor == "app"</code>, we change the test with <code>funVal.ctor</code> by replacing <code>"opClosure"</code> by <code>"customFun"</code>and simply insert <code>return funVal.eval(argVal);</code> inside the branch of the if.
 </ul>
 <p>
 First, import your current evaluate function below so that you can do these breaking changes: <button onclick="if(confirm('Do you want to import your evaluate function?')) G('#evaluateCode2').value = G('#evaluateCode').value">Copy evaluate code</button>
@@ -353,8 +353,8 @@ min = {
 <p>
 Now, let's do the same transformation for the update part. Since this will be a breaking change as well, let's copy the function <code>update</code> below so that we can implement it.
 </p>
-<ul><li>Instead of switching on the name of the operation, we simply call <code>funVal.update(newVal, argVal)</code> and get an <code>newArgVal</code>
-<li>We back-propagate this <code>newArgVal</code> to get a new environment and a new <code>newArgApp</code> expression
+<ul><li>In the case when <code>exp.ctor == "app"</code>, we change the test with <code>funVal.ctor</code> by replacing <code>"opClosure"</code> by <code>"customFun"</code>, and inside the block, we simply call <code>funVal.update(newVal, argVal)</code> and get an <code>newArgVal</code>
+<li>Like in the case for the closure, we back-propagate this <code>newArgVal</code> to get a new environment and a new <code>newArgApp</code> expression
 <li>We combine everything to rebuild the correct function application.
 </ul>
 First, import your current update function below so that you can do these breaking changes: <button onclick="if(confirm('Do you want to import your update function?')) G('#updateCode2').value = G('#updateCode').value">Copy update code</button>
@@ -412,6 +412,25 @@ For example, consider the <code>min</code> function. If we modify its result, ei
 </ol>
 <p>Go ahead an implement the changes mentioned above</p>
 </article>
+<article>
+<h2></h2>
+With the tests above passing, this means that you can now create two boxes, one the left the program, and on the right the value. Modifying one modifies the other. Try it! Change the number in the text area above or below.
+</article>
+<section>
+<aside>
+<textarea id="finalprogram" class="inputholder" placeholder="Your expression" oninput="save(this); G('#finalvalue').value = bam.uneval(eval(S('#evaluateCode, #mergeCode, #unparseCode, #updateCode') + '\n\nevaluate({exp: parse(' + JSON.stringify(this.value) + '), env: undefined})'))">(\f -> f 1) (\x -> x)</textarea></aside>
+<aside>
+<textarea id="finalvalue" placeholder="The result of evaluating your program" oninput="backProp(this)"></textarea>
+</aside>
+<script>
+function backProp(self) {
+  let newVal = eval("(" + self.value + ")");
+  let newSrc = eval(S('#evaluateCode, #mergeCode, #unparseCode, #updateCode') +
+               '\n\nunparse(update({exp: parse(' + JSON.stringify(S("#finalprogram")) + '), env: undefined}, '+self.value+').exp)');
+  G("#finalprogram").value = newSrc;
+}
+</script>
+</section>
 </main>
 </body>
 </html>

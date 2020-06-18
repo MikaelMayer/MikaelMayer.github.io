@@ -219,8 +219,22 @@ function unparse(exp) {
 				fun: {ctor: "var", format: {wsBefore: "", wsAfter: ""}, name: "f"},
 				arg: {ctor: "const", format: {wsBefore: " ", wsAfter: ""}, value: 2}})</textarea>
 </td><td><textarea id="unparseTest3result" title='Result should be raw "  f 2  "' readonly=""></textarea></td></tr>
-<tr><td><textarea id="unparseTest5" class="unparse-test" dependencies="#unparseCode" placeholder="your own test" oninput="save(self)"></textarea>
-</td><td><textarea id="unparseTest5result"></textarea></td></tr></table>
+<tr><td><textarea id="unparseTest4" class="unparse-test" dependencies="#unparseCode" readonly="">unparse({ ctor: "app"
+, format:  { wsBefore: "", wsAfter: ""}
+, fun: { ctor: "app", format: { wsBefore: "("
+    , wsAfter: ")"}
+  , fun: { ctor: "var", format: { wsBefore: "", wsAfter: ""}, name: "f"}
+  , arg: { ctor: "var", format: { wsBefore: " ", wsAfter: ""}, name: "x1"}}
+, arg: { ctor: "app", format: { wsBefore: " (", wsAfter: ")"}
+  , fun: { ctor: "var", format: { wsBefore: "", wsAfter: ""}, name: "g"}
+  , arg: { ctor: "var", format: { wsBefore: " ", wsAfter: ""}, name: "x2"}}})</textarea>
+</td><td><textarea id="unparseTest4result" title='Result should be raw "(f x1) (g x2)"' readonly=""></textarea></td></tr>
+<tr><td><textarea id="unparseTest5" class="unparse-test" dependencies="#unparseCode" readonly="">unparse({ ctor: "fun", format: { wsBefore: "", wsBeforeArgName: " ", wsAfterArgName: " ", wsAfter: "", arrow: "->"}, argName: "x"
+, body: { ctor: "fun", format: { wsBefore: " ", wsBeforeArgName: " ", wsAfterArgName: " ", wsAfter: "", arrow: "->"}, argName: "y"
+  , body: { ctor: "var", format: { wsBefore: " ", wsAfter: ""}, name: "x"}}})</textarea>
+</td><td><textarea id="unparseTest5result" title='Result should be raw "\ x -> \ y -> x"' readonly=""></textarea></td></tr>
+<tr><td><textarea id="unparseTest6" class="unparse-test" dependencies="#unparseCode" placeholder="your own test" oninput="save(self)"></textarea>
+</td><td><textarea id="unparseTest6result"></textarea></td></tr></table>
 </section>
 
 <article>
