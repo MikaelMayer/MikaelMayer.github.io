@@ -407,8 +407,9 @@ For example, consider the <code>min</code> function. If we modify its result, ei
 </p>
 <ol>
 <li>In <code>update</code>, instead of calling <code>funVal.update(newVal, argVal)</code>, we call <code>funVal.update(newVal, argVal, funVal)</code>, passing the function value itself as a third argument.
-<li>In the definition of <code>.update</code> method, we enable the definition of update to return <code>{ctor: "compositeResult", newFunVal: ..., newArgVal: ...}</code> so that the update can return both the new function val and the new argument val.
+<li>In the definition of <code>.update</code> method, we enable the definition of update to return <code>{ctor: "compositeResult", newFunVal: ..., newArgVal: ...}</code> so that the update can return both the new function val and the new argument val. You should return such a "compositeResult" instead of <code>oldArgVal2</code>. 
 <li>In <code>update</code>, we now branch on the result of <code>funVal.update</code>. If it's a <code>compositeResult</code>, we also recursively update the function along with the argument and merge the environment like for the case of "closure". Else, we only update the argument.
+<li>It will be useful to define, in the object returned by the method <code>.eval</code> (the one that returns another <code>customFun</code>), another fields that stores the <code>argVal</code>, so that on update it can be updated.
 </ol>
 <p>Go ahead an implement the changes mentioned above</p>
 </article>
@@ -418,7 +419,7 @@ With the tests above passing, this means that you can now create two boxes, one 
 </article>
 <section>
 <aside>
-<textarea id="finalprogram" class="inputholder" placeholder="Your expression" oninput="save(this); G('#finalvalue').value = bam.uneval(eval(S('#evaluateCode, #mergeCode, #unparseCode, #updateCode') + '\n\nevaluate({exp: parse(' + JSON.stringify(this.value) + '), env: undefined})'))">(\f -> f 1) (\x -> x)</textarea></aside>
+<textarea id="finalprogram" class="inputholder" placeholder="Your expression" oninput="save(this); G('#finalvalue').value = bam.uneval(eval(S('#evaluateCode2, #mergeCode, #unparseCode, #updateCode2, #opDefinitions') + '\n\nevaluate({exp: parse(' + JSON.stringify(this.value) + '), env: undefined})'))">(\x -> + (min x 5) (min x 7)) 6</textarea></aside>
 <aside>
 <textarea id="finalvalue" placeholder="The result of evaluating your program" oninput="backProp(this)"></textarea>
 </aside>
