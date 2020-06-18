@@ -407,7 +407,7 @@ For example, consider the <code>min</code> function. If we modify its result, ei
 </p>
 <ol>
 <li>In <code>update</code>, instead of calling <code>funVal.update(newVal, argVal)</code>, we call <code>funVal.update(newVal, argVal, funVal)</code>, passing the function value itself as a third argument.
-<li>In the definition of <code>.update</code> method, we enable the definition of update to return <code>{ctor: "compositeResult", fun: ..., arg: ...}</code> so that the update can return both the new function and the new argument.
+<li>In the definition of <code>.update</code> method, we enable the definition of update to return <code>{ctor: "compositeResult", newFunVal: ..., newArgVal: ...}</code> so that the update can return both the new function val and the new argument val.
 <li>In <code>update</code>, we now branch on the result of <code>funVal.update</code>. If it's a <code>compositeResult</code>, we also recursively update the function along with the argument and merge the environment like for the case of "closure". Else, we only update the argument.
 </ol>
 <p>Go ahead an implement the changes mentioned above</p>
