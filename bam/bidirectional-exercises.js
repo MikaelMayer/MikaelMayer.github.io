@@ -16,6 +16,16 @@ function reset() {
   toSave = {};
   saveAll();
 }
+function resetLastTextarea(self) {
+  while(self && self.tagName != "TEXTAREA") {
+    self = self.previousElementSibling;
+  }
+  if(self) {
+    if(confirm('Restore original content?\n'+self.textContent)) self.value = self.textContent
+  } else {
+    alert("misplaced button - textarea not found.");
+  }
+}
 function eraseEverything() {
   for(let k in toSave) {
     let e = document.getElementById(k);
@@ -26,13 +36,14 @@ function eraseEverything() {
 }
 function restore() {
   toSave = JSON.parse(localStorage.getItem("saved") || "{}");
+  console.log("toSave.evaluateCode2:\n"+ toSave.evaluateCode2);
   for(let k in toSave) {
     let e = document.getElementById(k);
     if(e) {
       e.value = toSave[k];
-    } else {
-      delete toSave[k];
-      console.log(k + " does not exist in document. Removing it");
+    } else { // Might exist somewhere else.
+      //delete toSave[k];
+      //console.log(k + " does not exist in document. Removing it");
     }
   }
 }
