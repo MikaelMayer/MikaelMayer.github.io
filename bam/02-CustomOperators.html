@@ -324,7 +324,11 @@ min = {
     )
   }),
   update: (newOut, oldArgVal) => TODO
-}</textarea><br>
+}
+
+// The environment for operators.
+opEnv = { head: {name: "+", val: plus}, tail: {head: {name: "min", val: min}, tail: undefined}};
+</textarea><br>
 <button onclick="runTests('.evaluate2-test')">Run tests</button>&nbsp;Careful, if you have an infinite loop, this page will freeze.
 </article>
 <section><table><thead>
@@ -419,18 +423,21 @@ With the tests above passing, this means that you can now create two boxes, one 
 </article>
 <section>
 <aside>
-<textarea id="finalprogram" class="inputholder" placeholder="Your expression" oninput="save(this); G('#finalvalue').value = bam.uneval(eval(S('#evaluateCode2, #mergeCode, #unparseCode, #updateCode2, #opDefinitions') + '\n\nevaluate({exp: parse(' + JSON.stringify(this.value) + '), env: undefined})'))">(\x -> + (min x 5) (min x 7)) 6</textarea></aside>
-<aside>
-<textarea id="finalvalue" placeholder="The result of evaluating your program" oninput="backProp(this)"></textarea>
-</aside>
 <script>
-function backProp(self) {
+function computeForward() {
+  G('#finalvalue').value = bam.uneval(eval(S('#evaluateCode2, #mergeCode, #unparseCode, #updateCode2, #opDefinitions') + '\n\nevaluate({exp: parse(' + JSON.stringify(G("#finalprogram").value) + '), env: opEnv})'));
+}
+function computeBackward(self) {
   let newVal = eval("(" + self.value + ")");
-  let newSrc = eval(S('#evaluateCode, #mergeCode, #unparseCode, #updateCode') +
-               '\n\nunparse(update({exp: parse(' + JSON.stringify(S("#finalprogram")) + '), env: undefined}, '+self.value+').exp)');
+  let newSrc = eval(S('#evaluateCode2, #mergeCode, #unparseCode, #updateCode2, #opDefinitions') +
+               '\n\nunparse(update({exp: parse(' + JSON.stringify(S("#finalprogram")) + '), env: opEnv}, '+self.value+').exp)');
   G("#finalprogram").value = newSrc;
 }
 </script>
+<textarea id="finalprogram" class="inputholder" placeholder="Your expression" oninput="save(this); computeForward()">(\x -> + (min x 5) (min x 7)) 6</textarea></aside>
+<aside>
+<textarea id="finalvalue" placeholder="The result of evaluating your program" oninput="computeBackward(this)" onblur="computeForward()"></textarea>
+</aside>
 </section>
 </main>
 </body>
