@@ -373,34 +373,40 @@ First, import your current update function below so that you can do these breaki
 <tr><td>
 <textarea id="update2Test1"
           class="update2-test"
-          dependencies="#evaluateCode2, #mergeCode, #unparseCode, #opDefinitions, #updateCode2" readonly>stringUpdate({exp: parse("min 6 4"), env: {head: {name: "min", val: min}, tail: undefined}}, {ctor: "const", value: 5})</textarea></td><td>
+          dependencies="#evaluateCode2, #mergeCode, #unparseCode, #opDefinitions, #updateCode2" readonly>stringUpdate({exp: parse("min 6 4"), env: opEnv}, {ctor: "const", value: 5})</textarea></td><td>
 <textarea id="update2Test1result"
           title='Result should be raw "min 6 5"' readonly=""></textarea></td></tr>
 <tr><td>
 <textarea id="update2Test2"
           class="update2-test"
-          dependencies="#evaluateCode2, #mergeCode, #unparseCode, #opDefinitions, #updateCode2" readonly>stringUpdate({exp: parse("min 6 (min 4 2)"), env: {head: {name: "min", val: min}, tail: undefined}}, {ctor: "const", value: 3})</textarea></td><td>
+          dependencies="#evaluateCode2, #mergeCode, #unparseCode, #opDefinitions, #updateCode2" readonly>stringUpdate({exp: parse("min 6 (min 4 2)"), env: opEnv}, {ctor: "const", value: 3})</textarea></td><td>
 <textarea id="update2Test2result"
           title='Result should be raw "min 6 (min 4 3)"' readonly=""></textarea></td></tr>
 <tr><td>
 <textarea id="update2Test3"
           class="update2-test"
-          dependencies="#evaluateCode2, #mergeCode, #unparseCode, #opDefinitions, #updateCode2" readonly>stringUpdate({exp: parse("min 4 6"), env: {head: {name: "min", val: min}, tail: undefined}}, {ctor: "const", value: 5})</textarea></td><td>
+          dependencies="#evaluateCode2, #mergeCode, #unparseCode, #opDefinitions, #updateCode2" readonly>stringUpdate({exp: parse("min 4 6"), env: opEnv}, {ctor: "const", value: 5})</textarea></td><td>
 <textarea id="update2Test3result"
           title='Result should be raw "min 5 6"' readonly=""></textarea></td></tr>
 <tr><td>
 <textarea id="update2Test4"
           class="update2-test"
-          dependencies="#evaluateCode2, #mergeCode, #unparseCode, #opDefinitions, #updateCode2" readonly>stringUpdate({exp: parse("min 4 4"), env: {head: {name: "min", val: min}, tail: undefined}}, {ctor: "const", value: 5})</textarea></td><td>
+          dependencies="#evaluateCode2, #mergeCode, #unparseCode, #opDefinitions, #updateCode2" readonly>stringUpdate({exp: parse("min 4 4"), env: opEnv}, {ctor: "const", value: 5})</textarea></td><td>
 <textarea id="update2Test4result"
           title='Result should be raw "min 5 5"' readonly=""></textarea></td></tr>
 <tr><td>
 <textarea id="update2Test5"
           class="update2-test"
-          dependencies="#evaluateCode2, #mergeCode, #unparseCode, #opDefinitions, #updateCode2" readonly>stringUpdate({exp: parse("min (min 3 8) (min 6 3)"), env: {head: {name: "min", val: min}, tail: undefined}}, {ctor: "const", value: 5})</textarea></td><td>
+          dependencies="#evaluateCode2, #mergeCode, #unparseCode, #opDefinitions, #updateCode2" readonly>stringUpdate({exp: parse("min (min 3 8) (min 6 3)"), env: opEnv}, {ctor: "const", value: 5})</textarea></td><td>
 <textarea id="update2Test5result"
           title='Result should be raw "min (min 5 8) (min 6 5)"' readonly=""></textarea></td></tr>
-<tr><td><textarea id="update2Test6" class="update2-test" dependencies="#evaluateCode2, #mergeCode, #unparseCode, #updateCode2, #opDefinitions" placeholder="your own test" oninput="save(this)">stringUpdate("(\\x -> x) 1", {ctor: "const", value: 2})</textarea>
+<tr><td>
+<textarea id="update2Test5b"
+          class="update2-test"
+          dependencies="#evaluateCode2, #mergeCode, #unparseCode, #opDefinitions, #updateCode2" readonly>stringUpdate({exp: parse("min 1"), env: opEnv}, {...min.eval({ctor: "const", value: 3})})</textarea></td><td>
+<textarea id="update2Test5bresult"
+          title='Result should be raw "min 3"' readonly=""></textarea></td></tr>
+<tr><td><textarea id="update2Test6" class="update2-test" dependencies="#evaluateCode2, #mergeCode, #unparseCode, #updateCode2, #opDefinitions" placeholder="your own test" oninput="save(this)">stringUpdate({exp: parse("(\\x -> x) 1"), env: opEnv}}, {ctor: "const", value: 2})</textarea>
 </td><td><textarea id="update2Test6result"></textarea></td></tr></table>
 </section>
 <article>
