@@ -1,18 +1,23 @@
 <html>
 <head>
+<!--% name_inner title1-->
 <title>1/4 - Bidirectional Evaluation from scratch</title>
+<!--% name_start head -->
 <link rel="stylesheet" href="mvp.css">
 <meta name="description" content="The interactive course to learn Bidirectional Evaluation">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="bidirectional-exercises.css">
 <script src="https://tharzen.com/Thaditor/bam.js"></script>
 <script src="bidirectional-exercises.js"></script>
+<!--% name_end head -->
 </head>
 <body>
 <header>
 <nav>
 <a href=""><img></a>
 <ul>
+<!--% attr_title title1-->
+<!--% inner_exp ("Part " + "1")-->
 <li title="Bidirectional Evaluation from Scratch">Part 1</li>
 <li title="Custom Operators"><a href="02-CustomOperators.html">Part 2</a></li>
 <li title="Tail recursion"><a href="03-TailRecursion.html">Part 3</a></li>
@@ -176,7 +181,7 @@ function evaluate(prog) {
 </td><td><textarea id="evaluateTest3result" title='Result should be { ctor: "const", value: 2}' readonly=""></textarea></td></tr>
 <tr><td><textarea id="evaluateTest4" class="evaluate-test" dependencies="#evaluateCode" readonly="">evaluate({exp: parse("(\\first-> first(\\z -> z 3 2)) (\\pair -> pair(\\f -> \\s -> f))"), env: undefined})</textarea>
 </td><td><textarea id="evaluateTest4result" title='Result should be { ctor: "const", value: 3}' readonly=""></textarea></td></tr>
-<tr><td><textarea id="evaluateTest5" class="evaluate-test" dependencies="#evaluateCode" placeholder="your own test" oninput="save(self)"></textarea>
+<tr><td><textarea id="evaluateTest5" class="evaluate-test" dependencies="#evaluateCode" placeholder="your own test" oninput="save(this)"></textarea>
 </td><td><textarea id="evaluateTest5result"></textarea></td></tr></table>
 </section>
 <article>
@@ -233,7 +238,7 @@ function unparse(exp) {
 , body: { ctor: "fun", format: { wsBefore: " ", wsBeforeArgName: " ", wsAfterArgName: " ", wsAfter: "", arrow: "->"}, argName: "y"
   , body: { ctor: "var", format: { wsBefore: " ", wsAfter: ""}, name: "x"}}})</textarea>
 </td><td><textarea id="unparseTest5result" title='Result should be raw "\ x -> \ y -> x"' readonly=""></textarea></td></tr>
-<tr><td><textarea id="unparseTest6" class="unparse-test" dependencies="#unparseCode" placeholder="your own test" oninput="save(self)"></textarea>
+<tr><td><textarea id="unparseTest6" class="unparse-test" dependencies="#unparseCode" placeholder="your own test" oninput="save(this)"></textarea>
 </td><td><textarea id="unparseTest6result"></textarea></td></tr></table>
 </section>
 
@@ -321,7 +326,7 @@ function merge3(original, modified1, modified2) {
 </td><td><textarea id="mergeTest3result" title='Result should be 8' readonly=""></textarea></td></tr>
 <tr><td><textarea id="mergeTest4" class="merge-test" dependencies="#mergeCode" readonly="">merge3("original", "m1", "m2")</textarea>
 </td><td><textarea id="mergeTest4result" title='Result should be "m1"' readonly=""></textarea></td></tr>
-<tr><td><textarea id="mergeTest5" class="merge-test" dependencies="#mergeCode" placeholder="your own test" oninput="save(self)">merge3({a: 1}, {a: 2}, {a: 4})</textarea>
+<tr><td><textarea id="mergeTest5" class="merge-test" dependencies="#mergeCode" placeholder="your own test" oninput="save(this)">merge3({a: 1}, {a: 2}, {a: 4})</textarea>
 </td><td><textarea id="mergeTest5result"></textarea></td></tr></table>
 </section>
 
@@ -422,7 +427,7 @@ stringUpdate = (source, newVal) => {
 )</textarea>
 </td><td><textarea id="updateTest5result"
           title='Result should be raw "(\z -> ((\x -> \w -> w) z)) 4"' readonly=""></textarea></td></tr>
-<tr><td><textarea id="updateTest6" class="update-test" dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" placeholder="your own test" oninput="save(self)">stringUpdate("(\\x -> x) 1", {ctor: "const", value: 2})</textarea>
+<tr><td><textarea id="updateTest6" class="update-test" dependencies="#evaluateCode, #mergeCode, #unparseCode, #updateCode" placeholder="your own test" oninput="save(this)">stringUpdate("(\\x -> x) 1", {ctor: "const", value: 2})</textarea>
 </td><td><textarea id="updateTest6result"></textarea></td></tr></table>
 </section>
 <article>
