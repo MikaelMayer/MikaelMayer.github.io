@@ -102,6 +102,8 @@ function backprop() {
   try {
     let evalStep = eval(editaction.value);
     step = "Evaluating user step";
+    let prog = eval("(" + originalprog.value + ")");
+    let result = bam.apply(evalStep, prog)
     let userAction = eval(newProgEdit.value);
     step = "Back-propagating user step";
     let initAction = bam.backPropagate(evalStep, userAction);
@@ -110,7 +112,6 @@ function backprop() {
     updatedEditAction.value = resultStr;
     updatedProgStep = true;
     step = "Getting original program";
-    let prog = eval("(" + originalprog.value + ")");
     step = "Applying to original program";
     let initProgUpdated = bam.apply(initAction, prog);
     step = "rendering updated original program";
