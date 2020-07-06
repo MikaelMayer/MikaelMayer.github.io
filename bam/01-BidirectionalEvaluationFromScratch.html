@@ -124,10 +124,15 @@ then     E |- e1 e2          ==> v
    we need to have a syntax implementation (Abstract Syntax Tree) that we can work on:
 </p>
 <pre><code>Prog    = {env: Env, exp: Exp}
+Exp     = {ctor: "const", format: ...., value: Any}
+        | {ctor: "fun", format: ...., argName: String, body: Exp}
+        | {ctor: "app", format: ...., fun: Exp, arg: Exp}
+        | {ctor: "var", format: ...., name: String}
 Env     = undefined | {head: Binding, tail: Env}
 Binding = {name: String, val: Val }
 Val     = {ctor: “const”, value: Any}
-        | {ctor: “closure”, argName: String, body: Exp, env: Env}</code></pre>
+        | {ctor: “closure”, argName: String, body: Exp, env: Env}
+Any     = 1 | 2 | 3 ... | "string" ... </code></pre>
 <p>So the <code>evaluate</code> function takes a <code>Prog</code> with an initially empty environment, and returns a <code>Val</code>.
 </p>
 <h1>Exercise: Complete <code>evaluate</code></h1>
@@ -168,6 +173,28 @@ function evaluate(prog) {
           dependencies="#evaluateCode" readonly>evaluate({exp: parse("  0"), env: undefined})</textarea></td><td>
 <textarea id="evaluateTest1result"
           title='Result should be { ctor: "const", value: 0}' readonly=""></textarea></td></tr>
+<tr><td>
+<textarea id="evaluateTest1b"
+          class="evaluate-test"
+          dependencies="#evaluateCode" readonly>evaluate({exp: parse("\\x -> x"), env: undefined})</textarea></td><td>
+<textarea id="evaluateTest1bresult"
+          title='Result should be { ctor: "closure", argName: "x", body:   { ctor: "var"  , format:     { wsBefore: " "    , wsAfter: ""}  , name: "x"}, env: undefined}' readonly=""></textarea></td></tr>
+<tr><td>
+<textarea id="evaluateTest1c"
+          class="evaluate-test"
+          dependencies="#evaluateCode" readonly>evaluate({exp: parse("x"), env: {head: {name: "x", val: {ctor: "const", value: 1}}, tail: undefined}})</textarea></td><td>
+<textarea id="evaluateTest1cresult"
+          title='Result should be { ctor: "const", value: 1}' readonly=""></textarea></td></tr>
+<tr><td><textarea id="evaluateTest1d"
+          class="evaluate-test"
+          dependencies="#evaluateCode" readonly>evaluate({exp: parse("x"), env: {head: {name: "x", val: {ctor: "const", value: 1}}, tail: {head: {name: "y", val: {ctor: "const", value: 2}}, tail: undefined}}})</textarea></td><td>
+<textarea id="evaluateTest1dresult"
+          title='Result should be { ctor: "const", value: 1}' readonly=""></textarea></td></tr>
+<tr><td><textarea id="evaluateTest1e"
+          class="evaluate-test"
+          dependencies="#evaluateCode" readonly>evaluate({exp: parse("y"), env: {head: {name: "x", val: {ctor: "const", value: 1}}, tail: {head: {name: "y", val: {ctor: "const", value: 2}}, tail: undefined}}})</textarea></td><td>
+<textarea id="evaluateTest1eresult"
+          title='Result should be { ctor: "const", value: 2}' readonly=""></textarea></td></tr>
 <tr><td
 ><textarea id="evaluateTest2" class="evaluate-test" dependencies="#evaluateCode" readonly="">evaluate({exp: parse("(\\ x-> 1) 2"), env: undefined})</textarea>
 </td><td><textarea id="evaluateTest2result" title='Result should be { ctor: "const", value: 1}' readonly=""></textarea></td></tr>
