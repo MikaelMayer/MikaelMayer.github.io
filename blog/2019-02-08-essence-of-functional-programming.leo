@@ -1,5 +1,11 @@
 include = if listDict.get "include" vars == Just "true" then include else (always [])
 
+dialogflow = "https://dialogflow.cloud.google.com/"
+
+googlescript = "https://www.google.com/script/start/"
+
+
+
 lineOf filename whatregexp =
   case Regex.extract ("^([\\s\\S]*)" + whatregexp) (fs.read filename|> Maybe.withDefault "") of
     Just (linesBefore :: _) -> Regex.split "\n" linesBefore |> List.length

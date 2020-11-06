@@ -1,6 +1,9 @@
 <html>
-<head><title>BAM SandBox</title>
-<script src="https://tharzen.com/Thaditor/bam.js"></script>
+<head><title>Edit actions SandBox</title>
+<script src="https://combinatronics.com/MikaelMayer/edit-actions/master/edit-actions.js"></script>
+<script>
+var ea = editActions;
+</script>
 <style>
 div.separation {
   width: 30%;
@@ -29,21 +32,19 @@ div.textarea {
 </style>
 </head>
 <body>
-<script src="sandbox.js"></script>
-<h1>New version available</h1>
-<p>This project is no longer maintained. Please visit the <a href="sandbox-edit-actions.html">page for the replacement project "Edit Actions"</a>;
-<h1>Try BAM</h1>
-<p>Look at <a href="https://github.com/MikaelMayer/bam-for-js#language-example">the documentation</a></p>
+<script src="sandbox-ea.js"></script>
+<h1>Try Edit actions</h1>
+<p>Look at <a href="https://github.com/MikaelMayer/edit-actions#sandbox-online">the documentation</a></p>
 <input type="button" value="Reset" onclick="reset();"><br>
-<div class="separation">program</div><span class="invisible">→</span><div class="separation">evaluation step:</div><span class="invisible"></span><div class="separation"><input type="button" value="bam.apply(evaluation step, program)" onclick="runBamApply()"></div><br>
+<div class="separation">program</div><span class="invisible">→</span><div class="separation">evaluation step:</div><span class="invisible"></span><div class="separation"><input type="button" value="editActions.apply(evaluation step, program)" onclick="runEaApply()"></div><br>
 
 <textarea title="The original program" id="originalprog" oninput="save(this)">{b: 1}</textarea>→<textarea title="The edit action, evaluation step" id="editaction" oninput="save(this)">New({ a: Reuse(), c: Reuse('b') })</textarea>→<textarea title="The computed program" id="computedProg" readonly></textarea><br>
 
 <div class="separation">↓ user step'  </div><span class="invisible">→</span><div class="separation">&nbsp;</div><span class="invisible">→</span><div class="separation">↓ user step</div><br>
 
-<textarea id="updatedEditAction" title="Resulting edit action on original program" readonly></textarea>←<div class="textarea"><input type="button" value="user step' = bam.backPropagate(evaluation step, user step)" onclick="backprop()"></div>←<textarea class="nowrap" title="The diff from originally computed program" id="newProgEdit" oninput="ifIdleAfter(defaultTiming, 'computeNewProg', computeNewProg); save(this);"></textarea><br>
+<textarea id="updatedEditAction" title="Resulting edit action on original program" readonly></textarea>←<div class="textarea"><input type="button" value="user step' = editActions.backPropagate(evaluation step, user step)" onclick="backprop()"></div>←<textarea class="nowrap" title="The diff from originally computed program" id="newProgEdit" oninput="ifIdleAfter(defaultTiming, 'computeNewProg', computeNewProg); save(this);"></textarea><br>
 
-<div class="separation">↓ =bam.backPropagate(user step', program)</div><span class="invisible">→</span><div class="separation"></div><span class="invisible">→</span><div class="separation">↓</div><br>
+<div class="separation">↓ =ea.backPropagate(user step', program)</div><span class="invisible">→</span><div class="separation"></div><span class="invisible">→</span><div class="separation">↓</div><br>
 
 <textarea id="updatedProg" title="The program after applying the back-propagated edit action" readonly></textarea><span class="invisible">→</span><div class="textarea"></div><span class="invisible">→</span><textarea title="The new program" id="newComputedProg" oninput="ifIdleAfter(defaultTiming, 'computeDiff', computeDiff);"></textarea>
 
