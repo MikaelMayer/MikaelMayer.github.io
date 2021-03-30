@@ -50,7 +50,7 @@ i.getAttribute("src") && i.getAttribute("src").indexOf("platform.twitter.com") >
 <h1>Formulas for Google Docs</h1>
 <em>2019/02/13 &mdash; Mikaël Mayer</em>.<br>
 Have you ever wished you could synchronize content within one Google doc? Do you need temporary placeholders that you will replace later? Do you want to generate text? Do you miss spreadsheets in docs?<br><br>
-If you answered yes to one of these questions, this <a href="https://chrome.google.com/webstore/detail/kgjbgmonlnhglokmfnpnklegakfknbeh">Google docs add-on</a> this for you.It enables you to define names (a.k.a. variables) anywhere in the document, and to insert computations that produce rich text anywhere in the document.<h2>Define names</h2>
+If you answered yes to one of these questions, this <a href="https://workspace.google.com/u/0/marketplace/app/spreadsheet_cells_in_javascript_fields_s/159836395898">Google docs add-on</a> this for you.It enables you to define names (a.k.a. variables) anywhere in the document, and to insert computations that produce rich text anywhere in the document.<h2>Define names</h2>
 You can define a name anywhere in your document. It has to start with a word, the sign equal '=' and <b>a non-empty space behind it</b>. If there is an opening parenthesis, the content will be evaluated as JavaScript. If there is no opening parenthesis, the remaining until the end of the newline is treated as raw text. Definitions can depend on previous definitions.<br>
 The following are all valid definitions of names:
 <blockquote>
