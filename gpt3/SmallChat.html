@@ -307,15 +307,19 @@ function retry() {
   if(t.value === "" && t.matches(".me")) {
     t.remove();
     t = get_last_message();
-    t.value = "";
-    complete(ai);
+  }
+  if(t.prevValue) {
+    t.value = t.prevValue.head;
+    t.prevValue = t.prevValue.tail;
   } else {
     t.value = "";
-    if(t.matches(".me")) {
-      complete(me);
-    } else {
-      complete(ai)
-    }
+  }
+  if(t.matches(".me")) {
+    complete(me);
+  } else if(t.matches(".ai")) {
+    complete(ai)
+  } else {
+    complete("");
   }
 }
 </script>
