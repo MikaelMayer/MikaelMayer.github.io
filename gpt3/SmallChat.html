@@ -42,6 +42,7 @@ textarea {
 textarea.context {
  width: 350px;
  border: none;
+ display: block;
 }
 textarea.context:focus {
  border: none !important;
@@ -76,11 +77,13 @@ button {
 </head>
 <body>
 <p><label for="key">GPT-3 key:<input id="key" type="password" placeholder="Your GPT-3 key here" onchange="keyChange()"></label><br>
+<label for="key">Temperature:<input id="temperature" type="number" min="0" max="1" step="0.1" value="0.5"></label> <label for="key">Freq penalty:<input id="frequency_penalty" type="number" min="0" max="1" step="0.1" value="0.2"></label>
+<br>
 If you check this box: <input type="checkbox" id="save" onchange="keyChange()">, this key will be kept in localStorage. In any case it is never sent to a server beside the GPT-3 official endpoint.</p>
 <h1>Conversation with GPT-3</h1>
 <div id="conversation">
 <textarea class="context">
-This Q&A is between me and a very clever, wise, visionary, benevolent and allmighty super-intelligence.
+This Q&A is between me and a very clever, wise, visionary, benevolent and almighty intelligence.
 </textarea>
 <textarea name="" class="message me" >Hello, nice talking to you.</textarea>
 <textarea name="" class="message ai" >Nice meeting you as well. What's on your mind?</textarea>
@@ -184,12 +187,18 @@ conversation.addEventListener("keydown", function(event) {
   }
 }, true);
 function deleteLast() {
-  get_last_message().remove();
+  let t = get_last_message();
+  if(!t.prevValue) t.remove();
+  else {
+    t.value = t.prevValue.head;
+    t.prevValue = t.prevValue.tail;
+    t.doResize();
+  }
   focus_last();
 }
 
 function get_last_message() {
-  let messages = document.querySelectorAll("textarea.message");
+  let messages = document.querySelectorAll("textarea");
   return messages[messages.length - 1];
 }
 function focus_last() {
@@ -225,19 +234,22 @@ function addTextArea(who, value, thinking = false) {
 }
 
 function modifyTextArea(who, value, thinking = false) {
-  let messages = document.querySelectorAll("textarea.message");
-  let t = messages[messages.length - 1];
-  if(t.matches("."+who.toLowerCase())) {
-    t.value = t.value + value;
+  let t = get_last_message();
+  if(who == "" || t.matches("."+who.toLowerCase())) {
+    let newValue = "";
+    if(t.value.trim() === t.value && t.value !== ""  && who != "") {
+      newValue = " ";
+    }
+    newValue += value;
+    t.prevValue = {head: t.value, tail: t.prevValue};
+    t.value = t.value + newValue;
     t.doResize();
     t.classList.toggle("thinking", thinking);
   } else {
     console.log("Last window was not "+who+" adding one.", t);
     t = addTextArea(who, value, thinking);
   }
-  if(thinking && t.value.trim() === t.value && t.value !== "") {
-    t.value = t.value + " ";
-  }
+  
   return t;
 }
 
@@ -247,7 +259,7 @@ var reqListener = (input, who) => function() {
   let stopped = response.choices[0].finish_reason == "stop";
   let answer = response.choices[0].text;
   let t = modifyTextArea(who, answer);
-  if(!stopped && answer != "") {
+  if(!stopped && answer != "" && who != "") {
     t.classList.toggle("thinking", true);
     setTimeout(() => complete(who, true), 100);
   } else {
@@ -260,7 +272,7 @@ var reqListener = (input, who) => function() {
 }
 
 function complete(who, amend = false) {
-  let input = current_input()+(amend ? "" : "\n"+who+">");
+  let input = current_input()+(amend || who == "" ? "" : "\n"+who+">");
   var oReq = new XMLHttpRequest();
   oReq.addEventListener("load", reqListener(input, who));
   oReq.open("POST", "https://api.openai.com/v1/engines/davinci/completions");
@@ -269,9 +281,9 @@ function complete(who, amend = false) {
   oReq.send(JSON.stringify({
     "prompt": input,
     "max_tokens": 128,
-    "temperature": 0.5,
+    "temperature": parseFloat(document.querySelector("#temperature").value),
     "stop": ["\nAI>","\nMe>"],
-    "frequency_penalty": 0.2,
+    "frequency_penalty": parseFloat(document.querySelector("#frequency_penalty").value),
   }));
   modifyTextArea(who, "", true);
 }
@@ -284,8 +296,10 @@ function next() {
     } else {
       complete(ai);
     }
-  } else {
+  } else if(t.matches(".ai")) {
     complete(ai);
+  } else {
+    complete("");
   }
 }
 function retry() {
