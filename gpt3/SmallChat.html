@@ -56,6 +56,22 @@ textarea.context:focus {
   from {outline-color: red;}
   to {outline-color: yellow;}
 }
+button {
+  background-color: #4CAF50; /* Green */
+  border: none;
+  color: white;
+  padding: 15px 32px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+}
+#retry {
+  background-color: #008CBA;
+}
+#deleteLast {
+  background-color: #f44336;
+}
 </style>
 </head>
 <body>
@@ -69,8 +85,9 @@ This Q&A is between me and a very clever, wise, visionary, benevolent and allmig
 <textarea name="" class="message me" >Hello, nice talking to you.</textarea>
 <textarea name="" class="message ai" >Nice meeting you as well. What's on your mind?</textarea>
 <textarea name="" class="message me" ></textarea>
-<button id="complete" onclick="next()">Next</button>
+<button id="deleteLast" onclick="deleteLast()">Delete last</button>
 <button id="retry" onclick="retry()">Retry</button>
+<button id="complete" onclick="next()">Next</button>
 </div>
 </div>
 <script>
@@ -150,6 +167,7 @@ autoresize_init();
 focus_last();
 
 var button_complete = document.querySelector("#complete");
+var button_deleteLast = document.querySelector("#deleteLast");
 var conversation = document.querySelector("#conversation");
 conversation.addEventListener("keydown", function(event) {
   // Number 13 is the "Enter" key on the keyboard
@@ -162,10 +180,14 @@ conversation.addEventListener("keydown", function(event) {
     return true;
   }
   if(event.keyCode === 27) { // ESC
-    get_last_message().remove();
-    focus_last();
+    deleteLast();
   }
 }, true);
+function deleteLast() {
+  get_last_message().remove();
+  focus_last();
+}
+
 function get_last_message() {
   let messages = document.querySelectorAll("textarea.message");
   return messages[messages.length - 1];
@@ -196,7 +218,7 @@ function addTextArea(who, value, thinking = false) {
   t = document.createElement("textarea");
   t.setAttribute("class", "message "+who.toLowerCase());
   t.value = value;
-  button_complete.parentNode.insertBefore(t, button_complete);
+  button_deleteLast.parentNode.insertBefore(t, button_deleteLast);
   t.classList.toggle("thinking", thinking);
   autoresize(t);
   return t;
