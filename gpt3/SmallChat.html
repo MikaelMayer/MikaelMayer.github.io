@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chat with GPT-3</title>
 <style>
+body {
+  position:relative;
+}
 .message {
   display: block;
   max-width: 400px;
@@ -38,6 +41,7 @@ max-width: 400px;
 
 textarea {
   font-family: serif;
+  max-width: 100%;
 }
 textarea.context {
  width: 350px;
@@ -73,11 +77,14 @@ button {
 #deleteLast {
   background-color: #f44336;
 }
+#conversation {
+  position: relative;
+}
 </style>
 </head>
 <body>
 <p><label for="key">GPT-3 key:<input id="key" type="password" placeholder="Your GPT-3 key here" onchange="keyChange()"></label><br>
-<label for="key">Temperature:<input id="temperature" type="number" min="0" max="1" step="0.1" value="0.5"></label> <label for="key">Freq penalty:<input id="frequency_penalty" type="number" min="0" max="1" step="0.1" value="0.2"></label>
+<label for="key">Temperature:<input id="temperature" type="number" min="0" max="1" step="0.1" value="0.5"></label> <label for="key">Freq penalty:<input id="frequency_penalty" type="number" min="0" max="1" step="0.1" value="0.8"></label>
 <br>
 If you check this box: <input type="checkbox" id="save" onchange="keyChange()">, this key will be kept in localStorage. In any case it is never sent to a server beside the GPT-3 official endpoint.</p>
 <h1>Conversation with GPT-3</h1>
@@ -136,8 +143,10 @@ else {
 }
 function autoresize(text) {
     function resize () {
-        text.style.height = 'auto';
-        text.style.height = text.scrollHeight+'px';
+        if(text.scrollHeight+'px' != text.style.height) {
+          text.style.height = 'auto';
+          text.style.height = text.scrollHeight+'px';
+        }
     }
     /* 0-timeout to get the already changed text */
     function delayedResize () {
@@ -174,7 +183,7 @@ var button_deleteLast = document.querySelector("#deleteLast");
 var conversation = document.querySelector("#conversation");
 conversation.addEventListener("keydown", function(event) {
   // Number 13 is the "Enter" key on the keyboard
-  if (event.keyCode === 13) {
+  if (event.keyCode === 13 && document.activeElement && document.activeElement.matches(".me")) {
     // Cancel the default action, if needed
     event.preventDefault();
     event.stopPropagation();
@@ -253,13 +262,18 @@ function modifyTextArea(who, value, thinking = false) {
   return t;
 }
 
+function listLength(list) {
+  if(!list) return 0;
+  return 1 + listLength(list.prevValue);
+}
+
 var reqListener = (input, who) => function() {
   let response = JSON.parse(this.responseText);
   console.log(response);
   let stopped = response.choices[0].finish_reason == "stop";
   let answer = response.choices[0].text;
   let t = modifyTextArea(who, answer);
-  if(!stopped && answer != "" && who != "") {
+  if(!stopped && answer != "" && who != "" && listLength(t.prevValue) < 5) {
     t.classList.toggle("thinking", true);
     setTimeout(() => complete(who, true), 100);
   } else {
@@ -272,7 +286,7 @@ var reqListener = (input, who) => function() {
 }
 
 function complete(who, amend = false) {
-  let input = current_input()+(amend || who == "" ? "" : "\n"+who+">");
+  let input = (current_input()+(amend || who == "" ? "" : "\n"+who+">")).trim();
   var oReq = new XMLHttpRequest();
   oReq.addEventListener("load", reqListener(input, who));
   oReq.open("POST", "https://api.openai.com/v1/engines/davinci/completions");
