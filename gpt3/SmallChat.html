@@ -86,7 +86,7 @@ button {
 <p><label for="key">GPT-3 key:<input id="key" type="password" placeholder="Your GPT-3 key here" onchange="keyChange()"></label><br>
 <label for="key">Temperature:<input id="temperature" type="number" min="0" max="1" step="0.1" value="0.5"></label> <label for="key">Freq penalty:<input id="frequency_penalty" type="number" min="0" max="1" step="0.1" value="0.8"></label>
 <br>
-If you check this box: <input type="checkbox" id="save" onchange="keyChange()">, this key will be kept in localStorage. In any case it is never sent to a server beside the GPT-3 official endpoint.</p>
+If you check this box: <input type="checkbox" id="save" onchange="keyChange()">, this key will be kept in localStorage. In any case it is never sent to a server beside the GPT-3 official endpoint.<button id="" onclick="copyPrompt()">Copy conversation</button></p>
 <h1>Conversation with GPT-3</h1>
 <div id="conversation">
 <textarea class="context">
@@ -251,7 +251,7 @@ function modifyTextArea(who, value, thinking = false) {
     }
     newValue += value;
     t.prevValue = {head: t.value, tail: t.prevValue};
-    t.value = t.value + newValue;
+    t.value = t.value.trim() + newValue;
     t.doResize();
     t.classList.toggle("thinking", thinking);
   } else {
@@ -284,7 +284,10 @@ var reqListener = (input, who) => function() {
     }
   }
 }
-
+function current_prompt() {
+  let [who, amend] = getNextWho();
+  return (current_input() + (amend || who == "" ? "" : "\n"+who+">")).trim();
+}
 function complete(who, amend = false) {
   let input = (current_input()+(amend || who == "" ? "" : "\n"+who+">")).trim();
   var oReq = new XMLHttpRequest();
@@ -301,20 +304,23 @@ function complete(who, amend = false) {
   }));
   modifyTextArea(who, "", true);
 }
-
-function next() {
+function getNextWho() {
   let t = get_last_message();
   if(t.matches(".me")) {
     if(t.value === "") {
-      complete(me);
+      return [me, true];
     } else {
-      complete(ai);
+      return [ai, false];
     }
   } else if(t.matches(".ai")) {
-    complete(ai);
+    return [ai, true];
   } else {
-    complete("");
+    return ["", true];
   }
+}
+function next() {
+  let [who, amend] = getNextWho();
+  complete(who, amend);
 }
 function retry() {
   let t = get_last_message();
@@ -335,6 +341,41 @@ function retry() {
   } else {
     complete("");
   }
+}
+// Copies a string to the clipboard. Must be called from within an
+// event handler such as click. May return false if it failed, but
+// this is not always possible. Browser support for Chrome 43+,
+// Firefox 42+, Safari 10+, Edge and Internet Explorer 10+.
+// Internet Explorer: The clipboard feature may be disabled by
+// an administrator. By default a prompt is shown the first
+// time the clipboard is used (per session).
+function copyToClipboard(text) {
+    if (window.clipboardData && window.clipboardData.setData) {
+        // Internet Explorer-specific code path to prevent textarea being shown while dialog is visible.
+        return window.clipboardData.setData("Text", text);
+
+    }
+    else if (document.queryCommandSupported && document.queryCommandSupported("copy")) {
+        var textarea = document.createElement("textarea");
+        textarea.textContent = text;
+        textarea.style.position = "fixed";  // Prevent scrolling to bottom of page in Microsoft Edge.
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            return document.execCommand("copy");  // Security exception may be thrown by some browsers.
+        }
+        catch (ex) {
+            console.warn("Copy to clipboard failed.", ex);
+            return false;
+        }
+        finally {
+            document.body.removeChild(textarea);
+        }
+    }
+}
+function copyPrompt() {
+  let prompt = current_prompt();
+  copyToClipboard(prompt);
 }
 </script>
 </body>
