@@ -90,7 +90,7 @@ If you check this box: <input type="checkbox" id="save" onchange="keyChange()">,
 <h1>Conversation with GPT-3</h1>
 <div id="conversation">
 <textarea class="context">
-This Q&A is between me and a very clever, wise, visionary, benevolent and almighty intelligence.
+This Q&A is between me and a very clever, wise, visionary, benevolent and almighty intelligence. His speech starts with "AI>", while my speech starts with "Me>".
 </textarea>
 <textarea name="" class="message me" >Hello, nice talking to you.</textarea>
 <textarea name="" class="message ai" >Nice meeting you as well. What's on your mind?</textarea>
@@ -244,13 +244,26 @@ function addTextArea(who, value, thinking = false) {
 
 function modifyTextArea(who, value, thinking = false) {
   let t = get_last_message();
-  if(who == "" || t.matches("."+who.toLowerCase())) {
+  let values = value.split(/\n?AI>/i);
+  if(values.length > 1) {
+    for(let i in values) {
+      if(i == 0) {
+        t = modifyTextArea(who, values[i]);
+      } else {
+        t = addTextArea(who, values[i], thinking && i === values.length - 1);
+      }
+    }
+    return t;
+  }
+  if((who == "" || t.matches("."+who.toLowerCase()))) {
     let newValue = "";
     if(t.value.trim() === t.value && t.value !== ""  && who != "") {
       newValue = " ";
     }
     newValue += value;
-    t.prevValue = {head: t.value, tail: t.prevValue};
+    if(t.prevValue === undefined || t.prevValue.head != t.value) {
+      t.prevValue = {head: t.value, tail: t.prevValue};
+    }
     t.value = t.value.trim() + newValue;
     t.doResize();
     t.classList.toggle("thinking", thinking);
@@ -299,7 +312,8 @@ function complete(who, amend = false) {
     "prompt": input,
     "max_tokens": 128,
     "temperature": parseFloat(document.querySelector("#temperature").value),
-    "stop": ["\nAI>","\nMe>"],
+    "stop": who == ai ? ["Me>", "Me:", "\nMe:", "\nMe>"] :
+                        ["AI>", "AI:", "Me>", "me:"],
     "frequency_penalty": parseFloat(document.querySelector("#frequency_penalty").value),
   }));
   modifyTextArea(who, "", true);
