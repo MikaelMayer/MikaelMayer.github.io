@@ -103,6 +103,7 @@ If you check this box: <input type="checkbox" id="save" onchange="keyChange()">,
 <button id="read" onclick="read()">Read</button>
 </div>
 <script>
+var current_language = "en";
 var button_complete = document.querySelector("#complete");
 var button_deleteLast = document.querySelector("#deleteLast");
 var button_retry = document.querySelector("#retry");
@@ -156,6 +157,7 @@ function applySelection() {
   var lang = selectedOption.value;
   var langOption = lang.split(/-/);
   var l = langOption[0];
+  current_language = l;
   var isRandom = langOption.length > 1 && langOption[1] == "random";
   var template = templates[l];
   for(let obj in template) {
@@ -192,10 +194,13 @@ function serenpidity(inputs, callback) {
     let response = JSON.parse(this.responseText);
     console.log(response);
     let stopped = response.choices[0].finish_reason == "stop";
-    let answer = response.choices[0].text;
-    callback(answer);
+    let answer = response.choices[0].text.trim();
+    if(answer.startsWith("* ")) answer = answer.substring(2);
+    var first = answer.split(/\n(?:\* )?/);
+    
+    callback(first[0]);
   });
-  var theprompt = inputs.join("\n") + "\n";
+  var theprompt = "*"+inputs.join("\n* ") + "\n";
   console.log("prompt: ", theprompt);
   oReq.open("POST", "https://api.openai.com/v1/engines/davinci-instruct-beta-v3/completions");
   oReq.setRequestHeader("Content-Type", "application/json");
@@ -204,7 +209,7 @@ function serenpidity(inputs, callback) {
     "prompt": theprompt,
     "max_tokens": 128,
     "temperature": 0.8,
-    "stop": ["\n"],
+    "stop": undefined,//["\n"],
     "frequency_penalty": 0.8,
   }));
 }
@@ -347,7 +352,7 @@ function current_input(withContext = true) {
     let textarea = all_textareas[i];
     let isContext = textarea.classList.contains("context");
     if(!isContext || withContext) {
-      input += input.trim() + (input != "" ? (isContext ? " " : "\n\n") : "") + textarea.value;
+      input = input.trim() + (input != "" ? (isContext ? " " : "\n\n") : "") + textarea.value;
     }
   }
   return input;
@@ -450,7 +455,11 @@ function say(m) {
   msg.rate = 1;
   msg.pitch = 0.8;
   msg.text = m;
-  msg.lang = 'fr-FR';
+  if(current_language == "en") {
+    msg.lang = 'en-US';
+  } else {
+    msg.lang = 'fr-FR';
+  }
   speechSynthesis.speak(msg);
 }
 function read() {
