@@ -94,9 +94,9 @@ If you check this box: <input type="checkbox" id="save" onchange="keyChange()">,
 <h1 id="the_title">Bedtime story GPT-3</h1>
 <button id="randomize" onclick="applySelection(true)"></button>
 <div id="conversation">
-<textarea class="context input" id="first"></textarea>
-<textarea class="context input" id="second"></textarea>
-<textarea class="input" id="defaultinput"></textarea>
+<textarea class="context input" id="first" spellcheck="false"></textarea>
+<textarea class="context input" id="second" spellcheck="false"></textarea>
+<textarea class="input" id="defaultinput" spellcheck="false"></textarea>
 </div>
 <div id="quick_complete">
 </div>
@@ -413,6 +413,7 @@ function current_input(withContext = true) {
 function addTextArea(value, thinking = false) {
   t = document.createElement("textarea");
   t.setAttribute("class", "input");
+  t.setAttribute("spellcheck", "false");
   t.value = value;
   conversation.appendChild(t);
   t.classList.toggle("thinking", thinking);
