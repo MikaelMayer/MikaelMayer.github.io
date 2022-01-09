@@ -60,7 +60,7 @@ button.completion {
 button:not(.disabled):hover {
   opacity: 0.7;
 }
-button.disabled {
+button.disabled, #quick_complete select.disabled {
   background-color: #888 !important;
   color: #aaa !important;
   cursor: auto;
@@ -77,6 +77,9 @@ button.disabled {
 #read {
   background-color: #008CBA;
 }
+#quick_complete select, #quick_complete option {
+  padding: 15px;
+}
 </style>
 </head>
 <body>
@@ -84,22 +87,22 @@ button.disabled {
 <label for="key">Temperature:<input id="temperature" type="number" min="0" max="1" step="0.1" value="0.5"></label> <label for="key">Freq penalty:<input id="frequency_penalty" type="number" min="0" max="1" step="0.1" value="0.8"></label>
 <br>
 If you check this box: <input type="checkbox" id="save" onchange="keyChange()">, this key will be kept in localStorage. In any case it is never sent to a server beside the GPT-3 official endpoint.<button id="" onclick="copyPrompt()">Copy conversation</button></p>
-<h1>Bedtime story GPT-3</h1>
 <select onchange="applySelection()" id="languageSelection">
 <option value="en" selected>English</option>
 <option value="fr">Français</option>
-<option value="en-random">English + Random</option>
-<option value="fr-random">Français + Random</option>
 </select>
+<h1 id="the_title">Bedtime story GPT-3</h1>
+<button id="randomize" onclick="applySelection(true)"></button>
 <div id="conversation">
 <textarea class="context input" id="first"></textarea>
 <textarea class="context input" id="second"></textarea>
+<textarea class="input" id="defaultinput"></textarea>
 </div>
 <div id="quick_complete">
 </div>
-<button id="deleteLast" onclick="deleteLast()">Delete</button>
-<button id="retry" onclick="retry()">Retry</button>
 <button id="complete" onclick="next()">Continue!</button>
+<button id="retry" onclick="retry()">Retry</button>
+<button id="deleteLast" onclick="deleteLast()">Delete</button>
 <button id="read" onclick="read()">Read</button>
 </div>
 <script>
@@ -110,9 +113,11 @@ var button_retry = document.querySelector("#retry");
 var button_read = document.querySelector("#read");
 var templates = {
   "en": {
-    "first": "Write a bedtime story for a 6 years old about",
+    "first": "Write a long bedtime story with twists for a 6 years old about",
     "second": "a boy going on an adventure in the forest.",
+    "defaultinput": "Once upon a time,",
     "waitalittle": "...wait a little till the engine generate a story idea...",
+    "randomize": "Randomize topic",
     "second-random": [
       "a boy going on an adventure in the forest.",
       "a girl who discovers a hidden castle.",
@@ -126,13 +131,23 @@ var templates = {
       "However,",
       "Fortunately,",
       "Luckily,",
-      "Suddenly,"
-    ]
+      "Suddenly,",
+      "And then,",
+      "Anyway,"
+    ],
+    "completionName": "Preposition...",
+    "deleteLast": "Cancel last",
+    "retry": "Retry",
+    "complete": "Tell me  more!",
+    "read": "Read aloud",
+    "the_title": "Bedtime stories by GPT-3"
   },
   "fr": {
-    "first": "Ecris une histoire pour s'endormir pour un enfant de 6 ans à propos d'",
+    "first": "Ecris une longue histoire avec rebondissements pour s'endormir pour un enfant de 6 ans à propos d'",
     "second": "un garçon qui part pour l'aventure dans une forêt.",
+    "defaultinput": "Il étais une fois",
     "waitalittle": "...attendez un peu que le moteur trouve une idée d'histoire...",
+    "randomize": "Choisir un sujet au hasard",
     "second-random": [
       "un garçon qui part pour l'aventure dans une forêt.",
       "une fille qui découvre un château caché.",
@@ -144,21 +159,27 @@ var templates = {
       "Malheureusement,",
       "Un jour,",
       "Cependant,",
+      "Par bonheur,",
       "Heureusement,",
-      "Grâce à beaucoup de chance,",
-      "Soudainement,"
-    ]
+      "Soudainement,",
+      "Et puis,",
+      "D'ailleurs,"
+    ],
+    "completionName": "Préposition...",
+    "deleteLast": "Annuler dernier",
+    "retry": "Réessayer",
+    "complete": "La suite!",
+    "read": "Lire à voix haute",
+    "the_title": "Histoires pour dormir par GPT-3"
   }
 };
-function applySelection() {
+function applySelection(isRandom) {
   var select = document.querySelector("#languageSelection");
+  saveOptions();
   var options = select.options;
   var selectedOption = options[select.selectedIndex];
-  var lang = selectedOption.value;
-  var langOption = lang.split(/-/);
-  var l = langOption[0];
+  var l = selectedOption.value;
   current_language = l;
-  var isRandom = langOption.length > 1 && langOption[1] == "random";
   var template = templates[l];
   for(let obj in template) {
     let elem = document.getElementById(obj);
@@ -166,7 +187,13 @@ function applySelection() {
       if(isRandom && ((obj + "-random") in template)) {
         var randomSeeds = template[obj + "-random"];
         elem.value = template["waitalittle"];
-        serenpidity(randomSeeds, value => { elem.value = value; });
+        elem.classList.toggle("thinking", true);
+        serenpidity(randomSeeds, value => {
+          elem.value = value;
+        elem.classList.toggle("thinking", false);
+        });
+      } else if(elem.tagName == "BUTTON" || elem.tagName == "H1") {
+        elem.innerHTML = template[obj];
       } else {
         elem.value = template[obj];
       }
@@ -174,17 +201,26 @@ function applySelection() {
   }
   var quick_complete = document.getElementById("quick_complete");
   quick_complete.innerHTML = "";
+  var selectCompletions = document.createElement("select");
+  var firstOption = document.createElement("option");
+  firstOption.innerHTML = template["completionName"];
+  selectCompletions.appendChild(firstOption);
   for(let completion of template["completions"]) {
-    var b = document.createElement("button");
+    var b = document.createElement("option");
     b.classList.toggle("completion", true);
     b.innerHTML = completion;
-    b.onclick = function() {
-      var toAdd = this.innerHTML;
-      addTextArea(toAdd);
-      complete();
-    }
-    quick_complete.append(b);
+    selectCompletions.append(b);
   }
+  selectCompletions.onchange = function() {
+    if(this.selectedIndex == 0) return;
+    if(selectCompletions.classList.contains("disabled")) return;
+    var option = selectCompletions.childNodes[this.selectedIndex];
+    var toAdd = option.innerHTML;
+    addTextArea(toAdd);
+    complete();
+    selectCompletions.selectedIndex = 0;
+  }
+  quick_complete.append(selectCompletions);
   changeButtons()
 }
 applySelection();
@@ -215,28 +251,43 @@ function serenpidity(inputs, callback) {
 }
 
 var GPT3_KEY = 'GPT3-key';
+var STORED_LANGUAGE = 'GPT3-STORED_LANGUAGE';
 var keyInput = document.querySelector("#key");
-var checkSaveKeyInput = document.querySelector("#save")
+var checkSaveOptionsInput = document.querySelector("#save");
+var languageSelection = document.querySelector("#languageSelection");
 
 function api_key() {
   return keyInput.value;
 }
 function keyChange() {
   let k = keyInput.value;
-  saveKey(k);
+  saveOptions(k);
 }
 function initRetrieveKey() {
   let result = localStorage.getItem(GPT3_KEY);
   if(result) {
-    checkSaveKeyInput.checked = true;
+    checkSaveOptionsInput.checked = true;
   }
   keyInput.value = result;
+  
+  let l = localStorage.getItem(STORED_LANGUAGE);
+  if(l) {
+    l = parseInt(l);
+    var prevSelectedIndex = languageSelection.selectedIndex;
+    if(prevSelectedIndex != l) {
+      languageSelection.selectedIndex = parseInt(l);
+      languageSelection.onchange();
+    }
+  }
 }
-function saveKey() {
-  if(checkSaveKeyInput.checked) {
+function saveOptions() {
+  if(typeof checkSaveOptionsInput === "undefined") return;
+  if(checkSaveOptionsInput.checked) {
     localStorage.setItem(GPT3_KEY, keyInput.value);
+    localStorage.setItem(STORED_LANGUAGE, languageSelection.selectedIndex);
   } else {
     localStorage.removeItem(GPT3_KEY);
+    localStorage.removeItem(STORED_LANGUAGE);
   }
 }
 initRetrieveKey();
@@ -288,7 +339,7 @@ function autoresize_init() {
 }
 
 autoresize_init();
-focus_last();
+document.getElementById("second").focus();
 
 function changeButtons() {
   var t = get_last_message();
@@ -297,8 +348,9 @@ function changeButtons() {
   button_retry.classList.toggle("disabled", init);
   button_read.classList.toggle("disabled", init);
   
-  var quick_completes = document.querySelectorAll("#quick_complete button");
-  var canComplete = !init && t.value.length > 0 && t.value[t.value.length - 1] == ".";
+  var quick_completes = document.querySelectorAll("#quick_complete select, #quick_complete option");
+  var canCompleteChar = {".": true, "?": true, "!": true};
+  var canComplete = !init && t.value.length > 0 && canCompleteChar[t.value[t.value.length - 1]];
   for(let b of [...quick_completes]) {
     b.classList.toggle("disabled", !canComplete);
   }
