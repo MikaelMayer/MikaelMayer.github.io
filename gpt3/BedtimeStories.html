@@ -113,7 +113,7 @@ var button_retry = document.querySelector("#retry");
 var button_read = document.querySelector("#read");
 var templates = {
   "en": {
-    "first": "Write a long bedtime story with twists containing",
+    "first": "Below is a long bedtime story which a hero who gets out of his comfort zone because of an event, who meets people who teach him truths he needed to learn, who has ups and downs, and finally solves the situation. This uplifting story talks about",
     "second": "a boy going on an adventure in the forest.",
     "defaultinput": "Once upon a time,",
     "waitalittle": "...wait a little till the engine generate a story idea...",
@@ -146,7 +146,7 @@ var templates = {
     "the_title": "Bedtime stories by GPT-3"
   },
   "fr": {
-    "first": "Ecris une longue histoire avec rebondissements pour s'endormir contenant",
+    "first": "Ci-dessous se trouve une longue histoire pour dormir d'un héros qui sort de sa zone de confort à cause d'un événement, qui rencontre des gens qui lui enseignent des vérités qu'il avait besoin d'apprendre, qui a des hauts et des bas, et qui finalement résout la situation. Cette histoire édifiante mentionne",
     "second": "un garçon qui part pour l'aventure dans une forêt.",
     "defaultinput": "Il étais une fois",
     "waitalittle": "...attendez un peu que le moteur trouve une idée d'histoire...",
@@ -244,7 +244,8 @@ function serenpidity(inputs, callback) {
   });
   var theprompt = "*"+inputs.join("\n* ") + "\n";
   console.log("prompt: ", theprompt);
-  oReq.open("POST", "https://api.openai.com/v1/engines/davinci-instruct-beta-v3/completions");
+  //davinci-instruct-beta-v3
+  oReq.open("POST", "https://api.openai.com/v1/engines/davinci/completions");
   oReq.setRequestHeader("Content-Type", "application/json");
   oReq.setRequestHeader("Authorization", "Bearer "+api_key());
   oReq.send(JSON.stringify({
@@ -380,6 +381,9 @@ conversation.addEventListener("keydown", function(event) {
 }, true);
 function deleteLast() {
   let t = get_last_message();
+  while(t.prevValue && t.prevValue.head === t.value) {
+    t.prevValue = t.prevValue.tail;
+  }
   if(!t.prevValue) t.remove();
   else {
     t.value = t.prevValue.head;
@@ -492,7 +496,8 @@ function complete(amend = false) {
   }
   var oReq = new XMLHttpRequest();
   oReq.addEventListener("load", reqListener(input));
-  oReq.open("POST", "https://api.openai.com/v1/engines/davinci-instruct-beta-v3/completions");
+  //davinci-instruct-beta-v3
+  oReq.open("POST", "https://api.openai.com/v1/engines/davinci/completions");
   oReq.setRequestHeader("Content-Type", "application/json");
   oReq.setRequestHeader("Authorization", "Bearer "+api_key());
   oReq.send(JSON.stringify({
@@ -526,6 +531,9 @@ function read() {
 }
 function retry() {
   let t = get_last_message();
+  while(t.prevValue && t.prevValue.head === t.value) {
+    t.prevValue = t.prevValue.tail;
+  }
   if(t.prevValue) {
     t.value = t.prevValue.head;
     t.prevValue = t.prevValue.tail;
