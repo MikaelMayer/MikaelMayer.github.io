@@ -90,8 +90,8 @@ button.disabled, #quick_complete select.disabled {
 If you check this box: <input type="checkbox" id="save" onchange="keyChange()">, this key will be kept in localStorage. In any case it is never sent to a server beside the GPT-3 official endpoint.</p>
 <p>Now, open your console and type, for example:</p>
 <p><code>
-var x = await complete("Vanessa is a girl. John is a boy. Finley is a", 1)
-mapValues(x.choices[0].logprobs.top_logprobs[0], proba).sort(function(a, b) { return -a[1] + b[1]; });
+var x = await complete("Vanessa is a girl. John is a boy. Finley is a", {"max_tokens": 1});
+Object.entries(mapValues(x.choices[0].logprobs.top_logprobs[0], proba)).sort(function(a, b) { return -a[1] + b[1]; });
 </code></p>
 <script>
 var GPT3_KEY = 'GPT3-key';
