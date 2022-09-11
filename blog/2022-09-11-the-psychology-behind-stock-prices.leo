@@ -156,8 +156,8 @@ Now, let's assume there are 2x more sellers (each price has two sellers) than bu
 If you run this a lot of times, you'll come up with these stats:
 <ul>
 <li>When the number of buyers is equal to the number of sellers, the final price's average is $100 (standard deviation 2.1)
-<li>When the number of buyers is 2x the number of sellers, although they are all uniformly distributed around $100 in terms of price, the final price's average is $105.9 (standard deviation 1.7)
-<li>When the number of sellers is 2x the number of buyers, although they are all uniformly distributed around 100 in terms of price, the final price's average is $94.1 (standard deviation 1.7)
+<li>When the number of buyers is 2x the number of sellers, although they are all uniformly distributed around $100, the final price's average is $105.9 (standard deviation 1.7)
+<li>When the number of sellers is 2x the number of buyers, although they are all uniformly distributed around $100, the final price's average is $94.1 (standard deviation 1.7)
 </ul>
 
 Beyond the timing of entering buyers and sellers, you now have another factor that influences the final price even in a perfectly rational market: <i>the number of buyers vs. the number of sellers</i>.
