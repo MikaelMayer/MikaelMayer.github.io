@@ -18,4 +18,12 @@ body a {
 div.menu > a {
   position: fixed;
   right: 1em;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 0.2em;
+}
+@media all and (max-width:30em){
+	a.button3{
+		display:block;
+		margin:0.2em auto;
+	}
 }

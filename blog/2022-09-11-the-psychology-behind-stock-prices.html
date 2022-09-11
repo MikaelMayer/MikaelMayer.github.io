@@ -1,6 +1,17 @@
 <html><head><meta content="text/html; charset=UTF-8" http-equiv="content-type">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <link rel="stylesheet" type="text/css" href="index.css">
 <style>
+#nutshell-close-all {
+  display: none;
+}
+@media all and (max-width:30em){
+ a.button3{
+  display:block;
+  margin:0.2em auto;
+ }
+}
+
 @media (orientation: landscape) {
   body > div {
     margin-left: auto;
@@ -34,6 +45,31 @@ pre {
 code:not(#first-story) {
   line-height: 0.8;
 }
+/* Button styling from https://fdossena.com/?p=html5cool/as/i.frag */
+a.button3 {
+  display: inline-block;
+  padding: 0.3em 1.2em;
+  margin: 0 0.3em 0.3em 0;
+  border-radius: 2em;
+  box-sizing: border-box;
+  text-decoration: none;
+  font-family: 'Roboto',sans-serif;
+  font-weight: 300;
+  color: #FFFFFF;
+  background-color: #4eb5f1;
+  text-align: center;
+  transition: all 0.2s;
+}
+a.button3:hover{
+ background-color:#4095c6;
+}
+@media all and (max-width:30em){
+	a.button3{
+		display:block;
+		margin:0.2em auto;
+	}
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/gh/ncase/nutshell@1.0.1/nutshell.min.js"></script>
 </head><body><div class="menu">
@@ -119,7 +155,7 @@ To the contrary, if the highest buyer already present is bidding for $104, then 
 No one is in the market.
 </code>
 </pre>
-<button id="next-button" onclick="next()">Next</button><button id="restart-button" onclick="restart()" disabled="">Restart</button>
+<a class="button3" id="next-button" onclick="next()">Next</a><a class="button3" id="restart-button" onclick="restart()" disabled="">Restart</a>
 <p>Ok, we are onto something. We see clearly how deals can be "closed", and how the number of sellers/buyers can increase or decrease. But did you remark that every transaction has a different price? What else is striking?
 
 With all the steps being perfectly rational, you can already understand concepts that have real-life meaning:
@@ -138,7 +174,7 @@ Let's draw the curve of the price during the day, from our simulator before. Pre
 <br>
 <pre><code id="simulation1">
 </code></pre>
-<p><button onclick="simulate(1)">Simulate</button><button onclick="simulate(1, 10)">>> x10</button><button onclick="simulate(1, 100)">>> x100</button></p>
+<p><a class="button3" onclick="simulate(1)">Simulate</a><a class="button3" onclick="simulate(1, 10)">>> x10</a><a class="button3" onclick="simulate(1, 100)">>> x100</a></p>
 <p>
 A few interesting observations. First, the "curves" obtained really look like typical stock price moves during the day of any company stock. This empirically confirms our model, despite it being based on totally rational agents with uniformly distributed expectations.
 Second, you can imagine that, when the price does not move, it means that a buyer or a seller entered the market but could not find a deal. Hence, if you want to visualize everyone - not just the last transactions, you can 
@@ -147,12 +183,12 @@ Second, you can imagine that, when the price does not move, it means that a buye
 Now, let's assume there are 2x more buyers (each price has two buyers) than sellers, everyone still being perfectly rational. Press "simulate" to see what happens. Do you see a trend?
 <pre><code id="simulation2">
 </code></pre>
-<p><button onclick="simulate(2)">Simulate</button><button onclick="simulate(2, 10)">>> x10</button><button onclick="simulate(2, 100)">>> x100</button></p>
+<p><a class="button3" onclick="simulate(2)">Simulate</a><a class="button3" onclick="simulate(2, 10)">>> x10</a><a class="button3" onclick="simulate(2, 100)">>> x100</a></p>
 <p>A note on this simulation: Sometimes the final min seller price is "none". This is because all the sellers were able to sell their share. We do not count these cases into the computations :-)</p>
 Now, let's assume there are 2x more sellers (each price has two sellers) than buyers, everyone still being perfectly rational. Press "simulate" to see what happens. Do you see a trend?
 <pre><code id="simulation3">
 </code></pre>
-<p><button onclick="simulate(3)">Simulate</button><button onclick="simulate(3, 10)">>> x10</button><button onclick="simulate(3, 100)">>> x100</button></p>
+<p><a class="button3" onclick="simulate(3)">Simulate</a><a class="button3" onclick="simulate(3, 10)">>> x10</a><a class="button3" onclick="simulate(3, 100)">>> x100</a></p>
 
 If you run this a lot of times, you'll come up with these stats:
 <ul>
