@@ -1,5 +1,5 @@
 body > div {
-  overflow-x: hidden;
+  /*overflow-x: hidden;*/
 }
 body a {
   color: inherit;
