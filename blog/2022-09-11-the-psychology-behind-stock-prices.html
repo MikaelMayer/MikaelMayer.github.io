@@ -47,7 +47,7 @@ code:not(#first-story) {
 With so many ways to invest your spare money in today's world, stocks often come first in mind.
 Buying a company stock is literally buying a part of that company. You hope to get either dividends, or stock appreciation, or both.
 Although dividends are fixed by companies every quarter or every month, stock prices are not fixed by the company themselves.
-You've heard of supply and demand, high-frequency trading, market volatility, but what does the monster really looks like?
+You've heard of supply and demand, high-frequency trading, market volatility, but what does the monster really look like?
 </p>
 
 <p>
@@ -83,7 +83,7 @@ $1 per month.
 <!-- Animation of the company that outputs $21 every month and they arrive in the pockets of the shareholders --->
 
 <p>The Company decided to become public, and in that remote country, it <a href="#ThecostofanIPO">:was free to file an IPO</a>.
-On the first day of trading, the 21 of the Company's shareholders actually planned on selling their share, and 21 buyers planned on buying one share each.
+On the first day of trading, the 21 Company's shareholders actually planned on selling their share, and 21 buyers planned on buying one share each.
 None of these sellers or buyers actually needed the money for their own needs, they were just in search of better investments.</p>
 <p>The 21 shareholders (the sellers) had different expectations on rentability. As such, they each had a unique minimum selling price between $90 and $110. The 21 buyers also had different expectations on rentability, and they also had a unique maximum buying price between $90 and $110.</p>
 
@@ -99,19 +99,19 @@ Let's look at the buyer's side first. What are the expectations of the buyers?<b
 That makes sense. The buyers with the highest prices have the least expectations. Now, what on the seller's side?
 <ul>
 <li>A shareholder selling a share for a minimum price of $90 means that, from their point of view, the rentability of that company is $1/$90, which is 1.11% per month; or 13.33% per year. If they sell rationally, it means that they think they can obtain a better rentability and make a better use of their $90 elsewhere. That's why they are willing to sell at this price (or above!)
-</li><li>Similarly, a shareholder selling a share for a minimum price of $110 views the company's rentability as $1/$110, which is 0.9% per month, or 10.91% per year, and believe it can find better than that rate elsewhere.
+</li><li>Similarly, a shareholder selling a share for a minimum price of $110 views the company's rentability as $1/$110, which is 0.9% per month, or 10.91% per year, and believes it can find better than that rate elsewhere.
 </li></ul>
-This is interesting and almost counter-intuitive! More often than not, when shareholders like you and I sell at a lower price than others, it usually means that they think company is not performing as expected and they want to <a href="https://www.youtube.com/watch?v=MxPptm30EeQ">"limit their losses"</a>, not that they believe that the company is highly profitable. So what's the catch here? There is none. If a company is performing as usual, selling it at a way lower price than normal is not rational, unless the seller needs the money. Experienced buyers know this, as they think they buy a very profitable stock.
+This is interesting and almost counter-intuitive! More often than not, when shareholders like you and I sell at a lower price than others, it usually means that they think Company is not performing as expected and they want to <a href="https://www.youtube.com/watch?v=MxPptm30EeQ">"limit their losses"</a>, not that they believe that the company is highly profitable. So what's the catch here? There is none. If a company is performing as usual, selling it at a way lower price than normal is not rational, unless the seller needs the money. Experienced buyers know this, as they think they buy a very profitable stock.
 <p></p>
 <p>
-Now, what will now happen the first day of trading?
+Now, what will now happen on the first day of trading?
 </p>
 <h2>The first day of trading</h2>
-<p>The day of trading goes as follow: One by one, a seller (or a buyer) enters the "market". The market is a place where they either find the best deal they can accept, or post publicly their selling (or buying) price.</p>
+<p>The day of trading goes as follows: One by one, a seller (or a buyer) enters the "market". The market is a place where they either find the best deal they can accept, or post publicly their selling (or buying) price.</p>
 
 <p>
 For example, if a seller willing to sell their share for at least $106 enters the market, and the higher buyer already present is bidding for $108, then the seller will just sell their share for $108 and both <a href="#Whatisanorderbook">:leave the market</a>.
-To the contray, if the highest buyer already present is bidding for $104, then this seller will just post publicly their selling price of $106 and wait <a href="#whatisanendofdayorder">:till the end of the day.</a></p>
+To the contrary, if the highest buyer already present is bidding for $104, then this seller will just post publicly their selling price of $106 and wait <a href="#whatisanendofdayorder">:till the end of the day.</a></p>
 
 <p>One crucial aspect of the simulation is, sellers and buyers enter in a random order. So, let's do a simulation of the day of trading. Click on "Next" to make a seller (or buyer) enter the market. Their minimum price (or maximum price) is indicated in parentheses:</p>
 
@@ -120,18 +120,18 @@ No one is in the market.
 </code>
 </pre>
 <button id="next-button" onclick="next()">Next</button><button id="restart-button" onclick="restart()" disabled="">Restart</button>
-<p>Ok, we are on to something. We see clearly how deals can be "closed", and how the number of sellers/buyers can increase or decrease. But did you remark that every transaction has a different price? What else is striking?
+<p>Ok, we are onto something. We see clearly how deals can be "closed", and how the number of sellers/buyers can increase or decrease. But did you remark that every transaction has a different price? What else is striking?
 
 With all the steps being perfectly rational, you can already understand concepts that have real-life meaning:
 </p><ul>
 <li>At any point, the <b>stock price</b> is <a href="#Whatisthestockpricenormally">:<i>the minimum price asked by a seller</i></a> in the market. 
-</li><li>When a buyer comes in and makes a trade on the minimum sellers' price, <b>the price increases</b> <i>because the next seller always offer a higher stock price by definition!</i> We got half of our answer! <span style="color:green;font-weight:bold">✓</span>
-</li><li>When a seller comes in and makes trade on the maximum buyers' price, <b>the price does not decrease</b> because the buyer is out, but the minimum seller's price hasn't changed.
+</li><li>When a buyer comes in and makes a trade on the minimum sellers' price, <b>the price increases</b> <i>because the next seller always offers a higher stock price by definition!</i> We got half of our answer! <span style="color:green;font-weight:bold">✓</span>
+</li><li>When a seller comes in and makes a trade on the maximum buyers' price, <b>the price does not decrease</b> because the buyer is out, but the minimum seller's price hasn't changed.
 </li><li>When a seller comes in, and offers a price less than the previous minimum without finding a deal, <b>the price goes down by definition</b> because the minimum sellers' price decreases.<span style="color:green;font-weight:bold">✓</span>
 </li></ul>
 We can see through this simple example how a stock price really reflects the offer and the demand. 
 <p>
-Now, you might wonder, how does the evolution of the price looks like really? And what other rational and uniformly distributed factors can still influence that price?
+Now, you might wonder, what does the evolution of the price really look like? And what other rational and uniformly distributed factors can still influence that price?
 </p>
 <h2>The Final Price</h2>
 Let's draw the curve of the price during the day, from our simulator before. Press "Simulate" to generate a full simulation of our market: On the horizontal axis, the time. The vertical axis indicates the price. On each column, the price at which the last transaction happened.
@@ -140,16 +140,16 @@ Let's draw the curve of the price during the day, from our simulator before. Pre
 </code></pre>
 <p><button onclick="simulate(1)">Simulate</button><button onclick="simulate(1, 10)">>> x10</button><button onclick="simulate(1, 100)">>> x100</button></p>
 <p>
-A few interesting observations. First, the "curves" obtained really look like typical stock price move during the day of any company stock. This empirically confirms our model, despite it being based on totally rational agents with uniformly distributed expectations.
+A few interesting observations. First, the "curves" obtained really look like typical stock price moves during the day of any company stock. This empirically confirms our model, despite it being based on totally rational agents with uniformly distributed expectations.
 Second, you can imagine that, when the price does not move, it means that a buyer or a seller entered the market but could not find a deal. Hence, if you want to visualize everyone - not just the last transactions, you can 
 <input type="checkbox" id="displaymarketstatus"><label for="displaymarketstatus">check this to display the <a href="#whatisthefullmarketstatus">:full market status</a></label> and re-run the simulations.
 </p>
-Now, let's assume there are 2x more buyers (each price has two buyers) than sellers, everyone still being perfectly rationale. Press "simulate" to see what happens. Do you see a trend?
+Now, let's assume there are 2x more buyers (each price has two buyers) than sellers, everyone still being perfectly rational. Press "simulate" to see what happens. Do you see a trend?
 <pre><code id="simulation2">
 </code></pre>
 <p><button onclick="simulate(2)">Simulate</button><button onclick="simulate(2, 10)">>> x10</button><button onclick="simulate(2, 100)">>> x100</button></p>
-<p>A note on this simulation: Sometimes the final min seller price is "none". This is because all the sellers were able to sell their share. We do not count these case into the computations :-)</p>
-Now, let's assume there are 2x more sellers (each price has two sellers) than buyers, everyone still being perfectly rationale. Press "simulate" to see what happens. Do you see a trend?
+<p>A note on this simulation: Sometimes the final min seller price is "none". This is because all the sellers were able to sell their share. We do not count these cases into the computations :-)</p>
+Now, let's assume there are 2x more sellers (each price has two sellers) than buyers, everyone still being perfectly rational. Press "simulate" to see what happens. Do you see a trend?
 <pre><code id="simulation3">
 </code></pre>
 <p><button onclick="simulate(3)">Simulate</button><button onclick="simulate(3, 10)">>> x10</button><button onclick="simulate(3, 100)">>> x100</button></p>
@@ -161,14 +161,14 @@ If you run this a lot of times, you'll come up with these stats:
 </li><li>When the number of sellers is 2x the number of buyers, although they are all uniformly distributed around 100 in terms of price, the final price's average is $94.1 (standard deviation 1.7)
 </li></ul>
 
-Beyond the timing of entering buyers and sellers, you now have another factor that influence the final price even in a perfectly rational market: <i>the number of buyers vs. the number of sellers</i>.
+Beyond the timing of entering buyers and sellers, you now have another factor that influences the final price even in a perfectly rational market: <i>the number of buyers vs. the number of sellers</i>.
 Here is how we could manipulate a stock price by using this very interesting remark:
 <ul>
 <li>If we want a stock's price to decrease, we should bring people to stop buying it, and wait patiently for desperate sellers to offer lower prices - even if it says nothing about the intrinsic value of the company!
 </li><li>Conversely, for a stock price to increase, we should bring people to buy a stock (e.g. <a href="#WhathappenedwithGameStoponReddit">:through advertising for this stock in Reddit</a>).
 </li></ul>
-So beware, the next time you buy a stock just because it was mentioned in some journal with a high audience. You might just be contributing to artificially increasing the stock and make a seller with high expectations happy :-).
-And beware, the next time you sell a stock because no one wants it anymore. The stock price might have artificially go down because there were less buyers, for example because they are all scared of some bad news about the stock market (which has sometimes nothing to do with the company's actual performance).
+So beware, the next time you buy a stock just because it was mentioned in some journal with a high audience. You might just be contributing to artificially increasing the stock and making sellers with high expectations happy :-).
+And beware, the next time you sell a stock because no one wants it anymore. The stock price might have artificially gone down because there were less buyers, for example because they are all scared of some bad news about the stock market (which sometimes has nothing to do with the company's actual performance).
 <p></p>
 <p>
 Thanks for reading until now. I hope you had fun experimenting with a toy stock market!
@@ -186,8 +186,8 @@ According to <a href="&#13;&#10;https://www.investopedia.com/terms/e/end-of-day-
 <p>An order book is what was called the "market" in the story. As in the story, it contains bids from buyers and asks from sellers.
 You can <a href="https://www.investopedia.com/terms/o/order-book.asp#:~:text=Key%20Takeaways,%2C%20currencies%2C%20and%20even%20cryptocurrencies">learn more about order books there</a></p>
 
-<h3>Do you have an example of order book?</h3>
-<p>You can find a realtime example of an order book <a href="https://www.binance.com/en/trade/BNB_BUSD?theme=dark&amp;type=spot">for example for cryptocurrencies here</a>
+<h3>Do you have an example of an order book?</h3>
+<p>You can find a real time example of an order book <a href="https://www.binance.com/en/trade/BNB_BUSD?theme=dark&amp;type=spot">for example for cryptocurrencies here</a>
 
 </p><h3>How to read these complicated order books?</h3>
 <p>For real-life applications you can follow this <a href="https://guides.cryptowat.ch/trader-education/order-books-and-market-depth-charts-explained">excellent tutorial about real order books</a>
@@ -198,11 +198,11 @@ In real life, normally, the stock price consists of both the maximum price offer
 </p>
 <h3>What happened with GameStop on Reddit?</h3>
 <p>
-<a href="https://www.thetradenews.com/the-reddit-revolt-gamestop-and-the-impact-of-social-media-on-institutional-investors/">GameStop's price increased</a> despite rational analyses because a lot of reddit-propulsed investors decided to make short sales to fail, which has the real effect of keeping the price artificially high.
+<a href="https://www.thetradenews.com/the-reddit-revolt-gamestop-and-the-impact-of-social-media-on-institutional-investors/">GameStop's price increased</a> despite rational analyses because a lot of reddit-propelled investors decided to make short sales to fail, which has the real effect of keeping the price artificially high.
 </p>
 <h3>What is the full market status?</h3>
 <p>
-Each column depicts what happens when someone new enters the market: 's' means there is a seller that did not sell yet, 'b' a buyer that did not buy yet, 'S' a seller that just entered the market and sold, 'B' a buyer that just entered the market and bought, and '-' indicates the last transaction price. At any point, there is a gap between all the buyers (below) and all the sellers (above), 
+Each column depicts what happens when someone new enters the market: 's' means there is a seller that did not sell yet, 'b' a buyer that did not buy yet, 'S' a seller that just entered the market and sold, 'B' a buyer that just entered the market and bought, and '-' indicates the last transaction price. <a href="#Doyouhaveanexampleofanorderbook">:At any point, there is a gap between all the buyers (below) and all the sellers (above)</a>, 
 </p>
 <script src="sellersbuyers.js"></script>
 </div></body>
