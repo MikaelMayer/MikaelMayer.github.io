@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Cryptography</title>
+    <style>
+body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f0f4f8;
+    color: #333;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+h3 {
+    font-size: 26px;
+    font-weight: 600;
+    text-align: center;
+    margin: 10px 0;
+    color: #000000;
+}
+
+p {
+    max-width: 600px;
+    font-size: 16px;
+    text-align: center;
+    margin: 0 20px 20px;
+    padding: 0 10px;
+    line-height: 1.5;
+    color: #555;
+}
+
+label {
+    font-weight: 500;
+    margin-top: 10px;
+    color: #555;
+}
+
+input, textarea {
+    display: block;
+    width: 100%;
+    max-width: 300px;
+    padding: 10px;
+    margin: 10px 0 20px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-sizing: border-box;
+}
+
+#canvas-section {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+    margin-top: 20px;
+    gap: 20px;
+}
+
+.canvas-container {
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 15px;
+    max-width: 320px;
+    text-align: center;
+}
+
+canvas {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-top: 10px;
+    width: 100%;
+    height: auto;
+    max-width: 280px;
+    image-rendering: pixelated;
+}
+
+.download-button {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 8px 16px;
+    background-color: #007BFF;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 5px;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+}
+
+.download-button:hover {
+    background-color: #0056b3;
+}
+
+@media (max-width: 600px) {
+    h1 {
+        font-size: 22px;
+    }
+    
+    p {
+        font-size: 14px;
+        margin: 0 10px 20px;
+    }
+
+    input, textarea {
+        max-width: 100%;
+    }
+    
+    #canvas-section {
+        flex-direction: column;
+        align-items: center;
+        gap: 15px;
+    }
+
+    canvas {
+        max-width: 100%;
+    }
+}
+.tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.tab-button {
+    padding: 10px;
+    border: none;
+    background-color: #ddd;
+    cursor: pointer;
+}
+
+.tab-button.active {
+    background-color: #007BFF;
+    color: #fff;
+}
+
+.tab-content {
+    position: relative;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.tab-content:not(.active) {
+    display: none !important;
+}
+
+#video-feed-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+}
+
+#video {
+   position: relative;
+   width: 100%;
+   max-width: 600px;
+   height: auto;
+   z-index: 1;
+}
+
+#overlay-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none; /* Allows interaction with video while overlaying */
+    z-index: 2;
+}
+    </style>
+</head>
+<body>
+
+<h1>Visual Cryptography Generator</h1>
+<p>Welcome to the Visual Cryptography Generator! Create secure cryptographic shares from a B&W image or custom text by splitting them into two randomized shares that look like noise on their own. Only when combined will the hidden content be revealed. Upload an image or enter text to generate shares for secure sharing!
+</p><p>
+Print the shares and reveal the message by overlaying them and holding them to a strong light, or print one on a transparent paper.
+Use this tool for scavenger hunts, secure messages, educational puzzles, or secret codes. Visual cryptography adds a fun, secure twist to communication!</p>
+<div class="tabs">
+  <button class="tab-button active" data-target="text-input-container">Text</button>
+  <button class="tab-button" data-target="image-upload-container">Image</button>
+  <button class="tab-button" data-target="video-feed-container">Video Feed</button>
+</div>
+
+<div id="text-input-container" class="tab-content">
+  <label for="text-input">Type text:</label>
+  <textarea id="text-input" placeholder="Enter your text here" rows="3"></textarea>
+</div>
+
+<div id="image-upload-container" class="tab-content">
+  <label for="image-upload">Upload a custom B&W image:</label>
+  <input type="file" id="image-upload" accept="image/png">
+</div>
+<div id="video-feed-container" class="tab-content">
+   <h3>Live Video Feed with secret Overlay</h3>
+   <div style="position:relative">
+   <video id="video" autoplay playsinline style="width: 100%; max-width: 300px;"></video>
+   <canvas id="overlay-canvas" style="position: absolute; top: 0; left: 0; width: 100%; max-width: 300px;"></canvas>
+   </div>
+   <label for="video-image-upload">Upload a secret image to overlay:</label>
+   <input type="file" id="video-image-upload" accept="image/png">
+</div>
+
+<div id="canvas-section" style="display: none;">
+    <div class="canvas-container">
+        <h3>Original Image</h3>
+        <canvas id="original-image"></canvas>
+    </div>
+    <div class="canvas-container">
+        <h3>Superimposed Result</h3>
+        <canvas id="superimposed-canvas"></canvas>
+    </div>
+    <div class="canvas-container">
+        <h3>Share 1</h3>
+        <canvas id="share1-canvas"></canvas>
+        <a id="download-share1" class="download-button">Download Share 1</a>
+    </div>
+    <div class="canvas-container">
+        <h3>Share 2</h3>
+        <canvas id="share2-canvas"></canvas>
+        <a id="download-share2" class="download-button">Download Share 2</a>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Set default tab content visibility on page load
+    document.getElementById('text-input-container').classList.add('active');
+    document.querySelector('.tab-button[data-target="text-input-container"]').classList.add('active');
+    const video = document.getElementById('video');
+    const overlayCanvas = document.getElementById('overlay-canvas');
+    const overlayCtx = overlayCanvas.getContext('2d');
+
+  // Handle overlay image upload specifically for video feed
+  const videoImageUpload = document.getElementById('video-image-upload');
+  videoImageUpload.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file && file.type.startsWith('image/')) {
+        const img = new Image();
+
+        img.onload = () => {
+            console.log("Image loaded successfully");
+            overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            overlayCtx.globalCompositeOperation = 'source-over'; // Set composite mode
+            overlayCtx.drawImage(img, 0, 0, overlayCanvas.width, overlayCanvas.height);
+
+            // Process the image data to make white pixels transparent
+            const imageData = overlayCtx.getImageData(0, 0, overlayCanvas.width, overlayCanvas.height);
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                // Check if the pixel is white (R=255, G=255, B=255)
+                const isWhite = data[i] > 240 && data[i + 1] > 240 && data[i + 2] > 240;
+                if (isWhite) {
+                    data[i + 3] = 0; // Set alpha to 0 to make it transparent
+                    console.log("Pixel made transparent at index:", i);
+                } else {
+                  data[i] = 0;
+                  data[i + 1] = 0;
+                  data[i + 2] = 0;
+                }
+            }
+            console.log("Image processing completed");
+            
+            // Put the modified image data back onto the canvas
+            overlayCtx.putImageData(imageData, 0, 0);
+        };
+
+        img.onerror = () => {
+            console.error("Failed to load image. There might be a CORS issue or the file type is unsupported.");
+        };
+
+        img.src = URL.createObjectURL(file);
+      }
+  });
+});
+
+function startVideo() {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          navigator.mediaDevices.getUserMedia({ video: true })
+          .then((stream) => {
+              video.srcObject = stream;
+              video.onloadedmetadata = () => {
+                
+                 //const overlayCanvas = document.getElementById('overlay-canvas');
+                //overlayCanvas.width = video.videoWidth;
+                // overlayCanvas.height = video.videoHeight;
+              };
+          })
+          .catch((err) => {
+              console.error("Error accessing webcam: ", err);
+          });
+      }
+  }
+  
+document.querySelectorAll('.tab-button').forEach(button => {
+    button.addEventListener('click', function() {
+        // Remove active class from all buttons
+        document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+        // Add active class to the clicked button
+        this.classList.add('active');
+
+        // Hide all tab contents
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        // Show the target content
+        const target = document.getElementById(this.dataset.target);
+        target.classList.add('active');
+        if (this.dataset.target === 'video-feed-container') {
+          startVideo();
+        }
+    });
+});
+document.getElementById('image-upload').addEventListener('change', function(e) {
+    if (!e.target.files[0]) return;
+
+    const file = e.target.files[0];
+    const fileName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+
+    if (file.type !== 'image/png') {
+        alert('Please upload a PNG image.');
+        return;
+    }
+
+    const img = new Image();
+    const reader = new FileReader();
+
+    reader.onload = function(event) {
+        img.onload = function() {
+            processImage(img, fileName);
+        }
+        img.src = event.target.result;
+    }
+
+    reader.readAsDataURL(file);
+});
+function drawText(canvas, text) {
+    const ctx = canvas.getContext('2d');
+    ctx.font = '24px Arial'; // Adjust font size to increase sharpness
+
+    const lines = text.split('\n'); // Limit to 3 lines
+    const maxWidth = Math.max(...lines.map(line => ctx.measureText(line).width));
+    const lineHeight = 24; // Adjust based on font size
+    const textHeight = lines.length * lineHeight;
+
+    // Set the canvas dimensions to match the text size
+    canvas.width = maxWidth;
+    canvas.height = textHeight + lineHeight * 0.2; // Extra space for vertical centering
+
+    // Apply pixelated rendering
+    canvas.style.width = `${canvas.width}px`;
+    canvas.style.height = `${canvas.height}px`;
+    canvas.style.imageRendering = 'pixelated';
+
+    // Draw text on the canvas
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#000000';
+    ctx.font = '24px Arial';
+
+    // Center each line vertically
+    lines.forEach((line, index) => {
+      const lineWidth = ctx.measureText(line).width;
+      const xOffset = (canvas.width - lineWidth) / 2;
+      const yOffset = (canvas.height - textHeight) / 2 + lineHeight * (index + 1);
+      ctx.fillText(line, xOffset, yOffset);
+    });
+}
+
+document.getElementById('text-input').addEventListener('input', function(e) {
+    const text = e.target.value;
+    if (!text) return;
+    const canvas = document.createElement('canvas');
+    drawText(canvas, text);
+
+    processImage(canvas, 'text_input');
+});
+
+function processImage(img, fileName) {
+    // Display canvases
+    document.getElementById('canvas-section').style.display = 'block';
+
+    // Original image canvas
+    const originalCanvas = document.getElementById('original-image');
+    originalCanvas.width = img.width;
+    originalCanvas.height = img.height;
+    const originalCtx = originalCanvas.getContext('2d');
+    originalCtx.drawImage(img, 0, 0);
+
+    // Create share canvases
+    const share1Canvas = document.getElementById('share1-canvas');
+    const share2Canvas = document.getElementById('share2-canvas');
+    const superimposedCanvas = document.getElementById('superimposed-canvas');
+    const scale = 6; // Each pixel becomes a 6x6 block
+    const newWidth = img.width * scale;
+    const newHeight = img.height * scale;
+
+    share1Canvas.width = newWidth;
+    share1Canvas.height = newHeight;
+    share2Canvas.width = newWidth;
+    share2Canvas.height = newHeight;
+    superimposedCanvas.width = newWidth;
+    superimposedCanvas.height = newHeight;
+
+    const share1Ctx = share1Canvas.getContext('2d');
+    const share2Ctx = share2Canvas.getContext('2d');
+    const superimposedCtx = superimposedCanvas.getContext('2d');
+
+    // Get pixel data from original image
+    const imgData = originalCtx.getImageData(0, 0, img.width, img.height);
+    const pixels = imgData.data;
+
+    // Define patterns
+    const patterns = [
+        // Pattern 1
+        { positions: [ [0,0], [1,1] ] },
+        // Pattern 2
+        { positions: [ [0,1], [1,0] ] },
+        // Pattern 3
+        { positions: [ [0,0], [1,0] ] },
+        // Pattern 4
+        { positions: [ [0,1], [1,1] ] },
+        // Pattern 5
+        { positions: [ [0,0], [0,1] ] },
+        // Pattern 6
+        { positions: [ [1,0], [1,1] ] }
+    ];
+
+    // Process each pixel
+    for (let y = 0; y < img.height; y++) {
+        for (let x = 0; x < img.width; x++) {
+            // Get pixel index
+            const idx = (y * img.width + x) * 4;
+            const r = pixels[idx];
+            const g = pixels[idx + 1];
+            const b = pixels[idx + 2];
+
+            // Determine if pixel is black or white
+            const isWhite = (r + g + b) > (255 * 3) / 2;
+
+            // Randomly select a pattern
+            const patternIdx = Math.floor(Math.random() * patterns.length);
+            const pattern = patterns[patternIdx];
+
+            // For black pixels, complement the pattern in share 2
+            const complement = !isWhite;
+
+            // Draw patterns on shares
+            drawPattern(share1Ctx, x * scale, y * scale, pattern.positions, false);
+            drawPattern(share2Ctx, x * scale, y * scale, pattern.positions, complement);
+        }
+    }
+
+    // Draw the superimposed image
+    const share1Data = share1Ctx.getImageData(0, 0, newWidth, newHeight).data;
+    const share2Data = share2Ctx.getImageData(0, 0, newWidth, newHeight).data;
+    const superimposedData = superimposedCtx.createImageData(newWidth, newHeight);
+
+    for (let i = 0; i < share1Data.length; i += 4) {
+      // If both shares are black at this pixel, make the superimposed pixel black
+      const isBlack = (share1Data[i] === 0 || share2Data[i] === 0);
+      superimposedData.data[i] = isBlack ? 0 : 255;
+      superimposedData.data[i + 1] = isBlack ? 0 : 255;
+      superimposedData.data[i + 2] = isBlack ? 0 : 255;
+      superimposedData.data[i + 3] = 255; // Full opacity
+    }
+
+    superimposedCtx.putImageData(superimposedData, 0, 0);
+
+    // Set download links
+    setDownloadLink('download-share1', share1Canvas, fileName + '_share1.png');
+    setDownloadLink('download-share2', share2Canvas, fileName + '_share2.png');
+}
+
+function drawPattern(ctx, x, y, positions, complement) {
+    const blockSize = 3; // Size of each 3x3 block
+    const colors = ['#000000', '#FFFFFF']; // Black and white
+    const positionsAll = [ [0,0], [0,1], [1,0], [1,1] ];
+
+    positionsAll.forEach(pos => {
+        const posX = x + pos[0] * blockSize;
+        const posY = y + pos[1] * blockSize;
+
+        // Determine color
+        let colorIndex = positions.some(p => p[0] === pos[0] && p[1] === pos[1]) ? 0 : 1;
+        if (complement) colorIndex = 1 - colorIndex;
+
+        ctx.fillStyle = colors[colorIndex];
+        ctx.fillRect(posX, posY, blockSize, blockSize);
+    });
+}
+
+function setDownloadLink(linkId, canvas, filename) {
+    const link = document.getElementById(linkId);
+    link.href = canvas.toDataURL();
+    link.download = filename;
+}
+
+// Prevent default behavior when dropping files
+window.addEventListener("dragover", function(e) {
+    e.preventDefault();
+}, false);
+window.addEventListener("drop", function(e) {
+    e.preventDefault();
+}, false);
+</script>
+
+</body>
+</html>
