@@ -76,7 +76,6 @@ input, textarea {
 canvas {
     border: 1px solid #ddd;
     border-radius: 8px;
-    margin-top: 10px;
     width: 100%;
     height: auto;
     max-width: 280px;
@@ -206,7 +205,7 @@ Use this tool for scavenger hunts, secure messages, educational puzzles, or secr
    <h3>Live Video Feed with secret Overlay</h3>
    <div style="position:relative">
    <video id="video" autoplay playsinline style="width: 100%; max-width: 300px;"></video>
-   <canvas id="overlay-canvas" style="position: absolute; top: 0; left: 0; width: 100%; max-width: 300px;"></canvas>
+   <canvas id="overlay-canvas" style="position: absolute; top: 0; left: 0; width: auto; height: auto;"></canvas>
    </div>
    <label for="video-image-upload">Upload a secret image to overlay:</label>
    <input type="file" id="video-image-upload" accept="image/png">
@@ -251,27 +250,38 @@ document.addEventListener('DOMContentLoaded', function() {
 
         img.onload = () => {
             console.log("Image loaded successfully");
+
+            // Calculate the new canvas dimensions to maintain the image's aspect ratio
+            const aspectRatio = img.height / img.width;
+            const newWidth = overlayCanvas.width; // Keep width maximized to canvas width
+            const newHeight = newWidth * aspectRatio; // Calculate height based on aspect ratio
+
+            // Set the canvas to the new dimensions
+            overlayCanvas.height = newHeight;
+
+            // Clear the canvas and set the global composite operation
             overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
             overlayCtx.globalCompositeOperation = 'source-over'; // Set composite mode
-            overlayCtx.drawImage(img, 0, 0, overlayCanvas.width, overlayCanvas.height);
+
+            // Draw the image to fit the canvas
+            overlayCtx.drawImage(img, 0, 0, newWidth, newHeight);
 
             // Process the image data to make white pixels transparent
-            const imageData = overlayCtx.getImageData(0, 0, overlayCanvas.width, overlayCanvas.height);
+            const imageData = overlayCtx.getImageData(0, 0, newWidth, newHeight);
             const data = imageData.data;
             for (let i = 0; i < data.length; i += 4) {
                 // Check if the pixel is white (R=255, G=255, B=255)
                 const isWhite = data[i] > 240 && data[i + 1] > 240 && data[i + 2] > 240;
                 if (isWhite) {
                     data[i + 3] = 0; // Set alpha to 0 to make it transparent
-                    console.log("Pixel made transparent at index:", i);
                 } else {
-                  data[i] = 0;
-                  data[i + 1] = 0;
-                  data[i + 2] = 0;
+                    data[i] = 0;
+                    data[i + 1] = 0;
+                    data[i + 2] = 0;
                 }
             }
             console.log("Image processing completed");
-            
+
             // Put the modified image data back onto the canvas
             overlayCtx.putImageData(imageData, 0, 0);
         };
@@ -282,24 +292,45 @@ document.addEventListener('DOMContentLoaded', function() {
 
         img.src = URL.createObjectURL(file);
       }
-  });
+    });
 });
 
 function startVideo() {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-          navigator.mediaDevices.getUserMedia({ video: true })
-          .then((stream) => {
-              video.srcObject = stream;
-              video.onloadedmetadata = () => {
-                
-                 //const overlayCanvas = document.getElementById('overlay-canvas');
-                //overlayCanvas.width = video.videoWidth;
+        navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: { exact: "environment" } 
+            }
+        })
+        .then((stream) => {
+            video.srcObject = stream;
+            video.onloadedmetadata = () => {
+                // const overlayCanvas = document.getElementById('overlay-canvas');
+                // overlayCanvas.width = video.videoWidth;
                 // overlayCanvas.height = video.videoHeight;
-              };
-          })
-          .catch((err) => {
-              console.error("Error accessing webcam: ", err);
-          });
+            };
+        })
+        .catch((error) => {
+            console.warn("Front camera not available, attempting to use any available camera.");
+
+            // Fallback to any available camera
+            navigator.mediaDevices.getUserMedia({
+                video: {
+                  facingMode: "environment"
+                }
+            })
+            .then((stream) => {
+                video.srcObject = stream;
+                video.onloadedmetadata = () => {
+                    // const overlayCanvas = document.getElementById('overlay-canvas');
+                    // overlayCanvas.width = video.videoWidth;
+                    // overlayCanvas.height = video.videoHeight;
+                };
+            })
+            .catch((fallbackError) => {
+                console.error("Error accessing webcam: ", fallbackError);
+            });
+        });
       }
   }
   
