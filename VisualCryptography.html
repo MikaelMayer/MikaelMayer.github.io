@@ -253,7 +253,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Calculate the new canvas dimensions to maintain the image's aspect ratio
             const aspectRatio = img.height / img.width;
-            const newWidth = overlayCanvas.width; // Keep width maximized to canvas width
+            const newWidth = overlayCanvas.width/2; // Keep width maximized to canvas width
             const newHeight = newWidth * aspectRatio; // Calculate height based on aspect ratio
 
             // Set the canvas to the new dimensions
@@ -264,10 +264,10 @@ document.addEventListener('DOMContentLoaded', function() {
             overlayCtx.globalCompositeOperation = 'source-over'; // Set composite mode
 
             // Draw the image to fit the canvas
-            overlayCtx.drawImage(img, 0, 0, newWidth, newHeight);
+            overlayCtx.drawImage(img, newWidth/2, 0, newWidth, newHeight);
 
             // Process the image data to make white pixels transparent
-            const imageData = overlayCtx.getImageData(0, 0, newWidth, newHeight);
+            const imageData = overlayCtx.getImageData(0, 0, overlayCanvas.width, overlayCanvas.height);
             const data = imageData.data;
             for (let i = 0; i < data.length; i += 4) {
                 // Check if the pixel is white (R=255, G=255, B=255)
