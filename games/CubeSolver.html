@@ -1,0 +1,43 @@
+<!DOCTYPE html><html><head>
+<meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1.0">
+<title>Back to green</title><style>
+body{margin:0;padding:0;box-sizing:border-box;overflow:hidden;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;background:#f2f2f2}
+h1{margin:8px;font-size:1.2rem;color:#333;text-align:center}
+s{flex:1;width:100%;display:flex;justify-content:center;align-items:center;perspective:1000px}
+c{position:relative;width:200px;height:200px;transform-style:preserve-3d;transition:.1s}
+d{position:absolute;width:200px;height:200px;border:2px solid #fff}
+o{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.75);color:#fff;padding:10px 20px;border-radius:8px;display:none}
+.show{display:block!important}
+</style></head>
+<body>
+<h1>Level <span id=L></span><br><i>Tap faces back to green</i></h1>
+<s><c><d></d><d></d><d></d><d></d><d></d><d></d></c></s>
+<o id=Z>Congratulations, you saved the planet!</o>
+<script>
+let D=document,Q=x=>D.querySelector(x),A=x=>D.querySelectorAll(x),CX="clientX",CY="clientY",
+cs=["#080","#00f","#808","#ff0","#f00"],n=0,m=cs.length-1,u=Q("c"),f=[...A("d")],z=Q("#Z"),v=Q("#L"),
+Sx,Sy,X=0,Y=0,Rx=0,Ry=0,I=false,TH=5,Fc=[0,0,0,0,0,0],Sp=false,
+G=[[0,1,3,4,5],[1,0,2,4,5],[2,1,3,4,5],[3,0,2,4,5],[4,0,1,2,3],[5,0,1,2,3]],
+T0=0,p="idle",sp=0,dx=0,dy=0,VM=3600,Du=2e3,ac=VM/Du;
+
+f.forEach((d,i)=>d.style.transform=["rotateY(0)","rotateY(90deg)","rotateY(180deg)","rotateY(-90deg)","rotateX(90deg)","rotateX(-90deg)"][i]+"translateZ(100px)");
+["touchstart","touchmove","touchend"].forEach((e,i)=>u.addEventListener(e,[TS,TM,TE][i]));
+
+function TS(e){if(Sp)return;let t=e.touches[0];Sx=t[CX];Sy=t[CY];I=true}
+function TM(e){if(Sp)return;let t=e.touches[0],xx=t[CX]-Sx,yy=t[CY]-Sy;if(Math.abs(xx)>TH||Math.abs(yy)>TH)I=false;X=Rx-.5*yy;Y=Ry+.5*xx;u.style.transform=`rotateX(${X}deg)rotateY(${Y}deg)`}
+function TE(e){if(Sp)return;if(I){let t=e.changedTouches[0],M=D.elementFromPoint(t[CX],t[CY]);M&&M.tagName=="D"&&tap(f.indexOf(M))}Rx=X;Ry=Y}
+
+function ld(L){v.textContent=L+1;Fc=[0,0,0,0,0,0];for(let i=0;i<6;i++)upd(i);scr();hm()}
+function scr(){let c=gco(),r=c.length;for(let i=0;i<6;i++){let R=Math.floor(Math.random()*r);for(;R--;)cyc(i)}}
+function gco(){return cs.slice(0,n+1)}
+function cyc(i){let c=gco();G[i].forEach(a=>{Fc[a]=(Fc[a]+1)%c.length;upd(a)})}
+function upd(i){f[i].style.background=gco()[Fc[i]]}
+function tap(i){cyc(i);chk()}
+function chk(){Fc.every(a=>!a)&&(sm("Congratulations, you saved the planet!"),cel())}
+function cel(){Sp=true;T0=performance.now();p="acc";sp=0;dx=Math.random()*2-1;dy=Math.random()*2-1;if(!dx&&!dy)dx=1;let h=Math.hypot(dx,dy);dx/=h;dy/=h;requestAnimationFrame(slp)}
+function slp(t){let dt=t-T0;T0=t;if(p=="acc"){sp+=ac*dt;if(sp>=VM){sp=VM;nxt();p="dec"}}else if(p=="dec"){sp-=ac*dt;if(sp<=0){sp=0;p="idle";Sp=false;return}}let r=sp*dt/1e3;X+=dx*r;Y+=dy*r;u.style.transform=`rotateX(${X}deg)rotateY(${Y}deg)`;p!="idle"&&requestAnimationFrame(slp)}
+function nxt(){n<m?(n++,ld(n)):sm("All levels complete! You saved the planet for good!")}
+function sm(t){z.textContent=t;z.classList.add("show")}
+function hm(){z.classList.remove("show")}
+ld(n)
+</script>
