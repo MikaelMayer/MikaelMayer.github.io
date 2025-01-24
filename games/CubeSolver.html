@@ -1,43 +1,424 @@
-<!DOCTYPE html><html><head>
-<meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1.0">
-<title>Back to green</title><style>
-body{margin:0;padding:0;box-sizing:border-box;overflow:hidden;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;background:#f2f2f2}
-h1{margin:8px;font-size:1.2rem;color:#333;text-align:center}
-s{flex:1;width:100%;display:flex;justify-content:center;align-items:center;perspective:1000px}
-c{position:relative;width:200px;height:200px;transform-style:preserve-3d;transition:.1s}
-d{position:absolute;width:200px;height:200px;border:2px solid #fff}
-o{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.75);color:#fff;padding:10px 20px;border-radius:8px;display:none}
-.show{display:block!important}
-</style></head>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Back to Blue</title>
+  <style>
+    /* Basic Reset */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    /* A more "random" star field using layered radial gradients */
+    body {
+      font-family: sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center; /* vertically center */
+      background: #000; /* base black */
+
+      /* Multiple layers with different radial sizes & positions for "random" effect */
+      background-image:
+        radial-gradient(#444 1px, transparent 1px),
+        radial-gradient(#444 1px, transparent 1px),
+        radial-gradient(#444 1px, transparent 1px),
+        radial-gradient(#444 1px, transparent 1px);
+      background-size: 10px 10px, 18px 18px, 25px 25px, 60px 60px;
+      background-position:
+        0 0,
+        9px 18px,
+        15px 5px,
+        30px 25px;
+    }
+
+    /* Title & Subtitle */
+    h1 {
+      color: #ccc;
+      margin-bottom: 10px;
+      text-align: center;
+      font-size: 1.2rem;
+    }
+
+    /* Container for 3D scene */
+    .scene {
+      width: 100vw;
+      height: 60vh; /* or any proportion you like */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      perspective: 1000px; /* essential for 3D transformations */
+    }
+
+    /* The cube (rotated in 3D) */
+    .cube {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      transform-style: preserve-3d;
+      transition: transform 0.1s;
+    }
+
+    /* Each face of the cube */
+    .face {
+      position: absolute;
+      width: 200px;
+      height: 200px;
+      border: 2px solid #fff;
+    }
+
+    /* Message overlay for "Congratulations" or final text */
+    .message-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.75);
+      color: #fff;
+      padding: 15px 25px;
+      border-radius: 8px;
+      display: none;
+      text-align: center;
+    }
+
+    .show {
+      display: block !important;
+    }
+  </style>
+</head>
+
 <body>
-<h1>Level <span id=L></span><br><i>Tap faces back to green</i></h1>
-<s><c><d></d><d></d><d></d><d></d><d></d><d></d></c></s>
-<o id=Z>Congratulations, you saved the planet!</o>
-<script>
-let D=document,Q=x=>D.querySelector(x),A=x=>D.querySelectorAll(x),CX="clientX",CY="clientY",
-cs=["#080","#00f","#808","#ff0","#f00"],n=0,m=cs.length-1,u=Q("c"),f=[...A("d")],z=Q("#Z"),v=Q("#L"),
-Sx,Sy,X=0,Y=0,Rx=0,Ry=0,I=false,TH=5,Fc=[0,0,0,0,0,0],Sp=false,
-G=[[0,1,3,4,5],[1,0,2,4,5],[2,1,3,4,5],[3,0,2,4,5],[4,0,1,2,3],[5,0,1,2,3]],
-T0=0,p="idle",sp=0,dx=0,dy=0,VM=3600,Du=2e3,ac=VM/Du;
+  <!-- Title with dynamic "Level X of Y" -->
+  <h1>
+    Level <span id="levelIndex"></span>/<span id="totalLevels"></span><br/>
+    <i>Tap faces back to blue</i>
+  </h1>
 
-f.forEach((d,i)=>d.style.transform=["rotateY(0)","rotateY(90deg)","rotateY(180deg)","rotateY(-90deg)","rotateX(90deg)","rotateX(-90deg)"][i]+"translateZ(100px)");
-["touchstart","touchmove","touchend"].forEach((e,i)=>u.addEventListener(e,[TS,TM,TE][i]));
+  <!-- 3D Scene Container -->
+  <div class="scene">
+    <div class="cube" id="cube">
+      <div class="face"></div>
+      <div class="face"></div>
+      <div class="face"></div>
+      <div class="face"></div>
+      <div class="face"></div>
+      <div class="face"></div>
+    </div>
+  </div>
 
-function TS(e){if(Sp)return;let t=e.touches[0];Sx=t[CX];Sy=t[CY];I=true}
-function TM(e){if(Sp)return;let t=e.touches[0],xx=t[CX]-Sx,yy=t[CY]-Sy;if(Math.abs(xx)>TH||Math.abs(yy)>TH)I=false;X=Rx-.5*yy;Y=Ry+.5*xx;u.style.transform=`rotateX(${X}deg)rotateY(${Y}deg)`}
-function TE(e){if(Sp)return;if(I){let t=e.changedTouches[0],M=D.elementFromPoint(t[CX],t[CY]);M&&M.tagName=="D"&&tap(f.indexOf(M))}Rx=X;Ry=Y}
+  <!-- Overlay for messages -->
+  <div id="messageBox" class="message-overlay">
+    Congratulations, you saved the planet!
+  </div>
 
-function ld(L){v.textContent=L+1;Fc=[0,0,0,0,0,0];for(let i=0;i<6;i++)upd(i);scr();hm()}
-function scr(){let c=gco(),r=c.length;for(let i=0;i<6;i++){let R=Math.floor(Math.random()*r);for(;R--;)cyc(i)}}
-function gco(){return cs.slice(0,n+1)}
-function cyc(i){let c=gco();G[i].forEach(a=>{Fc[a]=(Fc[a]+1)%c.length;upd(a)})}
-function upd(i){f[i].style.background=gco()[Fc[i]]}
-function tap(i){cyc(i);chk()}
-function chk(){Fc.every(a=>!a)&&(sm("Congratulations, you saved the planet!"),cel())}
-function cel(){Sp=true;T0=performance.now();p="acc";sp=0;dx=Math.random()*2-1;dy=Math.random()*2-1;if(!dx&&!dy)dx=1;let h=Math.hypot(dx,dy);dx/=h;dy/=h;requestAnimationFrame(slp)}
-function slp(t){let dt=t-T0;T0=t;if(p=="acc"){sp+=ac*dt;if(sp>=VM){sp=VM;nxt();p="dec"}}else if(p=="dec"){sp-=ac*dt;if(sp<=0){sp=0;p="idle";Sp=false;return}}let r=sp*dt/1e3;X+=dx*r;Y+=dy*r;u.style.transform=`rotateX(${X}deg)rotateY(${Y}deg)`;p!="idle"&&requestAnimationFrame(slp)}
-function nxt(){n<m?(n++,ld(n)):sm("All levels complete! You saved the planet for good!")}
-function sm(t){z.textContent=t;z.classList.add("show")}
-function hm(){z.classList.remove("show")}
-ld(n)
-</script>
+  <script>
+    /************************************************************
+     * 1) Setup & Configuration
+     ************************************************************/
+
+    // 6 total levels, each level includes 1..6 of these colors:
+    // Index 0 -> Blue (the "clean" color to get back to)
+    // Then "polluting" colors: Red, Purple, Orange, Yellow, Brown
+    const colorList = [
+      "#00f",      // Blue (solution color)
+      "#f00",      // Red
+      "#800080",   // Purple
+      "#ffa500",   // Orange
+      "#ff0",      // Yellow
+      "#b5651d"    // Brown
+    ];
+    const totalLevelCount = colorList.length; // 6 total
+
+    // We'll load levels 0..5. (Level 0 means 1 color: just blue, trivially solved)
+    let currentLevel = 0;
+
+    // Indices for faces: 0=front,1=right,2=back,3=left,4=top,5=bottom
+    // adjacency[i] => i + its adjacent faces
+    const adjacency = [
+      [0,1,3,4,5], // front
+      [1,0,2,4,5], // right
+      [2,1,3,4,5], // back
+      [3,0,2,4,5], // left
+      [4,0,1,2,3], // top
+      [5,0,1,2,3]  // bottom
+    ];
+
+    // Rotation state
+    let startX, startY;      // finger start coords
+    let currentX = 0, currentY = 0; // current rotation angles
+    let baseX = 0, baseY = 0;       // saved rotation after user ends drag
+    let isTap = false;
+    const tapThreshold = 5;
+
+    // Face color indices (0 => blue, solution color)
+    let faceColors = [0,0,0,0,0,0];
+
+    // Spinning (post-solve) state
+    let spinning = false;
+    let spinStartTime = 0;
+    let spinPhase = "idle"; // "acc" or "dec"
+    let spinVelocity = 0;
+    let spinDirX = 0, spinDirY = 0;
+    const maxSpinVelocity = 3600; // deg/s => 10 rotations/s
+    const spinDuration = 2000;    // accelerate/decelerate time in ms
+    const spinAccel = maxSpinVelocity / spinDuration;
+
+    // DOM Elements
+    const levelIndexSpan = document.getElementById("levelIndex");
+    const totalLevelsSpan = document.getElementById("totalLevels");
+    const messageBox = document.getElementById("messageBox");
+    const cube = document.getElementById("cube");
+    const faces = document.querySelectorAll(".face");
+
+    /************************************************************
+     * 2) Initialize
+     ************************************************************/
+
+    // Show total levels
+    totalLevelsSpan.textContent = totalLevelCount;
+
+    // Assign each face a 3D transform (we do it in JS for clarity):
+    const faceTransforms = [
+      "rotateY(0deg)   translateZ(100px)",   // front
+      "rotateY(90deg)  translateZ(100px)",   // right
+      "rotateY(180deg) translateZ(100px)",   // back
+      "rotateY(-90deg) translateZ(100px)",   // left
+      "rotateX(90deg)  translateZ(100px)",   // top
+      "rotateX(-90deg) translateZ(100px)"    // bottom
+    ];
+    faces.forEach((face, i) => {
+      face.style.transform = faceTransforms[i];
+    });
+
+    // Listen to touch events on the entire document (tap anywhere)
+    document.addEventListener("touchstart", onTouchStart);
+    document.addEventListener("touchmove", onTouchMove);
+    document.addEventListener("touchend", onTouchEnd);
+
+    // Load first level
+    loadLevel(currentLevel);
+
+    /************************************************************
+     * 3) Touch & Drag -> Rotate
+     ************************************************************/
+
+    function onTouchStart(e) {
+      if (spinning) return; // ignore if puzzle is spinning
+      const t = e.touches[0];
+      startX = t.clientX;
+      startY = t.clientY;
+      isTap = true; // assume it's a tap unless we exceed threshold
+    }
+
+    function onTouchMove(e) {
+      if (spinning) return;
+      const t = e.touches[0];
+      const deltaX = t.clientX - startX;
+      const deltaY = t.clientY - startY;
+
+      if (Math.abs(deltaX) > tapThreshold || Math.abs(deltaY) > tapThreshold) {
+        isTap = false;
+      }
+      currentX = baseX - (deltaY * 0.5);
+      currentY = baseY + (deltaX * 0.5);
+      cube.style.transform = `rotateX(${currentX}deg) rotateY(${currentY}deg)`;
+    }
+
+    function onTouchEnd(e) {
+      if (spinning) return;
+      if (isTap) {
+        // It's a tap: see which face was tapped
+        const t = e.changedTouches[0];
+        const tappedEl = document.elementFromPoint(t.clientX, t.clientY);
+        if (tappedEl && tappedEl.classList.contains("face")) {
+          const idx = Array.from(faces).indexOf(tappedEl);
+          handleFaceTap(idx);
+        }
+      }
+      // Save rotation
+      baseX = currentX;
+      baseY = currentY;
+    }
+
+    /************************************************************
+     * 4) Puzzle Logic
+     ************************************************************/
+
+    /**
+     * Loads the puzzle for the given level:
+     *  - Update level text "Level X"
+     *  - Reset face colors to 0 (blue)
+     *  - Scramble puzzle
+     *  - Hide any leftover messages
+     */
+    function loadLevel(lvl) {
+      levelIndexSpan.textContent = (lvl + 1);
+      faceColors = [0, 0, 0, 0, 0, 0];
+
+      for (let i = 0; i < 6; i++) {
+        updateFaceColor(i);
+      }
+      scramblePuzzle();
+      hideMessage();
+    }
+
+    /**
+     * Returns the color set used at the current level
+     *  - e.g. level 0 => [Blue], level 1 => [Blue, Red], ...
+     */
+    function getColorSet() {
+      return colorList.slice(0, currentLevel + 1);
+    }
+
+    /**
+     * Scrambles puzzle by valid moves:
+     * For each face, randomly tap it 0..(numberOfColors) times
+     */
+    function scramblePuzzle() {
+      const colors = getColorSet();
+      const colorCount = colors.length;
+      for (let i = 0; i < 6; i++) {
+        let randomTaps = Math.floor(Math.random() * colorCount);
+        while (randomTaps-- > 0) {
+          cycleFaceColors(i);
+        }
+      }
+    }
+
+    /**
+     * Tapping a face cycles that face + adjacent faces by +1 color index
+     */
+    function cycleFaceColors(faceIdx) {
+      const colors = getColorSet();
+      adjacency[faceIdx].forEach(idx => {
+        faceColors[idx] = (faceColors[idx] + 1) % colors.length;
+        updateFaceColor(idx);
+      });
+    }
+
+    /**
+     * Update background color of a single face
+     */
+    function updateFaceColor(faceIdx) {
+      const colorSet = getColorSet();
+      const cIndex = faceColors[faceIdx];
+      faces[faceIdx].style.background = colorSet[cIndex];
+    }
+
+    /**
+     * Tap event on face i
+     */
+    function handleFaceTap(i) {
+      cycleFaceColors(i);
+      checkSolved();
+    }
+
+    /**
+     * If all faceColors are 0 => solved
+     */
+    function checkSolved() {
+      const allBlue = faceColors.every(cIdx => cIdx === 0);
+      if (allBlue) {
+        showMessage("Congratulations, you saved the planet!");
+        startSpinAnimation();
+      }
+    }
+
+    /************************************************************
+     * 5) Celebration Spin
+     ************************************************************/
+
+    /**
+     * Start spinning (accelerate, switch level, decelerate)
+     */
+    function startSpinAnimation() {
+      spinning = true;
+      spinStartTime = performance.now();
+      spinPhase = "acc"; // accelerate
+      spinVelocity = 0;
+
+      // pick random direction
+      spinDirX = Math.random()*2 - 1;
+      spinDirY = Math.random()*2 - 1;
+      if (!spinDirX && !spinDirY) spinDirX = 1; // fallback
+
+      // normalize
+      const len = Math.hypot(spinDirX, spinDirY);
+      spinDirX /= len;
+      spinDirY /= len;
+
+      requestAnimationFrame(spinLoop);
+    }
+
+    /**
+     * spinLoop handles accelerating & decelerating the cube
+     */
+    function spinLoop(timestamp) {
+      const dt = timestamp - spinStartTime;
+      spinStartTime = timestamp;
+
+      if (spinPhase === "acc") {
+        spinVelocity += spinAccel * dt; // accelerate
+        if (spinVelocity >= maxSpinVelocity) {
+          spinVelocity = maxSpinVelocity;
+          goToNextLevel(); // switch levels at top speed
+          spinPhase = "dec"; // now we decelerate
+        }
+      }
+      else if (spinPhase === "dec") {
+        spinVelocity -= spinAccel * dt; // decelerate
+        if (spinVelocity <= 0) {
+          spinVelocity = 0;
+          spinPhase = "idle";
+          spinning = false;
+
+          // Prevent "snap-back" glitch by synchronizing final angle
+          baseX = currentX;
+          baseY = currentY;
+          return;
+        }
+      }
+
+      // rotate the cube
+      const rotationDelta = (spinVelocity * dt) / 1000;
+      currentX += spinDirX * rotationDelta;
+      currentY += spinDirY * rotationDelta;
+      cube.style.transform = `rotateX(${currentX}deg) rotateY(${currentY}deg)`;
+
+      if (spinPhase !== "idle") {
+        requestAnimationFrame(spinLoop);
+      }
+    }
+
+    /**
+     * Advance to next level or final message
+     */
+    function goToNextLevel() {
+      if (currentLevel < totalLevelCount - 1) {
+        currentLevel++;
+        loadLevel(currentLevel);
+      } else {
+        showMessage("All levels complete! You saved the planet for good!");
+      }
+    }
+
+    /************************************************************
+     * 6) Utility: Show/Hide Message
+     ************************************************************/
+
+    function showMessage(text) {
+      messageBox.textContent = text;
+      messageBox.classList.add("show");
+    }
+
+    function hideMessage() {
+      messageBox.classList.remove("show");
+    }
+  </script>
+</body>
+</html>
