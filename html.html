@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HTML Code Tester</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #f0f0f0;
+    }
+    textarea {
+      width: 80%;
+      height: 150px;
+      margin-bottom: 10px;
+      font-family: monospace;
+      font-size: 14px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      margin: 5px;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    pre#errorLog {
+      width: 80%;
+      background-color: #ffe6e6;
+      color: red;
+      padding: 10px;
+      border: 1px solid red;
+      border-radius: 5px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #copyErrorButton {
+      margin-left: 10px;
+      padding: 5px 10px;
+      font-size: 14px;
+      cursor: pointer;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+    #copyErrorButton:hover {
+      background-color: #218838;
+    }
+    #charCount {
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+    #charCount.exceeds {
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <h1>HTML Code Tester</h1>
+  <div id="errorContainer" style="width: 80%; display: none;">
+    <pre id="errorLog"></pre>
+    <button id="copyErrorButton" onclick="copyError()">Copy Error</button>
+  </div>
+  <textarea id="htmlInput" placeholder="Paste your HTML code here..." oninput="updateCharCount()"></textarea>
+  <div id="charCount">0 characters</div>
+  <button onclick="loadHtml()">Load HTML</button>
+  <button onclick="resetPage()">Reset</button>
+  <button onclick="shareHtml()">Share</button>
+
+  <script src="https://cdn.jsdelivr.net/npm/pako/dist/pako.min.js"></script>
+  <script>
+    const $ = id => document.getElementById(id);
+
+    // URL-safe Base64 encode/decode functions
+    const base64UrlEncode = str => btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const base64UrlDecode = str => atob(str.replace(/-/g, '+').replace(/_/g, '/'));
+
+    const encode = data => base64UrlEncode(String.fromCharCode.apply(null, new Uint8Array(data)));
+    const decode = data => new Uint8Array(base64UrlDecode(data).split("").map(c => c.charCodeAt(0)));
+
+    window.onload = () => {
+      const errLog = localStorage.getItem('errLog');
+      if (errLog) {
+        $('errorLog').innerText = errLog;
+        $('errorContainer').style.display = 'flex';
+        localStorage.removeItem('errLog');
+      }
+
+      const savedHtml = localStorage.getItem('savedHtml');
+      if (savedHtml) $('htmlInput').value = savedHtml;
+
+      const encodedHtml = new URLSearchParams(window.location.search).get('code');
+      if (encodedHtml) {
+        try {
+          const decompressedData = pako.ungzip(decode(encodedHtml), { to: 'string' });
+          $('htmlInput').value = decompressedData;
+          if (window.location.hash === '#run') loadHtml();
+        } catch (e) {
+          logError(e);
+        }
+      }
+      updateCharCount();
+    };
+
+    const loadHtml = () => {
+      const htmlInput = $('htmlInput').value;
+      localStorage.setItem('savedHtml', htmlInput);
+      const errHandlerScript = `
+        <script>
+          window.onerror = (msg, src, line, col, err) => {
+            let errLog = localStorage.getItem('errLog') || '';
+            errLog += 'Error: ' + msg + ' at ' + src + ':' + line + ':' + col + '\\n';
+            localStorage.setItem('errLog', errLog);
+          };
+        <\/script>`;
+      const newHtml = insertErrorHandler(htmlInput, errHandlerScript);
+      try {
+        document.open();
+        document.write(newHtml);
+        document.close();
+      } catch (e) {
+        logError(e);
+      }
+    };
+
+    const insertErrorHandler = (html, script) => {
+      if (html.includes('<head>')) return html.replace('<head>', '<head>' + script);
+      if (html.includes('<html>')) return html.replace('<html>', '<html><head>' + script + '</head>');
+      return script + html;
+    };
+
+    const resetPage = () => {
+      localStorage.removeItem('savedHtml');
+      $('htmlInput').value = '';
+      updateCharCount();
+    };
+
+    const logError = (err) => {
+      let errLog = localStorage.getItem('errLog') || '';
+      errLog += 'Error: ' + err.message + '\n';
+      localStorage.setItem('errLog', errLog);
+    };
+
+    const copyError = () => {
+      const errLog = $('errorLog').innerText;
+      navigator.clipboard.writeText(errLog).then(
+        () => alert('Error message copied to clipboard!'),
+        err => alert('Failed to copy error message: ' + err)
+      );
+    };
+
+    const shareHtml = () => {
+      const html = $('htmlInput').value;
+      const compressed = pako.gzip(html);
+      const base64Encoded = encode(compressed);
+      const url = `https://tharzen.com/html.html?code=${base64Encoded}#run`;
+      navigator.clipboard.writeText(url).then(
+        () => alert('URL copied to clipboard!'),
+        err => alert('Failed to copy URL: ' + err)
+      );
+    };
+
+    const updateCharCount = () => {
+      const html = $('htmlInput').value;
+      const compressed = pako.gzip(html);
+      const base64Encoded = encode(compressed);
+      const urlLength = `https://tharzen.com/html.html?code=${base64Encoded}`.length;
+      const charCount = `${html.length} characters (URL length: ${urlLength})`;
+
+      const charCountElement = $('charCount');
+      charCountElement.textContent = charCount;
+      if (urlLength > 2000) {
+        charCountElement.classList.add('exceeds');
+      } else {
+        charCountElement.classList.remove('exceeds');
+      }
+    };
+
+    window.addEventListener('error', e => logError(e.error || { message: e.message }));
+    window.addEventListener('unhandledrejection', e => logError(e.reason || { message: e.reason }));
+  </script>
+</body>
+</html>
