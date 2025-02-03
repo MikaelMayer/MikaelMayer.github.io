@@ -246,43 +246,112 @@
 
     // Parse the entire code in #htmlInput into "blocks" based on indentation
     function parseAllBlocks() {
-      const lines = $('htmlInput').value.split('\n');
       parsedBlocks = [];
 
-      // We'll track blocks by scanning line by line
-      // "A new block starts at line i if line i's indentation is <= line i-1's indentation,
-      //  or if it's the very first line. Then all subsequent lines with strictly greater indentation belong to that block,
-      //  until we come back to line with indentation <= the block's indentation."
-      // We'll do a simple stack approach to define block boundaries.
-
-      // However, the specification said: 
-      //   "An indented block is something that starts with some spaces and the next line starts with at least more spaces. 
-      //    If the next line has the same or fewer spaces, it starts a new block. 
-      //    The block ends right before we reach a line with indentation <= the original line's indentation."
-
-      // We'll do the following:
-      //   For i from 0..N-1, define line i as either top-level or indented. 
-      //   We'll group consecutive lines where indentation is strictly deeper than line 0 of that group.
+      const text = document.getElementById('htmlInput').value;
+      const lines = text.split('\n');
 
       let i = 0;
       while (i < lines.length) {
         const line = lines[i];
-        const currentIndent = countLeadingSpaces(line);
-        // We'll gather lines for this block. The block's "baseIndent" is currentIndent.
-        const blockStart = i;
-        // We'll find how far it extends
-        let j = i + 1;
-        for (; j < lines.length; j++) {
-          const nextIndent = countLeadingSpaces(lines[j]);
-          if (nextIndent <= currentIndent) break;
+
+        if (line.trim().startsWith('<script')) {
+          const scriptLines = [];
+          i++;
+          while (i < lines.length && !lines[i].trim().startsWith('</script')) {
+            scriptLines.push(lines[i]);
+            i++;
+          }
+          i++;
+          parseJsRegion(scriptLines);
+          continue;
         }
-        // Now lines i..(j-1) belong to one block
-        const blockLines = lines.slice(i, j);
-        parseBlockFromLines(blockStart, blockLines, currentIndent);
-        i = j; // move on
+
+        if (line.trim().startsWith('<style')) {
+          const styleLines = [];
+          i++;
+          while (i < lines.length && !lines[i].trim().startsWith('</style')) {
+            styleLines.push(lines[i]);
+            i++;
+          }
+          i++;
+          parseCssRegion(styleLines);
+          continue;
+        }
+
+        i++;
       }
     }
+    function parseJsRegion(lines) {
+      let i = 0;
+      while (i < lines.length) {
+        const line = lines[i];
+        const trimmed = line.trimLeft();
+        if (!trimmed) {
+          i++;
+          continue;
+        }
 
+        let blockLines = [];
+        if (trimmed.startsWith('function ')) {
+          const { collected, newIndex } = gatherBlockWithBraces(lines, i);
+          blockLines = collected;
+          i = newIndex;
+          pushJsBlock(blockLines);
+
+        } else if (/\b(var|let|const)\s+[A-Za-z0-9_]+\s*=/.test(trimmed)) {
+          const { collected, newIndex } = gatherBlockWithBraces(lines, i, true);
+          blockLines = collected;
+          i = newIndex;
+          pushJsBlock(blockLines);
+
+        } else {
+          blockLines = [lines[i]];
+          i++;
+          pushJsBlock(blockLines);
+        }
+      }
+    }
+    function gatherBlockWithBraces(allLines, startIndex, stopAtSemicolon = false) {
+      let braceDepth = 0;
+      let collected = [];
+      let i = startIndex;
+      let foundEnd = false;
+
+      while (i < allLines.length && !foundEnd) {
+        const l = allLines[i];
+        collected.push(l);
+
+        const openCount = (l.match(/\{/g) || []).length;
+        const closeCount = (l.match(/\}/g) || []).length;
+        braceDepth += openCount;
+        braceDepth -= closeCount;
+
+        if (braceDepth <= 0) {
+          if (stopAtSemicolon) {
+            if (l.trim().endsWith(';') || l.includes(';')) {
+              foundEnd = true;
+            }
+          } else {
+            foundEnd = true;
+          }
+        }
+        i++;
+      }
+
+      return { collected, newIndex: i };
+    }
+    function pushJsBlock(blockLines) {
+      const code = blockLines.join('\n');
+      const { name, type } = extractNameFromBlock(code, 'js');
+      const uniqueId = `js:${type}:${name}:${Math.random()}`;
+      parsedBlocks.push({
+        name,
+        type,
+        code,
+        uniqueId
+      });
+    }
     // We parse a single block from the set of lines. Then store it in parsedBlocks.
     function parseBlockFromLines(startLine, blockLines, indent) {
       const code = blockLines.join('\n');
