@@ -408,6 +408,93 @@
         uniqueId
       });
     }
+    function parseCssRegion(lines) {
+      let i = 0;
+      while (i < lines.length) {
+        const line = lines[i];
+        if (!line.trim()) {
+          i++;
+          continue;
+        }
+
+        if (line.includes('{')) {
+          const { collected, newIndex } = gatherCssBlock(lines, i);
+          i = newIndex;
+          pushCssBlock(collected);
+        } else {
+          i++;
+        }
+      }
+    }
+    function gatherCssBlock(allLines, startIndex) {
+      let braceDepth = 0;
+      let collected = [];
+      let i = startIndex;
+      let foundEnd = false;
+
+      while (i < allLines.length && !foundEnd) {
+        const l = allLines[i];
+        collected.push(l);
+
+        const openCount = (l.match(/\{/g) || []).length;
+        const closeCount = (l.match(/\}/g) || []).length;
+        braceDepth += openCount;
+        braceDepth -= closeCount;
+
+        if (braceDepth <= 0 && openCount > 0) {
+          foundEnd = true;
+        }
+        i++;
+      }
+      return { collected, newIndex: i };
+    }
+    function pushCssBlock(blockLines) {
+      const code = blockLines.join('\n');
+      const { name, type } = extractNameFromBlock(code, 'css');
+      const uniqueId = `css:${type}:${name}:${Math.random()}`;
+      parsedBlocks.push({
+        name,
+        type,
+        code,
+        uniqueId
+      });
+    }
+    function extractNameFromBlock(code, context) {
+      const lines = code.split('\n');
+      const firstLine = lines[0].trim();
+
+      if (context === 'css') {
+        const match = firstLine.match(/^(.*?)\{/);
+        if (match) {
+          return {
+            name: match[1].trim(),
+            type: 'css'
+          };
+        }
+        return { name: firstLine, type: 'css' };
+      }
+
+      let funcMatch = firstLine.match(/\bfunction\s+([A-Za-z0-9_]+)/);
+      if (funcMatch) {
+        return {
+          name: `function ${funcMatch[1]}`,
+          type: 'function'
+        };
+      }
+
+      let declMatch = firstLine.match(/\b(var|let|const)\s+([A-Za-z0-9_]+)([\s\S]*)/);
+      if (declMatch) {
+        return {
+          name: `${declMatch[1]} ${declMatch[2]}${declMatch[3]}`,
+          type: 'declaration'
+        };
+      }
+
+      return {
+        name: firstLine,
+        type: 'unknown'
+      };
+    }
 
     function countLeadingSpaces(str) {
       let count = 0;
