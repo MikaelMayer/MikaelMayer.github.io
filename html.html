@@ -287,28 +287,35 @@
       while (i < lines.length) {
         const line = lines[i];
         const trimmed = line.trimLeft();
-        if (!trimmed) {
+
+        // 1) Skip empty or comment lines
+        if (!trimmed || trimmed.startsWith('//')) {
           i++;
           continue;
         }
 
+        // 2) Remember block start
+        const blockStart = i;
         let blockLines = [];
+
+        // 3) Check if it's function or var/let/const, etc.
         if (trimmed.startsWith('function ')) {
           const { collected, newIndex } = gatherBlockWithBraces(lines, i);
           blockLines = collected;
           i = newIndex;
-          pushJsBlock(blockLines);
+          pushJsBlock(blockLines, blockStart);
 
         } else if (/\b(var|let|const)\s+[A-Za-z0-9_]+\s*=/.test(trimmed)) {
           const { collected, newIndex } = gatherBlockWithBraces(lines, i, true);
           blockLines = collected;
           i = newIndex;
-          pushJsBlock(blockLines);
+          pushJsBlock(blockLines, blockStart);
 
         } else {
+          // Just treat as single-line block
           blockLines = [lines[i]];
           i++;
-          pushJsBlock(blockLines);
+          pushJsBlock(blockLines, blockStart);
         }
       }
     }
@@ -341,7 +348,7 @@
 
       return { collected, newIndex: i };
     }
-    function pushJsBlock(blockLines) {
+    function pushJsBlock(blockLines, blockStart) {
       const code = blockLines.join('\n');
       const { name, type } = extractNameFromBlock(code, 'js');
       const uniqueId = `js:${type}:${name}:${Math.random()}`;
@@ -349,7 +356,9 @@
         name,
         type,
         code,
-        uniqueId
+        uniqueId,
+        startLine: blockStart,
+        endLine: blockStart + blockLines.length - 1
       });
     }
     // We parse a single block from the set of lines. Then store it in parsedBlocks.
@@ -412,15 +421,19 @@
       let i = 0;
       while (i < lines.length) {
         const line = lines[i];
-        if (!line.trim()) {
+        const trimmed = line.trimLeft();
+
+        // Skip comments or blank lines
+        if (!trimmed || trimmed.startsWith('/*') || trimmed.startsWith('//')) {
           i++;
           continue;
         }
 
+        const blockStart = i;
         if (line.includes('{')) {
           const { collected, newIndex } = gatherCssBlock(lines, i);
           i = newIndex;
-          pushCssBlock(collected);
+          pushCssBlock(collected, blockStart);
         } else {
           i++;
         }
@@ -448,7 +461,7 @@
       }
       return { collected, newIndex: i };
     }
-    function pushCssBlock(blockLines) {
+    function pushCssBlock(blockLines, blockStart) {
       const code = blockLines.join('\n');
       const { name, type } = extractNameFromBlock(code, 'css');
       const uniqueId = `css:${type}:${name}:${Math.random()}`;
@@ -456,7 +469,9 @@
         name,
         type,
         code,
-        uniqueId
+        uniqueId,
+        startLine: blockStart,
+        endLine: blockStart + blockLines.length - 1
       });
     }
     function extractNameFromBlock(code, context) {
@@ -509,14 +524,14 @@
     // 2) DROPDOWN LOGIC
     // -------------------------------
     function updateDeclarationSelect() {
-      const sel = $('functionSelect');
-      const oldValue = sel.value; // e.g. the previously selected uniqueId
+      const sel = document.getElementById('functionSelect');
+      const oldValue = sel.value;
 
-      // Clear everything
+      // Clear the dropdown
       sel.innerHTML = '';
 
+      // If no parsed blocks, show a single "No declarations found"
       if (parsedBlocks.length === 0) {
-        // No declarations found
         const opt = document.createElement('option');
         opt.value = '';
         opt.textContent = '-- No declarations found --';
@@ -525,33 +540,34 @@
         return;
       }
 
-      // We do have some blocks, so let's add an initial "Select a declaration..." option
+      // Insert "Select a declaration..." at the top
       const defaultOpt = document.createElement('option');
       defaultOpt.value = '';
       defaultOpt.textContent = 'Select a declaration...';
       sel.appendChild(defaultOpt);
 
-      // Sort blocks just by startLine for a stable order
+      // Sort blocks by their startLine (so the dropdown has a predictable order)
       parsedBlocks.sort((a, b) => a.startLine - b.startLine);
 
-      // Populate each block
-      for (const block of parsedBlocks) {
+      // Add each block as an <option>, showing only first line + line number
+      parsedBlocks.forEach(block => {
         const opt = document.createElement('option');
+        // Grab just the first line of code
+        const firstLine = block.code.split('\n')[0] || '';
         opt.value = block.uniqueId;
-        opt.textContent = `[${block.type}] ${block.name} (line ${block.startLine+1})`;
+        opt.textContent = `${firstLine} (line ${block.startLine + 1})`;
         sel.appendChild(opt);
-      }
+      });
 
-      // Attempt to restore old selection if it still exists
+      // Attempt to restore previous selection
       let foundPrevious = false;
       if (oldValue) {
         const stillExists = parsedBlocks.find(b => b.uniqueId === oldValue);
         if (stillExists) {
           sel.value = oldValue;
           foundPrevious = true;
-        } 
+        }
       }
-      // If not found, see if we had a "previouslySelectedId" that we can restore
       if (!foundPrevious && previouslySelectedId) {
         const stillExists = parsedBlocks.find(b => b.uniqueId === previouslySelectedId);
         if (stillExists) {
@@ -560,15 +576,19 @@
         }
       }
 
-      // If we still haven't found a block to select, fallback to the default ("")
+      // If we still have no valid selection, revert to the default
       if (!foundPrevious) {
         sel.value = '';
       }
 
-      // Now the actual "selected" uniqueId is sel.value
+      // Remember the final selection
       previouslySelectedId = sel.value ? sel.value : null;
-      // We'll enable/disable the update button accordingly
+
+      // Enable/disable the Update button accordingly
       updateButtonDisabledState();
+
+      // Optionally re-check whether the dropdown should appear in red,
+      // if you have such logic in highlightDropdownIfNeeded().
       highlightDropdownIfNeeded();
     }
 
