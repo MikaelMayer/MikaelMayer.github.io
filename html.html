@@ -93,6 +93,10 @@
       color: red;
       font-weight: bold;
     }
+    .dropdown-orange {
+      color: orange;
+      font-weight: bold;
+    }
 
     /* Container for the second area & controls */
     #updateSection {
@@ -490,20 +494,9 @@
         endLine: blockStart + blockLines.length - 1
       });
     }
-    function extractNameFromBlock(code, context) {
+    function extractNameFromBlock(code) {
       const lines = code.split('\n');
       const firstLine = lines[0].trim();
-
-      if (context === 'css') {
-        const match = firstLine.match(/^(.*?)\{/);
-        if (match) {
-          return {
-            name: match[1].trim(),
-            type: 'css'
-          };
-        }
-        return { name: firstLine, type: 'css' };
-      }
 
       let funcMatch = firstLine.match(/\bfunction\s+([A-Za-z0-9_]+)/);
       if (funcMatch) {
@@ -520,7 +513,13 @@
           type: 'declaration'
         };
       }
-
+      let cssMatch = firstLine.match(/^\s*(.+?)\s*\{/);
+      if (cssMatch) {
+        return {
+          name: cssMatch[1].trim(),
+          type: 'css'
+        };
+      }
       return {
         name: firstLine,
         type: 'unknown'
@@ -863,20 +862,23 @@
     function highlightDropdownIfNeeded() {
       const sel = $('functionSelect');
       sel.classList.remove('dropdown-red');
+      sel.classList.remove('dropdown-orange');
 
       if (!sel.value) {
         // "Select a declaration..." 
         return;
       }
       const block = parsedBlocks.find(b => b.uniqueId === sel.value);
+      // If the second textarea references a different block name, highlight in orange
       if (!block) {
         // the selected block is missing => highlight red
         sel.classList.add('dropdown-red');
+        logError("Did not find selection?!");
       } else {
-        // If the second textarea references a different block name, also highlight in red
         const snippetName = extractNameFromBlock($('functionInput').value).name;
         if (snippetName && snippetName !== block.name) {
-          sel.classList.add('dropdown-red');
+          sel.classList.add('dropdown-orange');
+          logError("Could not find "+snippetName+", expected "+block.name);
         }
       }
     }
