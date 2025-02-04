@@ -322,50 +322,44 @@
     function gatherBlockWithBraces(allLines, startIndex) {
       let collected = [];
       let i = startIndex;
-      let baseIndent = allLines[i].match(/^\s*/)[0]; // Get indentation of starting line
-      let foundEnd = false;
-      let startedBlock = false;
+      let l = allLines[i];
+      let baseIndent = l.match(/^\s*/)[0]; // Get indentation of starting line
+      let isComment = l.trim().startsWith("//");
+      collected.push(allLines[i++]);
+      while (i < allLines.length) {
+        l = allLines[i];
+        let indent = l.match(/^\s*/)[0];
 
-      while (i < allLines.length && !foundEnd) {
-        const l = allLines[i];
-        collected.push(l);
-
-        let nextLine = allLines[i + 1] || "";
-        let nextIndent = nextLine.match(/^\s*/)[0];
-
-        if (nextLine.trim() === "") {
+        if (l.trim() === "") {
           // Case 2c: Empty line after -> this line is its own block
-          if (!startedBlock) {
-            foundEnd = true;
+          if (startIndex + 1 == i) {
+            break;
           } else {
+            collected.push(allLines[i++]);
+            continue;
             // an empty line is just part of the block
           }
-        } else if (nextIndent.length > baseIndent.length) {
+        } else if (indent.length > baseIndent.length) {
           // Case 2a: Next line is more indented -> entering a block
-          startedBlock = true;
-          let subBlock = gatherBlockWithBraces(allLines, i + 1);
+          let subBlock = gatherBlockWithBraces(allLines, i);
           collected.push(...subBlock.collected);
-          i = subBlock.newIndex - 1; // Adjust index
-        } else if (nextIndent.length === baseIndent.length) {
-          // Case 2b: Same indentation
-          if (l.trim().startsWith("//")) {
-           // Handle `//` comment block
-            while (i + 1 < allLines.length && allLines[i + 1].trim().startsWith("//")) {
-              collected.push(allLines[++i]);
-            }
-          } else if (l.trim().startsWith("}")) {
+          i = Math.max(i+1, subBlock.newIndex); // Ensure termination
+          continue;
+        } else if (indent.length === baseIndent.length) {
+          while (isComment && i < allLines.length && l.trim().startsWith("//")) {
+            collected.push(l);
+            l = allLines[++i] || "";
+          }
+          if (l.trim().startsWith("}")) {
             // Ending a block only if it's a closing brace at same indentation
-            foundEnd = true;
+            collected.push(allLines[i++]);
+            break;
           } else {
-            i--;
-            foundEnd = true;
+            break; // a different block
           }
         } else {
-          i--;
-          // Decreased indentation means we're done
-          foundEnd = true;
+          break; // a different block
         }
-        i++;
       }
     
       return { collected, newIndex: i };
