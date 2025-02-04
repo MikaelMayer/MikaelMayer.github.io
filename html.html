@@ -611,11 +611,12 @@
       // If user manually changes the dropdown, we record that as our "previously selected" ID
       previouslySelectedId = $('functionSelect').value || null;
       updateButtonDisabledState();
-      highlightDropdownIfNeeded();
       // If a valid block is selected, load its code into the second textarea
       fillSecondTextAreaFromSelection();
       // Then re-check highlight state
       updateFunctionUIState();
+      // Change the color of the dropdown if needed
+      highlightDropdownIfNeeded();
     }
 
     function fillSecondTextAreaFromSelection() {
