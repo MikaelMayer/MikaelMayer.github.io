@@ -950,7 +950,7 @@
     // -------------------------------
     function logError(err) {
       let errLog = localStorage.getItem('errLog') || '';
-      errLog += 'Error: ' + err.message + '\n';
+      errLog += 'Error: ' + (err.message || err) + '\n';
       localStorage.setItem('errLog', errLog);
     }
 
