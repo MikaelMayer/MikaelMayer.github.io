@@ -262,31 +262,33 @@
         if (line.trim().startsWith('<script')) {
           const scriptLines = [];
           i++;
+          const startIndex = i;
           while (i < lines.length && !lines[i].trim().startsWith('</s'+'cript')) {
             scriptLines.push(lines[i]);
             i++;
           }
           i++;
-          parseJsRegion(scriptLines);
+          parseJsRegion(scriptLines, startIndex);
           continue;
         }
 
         if (line.trim().startsWith('<style')) {
           const styleLines = [];
           i++;
+          const startIndex = i;
           while (i < lines.length && !lines[i].trim().startsWith('</style')) {
             styleLines.push(lines[i]);
             i++;
           }
           i++;
-          parseCssRegion(styleLines);
+          parseCssRegion(styleLines, startIndex);
           continue;
         }
 
         i++;
       }
     }
-    function parseJsRegion(lines) {
+    function parseJsRegion(lines, startIndex) {
       let i = 0;
       while (i < lines.length) {
         const line = lines[i];
@@ -307,19 +309,19 @@
           const { collected, newIndex } = gatherBlockWithBraces(lines, i);
           blockLines = collected;
           i = newIndex;
-          pushJsBlock(blockLines, blockStart);
+          pushJsBlock(blockLines, startIndex + blockStart);
 
         } else if (/\b(var|let|const)\s+[A-Za-z0-9_]+\s*=/.test(trimmed)) {
           const { collected, newIndex } = gatherBlockWithBraces(lines, i, true);
           blockLines = collected;
           i = newIndex;
-          pushJsBlock(blockLines, blockStart);
+          pushJsBlock(blockLines, startIndex + blockStart);
 
         } else {
           // Just treat as single-line block
           blockLines = [lines[i]];
           i++;
-          pushJsBlock(blockLines, blockStart);
+          pushJsBlock(blockLines, startIndex + blockStart);
         }
       }
     }
@@ -437,7 +439,7 @@
         uniqueId
       });
     }
-    function parseCssRegion(lines) {
+    function parseCssRegion(lines, startIndex) {
       let i = 0;
       while (i < lines.length) {
         const line = lines[i];
@@ -453,7 +455,7 @@
         if (line.includes('{')) {
           const { collected, newIndex } = gatherCssBlock(lines, i);
           i = newIndex;
-          pushCssBlock(collected, blockStart);
+          pushCssBlock(collected, startIndex + blockStart);
         } else {
           i++;
         }
