@@ -834,9 +834,7 @@
         const current = countLeadingSpaces(line);
         let newCount = current + indentDiff;
         if (newCount < 0) newCount = 0; // no negative indentation
-        // remove leading spaces
-        const stripped = line.trimStart();
-        return ' '.repeat(newCount) + stripped;
+        return ' '.repeat(newCount) + line;
       });
 
       // Now we splice them in
@@ -855,7 +853,6 @@
       $('updateMessage').textContent = 'Block updated!';
       localStorage.setItem('savedHtml', newText);
     }
-
     function updateButtonDisabledState() {
       const selVal = $('functionSelect').value;
       // If no selection or empty selection => disable
