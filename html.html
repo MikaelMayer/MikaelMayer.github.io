@@ -453,7 +453,7 @@
 
         const blockStart = i;
         if (line.includes('{')) {
-          const { collected, newIndex } = gatherCssBlock(lines, i);
+          const { collected, newIndex } = gatherBlockWithBraces(lines, i);
           i = newIndex;
           pushCssBlock(collected, startIndex + blockStart);
         } else {
