@@ -374,11 +374,13 @@
       const code = blockLines.join('\n');
       const { name, type } = extractNameFromBlock(code, 'js');
       const uniqueId = `js:${type}:${name}:${Math.random()}`;
+      const indent = countLeadingSpaces(blockLines[0]);
       parsedBlocks.push({
         name,
         type,
         code,
         uniqueId,
+        indent,
         startLine: blockStart,
         endLine: blockStart + blockLines.length - 1
       });
@@ -428,7 +430,7 @@
 
       // Construct a unique ID. We can do: type + ":" + name + ":" + startLine
       const uniqueId = `${type}:${name}:${startLine}`;
-
+      
       parsedBlocks.push({
         name,
         type,
@@ -487,11 +489,14 @@
       const code = blockLines.join('\n');
       const { name, type } = extractNameFromBlock(code, 'css');
       const uniqueId = `css:${type}:${name}:${Math.random()}`;
+      const indent = countLeadingSpaces(blockLines[0]);
+      
       parsedBlocks.push({
         name,
         type,
         code,
         uniqueId,
+        indent,
         startLine: blockStart,
         endLine: blockStart + blockLines.length - 1
       });
