@@ -657,7 +657,10 @@
         $('functionInput').value = '';
         return;
       }
-      $('functionInput').value = block.code;
+      let snippetLines = block.code.split('\n');
+      // Remove leading indentation for display:
+      snippetLines = removeLeadingIndentation(snippetLines);
+      $('functionInput').value = snippetLines.join('\n');
     }
 
     // -------------------------------
