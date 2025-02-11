@@ -542,6 +542,23 @@
       return count;
     }
 
+    function removeLeadingIndentation(lines) {
+      // Find the smallest (non-zero) indentation among these lines
+      let minIndent = Infinity;
+      for (const line of lines) {
+        if (line.trim().length > 0) {
+          const indent = countLeadingSpaces(line);
+          if (indent < minIndent) minIndent = indent;
+        }
+      }
+      if (minIndent === Infinity) {
+        minIndent = 0;  // If all lines are empty, no indentation to remove
+      }
+
+      // Strip minIndent spaces from the start of each line
+      return lines.map(line => line.slice(minIndent));
+    }
+
     // -------------------------------
     // 2) DROPDOWN LOGIC
     // -------------------------------
