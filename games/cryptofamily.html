@@ -145,10 +145,10 @@
          page breaks will happen only as needed */
     }
 
-    body.consent-block {
-    pointer-events: none;  /* no clicking */
-    filter: blur(2px);     /* visually indicate it’s blocked */
-  }
+    body.consent-block .page-content {
+      pointer-events: none;
+      filter: blur(2px);
+    }
 
   .consent-overlay {
     position: fixed;
@@ -207,6 +207,7 @@
   </style>
 </head>
 <body>
+  <div class="page-content">
   <h1>Secret Message Collaboration</h1>
 
   <div class="form-container">
@@ -508,6 +509,7 @@
       loadFormFromLocalStorage();
     });
   </script>
+  </div>
   <div id="consentOverlay" class="consent-overlay">
   <div class="consent-modal">
     <div class="consent-content">
