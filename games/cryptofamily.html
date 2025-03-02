@@ -507,7 +507,22 @@
     window.addEventListener('DOMContentLoaded', () => {
       loadFormFromLocalStorage();
     });
-    /************************************************************
+  </script>
+  <div id="consentOverlay" class="consent-overlay">
+  <div class="consent-modal">
+    <div class="consent-content">
+      <h3>We Value Your Privacy</h3>
+      <p>We use local storage to remember your secret message and children’s names across page refreshes. No data is sent to a server.</p>
+      <p>Please confirm that you accept the use of local storage in your browser. If you choose to decline, we will erase the data and you won’t be able to use this functionality.</p>
+    </div>
+    <div class="consent-buttons">
+      <button id="consentAcceptBtn">Accept</button>
+      <button id="consentDeclineBtn">Decline</button>
+    </div>
+  </div>
+  </div>
+  <script>
+        /************************************************************
    * RGPD-Like Consent Script
    ************************************************************/
   (function() {
@@ -558,18 +573,5 @@
     declineBtn.addEventListener("click", declineConsent);
   })();
   </script>
-  <div id="consentOverlay" class="consent-overlay">
-  <div class="consent-modal">
-    <div class="consent-content">
-      <h3>We Value Your Privacy</h3>
-      <p>We use local storage to remember your secret message and children’s names across page refreshes. No data is sent to a server.</p>
-      <p>Please confirm that you accept the use of local storage in your browser. If you choose to decline, we will erase the data and you won’t be able to use this functionality.</p>
-    </div>
-    <div class="consent-buttons">
-      <button id="consentAcceptBtn">Accept</button>
-      <button id="consentDeclineBtn">Decline</button>
-    </div>
-  </div>
-  </div>
 </body>
 </html>
