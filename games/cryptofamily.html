@@ -218,7 +218,7 @@
     <input type="number" id="numChildren" min="1" value="2" />
 
     <div class="child-names" id="childNamesContainer"></div>
-    <p>Press generate and tben print this page. Names are saved locally so you can safely come back to this page later.</p>
+    <p>Press generate and then print this page. Names are saved locally so you can safely come back to this page later.</p>
     <button class="generate-btn" id="generateBtn">Generate Printable Sheets</button>
   </div>
 
@@ -507,6 +507,56 @@
     window.addEventListener('DOMContentLoaded', () => {
       loadFormFromLocalStorage();
     });
+    /************************************************************
+   * RGPD-Like Consent Script
+   ************************************************************/
+  (function() {
+    const overlay = document.getElementById("consentOverlay");
+    const acceptBtn = document.getElementById("consentAcceptBtn");
+    const declineBtn = document.getElementById("consentDeclineBtn");
+
+    // Key under which we store consent in localStorage
+    const CONSENT_KEY = "myLocalStorageConsent";
+
+    // Check if user has already given consent
+    function hasConsent() {
+      return localStorage.getItem(CONSENT_KEY) === "true";
+    }
+
+    function showConsentModal() {
+      document.body.classList.add("consent-block");
+      overlay.style.display = "flex"; // show overlay
+    }
+
+    function hideConsentModal() {
+      document.body.classList.remove("consent-block");
+      overlay.style.display = "none"; // hide overlay
+    }
+
+    function acceptConsent() {
+      localStorage.setItem(CONSENT_KEY, "true");
+      hideConsentModal();
+      // Re-enable page usage
+    }
+
+    function declineConsent() {
+      // Clear local storage and blow away the page
+      localStorage.clear();
+      document.body.innerHTML = "<h1>Local storage usage was declined. Page disabled.</h1>";
+      // Alternatively, you could redirect, or show a 'Sorry' message, etc.
+    }
+
+    // On DOM load, check if we have consent
+    document.addEventListener("DOMContentLoaded", () => {
+      if (!hasConsent()) {
+        showConsentModal();
+      }
+    });
+
+    // Wire up the buttons
+    acceptBtn.addEventListener("click", acceptConsent);
+    declineBtn.addEventListener("click", declineConsent);
+  })();
   </script>
   <div id="consentOverlay" class="consent-overlay">
   <div class="consent-modal">
