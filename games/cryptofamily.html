@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Secret Message Collaboration (v2)</title>
+  <style>
+    /* Basic resets */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: sans-serif;
+      padding: 1rem;
+      background: #f8f8f8;
+    }
+
+    h1, h2, h3 {
+      margin-bottom: 0.5rem;
+    }
+
+    input, textarea, button {
+      font-size: 1rem;
+      padding: 0.5rem;
+      margin-bottom: 0.5rem;
+      width: 100%;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    label {
+      display: block;
+      margin: 0.5rem 0 0.25rem;
+      font-weight: bold;
+    }
+
+    /* Form container */
+    .form-container {
+      background: #fff;
+      padding: 1rem;
+      border-radius: 4px;
+      margin-bottom: 1rem;
+    }
+
+    /* Child name inputs */
+    .child-names {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .child-name-field {
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Generate Button */
+    .generate-btn {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: 0.75rem 1.5rem;
+      cursor: pointer;
+      border: none;
+      background-color: #007BFF;
+      color: white;
+      font-weight: bold;
+      border-radius: 4px;
+    }
+
+    /* The printable area */
+    .print-area {
+      display: none; /* Hidden until user generates */
+    }
+
+    .child-section {
+      background: white;
+      margin-bottom: 2rem;
+      border-radius: 4px;
+      padding: 1rem;
+      page-break-inside: avoid; /* Try to keep each child section on one page if possible */
+    }
+
+    .alphabet-table {
+      margin-bottom: 1rem;
+      border-collapse: collapse;
+      width: 100%;
+      text-align: center;
+    }
+
+    .alphabet-table th,
+    .alphabet-table td {
+      padding: 0.25rem;
+      border: 1px solid #aaa;
+    }
+
+    /* Horizontal message layout container */
+    .message-line {
+      display: flex;
+      flex-wrap: wrap;         /* allow wrapping if it’s too wide */
+      margin-top: 1rem;
+      margin-bottom: 1rem;
+      gap: 0.5rem;
+    }
+
+    /* Each character item: the blank box + info below it */
+    .message-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .message-box {
+      width: 2rem;
+      height: 2rem;
+      border: 1px solid #ccc;
+      margin-bottom: 0.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
+
+    .info-below {
+      font-size: 0.8rem;
+      text-align: center;
+      min-height: 1rem;
+    }
+
+    /* Print styles */
+    @media print {
+      body {
+        background: #fff;
+      }
+      .form-container {
+        display: none;
+      }
+      .print-area {
+        display: block !important;
+      }
+      /* The child sections will flow continuously;
+         page breaks will happen only as needed */
+    }
+
+    body.consent-block {
+    pointer-events: none;  /* no clicking */
+    filter: blur(2px);     /* visually indicate it’s blocked */
+  }
+
+  .consent-overlay {
+    position: fixed;
+    z-index: 9999; /* above everything */
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: none;  /* hidden by default */
+    align-items: center;
+    justify-content: center;
+  }
+
+  .consent-modal {
+    background: #fff;
+    border-radius: 4px;
+    width: 90%;
+    max-width: 500px;
+    padding: 1rem;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  }
+
+  .consent-content {
+    margin-bottom: 1rem;
+  }
+
+  .consent-content h3 {
+    margin-bottom: 0.5rem;
+  }
+
+  .consent-content p {
+    margin-bottom: 0.5rem;
+    line-height: 1.4;
+  }
+
+  .consent-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+  }
+
+  .consent-buttons button {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  #consentAcceptBtn {
+    background-color: #007BFF;
+    color: #fff;
+  }
+  
+  #consentDeclineBtn {
+    background-color: #ccc;
+    color: #333;
+  }
+  </style>
+</head>
+<body>
+  <h1>Secret Message Collaboration</h1>
+
+  <div class="form-container">
+    <h2>Setup</h2>
+    <label for="messageInput">Secret Message</label>
+    <textarea id="messageInput" rows="3" placeholder="Type your secret message..."></textarea>
+
+    <label for="numChildren">Number of Children</label>
+    <input type="number" id="numChildren" min="1" value="2" />
+
+    <div class="child-names" id="childNamesContainer"></div>
+    <p>Press generate and tben print this page. Names are saved locally so you can safely come back to this page later.</p>
+    <button class="generate-btn" id="generateBtn">Generate Printable Sheets</button>
+  </div>
+
+  <div class="print-area" id="printArea">
+    <!-- Generated child sections go here -->
+  </div>
+
+  <script>
+    /********************************************************
+     *                  DOM references
+     ********************************************************/
+    const messageInput = document.getElementById('messageInput');
+    const numChildrenInput = document.getElementById('numChildren');
+    const childNamesContainer = document.getElementById('childNamesContainer');
+    const generateBtn = document.getElementById('generateBtn');
+    const printArea = document.getElementById('printArea');
+
+    /********************************************************
+     *              Constants and helper functions
+     ********************************************************/
+    const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ ";
+    const ALPHABET_LENGTH = ALPHABET.length; // 27
+
+    // Shuffle array in-place using Fisher-Yates
+    function shuffleArray(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    // Create an array of 1..27
+    function makeNumberSequence() {
+      return Array.from({ length: ALPHABET_LENGTH }, (_, i) => i + 1);
+    }
+
+    // Generate a random permutation of A..Z plus space
+    function generateRandomAlphabet() {
+      const arr = ALPHABET.split('');
+      shuffleArray(arr);
+      return arr;
+    }
+
+    // Retrieve or set data in localStorage
+    function saveToLocalStorage(message, childNames) {
+      localStorage.setItem('secretMessage', message);
+      localStorage.setItem('childNames', JSON.stringify(childNames));
+    }
+
+    function getFromLocalStorage() {
+      const savedMessage = localStorage.getItem('secretMessage');
+      const savedChildNames = localStorage.getItem('childNames');
+      return {
+        message: savedMessage || '',
+        childNames: savedChildNames ? JSON.parse(savedChildNames) : []
+      }
+    }
+
+    /********************************************************
+     *          Populate form from local storage
+     ********************************************************/
+    function loadFormFromLocalStorage() {
+      const { message, childNames } = getFromLocalStorage();
+      messageInput.value = message;
+      // If childNames array is not empty, set numChildren accordingly
+      if (childNames.length > 0) {
+        numChildrenInput.value = childNames.length;
+      }
+      generateChildNameFields();
+      // Populate child name fields
+      childNames.forEach((name, idx) => {
+        const field = document.getElementById(`childNameInput_${idx}`);
+        if (field) {
+          field.value = name;
+        }
+      });
+    }
+
+    /********************************************************
+     *    Create child name input fields dynamically
+     ********************************************************/
+    function generateChildNameFields() {
+      const count = parseInt(numChildrenInput.value, 10) || 0;
+      childNamesContainer.innerHTML = "";
+      for (let i = 0; i < count; i++) {
+        const wrapper = document.createElement('div');
+        wrapper.classList.add('child-name-field');
+
+        const label = document.createElement('label');
+        label.textContent = `Child #${i + 1} Name`;
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.id = `childNameInput_${i}`;
+        input.placeholder = `Enter child #${i + 1} name`;
+
+        // Save to localStorage on change
+        input.addEventListener('input', () => {
+          storeFormInputs();
+        });
+
+        wrapper.appendChild(label);
+        wrapper.appendChild(input);
+        childNamesContainer.appendChild(wrapper);
+      }
+    }
+
+    /********************************************************
+     *   Store form inputs (message + child names) in localStorage
+     ********************************************************/
+    function storeFormInputs() {
+      const messageVal = messageInput.value;
+      const count = parseInt(numChildrenInput.value, 10) || 0;
+      const childNames = [];
+      for (let i = 0; i < count; i++) {
+        const field = document.getElementById(`childNameInput_${i}`);
+        childNames.push(field.value.trim());
+      }
+      saveToLocalStorage(messageVal, childNames);
+    }
+
+    // Whenever inputs change, store them
+    messageInput.addEventListener('input', storeFormInputs);
+    numChildrenInput.addEventListener('change', () => {
+      generateChildNameFields();
+      storeFormInputs();
+    });
+
+    /********************************************************
+     *   Main "Generate" button: builds the printable sections
+     ********************************************************/
+    generateBtn.addEventListener('click', () => {
+      // Clear out old content
+      printArea.innerHTML = "";
+      printArea.style.display = "block";
+
+      // Gather form data
+      const messageVal = messageInput.value;
+      const count = parseInt(numChildrenInput.value, 10) || 0;
+      const childNames = [];
+      for (let i = 0; i < count; i++) {
+        const field = document.getElementById(`childNameInput_${i}`);
+        childNames.push(field.value.trim() || `Child#${i+1}`);
+      }
+
+      if (!messageVal || count < 1) {
+        alert("Please enter a secret message and at least 1 child.");
+        return;
+      }
+
+      // Generate random alphabets for each child
+      const randomAlphabets = [];
+      for (let i = 0; i < count; i++) {
+        randomAlphabets.push(generateRandomAlphabet());
+      }
+
+      // Prepare distribution:
+      // distribution[childIndex][charIndex] => info to display (name, number, or "")
+      const distribution = Array.from({ length: count }, () => []);
+      const msgChars = messageVal.split('');
+
+      // For each character in the message:
+      msgChars.forEach((ch, charIndex) => {
+        // 1) Choose a random child whose alphabet is used for this character
+        const encodingChildIdx = Math.floor(Math.random() * count);
+        const encodingChildName = childNames[encodingChildIdx];
+
+        // 2) Find the letter's index in that child's random alphabet
+        let encIndex = randomAlphabets[encodingChildIdx].indexOf(ch.toUpperCase());
+        if (encIndex === -1) {
+          // This means the character is not A–Z or space. We'll store blank for all
+          for (let c = 0; c < count; c++) {
+            distribution[c][charIndex] = ""; 
+          }
+          return;
+        }
+        encIndex = encIndex + 1; // convert 0-based to 1-based index
+
+        // 3) We must pick exactly two children to hold the crucial info:
+        //    childX gets the "name" (encodingChildName),
+        //    childY gets the "index" (encIndex).
+        //    If count == 2, it's just the other child. If > 2, pick any 2 distinct children.
+
+        let chosenIndices;
+        if (count === 1) {
+          // Edge case: only 1 child, we'll give them the index
+          chosenIndices = [0];
+        } else if (count === 2) {
+          chosenIndices = [0, 1];
+          shuffleArray(chosenIndices);
+        } else {
+          // count > 2
+          chosenIndices = [];
+          while (chosenIndices.length < 2) {
+            let randIdx = Math.floor(Math.random() * count);
+            if (!chosenIndices.includes(randIdx)) {
+              chosenIndices.push(randIdx);
+            }
+          }
+          // random order
+          shuffleArray(chosenIndices);
+        }
+
+        // Initialize all distribution entries for this char to blank
+        for (let c = 0; c < count; c++) {
+          distribution[c][charIndex] = "";
+        }
+
+        // Now assign the chosen pair
+        if (chosenIndices.length >= 2) {
+          // The first chosen child sees the "name"
+          distribution[chosenIndices[0]][charIndex] = encodingChildName;
+          // The second chosen child sees the "index"
+          distribution[chosenIndices[1]][charIndex] = encIndex.toString();
+        } else if (chosenIndices.length === 1) {
+          distribution[chosenIndices[0]][charIndex] = encIndex.toString();
+        }
+      });
+
+      // Now we build each child's section
+      for (let i = 0; i < count; i++) {
+        const section = document.createElement('div');
+        section.classList.add('child-section');
+
+        // Child heading
+        const heading = document.createElement('h2');
+        heading.textContent = childNames[i];
+        section.appendChild(heading);
+
+        // 1) Table of numbers 1..27 and below them the child's random alphabet
+        const table = document.createElement('table');
+        table.classList.add('alphabet-table');
+
+        // Row of numbers
+        const numRow = document.createElement('tr');
+        makeNumberSequence().forEach(num => {
+          const th = document.createElement('th');
+          th.textContent = num;
+          numRow.appendChild(th);
+        });
+        table.appendChild(numRow);
+
+        // Row of letters
+        const alphaRow = document.createElement('tr');
+        randomAlphabets[i].forEach(letter => {
+          const td = document.createElement('td');
+          td.textContent = letter;
+          alphaRow.appendChild(td);
+        });
+        table.appendChild(alphaRow);
+
+        section.appendChild(table);
+
+        // 2) For each character, show horizontally: box + info underneath
+        const messageLine = document.createElement('div');
+        messageLine.classList.add('message-line');
+
+        msgChars.forEach((ch, charIndex) => {
+          const itemDiv = document.createElement('div');
+          itemDiv.classList.add('message-item');
+
+          // The box where the child can write the decoded letter
+          const boxDiv = document.createElement('div');
+          boxDiv.classList.add('message-box');
+
+          // The info below (name or number or blank)
+          const infoDiv = document.createElement('div');
+          infoDiv.classList.add('info-below');
+          infoDiv.textContent = distribution[i][charIndex] || "";
+
+          itemDiv.appendChild(boxDiv);
+          itemDiv.appendChild(infoDiv);
+          messageLine.appendChild(itemDiv);
+        });
+
+        section.appendChild(messageLine);
+        printArea.appendChild(section);
+      }
+
+      // Scroll to the generated area
+      printArea.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    // On load, populate from local storage
+    window.addEventListener('DOMContentLoaded', () => {
+      loadFormFromLocalStorage();
+    });
+  </script>
+  <div id="consentOverlay" class="consent-overlay">
+  <div class="consent-modal">
+    <div class="consent-content">
+      <h3>We Value Your Privacy</h3>
+      <p>We use local storage to remember your secret message and children’s names across page refreshes. No data is sent to a server.</p>
+      <p>Please confirm that you accept the use of local storage in your browser. If you choose to decline, we will erase the data and you won’t be able to use this functionality.</p>
+    </div>
+    <div class="consent-buttons">
+      <button id="consentAcceptBtn">Accept</button>
+      <button id="consentDeclineBtn">Decline</button>
+    </div>
+  </div>
+  </div>
+</body>
+</html>
