@@ -194,18 +194,54 @@
       color: #fff;
     }
     #consentDeclineBtn {
-      background-color: #ccc;
-      color: #333;
+        background-color: #ccc;
+        color: #333;
     }
+    .explanation {
+        background: #fff;
+        padding: 1rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+        line-height: 1.5;
+    }
+    
+    .explanation strong {
+        display: block;
+        margin-top: 0.75rem;
+        font-size: 1.1rem;
+    }
+    
+    .explanation ul {
+        padding-left: 1.5rem;
+        margin-top: 0.5rem;
+        list-style-type: disc;
+    }
+    
+    .explanation li {
+        margin-bottom: 0.3rem;
+    }
+    
   </style>
 </head>
 <body>
   <div class="page-content">
-    <h1>Scavenger Hunt Collaboration</h1>
+
 
     <div class="form-container">
+    <h1>Scavenger Hunt Collaboration</h1>
+    <p class="explanation">
+  This tool generates a collaborative scavenger hunt where children must work together to reveal their next destination.
+  <br><br>
+  Enter the children's names (youngest to oldest) and list, one per line, the locations where you will hide the next steps. 
+  The last line should be the final destination where the treasure awaits. Click "Generate Printable Sheets."
+  <br><br>
+  Place each message where it is labeled, and pre-cut the sheets so that each child can easily collect their own blank-coded message. 
+  Keep the first message and the letter mappings with you. Do this in secret before the hunt begins!
+  <br><br>
+  When the scavenger hunt starts, give the children their codes and the first message. Let the adventure begin!
+</p>
       <h2>Setup</h2>
-      <label for="messageInput">One Clue per Line</label>
+      <label for="messageInput">Please put the scavenger hunt stops here, one per line.</label>
       <textarea
         id="messageInput"
         rows="6"
@@ -474,14 +510,14 @@
       }
 
       /* ==============================================================
-       * 1) Print a "Mapping Only" section for each child
+       * 1) Print a "Your secret code" section for each child
        * ============================================================== */
       childNames.forEach((name, i) => {
         const mapSection = document.createElement('div');
         mapSection.classList.add('mapping-section');
 
         const heading = document.createElement('h2');
-        heading.textContent = `${name} — Mapping Only`;
+        heading.textContent = `${name} — Your Secret Code`;
         mapSection.appendChild(heading);
 
         // Show the table: 1..27 and the random alphabet
