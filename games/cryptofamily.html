@@ -127,6 +127,7 @@
       align-items: center;
       justify-content: center;
       font-weight: bold;
+      color: #EEE;
     }
     .info-below {
       font-size: 0.8rem;
@@ -469,6 +470,16 @@
       generateChildNameFields();
       storeFormInputs();
     });
+    const treasureHuntClues = [
+      "Everyone must hold hands or link arms and then release them.",
+      "Each person picks up a treat and hands it to the person on their right.",
+      "Everyone must make the sound of an animal.",
+      "Before moving forward, each person must gently tap the shoulder of the person next to them and say, ‘Let’s go together!’.",
+      "Together, count down from 7 to 0. At ‘0,’ everyone says Hurray!",
+      "Form a circle and place your hands in the center. On the count of three, lift them up together!",
+      "Everyone gives a side hug or a high five to someone else!",
+      "Hold the clue in the center—everyone must touch it."
+    ];
 
     /********************************************************
      *   Main "Generate" button: builds the printable sections
@@ -631,15 +642,15 @@
           childSection.classList.add('child-section');
 
           const subHeading = document.createElement('h3');
-          subHeading.textContent = `${childNames[i]} — Coded Message`;
+          subHeading.textContent = `${childNames[i]}`;
           childSection.appendChild(subHeading);
 
           // Optional “we will go together” line:
           const nextLine = document.createElement('p');
           if (childNames[i] === childNames[leaderIdx]) {
-            nextLine.textContent = `${childNames[i]}, we will go to the place below, and you will lead the way.`;
+            nextLine.innerHTML = `You are in charge. <i>${treasureHuntClues[lineIdx%treasureHuntClues.length]}</i> After, decode: for each box, announce its number, ask others for their hints, write the letter. Then, lead the way to the next place.<br>`;
           } else {
-            nextLine.textContent = `${childNames[i]}, we will go to the place below, and ${childNames[leaderIdx]} will lead the way.`;
+            nextLine.textContent = `Follow the lead of ${childNames[leaderIdx]} to decrypt this:`;
           }
           childSection.appendChild(nextLine);
 
@@ -654,18 +665,19 @@
             // The box for the child to fill once decoded
             const boxDiv = document.createElement('div');
             boxDiv.classList.add('message-box');
+            boxDiv.textContent = charIndex;
 
             // The raw info (could be the encoding child's name, or a number, or "")
             let rawInfo = distribution[i][charIndex] || "";
 
-            // If rawInfo is exactly this child's own name, replace with "me"
+            // If rawInfo is exactly this child's own name, replace with "you"
             if (rawInfo === childNames[i]) {
-              rawInfo = "me";
+              rawInfo = "you";
             }
 
             const infoDiv = document.createElement('div');
             infoDiv.classList.add('info-below');
-            infoDiv.textContent = rawInfo; // either "me", another child's name, a number, or blank
+            infoDiv.textContent = rawInfo; // either "you", another child's name, a number, or blank
 
             itemDiv.appendChild(boxDiv);
             itemDiv.appendChild(infoDiv);
