@@ -126,6 +126,17 @@
     cell.textContent = num;
   }
 
+  function combo(arr, k) {
+    if (k === 0) return [[]];
+    if (arr.length < k) return [];
+    if (arr.length === k) return [arr.slice()];
+    const [head, ...rest] = arr;
+    return [
+      ...combo(rest, k - 1).map(c => [head, ...c]),
+      ...combo(rest, k)
+    ];
+  }
+
   function revealMineAndLose(clickedIdx) {
     // Reveal all the X’s on the board
     finalBoard.X.forEach(i => {
