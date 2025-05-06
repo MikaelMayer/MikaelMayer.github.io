@@ -164,11 +164,111 @@
 
   // --- PUZZLE GENERATION ---
   function generateNewBoard(clickedIdx) {
+    let board = tryRandomBoard(clickedIdx);
+    if (!board) {
+      board = findBoardDeterministic(clickedIdx);
+    }
+    return board;
+  }
+
+  function tryRandomBoard(clickedIdx) {
     for (let i = 0; i < 10000; i++) {
       const board = simulateRandomGame(clickedIdx);
       if (board) return board;
     }
     return null;
+  }
+
+  function findBoardDeterministic(clickedIdx) {
+    for (let line of winLines) {
+      // clicked cell cannot be part of the winning X line
+      if (line.includes(clickedIdx)) continue;
+
+      // reject this line if it already conflicts with revealed info
+      let invalid = false;
+      for (let r of revealed) {
+        if (line.includes(r)) { invalid = true; break; }
+        const req = revealedNums[r];
+        const adj = countAdj(r, new Set(line));
+        if (adj > req) { invalid = true; break; }
+      }
+      if (invalid) continue;
+
+      const baseX = new Set(line);
+      const available = [...Array(9).keys()].filter(i => !baseX.has(i) && !revealed.includes(i));
+
+      // try adding extra Xs (total between 3 and 5)
+      for (let totalX = 3; totalX <= 5; totalX++) {
+        if (totalX < baseX.size) continue;
+        const extrasNeeded = totalX - baseX.size;
+
+        for (let extra of combo(available, extrasNeeded)) {
+          const Xset = new Set([...baseX, ...extra]);
+          if (Xset.has(clickedIdx)) continue;
+
+          // check revealed-count constraints
+          let ok = true;
+          for (let r of revealed) {
+            if (countAdj(r, Xset) !== revealedNums[r]) { ok = false; break; }
+          }
+          if (!ok) continue;
+
+          // place Os (one fewer than Xs)
+          const spots = [...Array(9).keys()].filter(i => !Xset.has(i) && !revealed.includes(i));
+          for (let Oarr of combo(spots, Xset.size - 1)) {
+            const Oset = new Set(Oarr);
+            if (reconstructHistory(Xset, Oset)) {
+              return { X: Xset, O: Oset };
+            }
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  function reconstructHistory(Xset, Oset) {
+    const Xarr = Array.from(Xset);
+    const Oarr = Array.from(Oset);
+    const totalMoves = Xarr.length + Oarr.length;
+    const usedX = new Set();
+    const usedO = new Set();
+    const board = Array(9).fill(null);
+
+    function dfs(moveIndex, xTurn) {
+      if (moveIndex === totalMoves) {
+        // must end in an X-win
+        return hasWin(usedX);
+      }
+
+      if (xTurn) {
+        for (let x of Xarr) {
+          if (usedX.has(x)) continue;
+          board[x] = 'X';
+          usedX.add(x);
+          // disallow an early X-win
+          if (!hasWin(usedX) && dfs(moveIndex + 1, false)) {
+            return true;
+          }
+          board[x] = null;
+          usedX.delete(x);
+        }
+      } else {
+        for (let o of Oarr) {
+          if (usedO.has(o)) continue;
+          board[o] = 'O';
+          usedO.add(o);
+          if (dfs(moveIndex + 1, true)) {
+            return true;
+          }
+          board[o] = null;
+          usedO.delete(o);
+        }
+      }
+      return false;
+    }
+
+    return dfs(0, true);
   }
 
   function simulateRandomGame(clickedIdx) {
