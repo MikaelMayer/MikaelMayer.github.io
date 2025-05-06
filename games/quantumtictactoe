@@ -1,0 +1,237 @@
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>How did you win tic-tac-toe again, Dad?</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; }
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, 80px);
+      grid-template-rows: repeat(3, 80px);
+      gap: 5px;
+      justify-content: center;
+      margin: 20px auto;
+    }
+    .cell {
+      width: 80px; height: 80px;
+      background: #ddd;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 2em;
+      cursor: pointer;
+      user-select: none;
+      color: #000;
+    }
+    .cell.revealed {
+      background: #fff;
+      cursor: default;
+    }
+    .cell.x-win {
+      background: #a2f5a2 !important;
+      color: #000;
+    }
+    /* Minesweeper number colors */
+    .num-1 { color: #0000FE; }
+    .num-2 { color: #187E00; }
+    .num-3 { color: #FF0000; }
+    .num-4 { color: #000080; }
+    .num-5 { color: #800000; }
+    .num-6 { color: #008080; }
+    .num-7 { color: #000000; }
+    .num-8 { color: #808080; }
+    #message {
+      margin: 10px;
+      font-size: 1.2em;
+      min-height: 1.5em;
+    }
+    #reset {
+      margin-top: 10px;
+      padding: 5px 10px;
+      font-size: 1em;
+    }
+  </style>
+</head>
+<body>
+  <h1>How did you win tic-tac-toe again, Dad?</h1>
+  <p>“Daddy played Tic Tac Toe but used mines instead of crosses. Guess all the spots where he did <strong>not</strong> play! If you do, he'll buy you ice cream. Don't worry he is nice.”</p>
+  <div id="board"></div>
+  <div id="message"></div>
+  <button id="reset">Reset</button>  <script>
+  // --- CONSTANTS & STATE ---
+  const winLines = [
+    [0,1,2],[3,4,5],[6,7,8],    // rows
+    [0,3,6],[1,4,7],[2,5,8],    // cols
+    [0,4,8],[2,4,6]             // diagonals
+  ];
+
+  let revealed = [];
+  let revealedNums = {};
+  let gameOver = false;
+  let finalBoard = null;
+
+  // --- INITIALIZATION ---
+  function init() {
+    const boardEl = document.getElementById('board');
+    boardEl.innerHTML = '';
+    revealed = [];
+    revealedNums = {};
+    gameOver = false;
+    finalBoard = null;
+    document.getElementById('message').textContent = '';
+
+    for (let i = 0; i < 9; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.idx = i;
+      cell.addEventListener('click', onCellClick);
+      boardEl.appendChild(cell);
+    }
+  }
+
+  // --- EVENT HANDLER ---
+  function onCellClick(e) {
+    if (gameOver) return;
+    const idx = +e.currentTarget.dataset.idx;
+    if (revealed.includes(idx)) return;
+
+    let board;
+    if (finalBoard === null || finalBoard.X.has(idx)) {
+      board = generateNewBoard(idx);
+      if (!board) return revealMineAndLose(idx);
+      finalBoard = board;
+    } else {
+      board = finalBoard;
+    }
+
+    const num = countAdj(idx, board.X);
+    revealed.push(idx);
+    revealedNums[idx] = num;
+    revealNumber(idx, num);
+
+    if (checkWin()) {
+      document.getElementById('message').textContent = 'You got it! That’s how I won. Let’s get ice cream.';
+      revealWin(board.X);
+      gameOver = true;
+    }
+  }
+
+  document.getElementById('reset').addEventListener('click', init);
+  window.onload = init;
+
+  // --- RENDERING ---
+  function revealNumber(idx, num) {
+    const cell = document.querySelector(`.cell[data-idx='${idx}']`);
+    cell.classList.add('revealed', `num-${num}`);
+    cell.textContent = num;
+  }
+
+  function revealMineAndLose(idx) {
+    const cell = document.querySelector(`.cell[data-idx='${idx}']`);
+    cell.classList.add('revealed');
+    cell.textContent = '✖';
+    document.getElementById('message').textContent = 'Arg, I should have known!';
+    gameOver = true;
+  }
+
+  function revealWin(Xset) {
+    for (let line of winLines) {
+      if (line.every(i => Xset.has(i))) {
+        line.forEach(i => {
+          const cell = document.querySelector(`.cell[data-idx='${i}']`);
+          cell.classList.add('x-win');
+          cell.textContent = 'X';
+        });
+        break;
+      }
+    }
+  }
+
+  // --- PUZZLE GENERATION ---
+  function generateNewBoard(clickedIdx) {
+    for (let i = 0; i < 10000; i++) {
+      const board = simulateRandomGame(clickedIdx);
+      if (board) return board;
+    }
+    return null;
+  }
+
+  function simulateRandomGame(clickedIdx) {
+    const boardArr = Array(9).fill(null);
+    const Xset = new Set();
+    const Oset = new Set();
+    let turn = 'X';
+    let moves = 0;
+
+    while (true) {
+      // gather empty cells
+      const empty = boardArr.map((v, i) => v === null ? i : null).filter(i => i !== null);
+      if (empty.length === 0) return null;
+      // filter candidates by turn constraints
+      let candidates = empty.slice();
+      if (turn === 'X') {
+        candidates = candidates.filter(i => !revealed.includes(i));
+      }
+      // O cannot win immediately
+      if (turn === 'O') {
+        candidates = candidates.filter(i => {
+          // would O win if played here?
+          Oset.add(i);
+          const wins = hasWin(Oset);
+          Oset.delete(i);
+          return !wins;
+        });
+      }
+      if (candidates.length === 0) return null;
+
+      // pick a move
+      const idx = candidates[Math.floor(Math.random() * candidates.length)];
+      boardArr[idx] = turn;
+      if (turn === 'X') Xset.add(idx);
+      else Oset.add(idx);
+
+      // check X win
+      if (turn === 'X' && hasWin(Xset)) break;
+      // enforce revealed count constraints
+      for (let r of revealed) {
+        if (countAdj(r, Xset) > revealedNums[r]) return null;
+      }
+
+      turn = turn === 'X' ? 'O' : 'X';
+      if (++moves >= 9) return null;
+    }
+
+    if (Xset.has(clickedIdx)) return null;
+    for (let r of revealed) {
+      if (countAdj(r, Xset) !== revealedNums[r]) return null;
+    }
+
+    return { X: Xset, O: Oset };
+  }
+
+  // --- UTILITIES ---
+  function countAdj(idx, Xset) {
+    return neighbors(idx).filter(n => Xset.has(n)).length;
+  }
+
+  function neighbors(i) {
+    const r = Math.floor(i / 3), c = i % 3;
+    const out = [];
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const nr = r + dr, nc = c + dc;
+      if (nr >= 0 && nr < 3 && nc >= 0 && nc < 3) out.push(nr * 3 + nc);
+    }
+    return out;
+  }
+
+  function hasWin(set) {
+    return winLines.some(line => line.every(i => set.has(i)));
+  }
+
+  function checkWin() {
+    const nonX = [...Array(9).keys()].filter(i => !finalBoard.X.has(i));
+    return nonX.every(i => revealed.includes(i));
+  }
+  </script></body>
+</html>
