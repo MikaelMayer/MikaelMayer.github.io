@@ -126,21 +126,36 @@
     cell.textContent = num;
   }
 
-  function revealMineAndLose(idx) {
-    const cell = document.querySelector(`.cell[data-idx='${idx}']`);
-    cell.classList.add('revealed');
-    cell.textContent = '✖';
+  function revealMineAndLose(clickedIdx) {
+    // Reveal all the X’s on the board
+    finalBoard.X.forEach(i => {
+      const cell = document.querySelector(`.cell[data-idx='${i}']`);
+      cell.classList.add('revealed');
+      cell.textContent = 'X';
+    });
+
+    // Mark the clicked cell as the exploded mine
+    const mineCell = document.querySelector(`.cell[data-idx='${clickedIdx}']`);
+    mineCell.textContent = '✖';
+
     document.getElementById('message').textContent = 'Arg, I should have known!';
     gameOver = true;
   }
 
   function revealWin(Xset) {
+    // Reveal every X on the board
+    Xset.forEach(i => {
+      const cell = document.querySelector(`.cell[data-idx='${i}']`);
+      cell.classList.add('revealed');
+      cell.textContent = 'X';
+    });
+
+    // Then highlight just the winning line
     for (let line of winLines) {
       if (line.every(i => Xset.has(i))) {
         line.forEach(i => {
           const cell = document.querySelector(`.cell[data-idx='${i}']`);
           cell.classList.add('x-win');
-          cell.textContent = 'X';
         });
         break;
       }
