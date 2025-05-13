@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon-192.png">
+  <meta name="theme-color" content="#000000">
+  <title>Responsive Delayed Camera</title>
+  <style>
+    body { margin: 0; background: black; overflow: hidden; }
+    video { position: absolute; object-fit: cover; }
+
+    #liveVideo {
+      top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1;
+    }
+    #delayedVideo {
+      top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; display: none;
+    }
+    #miniLive {
+      position: absolute; bottom: 10px; right: 10px;
+      width: 25vw; height: 20vh; border: 2px solid white;
+      border-radius: 8px; z-index: 2; display: none;
+    }
+    #overlay {
+      position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+      font-family: monospace; font-size: 2em; color: lime;
+      background: rgba(0,0,0,0.6); padding: 0.3em 0.8em;
+      border-radius: 10px; z-index: 3;
+    }
+    #switchBtn {
+      position: absolute; top: 15px; right: 15px; z-index: 4;
+      background: rgba(255,255,255,0.1); color: white; border: 1px solid white;
+      font-size: 1.2em; border-radius: 50%; width: 40px; height: 40px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    #recBtn {
+      position: absolute; bottom: 10px; left: 10px; z-index: 5;
+      background: rgba(255,255,255,0.1); color: white;
+      border: 1px solid red; font-size: 1em;
+      padding: 0.5em 1em; border-radius: 10px;
+      cursor: pointer; display: none;
+    }
+    #recordDot {
+      position: absolute; top: 15px; left: 15px; width: 16px; height: 16px;
+      border-radius: 50%; background: red; z-index: 6;
+      display: none; animation: blink 1s infinite;
+    }
+    @keyframes blink {
+      0%, 50%, 100% { opacity: 1; }
+      25%, 75% { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <video id="liveVideo" muted autoplay playsinline></video>
+  <video id="delayedVideo" muted autoplay playsinline></video>
+  <video id="miniLive" muted autoplay playsinline></video>
+
+  <div id="overlay">Tap to set delay</div>
+  <button id="switchBtn">&#8635;</button>
+  <button id="recBtn">REC</button>
+  <div id="recordDot"></div>
+
+  <script>
+    const liveVideo = document.getElementById('liveVideo');
+    const delayedVideo = document.getElementById('delayedVideo');
+    const miniLive = document.getElementById('miniLive');
+    const overlay = document.getElementById('overlay');
+    const switchBtn = document.getElementById('switchBtn');
+    const recBtn = document.getElementById('recBtn');
+    const recordDot = document.getElementById('recordDot');
+
+    let stream;
+    let currentFacingMode = "environment";
+    let tapCount = 0;
+    let delayStartTime = null;
+    let delayTimerInterval = null;
+    let delayMs = 5000;
+    let firstRecorder;
+    let firstChunkPromise;
+    let firstChunkBlob;
+
+    let isRecording = false;
+    let recordedBlobs = [];
+
+    function formatTime(ms) {
+      const seconds = Math.floor(ms / 1000);
+      const deci = Math.floor((ms % 1000) / 100);
+      return `${seconds}.${deci}`;
+    }
+
+    async function getCameraStream(facingMode) {
+      return navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { exact: facingMode } },
+        audio: false
+      });
+    }
+
+    async function startCamera() {
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      try {
+        stream = await getCameraStream(currentFacingMode);
+        liveVideo.srcObject = stream;
+        miniLive.srcObject = stream;
+        await liveVideo.play();
+      } catch (e) {
+        overlay.textContent = "Camera error";
+        console.error(e);
+      }
+    }
+
+    function startStopwatch() {
+      delayStartTime = performance.now();
+      overlay.textContent = "0.0";
+      delayTimerInterval = setInterval(() => {
+        const ms = performance.now() - delayStartTime;
+        overlay.textContent = formatTime(ms);
+      }, 100);
+    }
+
+    function freezeDelay() {
+      clearInterval(delayTimerInterval);
+      delayMs = Math.max(1000, Math.round((performance.now() - delayStartTime) / 100) * 100);
+      overlay.textContent = `Delay: ${formatTime(delayMs)}`;
+    }
+
+    function startRecording() {
+      return new Promise(resolve => {
+        const recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp8' });
+        let blob;
+        recorder.ondataavailable = e => {
+          if (e.data && e.data.size > 0) blob = e.data;
+        };
+        recorder.onstop = () => resolve(blob);
+        recorder.start();
+        firstRecorder = recorder;
+      });
+    }
+
+    function stopRecording() {
+      if (firstRecorder && firstRecorder.state === "recording") {
+        firstRecorder.stop();
+      }
+    }
+
+    async function recordChunk(durationMs) {
+      return new Promise(resolve => {
+        const recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp8' });
+        let blob;
+        recorder.ondataavailable = e => {
+          if (e.data && e.data.size > 0) blob = e.data;
+        };
+        recorder.onstop = () => resolve(blob);
+        recorder.start();
+        setTimeout(() => recorder.stop(), durationMs);
+      });
+    }
+
+    async function playAndRecordLoop(initialChunk, durationMs) {
+      let nextChunkPromise = recordChunk(durationMs);
+
+      async function playChunk(blob) {
+        return new Promise(resolve => {
+          const url = URL.createObjectURL(blob);
+          delayedVideo.src = url;
+          delayedVideo.onloadeddata = () => delayedVideo.play();
+          delayedVideo.onended = () => {
+            URL.revokeObjectURL(url);
+            // If we are recording, store this chunk
+            if (isRecording) recordedBlobs.push(blob);
+            resolve();
+          };
+          delayedVideo.onerror = () => {
+            URL.revokeObjectURL(url);
+            resolve();
+          };
+        });
+      }
+
+      while (true) {
+        await playChunk(initialChunk);
+        initialChunk = await nextChunkPromise;
+        nextChunkPromise = recordChunk(durationMs);
+      }
+    }
+
+    function toggleRecording() {
+      if (!isRecording) {
+        isRecording = true;
+        recordedBlobs = [];
+        recBtn.textContent = "STOP";
+        recordDot.style.display = "block";
+      } else {
+        isRecording = false;
+        recBtn.textContent = "REC";
+        recordDot.style.display = "none";
+
+        if (recordedBlobs.length > 0) {
+          const blob = new Blob(recordedBlobs, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `delayed-recording-${Date.now()}.webm`;
+          a.click();
+        }
+      }
+    }
+
+    // Handle first/second tap to set delay
+    liveVideo.addEventListener('click', async () => {
+      tapCount++;
+      if (tapCount === 1) {
+        switchBtn.style.display = "none";
+        startStopwatch();
+        firstChunkPromise = startRecording();
+      } else if (tapCount === 2) {
+        freezeDelay();
+        stopRecording();
+        firstChunkBlob = await firstChunkPromise;
+
+        liveVideo.style.display = 'none';
+        delayedVideo.style.display = 'block';
+        miniLive.style.display = 'block';
+        recBtn.style.display = 'block';
+
+        playAndRecordLoop(firstChunkBlob, delayMs);
+      }
+    });
+
+    switchBtn.addEventListener('click', async () => {
+      currentFacingMode = currentFacingMode === "user" ? "environment" : "user";
+      await startCamera();
+    });
+
+    miniLive.addEventListener('click', () => {
+      location.reload();
+    });
+
+    recBtn.addEventListener('click', toggleRecording);
+
+    startCamera();
+    // Register the service worker
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("service-worker.js");
+    }
+  </script>
+</body>
+</html>
