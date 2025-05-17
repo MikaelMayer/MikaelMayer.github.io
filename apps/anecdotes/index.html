@@ -1,7 +1,7 @@
 <!DOCTYPE html><html lang="fr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Partage une anecdote</title>
   <style>
     body {
@@ -71,30 +71,163 @@
     <button id="showPrevious">Relire les anecdotes précédentes</button>
     <div id="previousStories" class="hidden"></div>
   </div>  <div id="unlockedStories"></div>  <script>
-    const DEFAULT_TOKEN = "famillemayerwagnermenoncourt";
-    const urlParams = new URLSearchParams(window.location.search);
-    let token = urlParams.get("token") || prompt("Veuillez entrer le token pour accéder aux anecdotes :");
-    if (!urlParams.get("token") && token) {
-      history.replaceState(null, "", `${location.pathname}?token=${token}`);
+    function errorLog(...args) {
+      console.log("[DEBUG]", ...args);
     }
 
-    const testMode = !token;
+    const token = new URLSearchParams(location.search).get("token") ?? prompt("Veuillez entrer le token :") ?? "";
+    if (!location.search.includes("token=") && token !== null) {
+      history.replaceState(null, "", `${location.pathname}?token=${encodeURIComponent(token)}`);
+    }
+
+    const testMode = token.trim() === "";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCXjJkj_FUaxsEI-72ikgGGgFXF5fyCD20",
       authDomain: "anecdotesfamiliales.firebaseapp.com",
       databaseURL: "https://anecdotesfamiliales-default-rtdb.firebaseio.com",
       projectId: "anecdotesfamiliales",
-      storageBucket: "anecdotesfamiliales.firebasestorage.app",
+      storageBucket: "anecdotesfamiliales.appspot.com",
       messagingSenderId: "397937359982",
-      appId: "1:397937359982:web:10cc7fab8db02324cb7a7f",
-      measurementId: "G-LN59537NPB"
+      appId: "1:397937359982:web:10cc7fab8db02324cb7a7f"
     };
 
-    if (!testMode) {
-      firebase.initializeApp(firebaseConfig);
+    if (!testMode) firebase.initializeApp(firebaseConfig);
+
+    const storyForm = document.getElementById('storyForm');
+    const statusDiv = document.getElementById('status');
+    const lockedPreviewsDiv = document.getElementById('lockedPreviews');
+    const unlockedStoriesDiv = document.getElementById('unlockedStories');
+    const previousStories = document.getElementById('previousStories');
+    const waitingList = document.getElementById('waitingList');
+    const inviteOthers = document.getElementById('inviteOthers');
+    const promptForm = document.getElementById('promptForm');
+    const nameInput = document.getElementById('name');
+    const submitBtn = storyForm.querySelector('button');
+
+    const savedName = document.cookie.replace(/(?:(?:^|.*;\s*)username\s*=\s*([^;]*).*$)|^.*$/, "$1");
+    const currentUser = savedName || "Testeur";
+    if (savedName) nameInput.value = savedName;
+
+    nameInput.addEventListener('input', () => {
+      submitBtn.disabled = nameInput.value.trim() === '' && testMode;
+    });
+
+    let currentAllStories = {};
+    let currentUnread = [];
+
+    function updateUI(allStories, views) {
+      views = views || {};
+      const readKeys = views[currentUser] || [];
+      const storyKeys = Object.keys(allStories);
+      const unread = storyKeys.filter(k => !readKeys.includes(k));
+
+      currentAllStories = allStories;
+      currentUnread = unread;
+
+      statusDiv.innerHTML = unread.length > 0
+        ? `<h2>${unread.length} anecdote${unread.length > 1 ? 's' : ''} prêtes à être débloquées !</h2>`
+        : `<h2>Tu as tout lu. Merci d'avoir partagé !</h2>`;
+
+      lockedPreviewsDiv.innerHTML = '';
+      if (unread.length > 0 || storyKeys.length === 0) {
+        unread.forEach(k => {
+          const d = allStories[k];
+          const div = document.createElement('div');
+          div.className = 'story preview';
+          div.dataset.key = k;
+          div.innerHTML = `<strong>${d.when}</strong><br><em>${d.name}</em> était <em>${d.where}</em>... Veux-tu savoir ce qui s'est passé ?`;
+          lockedPreviewsDiv.appendChild(div);
+        });
+        promptForm.classList.remove('hidden');
+        storyForm.classList.remove('hidden');
+      }
+
+      const pending = Object.keys(views).filter(name => name !== currentUser && storyKeys.some(k => !(views[name] || []).includes(k)));
+      if (pending.length > 0) {
+        inviteOthers.classList.remove('hidden');
+        waitingList.innerHTML = '';
+        pending.forEach(name => {
+          const li = document.createElement('li');
+          li.textContent = `${name} n'a pas encore lu toutes les anecdotes.`;
+          waitingList.appendChild(li);
+        });
+      }
+
+      document.getElementById('showPrevious').onclick = () => {
+        previousStories.classList.remove('hidden');
+        previousStories.innerHTML = '';
+        readKeys.forEach(k => {
+          const d = allStories[k];
+          const div = document.createElement('div');
+          div.className = 'story';
+          div.innerHTML = `<strong>${d.when}</strong>, <em>${d.name}</em> se rappelle :<br><em>${d.where}</em>, ${d.story}`;
+          previousStories.appendChild(div);
+        });
+      };
     }
 
-    // Le reste du code JavaScript (interface, simulation ou Firebase) sera injecté ici
+    function simulateData() {
+      const stories = {
+        one: { name: 'Alice', story: "J'ai vu une étoile filante", when: 'il y a 3 ans', where: 'dans le jardin' },
+        two: { name: 'Bob', story: "J'ai nagé avec des dauphins", when: 'cet été', where: 'à Hawaï' }
+      };
+      const views = { Testeur: ['one'] };
+      updateUI(stories, views);
+    }
+
+    function saveStory(name, story, when, where) {
+      if (testMode) return;
+      const db = firebase.database();
+      const ref = db.ref('stories_' + token).push();
+      ref.set({ name, story, when, where, timestamp: Date.now() });
+      db.ref('views_' + token + '/' + currentUser).once('value').then(snap => {
+        const seen = snap.val() || [];
+        seen.push(ref.key);
+        db.ref('views_' + token + '/' + currentUser).set(seen);
+      });
+    }
+
+    storyForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const name = nameInput.value.trim();
+      const story = document.getElementById('story').value.trim();
+      const when = document.getElementById('when').value.trim();
+      const where = document.getElementById('where').value.trim();
+      if (!name || !story || !when || !where) return;
+      document.cookie = `username=${name}; path=/`;
+      saveStory(name, story, when, where);
+      statusDiv.innerHTML = `<h2>Anecdotes débloquées :</h2>`;
+      storyForm.classList.add('hidden');
+      promptForm.classList.add('hidden');
+      const div = document.createElement('div');
+      div.className = 'story';
+      div.innerHTML = `<strong>${when}</strong>, <em>${name}</em> se rappelle :<br><em>${where}</em>, ${story}`;
+      lockedPreviewsDiv.prepend(div);
+      currentUnread.forEach(k => {
+        const d = currentAllStories[k];
+        const preview = lockedPreviewsDiv.querySelector(`[data-key="${k}"]`);
+        if (preview) {
+          preview.classList.remove('preview');
+          preview.classList.add('story');
+          preview.innerHTML = `<strong>${d.when}</strong>, <em>${d.name}</em> se rappelle :<br><em>${d.where}</em>, ${d.story}`;
+        }
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    if (testMode) {
+      simulateData();
+    } else {
+      const db = firebase.database();
+      Promise.all([
+        db.ref('stories_' + token).once('value'),
+        db.ref('views_' + token).once('value')
+      ]).then(([snapStories, snapViews]) => {
+        const stories = snapStories.val() || {};
+        const views = snapViews.val() || {};
+        updateUI(stories, views);
+      }).catch(err => errorLog("Firebase error:", err));
+    }
   </script></body>
 </html>
