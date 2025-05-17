@@ -1,0 +1,100 @@
+<!DOCTYPE html><html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Partage une anecdote</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #fffaf2;
+      color: #333;
+      max-width: 600px;
+      margin: 2em auto;
+      padding: 1em;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    h1, h2 {
+      color: #884400;
+    }
+    input, textarea, button {
+      width: 100%;
+      margin: 0.5em 0;
+      padding: 0.6em;
+      font-size: 1em;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+    input[type="text"], textarea {
+      text-transform: none;
+    }
+    button {
+      background-color: #ffcc88;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #ffbb66;
+    }
+    .story {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 1em;
+      margin: 1em 0;
+    }
+    .preview {
+      background: #ffe;
+      border: 1px dashed #cc9;
+    }
+    .hidden { display: none; }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+</head>
+<body>
+  <h1>Bienvenue dans notre collection d'anecdotes familiales !</h1>  <div id="status"></div>
+  <div id="lockedPreviews"></div>
+  <p id="promptForm" class="hidden">Pour lire ces anecdotes, soumets une anecdote à toi :</p>  <form id="storyForm" class="hidden">
+    <label>Ton nom : <input type="text" id="name" required autocomplete="off" /></label>
+    <label>Une anecdote qui t'a marqué : <textarea id="story" required></textarea></label>
+    <label>Il y a combien de temps ? <input type="text" id="when" required autocomplete="off" /></label>
+    <label>Où étais-tu ? <input type="text" id="where" required autocomplete="off" /></label>
+    <button type="submit">Envoyer et lire les nouvelles</button>
+  </form>  <div id="inviteOthers" class="hidden">
+    <h2>Des anecdotes attendent d'autres personnes !</h2>
+    <p>Voici ceux qui n'ont pas encore lu toutes les anecdotes :</p>
+    <ul id="waitingList"></ul>
+    <button onclick="navigator.clipboard.writeText(location.href)">Copier le lien de l'application</button>
+  </div>  <div>
+    <button id="showPrevious">Relire les anecdotes précédentes</button>
+    <div id="previousStories" class="hidden"></div>
+  </div>  <div id="unlockedStories"></div>  <script>
+    const DEFAULT_TOKEN = "famillemayerwagnermenoncourt";
+    const urlParams = new URLSearchParams(window.location.search);
+    let token = urlParams.get("token") || prompt("Veuillez entrer le token pour accéder aux anecdotes :");
+    if (!urlParams.get("token") && token) {
+      history.replaceState(null, "", `${location.pathname}?token=${token}`);
+    }
+
+    const testMode = !token;
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCXjJkj_FUaxsEI-72ikgGGgFXF5fyCD20",
+      authDomain: "anecdotesfamiliales.firebaseapp.com",
+      databaseURL: "https://anecdotesfamiliales-default-rtdb.firebaseio.com",
+      projectId: "anecdotesfamiliales",
+      storageBucket: "anecdotesfamiliales.firebasestorage.app",
+      messagingSenderId: "397937359982",
+      appId: "1:397937359982:web:10cc7fab8db02324cb7a7f",
+      measurementId: "G-LN59537NPB"
+    };
+
+    if (!testMode) {
+      firebase.initializeApp(firebaseConfig);
+    }
+
+    // Le reste du code JavaScript (interface, simulation ou Firebase) sera injecté ici
+  </script></body>
+</html>
