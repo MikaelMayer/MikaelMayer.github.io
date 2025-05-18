@@ -72,7 +72,7 @@
     <div id="previousStories" class="hidden"></div>
   </div>  <div id="unlockedStories"></div>  <script>
     function errorLog(...args) {
-      console.log("[DEBUG]", ...args);
+      alert("[DEBUG] "+args[0]);
     }
 
     const token = new URLSearchParams(location.search).get("token") ?? prompt("Veuillez entrer le token :") ?? "";
