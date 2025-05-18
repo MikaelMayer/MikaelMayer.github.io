@@ -125,7 +125,7 @@
       const readKeys = views[currentUser] || [];
       const storyKeys = Object.keys(allStories);
       const unread = storyKeys.filter(k => !readKeys.includes(k));
-      alert(JSON.stringify({allStories, views, currentUser, unread}));
+      //alert(JSON.stringify({allStories, views, currentUser, unread}));
 
       currentAllStories = allStories;
       currentUnread = unread;
