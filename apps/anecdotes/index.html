@@ -107,11 +107,14 @@
     const submitBtn = storyForm.querySelector('button');
 
     const savedName = document.cookie.replace(/(?:(?:^|.*;\s*)username\s*=\s*([^;]*).*$)|^.*$/, "$1");
-    const currentUser = savedName || "Testeur";
+    var currentUser = savedName || "Testeur";
     if (savedName) nameInput.value = savedName;
 
     nameInput.addEventListener('input', () => {
-      submitBtn.disabled = nameInput.value.trim() === '' && testMode;
+      const name = nameInput.value.trim();
+      submitBtn.disabled = name === '' && testMode;
+      currentUser = name;
+      UpdateEverything();
     });
 
     let currentAllStories = {};
@@ -122,6 +125,7 @@
       const readKeys = views[currentUser] || [];
       const storyKeys = Object.keys(allStories);
       const unread = storyKeys.filter(k => !readKeys.includes(k));
+      alert(JSON.stringify({allStories, views, currentUser, unread}));
 
       currentAllStories = allStories;
       currentUnread = unread;
@@ -217,10 +221,7 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
-    if (testMode) {
-      simulateData();
-    } else {
-      const db = firebase.database();
+    function UpdateEverything() {
       Promise.all([
         db.ref('stories_' + token).once('value'),
         db.ref('views_' + token).once('value')
@@ -229,6 +230,13 @@
         const views = snapViews.val() || {};
         updateUI(stories, views);
       }).catch(err => errorLog("Firebase error:", err));
+    }
+    
+    if (testMode) {
+      simulateData();
+    } else {
+      const db = firebase.database();
+      UpdateEverything();
     }
   </script></body>
 </html>
