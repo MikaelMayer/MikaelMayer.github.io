@@ -187,11 +187,12 @@
       if (testMode) return;
       const db = firebase.database();
       const ref = db.ref('stories_' + token).push();
-      ref.set({ name, story, when, where, timestamp: Date.now() });
-      db.ref('views_' + token + '/' + currentUser).once('value').then(snap => {
-        const seen = snap.val() || [];
-        seen.push(ref.key);
-        db.ref('views_' + token + '/' + currentUser).set(seen);
+      ref.set({ name, story, when, where, timestamp: Date.now() }).then(() => {
+        db.ref('views_' + token + '/' + currentUser).once('value').then(snap => {
+          const seen = snap.val() || [];
+          seen.push(ref.key);
+          db.ref('views_' + token + '/' + currentUser).set(seen);
+        });
       });
     }
 
