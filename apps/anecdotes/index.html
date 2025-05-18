@@ -71,11 +71,12 @@
     <button id="showPrevious">Relire les anecdotes précédentes</button>
     <div id="previousStories" class="hidden"></div>
   </div>  <div id="unlockedStories"></div>  <script>
+    const token = new URLSearchParams(location.search).get("token") ?? prompt("Veuillez entrer le token :").trim() ?? "";
+     
     function errorLog(...args) {
-      alert("[DEBUG] "+JSON.stringify([...args]));
+      alert("[DEBUG '"+token+"'] "+JSON.stringify([...args]));
     }
 
-    const token = new URLSearchParams(location.search).get("token") ?? prompt("Veuillez entrer le token :") ?? "";
     if (!location.search.includes("token=") && token !== null) {
       history.replaceState(null, "", `${location.pathname}?token=${encodeURIComponent(token)}`);
     }
