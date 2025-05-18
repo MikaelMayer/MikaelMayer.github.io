@@ -107,7 +107,7 @@
     const submitBtn = storyForm.querySelector('button');
 
     const savedName = document.cookie.replace(/(?:(?:^|.*;\s*)username\s*=\s*([^;]*).*$)|^.*$/, "$1");
-    var currentUser = savedName || "Testeur";
+    var currentUser = savedName || "";
     if (savedName) nameInput.value = savedName;
 
     nameInput.addEventListener('input', () => {
@@ -178,6 +178,8 @@
         two: { name: 'Bob', story: "J'ai nagé avec des dauphins", when: 'cet été', where: 'à Hawaï' }
       };
       const views = { Testeur: ['one'] };
+      currentUser.name = "Testeur";
+      nameInput.value = "Testeur";
       updateUI(stories, views);
     }
 
