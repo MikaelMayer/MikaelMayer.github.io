@@ -222,6 +222,7 @@
     });
 
     function UpdateEverything() {
+      const db = firebase.database();
       Promise.all([
         db.ref('stories_' + token).once('value'),
         db.ref('views_' + token).once('value')
@@ -235,7 +236,6 @@
     if (testMode) {
       simulateData();
     } else {
-      const db = firebase.database();
       UpdateEverything();
     }
   </script></body>
