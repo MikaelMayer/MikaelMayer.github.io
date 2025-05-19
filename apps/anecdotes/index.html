@@ -131,7 +131,7 @@
       currentUnread = unread;
 
       statusDiv.innerHTML = unread.length > 0
-        ? `<h2>${unread.length} anecdote${unread.length > 1 ? 's' : ''} prêtes à être débloquées !</h2>`
+        ? `<h2>${unread.length} anecdote${unread.length > 1 ? 's' : ''} prête${unread.length > 1 ? 's' : ''} à être débloquée${unread.length > 1 ? 's' : ''} !</h2>`
         : `<h2>Tu as tout lu. Merci d'avoir partagé !</h2>`;
 
       lockedPreviewsDiv.innerHTML = '';
@@ -141,7 +141,7 @@
           const div = document.createElement('div');
           div.className = 'story preview';
           div.dataset.key = k;
-          div.innerHTML = `<strong>${d.when}</strong><br><em>${d.name}</em> était <em>${d.where}</em>... Veux-tu savoir ce qui s'est passé ?`;
+          div.innerHTML = renderPreviewAnecdote(d);
           lockedPreviewsDiv.appendChild(div);
         });
         promptForm.classList.remove('hidden');
@@ -166,10 +166,65 @@
           const d = allStories[k];
           const div = document.createElement('div');
           div.className = 'story';
-          div.innerHTML = `<strong>${d.when}</strong>, <em>${d.name}</em> se rappelle :<br><em>${d.where}</em>, ${d.story}`;
+          div.innerHTML = renderFullAnecdote(d);
           previousStories.appendChild(div);
         });
       };
+    }
+
+    function renderFullAnecdote(d) {
+      return `<strong>${capitalizeFirst(formatWhen(d.when, d.timestamp))}</strong>, <em>${d.name}</em> se rappelle :<br><em>${uncapitalizeFirst(replaceFirstPersonPossessive(d.where))}</em>, ${d.story}`;
+    }
+    function renderPreviewAnecdote(d) {
+      return `<strong>${capitalizeFirst(formatWhen(d.when, d.timestamp))}</strong><br><em>${d.name}</em> était <em>${uncapitalizeFirst(replaceFirstPersonPossessive(d.where))}</em>... Veux-tu savoir ce qui s'est passé ?`;
+    }
+
+    function formatWhen(when, timestamp) {
+      const lower = when.toLowerCase();
+      const keywords = ["hier", "avant-hier", "aujourd’hui", "aujourd'hui", "hui"];
+    
+      const containsRelative = keywords.some(word => lower.includes(word));
+      if (!containsRelative) return when;
+    
+      const now = new Date();
+      const date = new Date(timestamp);
+      const diffMs = now - date;
+      const diffHours = diffMs / (1000 * 60 * 60);
+    
+      if (diffHours < 24) return when;
+    
+      const jours = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+      const mois = ["janvier", "février", "mars", "avril", "mai", "juin",
+                    "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+    
+      const jourNom = jours[date.getDay()];
+      const jour = date.getDate();
+      const moisNom = mois[date.getMonth()];
+      const année = date.getFullYear();
+      const nowAnnée = now.getFullYear();
+      const diffDays = Math.floor(diffHours / 24);
+    
+      if (diffDays < 6) {
+        return `${jourNom} dernier`;
+      } else if (année === nowAnnée) {
+        return `${jourNom} ${jour} ${moisNom}`;
+      } else {
+        return `${jourNom} ${jour} ${moisNom} ${année}`;
+      }
+    }
+
+    function capitalizeFirst(str) {
+      return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
+    function uncapitalizeFirst(str) {
+      return str.charAt(0).toLowerCase() + str.slice(1);
+    }
+    function replaceFirstPersonPossessive(str) {
+      return str
+        .replace(/\bmon\b/gi, match => match[0] === 'M' ? 'Son' : 'son')
+        .replace(/\bma\b/gi, match => match[0] === 'M' ? 'Sa' : 'sa')
+        .replace(/\bmes\b/gi, match => match[0] === 'M' ? 'Ses' : 'ses');
     }
 
     function simulateData() {
@@ -210,7 +265,7 @@
       promptForm.classList.add('hidden');
       const div = document.createElement('div');
       div.className = 'story';
-      div.innerHTML = `<strong>${when}</strong>, <em>${name}</em> se rappelle :<br><em>${where}</em>, ${story}`;
+      div.innerHTML = renderFullAnecdote(d);
       lockedPreviewsDiv.prepend(div);
       currentUnread.forEach(k => {
         const d = currentAllStories[k];
@@ -218,7 +273,7 @@
         if (preview) {
           preview.classList.remove('preview');
           preview.classList.add('story');
-          preview.innerHTML = `<strong>${d.when}</strong>, <em>${d.name}</em> se rappelle :<br><em>${d.where}</em>, ${d.story}`;
+          preview.innerHTML = renderFullAnecdote(d);
         }
       });
       window.scrollTo({ top: 0, behavior: 'smooth' });
