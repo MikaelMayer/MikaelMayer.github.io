@@ -261,31 +261,57 @@
     }
 
     storyForm.addEventListener('submit', e => {
-      e.preventDefault();
-      const name = nameInput.value.trim();
-      const story = document.getElementById('story').value.trim();
-      const when = document.getElementById('when').value.trim();
-      const where = document.getElementById('where').value.trim();
-      if (!name || !story || !when || !where) return;
-      document.cookie = `username=${name}; path=/`;
-      saveStory(name, story, when, where);
-      statusDiv.innerHTML = `<h2>Anecdotes débloquées :</h2>`;
-      storyForm.classList.add('hidden');
-      promptForm.classList.add('hidden');
-      const div = document.createElement('div');
-      div.className = 'story';
-      div.innerHTML = renderFullAnecdote(d);
-      lockedPreviewsDiv.prepend(div);
-      currentUnread.forEach(k => {
-        const d = currentAllStories[k];
-        const preview = lockedPreviewsDiv.querySelector(`[data-key="${k}"]`);
-        if (preview) {
-          preview.classList.remove('preview');
-          preview.classList.add('story');
-          preview.innerHTML = renderFullAnecdote(d);
-        }
-      });
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+        e.preventDefault();
+
+        const name = nameInput.value.trim();
+        const story = document.getElementById('story').value.trim();
+        const when = document.getElementById('when').value.trim();
+        const where = document.getElementById('where').value.trim();
+        if (!name || !story || !when || !where) return;
+
+        document.cookie = `username=${name}; path=/`;
+        const timestamp = Date.now();
+
+        const db = firebase.database();
+        const ref = db.ref('stories_' + token).push();
+        ref.set({ name, story, when, where, timestamp }).then(() => {
+            // Ajoute la nouvelle anecdote à l'état local
+            currentAllStories[ref.key] = { name, story, when, where, timestamp };
+
+            // Marque l'utilisateur comme ayant lu cette anecdote
+            db.ref('views_' + token + '/' + currentUser).once('value').then(snap => {
+                const seen = snap.val() || [];
+                seen.push(ref.key);
+                db.ref('views_' + token + '/' + currentUser).set(seen);
+            });
+
+            // Met à jour l'affichage local immédiatement
+            statusDiv.innerHTML = `<h2>Anecdotes débloquées :</h2>`;
+            storyForm.classList.add('hidden');
+            promptForm.classList.add('hidden');
+            lockedPreviewsDiv.innerHTML = '';
+
+            // Affiche toutes les anecdotes débloquées (celles non encore lues avant)
+            currentUnread.forEach(k => {
+                const d = currentAllStories[k];
+                const div = document.createElement('div');
+                div.className = 'story';
+                div.innerHTML = renderFullAnecdote(d);
+                lockedPreviewsDiv.appendChild(div);
+            });
+
+            // Affiche aussi l'anecdote qu'on vient d'écrire
+            const div = document.createElement('div');
+            div.className = 'story';
+            div.innerHTML = renderFullAnecdote({ name, story, when, where, timestamp });
+            lockedPreviewsDiv.appendChild(div);
+
+            // On considère toutes les anecdotes comme lues localement maintenant
+            currentUnread = [];
+
+            // Scroll vers le haut
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
     });
 
     function UpdateEverything() {
