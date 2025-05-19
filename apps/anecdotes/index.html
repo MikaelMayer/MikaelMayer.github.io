@@ -172,11 +172,20 @@
       };
     }
 
+    function ensurePlacePrefix(where) {
+      const trimmed = where.trim();
+      const prefixes = ["à", "au", "aux", "en", "dans", "chez", "sur", "sous"];
+      const lower = trimmed.toLowerCase();
+    
+      const hasPrefix = prefixes.some(prefix => lower.startsWith(prefix + " ") || lower === prefix);
+      return hasPrefix ? trimmed : "à " + uncapitalizeFirst(trimmed);
+    }
+    
     function renderFullAnecdote(d) {
-      return `<strong>${capitalizeFirst(formatWhen(d.when, d.timestamp))}</strong>, <em>${d.name}</em> se rappelle :<br><em>${uncapitalizeFirst(replaceFirstPersonPossessive(d.where))}</em>, ${d.story}`;
+      return `<strong>${capitalizeFirst(formatWhen(d.when, d.timestamp))}</strong>, <em>${d.name}</em> se rappelle :<br><em>${capitalizeFirst(ensurePlacePrefix(d.where))}</em>, ${d.story}`;
     }
     function renderPreviewAnecdote(d) {
-      return `<strong>${capitalizeFirst(formatWhen(d.when, d.timestamp))}</strong><br><em>${d.name}</em> était <em>${uncapitalizeFirst(replaceFirstPersonPossessive(d.where))}</em>... Veux-tu savoir ce qui s'est passé ?`;
+      return `<strong>${capitalizeFirst(formatWhen(d.when, d.timestamp))}</strong><br><em>${d.name}</em> était <em>${uncapitalizeFirst(replaceFirstPersonPossessive(ensurePlacePrefix(d.where)))}</em>... Veux-tu savoir ce qui s'est passé ?`;
     }
 
     function formatWhen(when, timestamp) {
