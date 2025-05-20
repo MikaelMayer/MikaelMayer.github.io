@@ -49,6 +49,48 @@
       border: 1px dashed #cc9;
     }
     .hidden { display: none; }
+    .comments {
+  margin-top: 1em;
+  padding-top: 0.5em;
+  border-top: 1px solid #ddd;
+}
+
+.comments textarea {
+  width: 100%;
+  margin-top: 0.5em;
+  border-radius: 6px;
+  padding: 0.5em;
+  font-family: inherit;
+  font-size: 1em;
+  box-sizing: border-box;
+}
+
+.comments button {
+  margin-top: 0.5em;
+  background-color: #e2e2ff;
+  color: #333;
+  border: none;
+  padding: 0.4em 0.8em;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.comments button:hover {
+  background-color: #cfcfff;
+}
+
+.existing-comments p {
+  margin: 0.3em 0;
+}
+
+.existing-comments button {
+  margin-left: 0.5em;
+  background: transparent;
+  border: none;
+  color: red;
+  font-weight: bold;
+  cursor: pointer;
+}
   </style>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
@@ -164,9 +206,7 @@
         previousStories.innerHTML = '';
         readKeys.forEach(k => {
           const d = allStories[k];
-          const div = document.createElement('div');
-          div.className = 'story';
-          div.innerHTML = renderFullAnecdote(d);
+          const div = renderFullAnecdote(d, k);
           previousStories.appendChild(div);
         });
       };
@@ -181,8 +221,82 @@
       return hasPrefix ? trimmed : "à " + uncapitalizeFirst(trimmed);
     }
     
-    function renderFullAnecdote(d) {
-      return `<strong>${capitalizeFirst(formatWhen(d.when, d.timestamp))}</strong>, <em>${d.name}</em> se rappelle :<br><em>${capitalizeFirst(ensurePlacePrefix(d.where))}</em>, ${d.story}`;
+    function renderFullAnecdote(d, key) {
+      const div = document.createElement('div');
+      div.className = 'story';
+      div.innerHTML = `
+        <strong>${capitalizeFirst(formatWhen(d.when, d.timestamp))}</strong>, <em>${d.name}</em> se rappelle :<br>
+        <em>${capitalizeFirst(ensurePlacePrefix(d.where))}</em>, ${d.story}
+         <div class="comments" data-storykey="${key}">
+         <div class="existing-comments"></div>
+          <textarea placeholder="Ton commentaire..."></textarea>
+          <button>Commenter</button>
+         </div>
+       `;
+      attachCommentLogic(div, key);
+      return div;
+    }
+    function attachCommentLogic(div, key) {
+  const commentDiv = div.querySelector('.comments');
+  const btn = commentDiv.querySelector('button');
+  const input = commentDiv.querySelector('textarea');
+  const list = commentDiv.querySelector('.existing-comments');
+
+  const ref = firebase.database().ref(`comments_${token}/${key}`);
+
+  // Charger les commentaires existants
+  ref.once('value').then(snap => {
+    const comments = snap.val() || {};
+    Object.entries(comments).forEach(([ts, c]) => {
+      const p = document.createElement('p');
+      p.dataset.ts = ts;
+      p.innerHTML = `<strong>${c.name} :</strong> ${c.comment}`;
+      if (c.name === currentUser) {
+        const delBtn = document.createElement('button');
+        delBtn.textContent = \"✖\";
+        delBtn.onclick = () => {
+          ref.once('value').then(snapshot => {
+            const count = Object.keys(snapshot.val() || {}).length;
+            if (count === 1) {
+              ref.remove();
+            } else {
+              ref.child(ts).remove();
+            }
+            p.remove();
+          });
+        };
+        p.appendChild(delBtn);
+      }
+      list.appendChild(p);
+    });
+  });
+
+  // Ajouter un commentaire
+  btn.addEventListener('click', () => {
+    const text = input.value.trim();
+    if (!text) return;
+    const ts = Date.now();
+    const comment = { name: currentUser, comment: text };
+    ref.child(ts).set(comment);
+    const p = document.createElement('p');
+    p.innerHTML = `<strong>${currentUser} :</strong> ${text}`;
+    const delBtn = document.createElement('button');
+    delBtn.textContent = \"✖\";
+    delBtn.onclick = () => {
+      ref.once('value').then(snapshot => {
+        const count = Object.keys(snapshot.val() || {}).length;
+        if (count === 1) {
+          ref.remove();
+        } else {
+          ref.child(ts).remove();
+        }
+        p.remove();
+      });
+    };
+    p.appendChild(delBtn);
+    list.appendChild(p);
+    input.value = '';
+  });
     }
     function renderPreviewAnecdote(d) {
       return `<strong>${capitalizeFirst(formatWhen(d.when, d.timestamp))}</strong><br><em>${d.name}</em> était <em>${uncapitalizeFirst(replaceFirstPersonPossessive(ensurePlacePrefix(d.where)))}</em>... Veux-tu savoir ce qui s'est passé ?`;
@@ -247,19 +361,6 @@
       updateUI(stories, views);
     }
 
-    function saveStory(name, story, when, where) {
-      if (testMode) return;
-      const db = firebase.database();
-      const ref = db.ref('stories_' + token).push();
-      ref.set({ name, story, when, where, timestamp: Date.now() }).then(() => {
-        db.ref('views_' + token + '/' + currentUser).once('value').then(snap => {
-          const seen = snap.val() || [];
-          seen.push(ref.key);
-          db.ref('views_' + token + '/' + currentUser).set(seen);
-        });
-      });
-    }
-
     storyForm.addEventListener('submit', e => {
         e.preventDefault();
 
@@ -279,11 +380,13 @@
             currentAllStories[ref.key] = { name, story, when, where, timestamp };
 
             // Marque l'utilisateur comme ayant lu cette anecdote
-            db.ref('views_' + token + '/' + currentUser).once('value').then(snap => {
+            db.ref('views_' + token + '/' + currentUser).once('value').then(
+              (currentStories => snap => {
                 const seen = snap.val() || [];
                 seen.push(ref.key);
+                currentUnread.forEach(k => seen.add(k));
                 db.ref('views_' + token + '/' + currentUser).set(seen);
-            });
+            })(currentStories));
 
             // Met à jour l'affichage local immédiatement
             statusDiv.innerHTML = `<h2>Anecdotes débloquées :</h2>`;
@@ -294,16 +397,13 @@
             // Affiche toutes les anecdotes débloquées (celles non encore lues avant)
             currentUnread.forEach(k => {
                 const d = currentAllStories[k];
-                const div = document.createElement('div');
-                div.className = 'story';
-                div.innerHTML = renderFullAnecdote(d);
+                const div = renderFullAnecdote(d, k);
                 lockedPreviewsDiv.appendChild(div);
             });
 
             // Affiche aussi l'anecdote qu'on vient d'écrire
-            const div = document.createElement('div');
-            div.className = 'story';
-            div.innerHTML = renderFullAnecdote({ name, story, when, where, timestamp });
+            const div = renderFullAnecdote(
+              { name, story, when, where, timestamp }, ref.key);
             lockedPreviewsDiv.appendChild(div);
 
             // On considère toutes les anecdotes comme lues localement maintenant
