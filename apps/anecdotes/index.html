@@ -236,21 +236,11 @@
       attachCommentLogic(div, key);
       return div;
     }
-    function attachCommentLogic(div, key) {
-  const commentDiv = div.querySelector('.comments');
-  const btn = commentDiv.querySelector('button');
-  const input = commentDiv.querySelector('textarea');
-  const list = commentDiv.querySelector('.existing-comments');
-
-  const ref = firebase.database().ref(`comments_${token}/${key}`);
-
-  // Charger les commentaires existants
-  ref.once('value').then(snap => {
-    const comments = snap.val() || {};
-    Object.entries(comments).forEach(([ts, c]) => {
+    function renderComment(ref, ts, c, list) {
       const p = document.createElement('p');
       p.dataset.ts = ts;
       p.innerHTML = `<strong>${c.name} :</strong> ${c.comment}`;
+    
       if (c.name === currentUser) {
         const delBtn = document.createElement('button');
         delBtn.textContent = "✖";
@@ -267,36 +257,36 @@
         };
         p.appendChild(delBtn);
       }
+    
       list.appendChild(p);
-    });
-  });
-
-  // Ajouter un commentaire
-  btn.addEventListener('click', () => {
-    const text = input.value.trim();
-    if (!text) return;
-    const ts = Date.now();
-    const comment = { name: currentUser, comment: text };
-    ref.child(ts).set(comment);
-    const p = document.createElement('p');
-    p.innerHTML = `<strong>${currentUser} :</strong> ${text}`;
-    const delBtn = document.createElement('button');
-    delBtn.textContent = "✖";
-    delBtn.onclick = () => {
-      ref.once('value').then(snapshot => {
-        const count = Object.keys(snapshot.val() || {}).length;
-        if (count === 1) {
-          ref.remove();
-        } else {
-          ref.child(ts).remove();
-        }
-        p.remove();
+    }
+    function attachCommentLogic(div, key) {
+      const commentDiv = div.querySelector('.comments');
+      const btn = commentDiv.querySelector('button');
+      const input = commentDiv.querySelector('textarea');
+      const list = commentDiv.querySelector('.existing-comments');
+    
+      const ref = firebase.database().ref(`comments_${token}/${key}`);
+      
+    
+      // Charger les commentaires existants
+      ref.once('value').then(snap => {
+        const comments = snap.val() || {};
+        Object.entries(comments).forEach(([ts, c]) => {
+          renderComment(ref, ts, c, list);
+        });
       });
-    };
-    p.appendChild(delBtn);
-    list.appendChild(p);
-    input.value = '';
-  });
+
+      // Ajouter un commentaire
+      btn.addEventListener('click', () => {
+        const text = input.value.trim();
+        if (!text) return;
+        const ts = Date.now();
+        const comment = { name: currentUser, comment: text };
+        ref.child(ts).set(comment);
+        renderComment(ref, ts, comment, list);
+        input.value = '';
+      });
     }
     function renderPreviewAnecdote(d) {
       return `<strong>${capitalizeFirst(formatWhen(d.when, d.timestamp))}</strong><br><em>${d.name}</em> était <em>${uncapitalizeFirst(replaceFirstPersonPossessive(ensurePlacePrefix(d.where)))}</em>... Veux-tu savoir ce qui s'est passé ?`;
