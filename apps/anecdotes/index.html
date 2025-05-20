@@ -372,12 +372,12 @@
 
             // Marque l'utilisateur comme ayant lu cette anecdote
             db.ref('views_' + token + '/' + currentUser).once('value').then(
-              (currentStories => snap => {
+              (currentUnread => snap => {
                 const seen = snap.val() || [];
                 seen.push(ref.key);
                 currentUnread.forEach(k => seen.add(k));
                 db.ref('views_' + token + '/' + currentUser).set(seen);
-            })(currentStories));
+            })(currentUnread));
 
             // Met à jour l'affichage local immédiatement
             statusDiv.innerHTML = `<h2>Anecdotes débloquées :</h2>`;
