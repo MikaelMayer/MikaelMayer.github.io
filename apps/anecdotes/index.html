@@ -156,6 +156,7 @@
       const name = nameInput.value.trim();
       submitBtn.disabled = name === '' && testMode;
       currentUser = name;
+      document.cookie = `username=${name}; path=/`;
       UpdateEverything();
     });
 
