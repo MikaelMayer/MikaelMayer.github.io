@@ -375,7 +375,7 @@
               (currentUnread => snap => {
                 const seen = snap.val() || [];
                 seen.push(ref.key);
-                currentUnread.forEach(k => seen.add(k));
+                currentUnread.forEach(k => seen.push(k));
                 db.ref('views_' + token + '/' + currentUser).set(seen);
             })(currentUnread));
 
