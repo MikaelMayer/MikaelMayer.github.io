@@ -281,7 +281,7 @@
     const p = document.createElement('p');
     p.innerHTML = `<strong>${currentUser} :</strong> ${text}`;
     const delBtn = document.createElement('button');
-    delBtn.textContent = \"✖\";
+    delBtn.textContent = "✖";
     delBtn.onclick = () => {
       ref.once('value').then(snapshot => {
         const count = Object.keys(snapshot.val() || {}).length;
