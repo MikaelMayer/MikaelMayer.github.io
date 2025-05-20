@@ -253,7 +253,7 @@
       p.innerHTML = `<strong>${c.name} :</strong> ${c.comment}`;
       if (c.name === currentUser) {
         const delBtn = document.createElement('button');
-        delBtn.textContent = \"✖\";
+        delBtn.textContent = "✖";
         delBtn.onclick = () => {
           ref.once('value').then(snapshot => {
             const count = Object.keys(snapshot.val() || {}).length;
