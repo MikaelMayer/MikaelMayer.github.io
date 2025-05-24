@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #ffe5ec;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: sans-serif;
+    }
+    svg {
+      width: 200px;
+      height: 200px;
+      overflow: visible;
+    }
+    .layer {
+      transition: transform 0.1s linear;
+    }
+    #fallMessage {
+      display: none;
+      margin-top: 20px;
+      font-size: 1.2em;
+      color: #c00;
+    }
+    #retry {
+      display: none;
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 1em;
+      background: #c00;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+    #tapToStart {
+      position: absolute;
+      top: 20px;
+      font-size: 14px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div id="tapToStart">Tap to start</div>
+  <svg id="cake" viewBox="0 0 100 100">
+    <circle id="layer3" class="layer" cx="50" cy="50" r="45" fill="#f7c59f"/>
+    <circle id="layer2" class="layer" cx="50" cy="50" r="30" fill="#ec6b6b"/>
+    <circle id="layer1" class="layer" cx="50" cy="50" r="15" fill="#fcd5ce"/>
+  </svg>
+  <div id="fallMessage">Oh no! The cake fell over!</div>
+  <button id="retry">Try Again</button>
+
+  <script>
+    const layers = [
+      document.getElementById('layer1'),
+      document.getElementById('layer2'),
+      document.getElementById('layer3'),
+    ];
+
+    const tapToStart = document.getElementById('tapToStart');
+    const fallMessage = document.getElementById('fallMessage');
+    const retry = document.getElementById('retry');
+
+    let fallen = false;
+    let tiltX = 0, tiltY = 0;
+
+    // Seuils d'inclinaison et messages
+    const thresholds = [0.8, 1.6, 2.4, 3.2, 4.0];
+    const phrases = ["comfy", "wheee", "waaaah", "whoooa", "oops"];
+    let currentZone = -1;
+
+    function speak(text) {
+      speechSynthesis.cancel(); // Stoppe la voix précédente
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      speechSynthesis.speak(utterance);
+    }
+
+    function updateAudioFeedback(mag) {
+      let zone = thresholds.findIndex(t => mag < t);
+      if (zone === -1) zone = thresholds.length;
+
+      // Hystérésis simple : change uniquement si la différence est ≥ 1
+      if (Math.abs(zone - currentZone) >= 1) {
+        currentZone = zone;
+        speak(phrases[zone]);
+      }
+    }
+
+    function updateTilt(event) {
+      if (fallen) return;
+
+      let x = -event.accelerationIncludingGravity.x;
+      let y = event.accelerationIncludingGravity.y;
+
+      tiltX += (x - tiltX) * 0.1;
+      tiltY += (y - tiltY) * 0.1;
+
+      const mag = Math.sqrt(tiltX**2 + tiltY**2);
+
+      updateAudioFeedback(mag);
+
+      // Déplacement des couches (haut bouge + que bas)
+      const offsets = [3, 2, 1];
+      for (let i = 0; i < layers.length; i++) {
+        const factor = offsets[i] * 1.5;
+        layers[i].setAttribute("transform", `translate(${tiltX * factor}, ${tiltY * factor})`);
+      }
+
+      if (mag > 3.5) {
+        fallen = true;
+        fallMessage.style.display = 'block';
+        retry.style.display = 'inline-block';
+        breakCake(tiltX, tiltY);
+      }
+    }
+
+    function breakCake(x, y) {
+      const directions = [
+        {dx: x * 10, dy: y * 10},
+        {dx: x * 6, dy: y * 6},
+        {dx: x * 3, dy: y * 3},
+      ];
+      layers.forEach((layer, i) => {
+        const d = directions[i];
+        layer.setAttribute("transform", `translate(${d.dx}, ${d.dy})`);
+      });
+    }
+
+    function resetGame() {
+      fallen = false;
+      fallMessage.style.display = 'none';
+      retry.style.display = 'none';
+      tiltX = 0;
+      tiltY = 0;
+      currentZone = -1;
+      speechSynthesis.cancel();
+      layers.forEach(layer => layer.setAttribute("transform", "translate(0, 0)"));
+    }
+
+    async function init() {
+      tapToStart.style.display = 'none';
+      if (typeof DeviceMotionEvent?.requestPermission === 'function') {
+        try {
+          const res = await DeviceMotionEvent.requestPermission();
+          if (res !== 'granted') return alert("Permission denied");
+        } catch {
+          return alert("Permission error");
+        }
+      }
+      window.addEventListener('devicemotion', updateTilt);
+    }
+
+    retry.addEventListener('click', resetGame);
+    window.addEventListener('click', init);
+  </script>
+</body>
+</html>
