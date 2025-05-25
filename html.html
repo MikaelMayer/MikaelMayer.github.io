@@ -963,7 +963,7 @@
       const html = $('htmlInput').value;
       const compressed = pako.gzip(html);
       const base64Encoded = encode(compressed);
-      const url = `https://tharzen.com/html.html?code=${base64Encoded}`;
+      const url = `https://mikaelmayer.github.io/html.html?code=${base64Encoded}#run`;
       navigator.clipboard.writeText(url).then(
         () => alert('URL copied to clipboard!'),
         err => alert('Failed to copy URL: ' + err)
