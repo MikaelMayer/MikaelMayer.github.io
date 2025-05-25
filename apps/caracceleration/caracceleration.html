@@ -128,7 +128,7 @@
 
       const offsets = [3, 2, 1];
       for (let i = 0; i < layers.length; i++) {
-        const factor = offsets[i] * 3;
+        const factor = offsets[i] * 4.5;
         layers[i].setAttribute("transform", `translate(${tiltX * factor}, ${tiltY * factor})`);
       }
 
