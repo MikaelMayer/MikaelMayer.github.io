@@ -69,28 +69,49 @@
     let fallen = false;
     let tiltX = 0, tiltY = 0;
 
-    // Seuils d'inclinaison et messages
     const thresholds = [0.8, 1.6, 2.4, 3.2, 4.0];
-    const phrases = ["comfy", "wheee", "waaaah", "whoooa", "oops"];
-    let currentZone = -1;
+    const phrases = ["wheee", "whey", "waaaah", "whoooa", "oops"];
 
-    function speak(text) {
-      speechSynthesis.cancel(); // Stoppe la voix précédente
+    let lastZoneSpoken = -1;
+    let highestZoneSeen = -1;
+    let lastSpokenTime = 0;
+
+    function speak(text, force = false) {
+      if (!force && performance.now() - lastSpokenTime < 1000) return;
+
+      speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'en-US';
       speechSynthesis.speak(utterance);
+      lastSpokenTime = performance.now();
     }
 
     function updateAudioFeedback(mag) {
       let zone = thresholds.findIndex(t => mag < t);
       if (zone === -1) zone = thresholds.length;
 
-      // Hystérésis simple : change uniquement si la différence est ≥ 1
-      if (Math.abs(zone - currentZone) >= 1) {
-        currentZone = zone;
-        speak(phrases[zone]);
+      // Réaction immédiate si zone > dernière parlée
+      if (zone > lastZoneSpoken) {
+        lastZoneSpoken = zone;
+        highestZoneSeen = zone;
+        speak(phrases[zone], true); // Forcé
+        return;
       }
+
+      // Sinon, on garde en mémoire le plus haut niveau vu
+      highestZoneSeen = Math.max(highestZoneSeen, zone);
     }
+
+    // Vérification toutes les secondes
+    setInterval(() => {
+      if (highestZoneSeen !== lastZoneSpoken) {
+        lastZoneSpoken = highestZoneSeen;
+        if (highestZoneSeen >= 0) {
+          speak(phrases[highestZoneSeen]);
+        }
+      }
+      highestZoneSeen = -1; // reset pour la prochaine seconde
+    }, 1000);
 
     function updateTilt(event) {
       if (fallen) return;
@@ -105,10 +126,9 @@
 
       updateAudioFeedback(mag);
 
-      // Déplacement des couches (haut bouge + que bas)
       const offsets = [3, 2, 1];
       for (let i = 0; i < layers.length; i++) {
-        const factor = offsets[i] * 1.5;
+        const factor = offsets[i] * 3;
         layers[i].setAttribute("transform", `translate(${tiltX * factor}, ${tiltY * factor})`);
       }
 
@@ -138,7 +158,8 @@
       retry.style.display = 'none';
       tiltX = 0;
       tiltY = 0;
-      currentZone = -1;
+      lastZoneSpoken = -1;
+      highestZoneSeen = -1;
       speechSynthesis.cancel();
       layers.forEach(layer => layer.setAttribute("transform", "translate(0, 0)"));
     }
