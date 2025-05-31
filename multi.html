@@ -1,46 +1,123 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multiplayer Launcher</title>
+  <title>Multiplayer HTML Game</title>
   <style>
-    body { font-family: sans-serif; padding: 1em; max-width: 700px; margin: auto; }
-    #codeEditor { width: 100%; height: 200px; }
-    #playersList p { margin: 0.2em 0; }
-    textarea, input[type=text] { width: 100%; box-sizing: border-box; }
-    .hidden { display: none; }
-    #chatBox { height: 150px; overflow-y: auto; border: 1px solid #ccc; padding: 0.5em; margin-bottom: 0.5em; }
-    #gameFrame { width: 100%; height: 400px; border: 1px solid black; margin-top: 1em; }
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f0f2f5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+    input[type="text"], input[type="password"], textarea, button {
+      width: 100%;
+      max-width: 400px;
+      margin: 5px 0;
+      padding: 10px;
+      font-size: 16px;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    .hidden {
+      display: none;
+    }
+    #playersList {
+      margin: 10px 0;
+      width: 100%;
+      max-width: 400px;
+      background: white;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 10px;
+    }
+    #playersList p {
+      margin: 5px 0;
+    }
+    #chatBox {
+      width: 100%;
+      max-width: 400px;
+      height: 150px;
+      overflow-y: auto;
+      background: white;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 5px;
+    }
+    #gameFrame {
+      width: 100%;
+      max-width: 400px;
+      height: 400px;
+      border: 1px solid #333;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
-  <h1>Multiplayer Launcher</h1>
+  <h1>Multiplayer HTML Game</h1>
+
+  <!-- Étape 1 : bouton pour l'hôte -->
+  <div id="creatorPrompt">
+    <button id="startCreator" onclick="showTokenInput()">I am the Creator</button>
+    <div id="tokenInputContainer" class="hidden">
+      <input type="password" id="creatorTokenInput" placeholder="Enter creator token" />
+      <button id="submitCreatorToken" onclick="useCreatorToken()">Submit Token</button>
+    </div>
+  </div>
+
+  <!-- Étape 2 : champ pour saisir le nom et rejoindre/créer -->
   <div id="setup">
-    <label>Your Name: <input id="playerName" type="text" /></label>
-    <button id="submitName">Join</button>
-  </div>  <div id="gameArea" class="hidden">
-    <p><strong>Game ID:</strong> <span id="gameIdDisplay"></span>
+    <input type="text" id="playerName" placeholder="Your Name" />
+    <button id="submitName">Join Game</button>
+  </div>
+
+  <!-- Zone principale du jeu : liste des joueurs, chat, code host, iframe -->
+  <div id="gameArea" class="hidden">
+    <p>
+      <strong>Game ID:</strong>
+      <span id="gameIdDisplay"></span>
       <button id="copyLink">Copy Link</button>
+      <span id="copyNotice" style="color:green"></span>
     </p>
-    <div id="playersList"></div><div id="chat">
-  <div id="chatBox"></div>
-  <input id="chatInput" type="text" placeholder="Type your message...">
-</div>
+    <div id="playersList"><h3>Players:</h3></div>
 
-<div id="hostOptions" class="hidden">
-  <textarea id="codeEditor" placeholder="Paste your game HTML/JS here..."></textarea>
-  <button id="testGame">Test Game</button>
-  <button id="launchGame">Launch Game</button>
-</div>
+    <div id="chatBox"></div>
+    <input type="text" id="chatInput" placeholder="Type your message..." />
 
-<div id="waitMessage">Waiting for the host to start the game...</div>
-<iframe id="gameFrame" class="hidden"></iframe>
+    <div id="hostOptions" class="hidden">
+      <textarea id="codeEditor" placeholder="Paste HTML/JS game code here..."></textarea>
+      <button id="testGame">Test Game</button>
+      <button id="launchGame">Launch Game</button>
+    </div>
 
-  </div>  <div id="creatorPrompt" class="hidden">
-    <p>You need a creator token to create games.</p>
-    <input type="text" id="creatorTokenInput" placeholder="Enter creator token">
-    <button id="submitCreatorToken">Submit</button>
-  </div>  <!-- Firebase Scripts -->  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>  <script>
+    <p id="waitingMsg" class="hidden">Waiting for the host to start the game...</p>
+    <iframe id="gameFrame" class="hidden"></iframe>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+  <script>
+    // --- Configuration Firebase (à remplacer par tes propres clés si besoin) ---
     const firebaseConfig = {
       apiKey: "AIzaSyAAcMZ-dvevYe7IuPSkkdW1ZITQJo8vHqY",
       authDomain: "htmls-f4326.firebaseapp.com",
@@ -54,125 +131,149 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    const url = new URL(location.href);
-    const gameId = url.searchParams.get("game");
-    const creatorToken = url.searchParams.get("token");
+    // --- Variables globales ---
+    const urlParams = new URLSearchParams(window.location.search);
+    let gameId = urlParams.get("game");
+    const tokenParam = urlParams.get("token");
+    let isHost = false;
+    let currentPlayer = localStorage.getItem("playerName") || "";
 
+    // --- Éléments du DOM ---
+    const creatorPrompt = document.getElementById("creatorPrompt");
+    const tokenInputContainer = document.getElementById("tokenInputContainer");
     const setup = document.getElementById("setup");
-    const gameArea = document.getElementById("gameArea");
-    const playerNameInput = document.getElementById("playerName");
     const submitNameBtn = document.getElementById("submitName");
+    const playerNameInput = document.getElementById("playerName");
+    const gameArea = document.getElementById("gameArea");
+    const gameIdDisplay = document.getElementById("gameIdDisplay");
+    const copyLinkBtn = document.getElementById("copyLink");
+    const copyNotice = document.getElementById("copyNotice");
     const playersList = document.getElementById("playersList");
     const chatBox = document.getElementById("chatBox");
     const chatInput = document.getElementById("chatInput");
     const hostOptions = document.getElementById("hostOptions");
-    const waitMessage = document.getElementById("waitMessage");
-    const gameFrame = document.getElementById("gameFrame");
     const codeEditor = document.getElementById("codeEditor");
-    const testGame = document.getElementById("testGame");
-    const launchGame = document.getElementById("launchGame");
-    const copyLink = document.getElementById("copyLink");
-    const gameIdDisplay = document.getElementById("gameIdDisplay");
-    const creatorPrompt = document.getElementById("creatorPrompt");
-    const creatorTokenInput = document.getElementById("creatorTokenInput");
-    const submitCreatorToken = document.getElementById("submitCreatorToken");
+    const testGameBtn = document.getElementById("testGame");
+    const launchGameBtn = document.getElementById("launchGame");
+    const waitingMsg = document.getElementById("waitingMsg");
+    const gameFrame = document.getElementById("gameFrame");
 
-    let currentPlayer = localStorage.getItem("playerName") || "";
-    let isHost = false;
-
-    function generateGameId() {
-      return Math.random().toString(36).substring(2, 10);
+    // Affiche le champ pour entrer le token du créateur
+    function showTokenInput() {
+      tokenInputContainer.classList.remove("hidden");
+      document.getElementById("startCreator").classList.add("hidden");
     }
 
-    function setupGame(id) {
-      gameIdDisplay.textContent = id;
-      copyLink.onclick = () => {
-        navigator.clipboard.writeText(location.origin + location.pathname + `?game=${id}`);
-        alert("Link copied to clipboard!");
-      };
+    // Utilise le token fourni pour créer une nouvelle partie
+    function useCreatorToken() {
+      const token = document.getElementById("creatorTokenInput").value.trim();
+      if (!token) return alert("Enter a valid token.");
+      const newGameId = Math.random().toString(36).substring(2, 10);
+      history.replaceState(null, "", `?game=${newGameId}&token=${encodeURIComponent(token)}`);
+      isHost = true;
+      initializeForPlayer();
+    }
+
+    // Initialisation après saisie du nom (pour host ou client)
+    function initializeForPlayer() {
+      currentPlayer = playerNameInput.value.trim();
+      if (!currentPlayer) return alert("Enter your name first.");
+      localStorage.setItem("playerName", currentPlayer);
+
+      setup.style.display = "none";
       gameArea.classList.remove("hidden");
-      setup.classList.add("hidden");
-      updatePlayers(id);
-      setupChat(id);
-      waitForLaunch(id);
-    }
+      gameIdDisplay.textContent = gameId;
 
-    function updatePlayers(id) {
-      const ref = db.ref(`games/${id}/players`);
-      ref.on("value", snap => {
-        const players = snap.val() || {};
-        playersList.innerHTML = "<h3>Connected Players:</h3>" + Object.values(players).map(p => `<p>${p}</p>`).join("");
+      // Bouton copier le lien
+      copyLinkBtn.onclick = () => {
+        const link = `${location.origin}${location.pathname}?game=${gameId}`;
+        navigator.clipboard.writeText(link).then(() => {
+          copyNotice.textContent = "Link copied!";
+          setTimeout(() => (copyNotice.textContent = ""), 2000);
+        });
+      };
+
+      // Ajoute le joueur dans la liste
+      const playersRef = db.ref(`games/${gameId}/players`);
+      playersRef.child(currentPlayer).set(currentPlayer);
+      playersRef.child(currentPlayer).onDisconnect().remove();
+      playersRef.on("value", (snap) => {
+        const val = snap.val() || {};
+        playersList.innerHTML =
+          "<h3>Players:</h3>" +
+          Object.values(val)
+            .map((p) => `<p>${p}</p>`)
+            .join("");
       });
-      ref.child(currentPlayer).set(currentPlayer);
-      ref.child(currentPlayer).onDisconnect().remove();
-    }
 
-    function setupChat(id) {
-      const ref = db.ref(`games/${id}/chat`);
-      ref.on("child_added", snap => {
+      // Chat en temps réel
+      const chatRef = db.ref(`games/${gameId}/chat`);
+      chatRef.on("child_added", (snap) => {
         const { name, text } = snap.val();
         const p = document.createElement("p");
         p.innerHTML = `<strong>${name}:</strong> ${text}`;
         chatBox.appendChild(p);
         chatBox.scrollTop = chatBox.scrollHeight;
       });
-      chatInput.addEventListener("keydown", e => {
+      chatInput.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && chatInput.value.trim()) {
-          ref.push({ name: currentPlayer, text: chatInput.value.trim() });
+          e.preventDefault();
+          chatRef.push({ name: currentPlayer, text: chatInput.value.trim() });
           chatInput.value = "";
         }
       });
-    }
 
-    function waitForLaunch(id) {
-      const ref = db.ref(`games/${id}/code`);
-      ref.once("value").then(snap => {
-        if (snap.exists()) launchGameNow(snap.val());
-      });
-      ref.on("value", snap => {
-        if (snap.exists()) launchGameNow(snap.val());
-      });
-    }
-
-    function launchGameNow(code) {
-      waitMessage.classList.add("hidden");
-      gameFrame.classList.remove("hidden");
-      const blob = new Blob([code], { type: "text/html" });
-      gameFrame.src = URL.createObjectURL(blob);
-    }
-
-    submitNameBtn.onclick = () => {
-      const name = playerNameInput.value.trim();
-      if (!name) return;
-      localStorage.setItem("playerName", name);
-      currentPlayer = name;
-      if (gameId) {
-        setupGame(gameId);
-      } else if (creatorToken) {
-        const id = generateGameId();
-        history.replaceState(null, "", `?game=${id}`);
-        isHost = true;
-        setupGame(id);
+      // Interface hôte
+      if (isHost) {
         hostOptions.classList.remove("hidden");
+        waitingMsg.classList.add("hidden");
+      } else {
+        waitingMsg.classList.remove("hidden");
+        // Écoute du code publié par l'hôte
+        const codeRef = db.ref(`games/${gameId}/code`);
+        codeRef.on("value", (snap) => {
+          if (snap.exists()) {
+            waitingMsg.classList.add("hidden");
+            launchGameNow(snap.val());
+          }
+        });
       }
-    };
-
-    testGame.onclick = () => launchGameNow(codeEditor.value);
-    launchGame.onclick = () => {
-      const id = new URL(location.href).searchParams.get("game");
-      db.ref(`games/${id}/code`).set(codeEditor.value);
-    };
-
-    submitCreatorToken.onclick = () => {
-      const token = creatorTokenInput.value.trim();
-      if (token) {
-        location.href = location.pathname + `?token=${token}`;
-      }
-    };
-
-    if (!gameId && !creatorToken) {
-      creatorPrompt.classList.remove("hidden");
-      setup.classList.add("hidden");
     }
-  </script></body>
+
+    // Test local du code sans le publier
+    testGameBtn.onclick = () => {
+      launchGameNow(codeEditor.value);
+    };
+    // Lancement officiel du code pour tous
+    launchGameBtn.onclick = () => {
+      db.ref(`games/${gameId}/code`).set(codeEditor.value);
+    };
+
+    // Charge le jeu dans l'iframe
+    function launchGameNow(code) {
+      gameFrame.classList.remove("hidden");
+      gameFrame.srcdoc = code;
+    }
+
+    // Clique sur “Join Game” / “Create Game”
+    submitNameBtn.onclick = () => {
+      gameId = new URLSearchParams(location.search).get("game");
+      if (!gameId && tokenParam) {
+        gameId = new URLSearchParams(location.search).get("game");
+      }
+      initializeForPlayer();
+    };
+
+    // Au chargement de la page, on affiche le prompt ou le formulaire
+    window.onload = () => {
+      if (!gameId && !tokenParam) {
+        creatorPrompt.classList.remove("hidden");
+        setup.classList.add("hidden");
+      } else {
+        if (tokenParam) isHost = true;
+        setup.style.display = "block";
+      }
+    };
+  </script>
+</body>
 </html>
