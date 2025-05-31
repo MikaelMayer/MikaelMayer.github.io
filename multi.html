@@ -2,149 +2,166 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multiplayer Room</title>
+  <title>Multiplayer Code Editor</title>
   <style>
     body {
       font-family: sans-serif;
-      max-width: 600px;
-      margin: auto;
-      padding: 1em;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #f9f9f9;
     }
     textarea {
-      width: 100%;
+      width: 90%;
       height: 200px;
+      font-family: monospace;
+      font-size: 14px;
+      margin: 10px 0;
     }
-    #playersList, #chatLog {
-      background: #eee;
-      padding: 0.5em;
-      margin: 0.5em 0;
-      border-radius: 5px;
+    #chat {
+      width: 90%;
+      height: 100px;
+      overflow-y: scroll;
+      border: 1px solid #ccc;
+      background: white;
+      margin-bottom: 10px;
+      padding: 5px;
+    }
+    #messages {
+      list-style: none;
+      padding: 0;
+    }
+    input, button {
+      padding: 10px;
+      margin: 5px;
+      font-size: 14px;
+    }
+    #tokenRequest {
+      margin-top: 20px;
+      display: none;
     }
   </style>
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
-    import { getDatabase, ref, onValue, set, push, get, update } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-database.js";const firebaseConfig = {
-  apiKey: "AIzaSyAAcMZ-dvevYe7IuPSkkdW1ZITQJo8vHqY",
-  authDomain: "htmls-f4326.firebaseapp.com",
-  projectId: "htmls-f4326",
-  storageBucket: "htmls-f4326.appspot.com",
-  messagingSenderId: "1091418638117",
-  appId: "1:1091418638117:web:22a03ada0c812b82177ccc",
-  measurementId: "G-NF8DJEP777",
-  databaseURL: "https://htmls-f4326-default-rtdb.firebaseio.com/"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-
-const roomId = new URLSearchParams(location.search).get("room") || Math.random().toString(36).substring(2);
-if (!location.search.includes("room=")) {
-  history.replaceState(null, "", `?room=${roomId}`);
-}
-
-const username = document.cookie.replace(/(?:(?:^|.*;\s*)username\s*=\s*([^;]*).*$)|^.*$/, "$1") || prompt("Your name:");
-document.cookie = `username=${username}; path=/`;
-
-const roomRef = ref(db, `games/${roomId}`);
-const playersRef = ref(db, `games/${roomId}/players`);
-const chatRef = ref(db, `games/${roomId}/chat`);
-const codeRef = ref(db, `games/${roomId}/code`);
-
-// Register player
-update(playersRef, { [username]: true });
-
-// Show players
-onValue(playersRef, snap => {
-  const val = snap.val() || {};
-  playersList.innerHTML = Object.keys(val).map(n => `<li>${n}</li>`).join("");
-});
-
-// Chat logic
-chatSend.onclick = () => {
-  const msg = chatInput.value.trim();
-  if (!msg) return;
-  push(chatRef, { name: username, msg });
-  chatInput.value = "";
-};
-
-onValue(chatRef, snap => {
-  const val = snap.val() || {};
-  chatLog.innerHTML = Object.values(val).map(c => `<p><strong>${c.name}:</strong> ${c.msg}</p>`).join("");
-});
-
-// Host-specific features
-const isHost = location.hash === "#host";
-if (isHost) {
-  codeEditor.classList.remove("hidden");
-  launchBtn.onclick = () => {
-    const code = codeInput.value;
-    set(codeRef, code);
-    location.reload();
-  };
-} else {
-  // Check for game code
-  get(codeRef).then(snap => {
-    if (snap.exists()) {
-      const code = snap.val();
-      const blob = new Blob([code], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      location.href = url;
-    } else {
-      message.innerText = "Waiting for the host to start the game...";
-    }
-  });
-}
-
-copyPromptBtn.onclick = () => {
-  const prompt = `
-
-You are creating a full standalone multiplayer browser game (HTML + JS).
-
-Constraints:
-
-The app is self-contained and runs from a single HTML file.
-
-Players are identified by a name stored in a cookie called "username".
-
-The game uses Firebase Realtime Database (already initialized).
-
-The current room is identified by a variable `roomId`, which is set from the URL (?room=xyz) or generated randomly.
-
-The game logic should synchronize across all players using `/games/${roomId}/state` for shared state, and `/games/${roomId}/actions` for player actions.
-
-All players who load the same room URL see the same game and can interact in real time.
-
-When reloading the page, the game should continue from the current state.
-
-The HTML must include all necessary UI and logic to show the game, display player names, handle rejoining, and synchronize data.
-
-Use only vanilla JS and standard browser APIs (no frameworks or modules).
-
-Firebase initialization is already done elsewhere and should not be included.
-
-Avoid using unsafe global writes. Use `firebase.database().ref(...)` only.
-
-Include chat support if possible under `/games/${roomId}/chat`.
-
-
-Your job is to output a complete HTML page with a working multiplayer game that meets these requirements. `.trim(); navigator.clipboard.writeText(prompt).then(() => alert("LLM prompt copied to clipboard!")); }; </script>
-
 </head>
 <body>
-  <h1>Multiplayer Lobby</h1>
-  <p id="message"></p>
-  <p><strong>Your name:</strong> <span id="username"></span></p>
-  <p>Share this link to invite others: <input value="${location.href}" readonly onclick="this.select()" /></p>
-  <h2>Players:</h2>
-  <ul id="playersList"></ul>
-  <h2>Chat</h2>
-  <div id="chatLog"></div>
-  <input id="chatInput" placeholder="Type a message" /> <button id="chatSend">Send</button>
-  <div id="codeEditor" class="hidden">
-    <h2>Game Code (HTML)</h2>
-    <textarea id="codeInput"></textarea><br>
-    <button id="launchBtn">Launch Game</button>
-    <button id="copyPromptBtn">Copy LLM Information</button>
-  </div>
-</body>
+  <h1>Multiplayer Code Editor</h1>  <div id="tokenRequest">
+    <p>Enter creator token to create a new game:</p>
+    <input type="password" id="creatorTokenInput" placeholder="Creator token" />
+    <button onclick="useCreatorToken()">Use Token</button>
+  </div>  <div id="joinSection" style="display: none;">
+    <input type="text" id="playerName" placeholder="Your name" />
+    <button onclick="joinGame()">Join Game</button>
+  </div>  <div id="mainSection" style="display: none;">
+    <h2>Chat</h2>
+    <div id="chat"><ul id="messages"></ul></div>
+    <input type="text" id="chatInput" placeholder="Type a message..." />
+    <button onclick="sendMessage()">Send</button><h2>Code (Host only)</h2>
+<textarea id="codeEditor"></textarea>
+<button onclick="updateCode()">Share Code</button>
+
+  </div>  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const gameId = urlParams.get('game');
+    const creatorTokenFromUrl = urlParams.get('token');
+    const databaseUrl = 'https://anecdotesfamiliales-default-rtdb.firebaseio.com';
+    let playerName = '';
+    let isHost = false;
+    let gameCode = '';
+
+    function show(el) { el.style.display = 'block'; }
+    function hide(el) { el.style.display = 'none'; }
+
+    const tokenRequestDiv = document.getElementById('tokenRequest');
+    const joinSection = document.getElementById('joinSection');
+    const mainSection = document.getElementById('mainSection');
+
+    if (!gameId && !creatorTokenFromUrl) {
+      show(tokenRequestDiv);
+    } else if (creatorTokenFromUrl) {
+      createGameWithToken(creatorTokenFromUrl);
+    } else {
+      show(joinSection);
+    }
+
+    function useCreatorToken() {
+      const token = document.getElementById('creatorTokenInput').value;
+      if (!token) return alert("Please enter a token");
+      const newUrl = `${location.origin}${location.pathname}?token=${encodeURIComponent(token)}`;
+      location.href = newUrl;
+    }
+
+    async function createGameWithToken(token) {
+      const id = 'game-' + Math.random().toString(36).substring(2, 8);
+      const res = await fetch(`${databaseUrl}/games/${id}.json?auth=${token}`, {
+        method: 'PUT',
+        body: JSON.stringify({ createdAt: Date.now(), code: '', messages: [] })
+      });
+      if (res.ok) {
+        window.location.href = `${location.pathname}?game=${id}`;
+      } else {
+        alert("Failed to create game. Invalid token?");
+      }
+    }
+
+    async function joinGame() {
+      playerName = document.getElementById('playerName').value.trim();
+      if (!playerName) return alert("Enter your name");
+      show(mainSection);
+      hide(joinSection);
+      startListening();
+    }
+
+    function sendMessage() {
+      const msg = document.getElementById('chatInput').value.trim();
+      if (!msg || !playerName) return;
+      const data = { name: playerName, msg, time: Date.now() };
+      fetch(`${databaseUrl}/games/${gameId}/messages.json`, {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+      document.getElementById('chatInput').value = '';
+    }
+
+    function updateCode() {
+      const code = document.getElementById('codeEditor').value;
+      fetch(`${databaseUrl}/games/${gameId}/code.json`, {
+        method: 'PUT',
+        body: JSON.stringify(code)
+      });
+    }
+
+    async function startListening() {
+      const messagesList = document.getElementById('messages');
+      const codeEditor = document.getElementById('codeEditor');
+
+      setInterval(async () => {
+        const res = await fetch(`${databaseUrl}/games/${gameId}.json`);
+        const data = await res.json();
+
+        if (Array.isArray(data?.messages)) {
+          messagesList.innerHTML = '';
+          data.messages.forEach(msg => {
+            const li = document.createElement('li');
+            li.textContent = `${msg.name}: ${msg.msg}`;
+            messagesList.appendChild(li);
+          });
+        } else {
+          const list = [];
+          for (const key in data?.messages) {
+            list.push(data.messages[key]);
+          }
+          list.sort((a,b)=>a.time-b.time);
+          messagesList.innerHTML = '';
+          list.forEach(msg => {
+            const li = document.createElement('li');
+            li.textContent = `${msg.name}: ${msg.msg}`;
+            messagesList.appendChild(li);
+          });
+        }
+
+        codeEditor.value = data.code || '';
+      }, 1000);
+    }
+  </script></body>
 </html>
