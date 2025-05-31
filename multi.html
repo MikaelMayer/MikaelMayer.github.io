@@ -1,5 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -72,52 +71,33 @@
   </style>
 </head>
 <body>
-  <h1>Multiplayer HTML Game</h1>
-
-  <!-- 1: Enter Name -->
-  <div id="enterNameContainer">
+  <h1>Multiplayer HTML Game</h1>  <!-- 1: Enter Name -->  <div id="enterNameContainer">
     <input type="text" id="playerName" placeholder="Your Name" />
     <button id="saveNameBtn">Save Name</button>
-  </div>
-
-  <!-- 2: Join or Create Game -->
-  <div id="joinCreateContainer" class="hidden">
+  </div>  <!-- 2: Join or Create Game -->  <div id="joinCreateContainer" class="hidden">
     <input type="text" id="gameIdInput" placeholder="Enter Game ID to join" maxlength="8" />
     <button id="joinCreateBtn">Create Game</button>
-  </div>
-
-  <!-- 3: Creator token prompt (if needed) -->
-  <div id="tokenContainer" class="hidden">
+  </div>  <!-- 3: Creator token prompt (if needed) -->  <div id="tokenContainer" class="hidden">
     <input type="password" id="creatorTokenInput" placeholder="Enter Creator Token" />
     <button id="saveTokenBtn">Save Token</button>
-  </div>
-
-  <!-- 4: Game Lobby -->
-  <div id="lobbyContainer" class="hidden">
+  </div>  <!-- 4: Game Lobby -->  <div id="lobbyContainer" class="hidden">
     <p><strong>Game ID:</strong> <span id="gameIdDisplay"></span>
       <button id="copyLinkBtn">Copy Link</button>
       <span id="copyNotice" style="color:green"></span>
     </p>
     <div id="playersList"><h3>Players:</h3></div>
     <div id="chatBox"></div>
-    <input type="text" id="chatInput" placeholder="Type your message..." />
+    <input type="text" id="chatInput" placeholder="Type your message..." /><!-- Host only -->
+<div id="hostOptions" class="hidden">
+  <textarea id="codeEditor" placeholder="Paste HTML/JS game code here..."></textarea>
+  <button id="testGameBtn">Test Game</button>
+  <button id="launchGameBtn">Launch Game</button>
+  <button id="copyLLMBtn">Copy LLM Info</button>
+</div>
 
-    <!-- Host only -->
-    <div id="hostOptions" class="hidden">
-      <textarea id="codeEditor" placeholder="Paste HTML/JS game code here..."></textarea>
-      <button id="testGameBtn">Test Game</button>
-      <button id="launchGameBtn">Launch Game</button>
-      <button id="copyLLMBtn">Copy LLM Info</button>
-    </div>
+<p id="waitingMsg" class="hidden">Waiting for the host to start the game...</p>
 
-    <p id="waitingMsg" class="hidden">Waiting for the host to start the game...</p>
-  </div>
-
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-
-  <script>
+  </div>  <!-- Firebase SDKs -->  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>  <script>
     // --- Config Firebase ---
     const firebaseConfig = {
       apiKey: "AIzaSyAAcMZ-dvevYe7IuPSkkdW1ZITQJo8vHqY",
@@ -216,6 +196,12 @@
 
     // --- Step 2: Join or Create Game ---
     function showJoinCreate() {
+      if (gameId) {
+        // Already have a game ID in URL
+        joinCreateContainer.classList.add("hidden");
+        showLobby();
+        return;
+      }
       joinCreateContainer.classList.remove("hidden");
       gameIdInput.addEventListener("input", () => {
         joinCreateBtn.textContent = gameIdInput.value.trim() ? "Join Game" : "Create Game";
@@ -260,10 +246,14 @@
 
     // --- Step 3: Lobby ---
     function showLobby() {
+      // Hide other containers
+      joinCreateContainer.classList.add("hidden");
+      tokenContainer.classList.add("hidden");
       lobbyContainer.classList.remove("hidden");
+
       gameIdDisplay.textContent = gameId;
       copyLinkBtn.onclick = () => {
-        const link = `${location.origin}${location.pathname}?game=${gameId}&name=${playerName}`;
+        const link = `${location.origin}${location.pathname}?game=${gameId}`;
         navigator.clipboard.writeText(link).then(() => {
           copyNotice.textContent = "Link copied!";
           setTimeout(() => (copyNotice.textContent = ""), 2000);
@@ -276,11 +266,7 @@
       playersRef.child(playerName).onDisconnect().remove();
       playersRef.on("value", (snap) => {
         const val = snap.val() || {};
-        playersList.innerHTML =
-          "<h3>Players:</h3>" +
-          Object.values(val)
-            .map((p) => `<p>${p}</p>`)
-            .join("");
+        playersList.innerHTML = '<h3>Players:</h3>' + Object.values(val).map((p) => `<p>${p}</p>`).join("");
       });
 
       // Chat
@@ -354,14 +340,14 @@ Write a complete HTML/JS implementation following these rules.
     // Initial load logic
     window.onload = () => {
       const nameFromCookie = getCookie("name");
-      if (nameFromCookie) {
-        playerNameInput.value = nameFromCookie;
+      if (nameFromCookie && !playerNameInput.value) {
+        playerName = nameFromCookie;
+        playerNameInput.value = playerName;
       }
       if (gameId && playerName) {
         enterNameContainer.classList.add("hidden");
         showLobby();
       }
     };
-  </script>
-</body>
+  </script></body>
 </html>
