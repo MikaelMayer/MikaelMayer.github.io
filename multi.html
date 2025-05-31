@@ -1,10 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="version" content="1.0.2" />
-  <title>Multiplayer HTML Game v1.0.2</title>
+  <meta name="version" content="1.0.4" />
+  <title>Multiplayer HTML Game v1.0.4</title>
   <style>
     body {
       font-family: sans-serif;
@@ -79,28 +78,16 @@
   </style>
 </head>
 <body>
-  <h1>Multiplayer HTML Game v1.0.2</h1>
-
-  <!-- 1: Enter Name -->
-  <div id="enterNameContainer">
+  <h1>Multiplayer HTML Game v1.0.4</h1>  <!-- 1: Enter Name -->  <div id="enterNameContainer">
     <input type="text" id="playerName" placeholder="Your Name" />
     <button id="saveNameBtn">Save Name</button>
-  </div>
-
-  <!-- 2: Join or Create Game -->
-  <div id="joinCreateContainer" class="hidden">
+  </div>  <!-- 2: Join or Create Game -->  <div id="joinCreateContainer" class="hidden">
     <input type="text" id="gameIdInput" placeholder="Enter Game ID to join" maxlength="8" />
     <button id="joinCreateBtn">Create Game</button>
-  </div>
-
-  <!-- 3: Creator token prompt (if needed) -->
-  <div id="tokenContainer" class="hidden">
+  </div>  <!-- 3: Creator token prompt (if needed) -->  <div id="tokenContainer" class="hidden">
     <input type="password" id="creatorTokenInput" placeholder="Enter Creator Token" />
     <button id="saveTokenBtn">Save Token</button>
-  </div>
-
-  <!-- 4: Game Lobby -->
-  <div id="lobbyContainer" class="hidden">
+  </div>  <!-- 4: Game Lobby -->  <div id="lobbyContainer" class="hidden">
     <p>
       <strong>Game ID:</strong> <span id="gameIdDisplay"></span>
       <button id="copyLinkBtn">Copy Link</button>
@@ -108,24 +95,17 @@
     </p>
     <div id="playersList"><h3>Players:</h3></div>
     <div id="chatBox"></div>
-    <input type="text" id="chatInput" placeholder="Type your message..." />
+    <input type="text" id="chatInput" placeholder="Type your message..." /><!-- Host only -->
+<div id="hostOptions" class="hidden">
+  <textarea id="codeEditor" placeholder="Paste HTML/JS game code here..."></textarea>
+  <button id="testGameBtn">Test Game</button>
+  <button id="launchGameBtn">Launch Game</button>
+  <button id="copyLLMBtn">Copy LLM Info</button>
+</div>
 
-    <!-- Host only -->
-    <div id="hostOptions" class="hidden">
-      <textarea id="codeEditor" placeholder="Paste HTML/JS game code here..."></textarea>
-      <button id="testGameBtn">Test Game</button>
-      <button id="launchGameBtn">Launch Game</button>
-      <button id="copyLLMBtn">Copy LLM Info</button>
-    </div>
+<p id="waitingMsg" class="hidden">Waiting for the host to start the game...</p>
 
-    <p id="waitingMsg" class="hidden">Waiting for the host to start the game...</p>
-  </div>
-
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-
-  <script>
+  </div>  <!-- Firebase SDKs -->  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>  <script>
     // --- Config Firebase ---
     const firebaseConfig = {
       apiKey: "AIzaSyAAcMZ-dvevYe7IuPSkkdW1ZITQJo8vHqY",
@@ -199,10 +179,21 @@
     let creatorToken = urlParams.get("token") || getCookie("token");
     let isHost = false;
 
-    // --- Step 1: Enter Name ---
+    // --- Helper: Add player if not already in Firebase ---
+    function addPlayer() {
+      if (!gameId || !playerName) return;
+      const playersRef = db.ref(`games/${gameId}/players`);
+      playersRef.child(playerName).set(playerName);
+      playersRef.child(playerName).onDisconnect().remove();
+    }
+
+    // 1: Enter Name
     saveNameBtn.onclick = () => {
       const nameVal = playerNameInput.value.trim();
-      if (!nameVal) return alert("Please enter your name.");
+      if (!nameVal) {
+        alert("Please enter your name.");
+        return;
+      }
       playerName = nameVal;
       setCookie("name", playerName);
       updateURL({ name: playerName });
@@ -210,12 +201,12 @@
       showJoinCreate();
     };
 
-    // Prefill if name exists
+    // Prefill if name in URL or cookie
     const nameParam = urlParams.get("name");
     if (nameParam) {
       playerName = nameParam;
-      setCookie("name", playerName);
       playerNameInput.value = playerName;
+      setCookie("name", playerName);
       enterNameContainer.classList.add("hidden");
       showJoinCreate();
     } else if (getCookie("name")) {
@@ -223,16 +214,16 @@
       playerNameInput.value = playerName;
     }
 
-    // --- Step 2: Join or Create Game ---
+    // 2: Join or Create Game
     function showJoinCreate() {
-      // If gameId is already present, skip showing this block
       if (gameId) {
+        // Already have an ID → skip this block and add player
         joinCreateContainer.classList.add("hidden");
         tokenContainer.classList.add("hidden");
+        addPlayer();        
         showLobby();
         return;
       }
-      // Otherwise, allow the user to type or click Create
       joinCreateContainer.classList.remove("hidden");
       gameIdInput.addEventListener("input", () => {
         joinCreateBtn.textContent = gameIdInput.value.trim() ? "Join Game" : "Create Game";
@@ -244,6 +235,7 @@
           gameId = enteredId;
           updateURL({ game: gameId });
           joinCreateContainer.classList.add("hidden");
+          addPlayer();
           showLobby();
         } else {
           // Create new
@@ -252,12 +244,15 @@
       };
     }
 
-    // --- Token prompt for host ---
+    // 3: Token prompt for host
     function showTokenPrompt() {
       tokenContainer.classList.remove("hidden");
       saveTokenBtn.onclick = () => {
         const tokenVal = creatorTokenInput.value.trim();
-        if (!tokenVal) return alert("Please enter a token.");
+        if (!tokenVal) {
+          alert("Please enter a token.");
+          return;
+        }
         creatorToken = tokenVal;
         setCookie("token", creatorToken);
         gameId = generateGameId();
@@ -265,19 +260,20 @@
         tokenContainer.classList.add("hidden");
         joinCreateContainer.classList.add("hidden");
         isHost = true;
+        addPlayer();
         showLobby();
       };
     }
 
-    // If a token is already in URL or cookie, we mark as host
+    // Host flag
     if (creatorToken) {
       isHost = true;
       setCookie("token", creatorToken);
     }
 
-    // --- Step 3: Lobby ---
+    // 4: Game Lobby
     function showLobby() {
-      // Hide blocks no longer needed
+      // Hide all upfront blocks
       joinCreateContainer.classList.add("hidden");
       tokenContainer.classList.add("hidden");
       lobbyContainer.classList.remove("hidden");
@@ -292,20 +288,15 @@
         });
       };
 
-      // Players list
+      // Players list subscription
       const playersRef = db.ref(`games/${gameId}/players`);
-      playersRef.child(playerName).set(playerName);
-      playersRef.child(playerName).onDisconnect().remove();
       playersRef.on("value", (snap) => {
         const val = snap.val() || {};
-        playersList.innerHTML =
-          "<h3>Players:</h3>" +
-          Object.values(val)
-            .map((p) => `<p>${p}</p>`)
-            .join("");
+        playersList.innerHTML = '<h3>Players:</h3>' +
+          Object.values(val).map(p => `<p>${p}</p>`).join("");
       });
 
-      // Chat
+      // Chat subscription
       const chatRef = db.ref(`games/${gameId}/chat`);
       chatRef.on("child_added", (snap) => {
         const { name, text } = snap.val();
@@ -314,7 +305,7 @@
         chatBox.appendChild(p);
         chatBox.scrollTop = chatBox.scrollHeight;
       });
-      chatInput.addEventListener("keydown", (e) => {
+      chatInput.addEventListener("keydown", e => {
         if (e.key === "Enter" && chatInput.value.trim()) {
           e.preventDefault();
           chatRef.push({ name: playerName, text: chatInput.value.trim() });
@@ -322,15 +313,15 @@
         }
       });
 
-      // Host options
+      // Host UI
       if (isHost) {
         hostOptions.classList.remove("hidden");
         waitingMsg.classList.add("hidden");
       } else {
         waitingMsg.classList.remove("hidden");
-        // Listen for published code
+        // Listen for code published
         const codeRef = db.ref(`games/${gameId}/code`);
-        codeRef.on("value", (snap) => {
+        codeRef.on("value", snap => {
           if (snap.exists()) {
             waitingMsg.classList.add("hidden");
             const code = snap.val();
@@ -340,11 +331,11 @@
       }
     }
 
-    // Test vs. Launch
+    // Test vs Launch
     testGameBtn.onclick = () => launchGame(codeEditor.value);
     launchGameBtn.onclick = () => db.ref(`games/${gameId}/code`).set(codeEditor.value);
 
-    // Copy LLM Info button
+    // Copy LLM Info
     copyLLMBtn.onclick = () => {
       const prompt = `
 You are building a multiplayer browser game in a single HTML file.
@@ -365,14 +356,14 @@ Write a complete HTML/JS implementation following these rules.
       navigator.clipboard.writeText(prompt).then(() => alert("LLM prompt copied!"));
     };
 
-    // Replace entire document with the game code
+    // Launch game via document.write
     function launchGame(code) {
       document.open();
       document.write(code);
       document.close();
     }
 
-    // --- Initial load logic ---
+    // Initial load logic
     window.onload = () => {
       const nameFromCookie = getCookie("name");
       if (nameFromCookie && !playerNameInput.value) {
@@ -380,13 +371,13 @@ Write a complete HTML/JS implementation following these rules.
         playerNameInput.value = playerName;
       }
       if (gameId && playerName) {
-        // If both game and name are known, go straight to lobby
+        // Both known → skip directly to lobby, auto-add
         enterNameContainer.classList.add("hidden");
         joinCreateContainer.classList.add("hidden");
         tokenContainer.classList.add("hidden");
+        addPlayer();
         showLobby();
       }
     };
-  </script>
-</body>
+  </script></body>
 </html>
