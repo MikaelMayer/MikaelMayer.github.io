@@ -2,8 +2,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="version" content="1.0.4" />
-  <title>Multiplayer HTML Game v1.0.4</title>
+  <meta name="version" content="1.0.5" />
+  <title>Multiplayer HTML Game v1.0.5</title>
   <style>
     body {
       font-family: sans-serif;
@@ -78,7 +78,7 @@
   </style>
 </head>
 <body>
-  <h1>Multiplayer HTML Game v1.0.4</h1>  <!-- 1: Enter Name -->  <div id="enterNameContainer">
+  <h1>Multiplayer HTML Game v1.0.5</h1>  <!-- 1: Enter Name -->  <div id="enterNameContainer">
     <input type="text" id="playerName" placeholder="Your Name" />
     <button id="saveNameBtn">Save Name</button>
   </div>  <!-- 2: Join or Create Game -->  <div id="joinCreateContainer" class="hidden">
@@ -179,12 +179,22 @@
     let creatorToken = urlParams.get("token") || getCookie("token");
     let isHost = false;
 
-    // --- Helper: Add player if not already in Firebase ---
+    // Helper: Show errors
+    function showError(err) {
+      alert("Error: " + err.message);
+      console.error(err);
+    }
+
+    // Helper: Add player if not already in Firebase
     function addPlayer() {
-      if (!gameId || !playerName) return;
-      const playersRef = db.ref(`games/${gameId}/players`);
-      playersRef.child(playerName).set(playerName);
-      playersRef.child(playerName).onDisconnect().remove();
+      try {
+        if (!gameId || !playerName) throw new Error("Missing gameId or playerName");
+        const playersRef = db.ref(`games/${gameId}/players`);
+        playersRef.child(playerName).set(playerName).catch(showError);
+        playersRef.child(playerName).onDisconnect().remove().catch(showError);
+      } catch (err) {
+        showError(err);
+      }
     }
 
     // 1: Enter Name
@@ -217,11 +227,15 @@
     // 2: Join or Create Game
     function showJoinCreate() {
       if (gameId) {
-        // Already have an ID → skip this block and add player
-        joinCreateContainer.classList.add("hidden");
-        tokenContainer.classList.add("hidden");
-        addPlayer();        
-        showLobby();
+        try {
+          if (!playerName) throw new Error("Cannot add player before setting name.");
+          joinCreateContainer.classList.add("hidden");
+          tokenContainer.classList.add("hidden");
+          addPlayer();
+          showLobby();
+        } catch (err) {
+          showError(err);
+        }
         return;
       }
       joinCreateContainer.classList.remove("hidden");
@@ -229,6 +243,10 @@
         joinCreateBtn.textContent = gameIdInput.value.trim() ? "Join Game" : "Create Game";
       });
       joinCreateBtn.onclick = () => {
+        if (!playerName) {
+          alert("Please save your name first.");
+          return;
+        }
         const enteredId = gameIdInput.value.trim().toUpperCase();
         if (enteredId) {
           // Join existing
@@ -248,6 +266,10 @@
     function showTokenPrompt() {
       tokenContainer.classList.remove("hidden");
       saveTokenBtn.onclick = () => {
+        if (!playerName) {
+          alert("Please save your name first.");
+          return;
+        }
         const tokenVal = creatorTokenInput.value.trim();
         if (!tokenVal) {
           alert("Please enter a token.");
@@ -290,25 +312,24 @@
 
       // Players list subscription
       const playersRef = db.ref(`games/${gameId}/players`);
-      playersRef.on("value", (snap) => {
+      playersRef.on("value", snap => {
         const val = snap.val() || {};
-        playersList.innerHTML = '<h3>Players:</h3>' +
-          Object.values(val).map(p => `<p>${p}</p>`).join("");
-      });
+        playersList.innerHTML = '<h3>Players:</h3>' + Object.values(val).map(p => `<p>${p}</p>`).join("");
+      }, showError);
 
       // Chat subscription
       const chatRef = db.ref(`games/${gameId}/chat`);
-      chatRef.on("child_added", (snap) => {
+      chatRef.on("child_added", snap => {
         const { name, text } = snap.val();
         const p = document.createElement("p");
         p.innerHTML = `<strong>${name}:</strong> ${text}`;
         chatBox.appendChild(p);
         chatBox.scrollTop = chatBox.scrollHeight;
-      });
+      }, showError);
       chatInput.addEventListener("keydown", e => {
         if (e.key === "Enter" && chatInput.value.trim()) {
           e.preventDefault();
-          chatRef.push({ name: playerName, text: chatInput.value.trim() });
+          chatRef.push({ name: playerName, text: chatInput.value.trim() }).catch(showError);
           chatInput.value = "";
         }
       });
@@ -327,13 +348,13 @@
             const code = snap.val();
             launchGame(code);
           }
-        });
+        }, showError);
       }
     }
 
     // Test vs Launch
     testGameBtn.onclick = () => launchGame(codeEditor.value);
-    launchGameBtn.onclick = () => db.ref(`games/${gameId}/code`).set(codeEditor.value);
+    launchGameBtn.onclick = () => db.ref(`games/${gameId}/code`).set(codeEditor.value).catch(showError);
 
     // Copy LLM Info
     copyLLMBtn.onclick = () => {
@@ -356,7 +377,7 @@ Write a complete HTML/JS implementation following these rules.
       navigator.clipboard.writeText(prompt).then(() => alert("LLM prompt copied!"));
     };
 
-    // Launch game via document.write
+    // Replace entire document with the game code
     function launchGame(code) {
       document.open();
       document.write(code);
