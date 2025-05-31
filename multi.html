@@ -2,166 +2,164 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multiplayer Code Editor</title>
+  <title>Multiplayer HTML Game</title>
   <style>
     body {
       font-family: sans-serif;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      background: #f9f9f9;
+      padding: 20px;
+      background: #f8f9fa;
+    }
+    h1 {
+      text-align: center;
+    }
+    #status {
+      margin: 10px 0;
+      font-weight: bold;
     }
     textarea {
-      width: 90%;
-      height: 200px;
+      width: 100%;
+      height: 150px;
       font-family: monospace;
       font-size: 14px;
-      margin: 10px 0;
-    }
-    #chat {
-      width: 90%;
-      height: 100px;
-      overflow-y: scroll;
-      border: 1px solid #ccc;
-      background: white;
-      margin-bottom: 10px;
-      padding: 5px;
-    }
-    #messages {
-      list-style: none;
-      padding: 0;
     }
     input, button {
-      padding: 10px;
+      font-size: 16px;
+      padding: 5px 10px;
       margin: 5px;
-      font-size: 14px;
     }
-    #tokenRequest {
-      margin-top: 20px;
-      display: none;
+    #chat {
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-top: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+      background: #fff;
+    }
+    #copyNotice {
+      color: green;
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
-  <h1>Multiplayer Code Editor</h1>  <div id="tokenRequest">
-    <p>Enter creator token to create a new game:</p>
-    <input type="password" id="creatorTokenInput" placeholder="Creator token" />
-    <button onclick="useCreatorToken()">Use Token</button>
-  </div>  <div id="joinSection" style="display: none;">
-    <input type="text" id="playerName" placeholder="Your name" />
-    <button onclick="joinGame()">Join Game</button>
-  </div>  <div id="mainSection" style="display: none;">
-    <h2>Chat</h2>
-    <div id="chat"><ul id="messages"></ul></div>
-    <input type="text" id="chatInput" placeholder="Type a message..." />
-    <button onclick="sendMessage()">Send</button><h2>Code (Host only)</h2>
-<textarea id="codeEditor"></textarea>
-<button onclick="updateCode()">Share Code</button>
-
+  <h1>Multiplayer HTML Game</h1>  <div id="setup">
+    <label for="yourName">Your Name:</label>
+    <input id="yourName" placeholder="Enter your name" />
+    <div id="creatorPrompt" style="display: none;">
+      <button onclick="promptCreatorToken()">I am the creator</button>
+    </div>
+  </div>  <div id="hostSection" style="display: none;">
+    <h2>Host Controls</h2>
+    <textarea id="hostCode" placeholder="Paste your code here"></textarea><br />
+    <button onclick="uploadHostCode()">Send Code to All</button>
+    <button onclick="copyInviteLink()">Copy Invite Link</button>
+    <span id="copyNotice"></span>
+  </div>  <div id="playerSection" style="display: none;">
+    <h2>Game Area</h2>
+    <textarea id="gameCode" readonly></textarea>
+  </div>  <div id="chat">
+    <strong>Chat:</strong><br />
+    <div id="chatMessages"></div>
+    <input id="chatInput" placeholder="Type a message" />
+    <button onclick="sendChat()">Send</button>
   </div>  <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const gameId = urlParams.get('game');
-    const creatorTokenFromUrl = urlParams.get('token');
-    const databaseUrl = 'https://anecdotesfamiliales-default-rtdb.firebaseio.com';
-    let playerName = '';
-    let isHost = false;
-    let gameCode = '';
+    const urlParams = new URLSearchParams(location.search);
+    const gameId = urlParams.get("game");
+    const creatorToken = urlParams.get("creator");
+    const isCreator = !!creatorToken;
+    let userName = "";
 
-    function show(el) { el.style.display = 'block'; }
-    function hide(el) { el.style.display = 'none'; }
+    const db = firebase.database();
 
-    const tokenRequestDiv = document.getElementById('tokenRequest');
-    const joinSection = document.getElementById('joinSection');
-    const mainSection = document.getElementById('mainSection');
-
-    if (!gameId && !creatorTokenFromUrl) {
-      show(tokenRequestDiv);
-    } else if (creatorTokenFromUrl) {
-      createGameWithToken(creatorTokenFromUrl);
-    } else {
-      show(joinSection);
-    }
-
-    function useCreatorToken() {
-      const token = document.getElementById('creatorTokenInput').value;
-      if (!token) return alert("Please enter a token");
-      const newUrl = `${location.origin}${location.pathname}?token=${encodeURIComponent(token)}`;
-      location.href = newUrl;
-    }
-
-    async function createGameWithToken(token) {
-      const id = 'game-' + Math.random().toString(36).substring(2, 8);
-      const res = await fetch(`${databaseUrl}/games/${id}.json?auth=${token}`, {
-        method: 'PUT',
-        body: JSON.stringify({ createdAt: Date.now(), code: '', messages: [] })
-      });
-      if (res.ok) {
-        window.location.href = `${location.pathname}?game=${id}`;
-      } else {
-        alert("Failed to create game. Invalid token?");
+    function promptCreatorToken() {
+      const token = prompt("Enter your creator token:");
+      if (token) {
+        const url = new URL(location.href);
+        url.searchParams.set("creator", token);
+        url.searchParams.set("game", generateId());
+        location.href = url.toString();
       }
     }
 
-    async function joinGame() {
-      playerName = document.getElementById('playerName').value.trim();
-      if (!playerName) return alert("Enter your name");
-      show(mainSection);
-      hide(joinSection);
-      startListening();
+    function generateId() {
+      return Math.random().toString(36).substring(2, 10);
     }
 
-    function sendMessage() {
-      const msg = document.getElementById('chatInput').value.trim();
-      if (!msg || !playerName) return;
-      const data = { name: playerName, msg, time: Date.now() };
-      fetch(`${databaseUrl}/games/${gameId}/messages.json`, {
-        method: 'POST',
-        body: JSON.stringify(data)
-      });
-      document.getElementById('chatInput').value = '';
-    }
-
-    function updateCode() {
-      const code = document.getElementById('codeEditor').value;
-      fetch(`${databaseUrl}/games/${gameId}/code.json`, {
-        method: 'PUT',
-        body: JSON.stringify(code)
+    function copyInviteLink() {
+      const link = `${location.origin}${location.pathname}?game=${gameId}`;
+      navigator.clipboard.writeText(link).then(() => {
+        document.getElementById("copyNotice").textContent = "Lien copié !";
+        setTimeout(() => {
+          document.getElementById("copyNotice").textContent = "";
+        }, 2000);
       });
     }
 
-    async function startListening() {
-      const messagesList = document.getElementById('messages');
-      const codeEditor = document.getElementById('codeEditor');
+    function uploadHostCode() {
+      const code = document.getElementById("hostCode").value;
+      db.ref(`games/${gameId}/code`).set(code);
+    }
 
-      setInterval(async () => {
-        const res = await fetch(`${databaseUrl}/games/${gameId}.json`);
-        const data = await res.json();
+    function sendChat() {
+      const msg = document.getElementById("chatInput").value;
+      if (msg.trim() !== "") {
+        const chatRef = db.ref(`games/${gameId}/chat`).push();
+        chatRef.set({ name: userName, text: msg });
+        document.getElementById("chatInput").value = "";
+      }
+    }
 
-        if (Array.isArray(data?.messages)) {
-          messagesList.innerHTML = '';
-          data.messages.forEach(msg => {
-            const li = document.createElement('li');
-            li.textContent = `${msg.name}: ${msg.msg}`;
-            messagesList.appendChild(li);
-          });
-        } else {
-          const list = [];
-          for (const key in data?.messages) {
-            list.push(data.messages[key]);
-          }
-          list.sort((a,b)=>a.time-b.time);
-          messagesList.innerHTML = '';
-          list.forEach(msg => {
-            const li = document.createElement('li');
-            li.textContent = `${msg.name}: ${msg.msg}`;
-            messagesList.appendChild(li);
-          });
+    function listenToCode() {
+      db.ref(`games/${gameId}/code`).on("value", snap => {
+        if (!isCreator) {
+          document.getElementById("gameCode").value = snap.val() || "";
         }
-
-        codeEditor.value = data.code || '';
-      }, 1000);
+      });
     }
+
+    function listenToChat() {
+      db.ref(`games/${gameId}/chat`).on("child_added", snap => {
+        const msg = snap.val();
+        const div = document.createElement("div");
+        div.textContent = `${msg.name}: ${msg.text}`;
+        document.getElementById("chatMessages").appendChild(div);
+      });
+    }
+
+    function initializeGame() {
+      userName = document.getElementById("yourName").value.trim();
+      if (!userName) return alert("Enter your name first.");
+
+      document.getElementById("setup").style.display = "none";
+      document.getElementById("playerSection").style.display = "block";
+      document.getElementById("chat").style.display = "block";
+
+      if (isCreator) {
+        document.getElementById("hostSection").style.display = "block";
+      }
+      listenToCode();
+      listenToChat();
+    }
+
+    window.onload = () => {
+      if (!gameId && !creatorToken) {
+        document.getElementById("creatorPrompt").style.display = "block";
+      }
+      if (gameId || creatorToken) {
+        document.getElementById("setup").innerHTML += '<button onclick="initializeGame()">Start</button>';
+      }
+    };
+  </script>  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>  <script>
+    const firebaseConfig = {
+      // Remplis avec tes infos Firebase
+      apiKey: "",
+      authDomain: "",
+      databaseURL: "https://YOUR_PROJECT.firebaseio.com",
+      projectId: "",
+      storageBucket: "",
+      messagingSenderId: "",
+      appId: ""
+    };
+    firebase.initializeApp(firebaseConfig);
   </script></body>
 </html>
