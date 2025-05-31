@@ -1,9 +1,10 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="version" content="1.0.5" />
-  <title>Multiplayer HTML Game v1.0.5</title>
+  <meta name="version" content="1.0.6" />
+  <title>Multiplayer HTML Game v1.0.6</title>
   <style>
     body {
       font-family: sans-serif;
@@ -78,16 +79,28 @@
   </style>
 </head>
 <body>
-  <h1>Multiplayer HTML Game v1.0.5</h1>  <!-- 1: Enter Name -->  <div id="enterNameContainer">
+  <h1>Multiplayer HTML Game v1.0.6 (with Debug)</h1>
+
+  <!-- 1: Enter Name -->
+  <div id="enterNameContainer">
     <input type="text" id="playerName" placeholder="Your Name" />
     <button id="saveNameBtn">Save Name</button>
-  </div>  <!-- 2: Join or Create Game -->  <div id="joinCreateContainer" class="hidden">
+  </div>
+
+  <!-- 2: Join or Create Game -->
+  <div id="joinCreateContainer" class="hidden">
     <input type="text" id="gameIdInput" placeholder="Enter Game ID to join" maxlength="8" />
     <button id="joinCreateBtn">Create Game</button>
-  </div>  <!-- 3: Creator token prompt (if needed) -->  <div id="tokenContainer" class="hidden">
+  </div>
+
+  <!-- 3: Creator token prompt (if needed) -->
+  <div id="tokenContainer" class="hidden">
     <input type="password" id="creatorTokenInput" placeholder="Enter Creator Token" />
     <button id="saveTokenBtn">Save Token</button>
-  </div>  <!-- 4: Game Lobby -->  <div id="lobbyContainer" class="hidden">
+  </div>
+
+  <!-- 4: Game Lobby -->
+  <div id="lobbyContainer" class="hidden">
     <p>
       <strong>Game ID:</strong> <span id="gameIdDisplay"></span>
       <button id="copyLinkBtn">Copy Link</button>
@@ -95,17 +108,24 @@
     </p>
     <div id="playersList"><h3>Players:</h3></div>
     <div id="chatBox"></div>
-    <input type="text" id="chatInput" placeholder="Type your message..." /><!-- Host only -->
-<div id="hostOptions" class="hidden">
-  <textarea id="codeEditor" placeholder="Paste HTML/JS game code here..."></textarea>
-  <button id="testGameBtn">Test Game</button>
-  <button id="launchGameBtn">Launch Game</button>
-  <button id="copyLLMBtn">Copy LLM Info</button>
-</div>
+    <input type="text" id="chatInput" placeholder="Type your message..." />
 
-<p id="waitingMsg" class="hidden">Waiting for the host to start the game...</p>
+    <!-- Host only -->
+    <div id="hostOptions" class="hidden">
+      <textarea id="codeEditor" placeholder="Paste HTML/JS game code here..."></textarea>
+      <button id="testGameBtn">Test Game</button>
+      <button id="launchGameBtn">Launch Game</button>
+      <button id="copyLLMBtn">Copy LLM Info</button>
+    </div>
 
-  </div>  <!-- Firebase SDKs -->  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>  <script>
+    <p id="waitingMsg" class="hidden">Waiting for the host to start the game...</p>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+  <script>
     // --- Config Firebase ---
     const firebaseConfig = {
       apiKey: "AIzaSyAAcMZ-dvevYe7IuPSkkdW1ZITQJo8vHqY",
@@ -120,7 +140,27 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // --- Utility functions ---
+    // --- Utilitaires de débogage ---
+    function debug(msg) {
+      console.log("[DEBUG] " + msg);
+      alert("[DEBUG] " + msg);
+    }
+    function showError(err, path) {
+      const fullMsg = `Firebase Error on "${path}": ${err.message}`;
+      console.error(fullMsg);
+      alert(fullMsg);
+    }
+
+    // --- Lecture initiale des paramètres / cookies ---
+    const urlParams = new URLSearchParams(location.search);
+    let playerName = null;
+    let gameId = urlParams.get("game") || null;
+    let creatorToken = urlParams.get("token") || getCookie("token");
+    let isHost = false;
+
+    console.log("Initial URL params: game=", gameId, ", token=", creatorToken, ", name=", urlParams.get("name"));
+
+    // Récupère la valeur d’un cookie
     function getCookie(name) {
       const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
       return match ? match[2] : null;
@@ -128,6 +168,8 @@
     function setCookie(name, value) {
       document.cookie = `${name}=${value}; path=/`;
     }
+
+    // Fonction pour générer un ID de jeu de 8 caractères
     function generateGameId() {
       const chars = "ABCDEFGHJKLMNPRSTUVWXYZ23456789";
       let id = "";
@@ -136,6 +178,8 @@
       }
       return id;
     }
+
+    // Met à jour l’URL sans recharger la page
     function updateURL(params) {
       const url = new URL(location.href);
       Object.keys(params).forEach(key => {
@@ -143,127 +187,72 @@
         else url.searchParams.delete(key);
       });
       history.replaceState(null, "", url.toString());
+      console.log("URL mise à jour vers:", url.toString());
     }
 
-    // --- DOM Elements ---
-    const enterNameContainer = document.getElementById("enterNameContainer");
-    const playerNameInput = document.getElementById("playerName");
-    const saveNameBtn = document.getElementById("saveNameBtn");
-
-    const joinCreateContainer = document.getElementById("joinCreateContainer");
-    const gameIdInput = document.getElementById("gameIdInput");
-    const joinCreateBtn = document.getElementById("joinCreateBtn");
-
-    const tokenContainer = document.getElementById("tokenContainer");
-    const creatorTokenInput = document.getElementById("creatorTokenInput");
-    const saveTokenBtn = document.getElementById("saveTokenBtn");
-
-    const lobbyContainer = document.getElementById("lobbyContainer");
-    const gameIdDisplay = document.getElementById("gameIdDisplay");
-    const copyLinkBtn = document.getElementById("copyLinkBtn");
-    const copyNotice = document.getElementById("copyNotice");
-    const playersList = document.getElementById("playersList");
-    const chatBox = document.getElementById("chatBox");
-    const chatInput = document.getElementById("chatInput");
-    const hostOptions = document.getElementById("hostOptions");
-    const codeEditor = document.getElementById("codeEditor");
-    const testGameBtn = document.getElementById("testGameBtn");
-    const launchGameBtn = document.getElementById("launchGameBtn");
-    const copyLLMBtn = document.getElementById("copyLLMBtn");
-    const waitingMsg = document.getElementById("waitingMsg");
-
-    // --- State ---
-    const urlParams = new URLSearchParams(location.search);
-    let playerName = null;
-    let gameId = urlParams.get("game") || null;
-    let creatorToken = urlParams.get("token") || getCookie("token");
-    let isHost = false;
-
-    // Helper: Show errors
-    function showError(err) {
-      alert("Error: " + err.message);
-      console.error(err);
-    }
-
-    // Helper: Add player if not already in Firebase
+    // --- Fonction qui ajoute un joueur sous /games/<gameId>/players/<playerName> ---
     function addPlayer() {
-      try {
-        if (!gameId || !playerName) throw new Error("Missing gameId or playerName");
-        const playersRef = db.ref(`games/${gameId}/players`);
-        playersRef.child(playerName).set(playerName).catch(showError);
-        playersRef.child(playerName).onDisconnect().remove().catch(showError);
-      } catch (err) {
-        showError(err);
-      }
-    }
-
-    // 1: Enter Name
-    saveNameBtn.onclick = () => {
-      const nameVal = playerNameInput.value.trim();
-      if (!nameVal) {
-        alert("Please enter your name.");
+      debug(`addPlayer() appelé avec gameId="${gameId}", playerName="${playerName}"`);
+      if (!gameId || !playerName) {
+        debug("addPlayer annulé : gameId ou playerName manquant");
         return;
       }
-      playerName = nameVal;
-      setCookie("name", playerName);
-      updateURL({ name: playerName });
-      enterNameContainer.classList.add("hidden");
-      showJoinCreate();
-    };
+      const path = `games/${gameId}/players/${playerName}`;
+      debug(`Tentative d’écriture au chemin "${path}" avec valeur "${playerName}"`);
+      db.ref(path)
+        .set(playerName)
+        .then(() => {
+          debug(`Succès: joueur "${playerName}" ajouté sous "/games/${gameId}/players"`);
+        })
+        .catch(err => showError(err, path));
 
-    // Prefill if name in URL or cookie
-    const nameParam = urlParams.get("name");
-    if (nameParam) {
-      playerName = nameParam;
-      playerNameInput.value = playerName;
-      setCookie("name", playerName);
-      enterNameContainer.classList.add("hidden");
-      showJoinCreate();
-    } else if (getCookie("name")) {
-      playerName = getCookie("name");
-      playerNameInput.value = playerName;
+      // Supprimer automatiquement à la déconnexion
+      db.ref(path)
+        .onDisconnect()
+        .remove()
+        .catch(err => showError(err, path + " (onDisconnect)"));
     }
 
-    // 2: Join or Create Game
-    function showJoinCreate() {
-      if (gameId) {
-        try {
-          if (!playerName) throw new Error("Cannot add player before setting name.");
-          joinCreateContainer.classList.add("hidden");
-          tokenContainer.classList.add("hidden");
-          addPlayer();
-          showLobby();
-        } catch (err) {
-          showError(err);
+    // --- Fonction qui met en place le chat sous /games/<gameId>/chat ---
+    function setupChat() {
+      debug(`setupChat() appelé pour gameId="${gameId}"`);
+      if (!gameId) {
+        debug("setupChat annulé : gameId manquant");
+        return;
+      }
+      const chatPath = `games/${gameId}/chat`;
+      debug(`Installation du listener sur "${chatPath}"`);
+      const chatRef = db.ref(chatPath);
+
+      // À chaque nouveau message ajouté
+      chatRef.on("child_added", snap => {
+        const { name, text } = snap.val();
+        debug(`Nouveau message reçu: { name: "${name}", text: "${text}" }`);
+        const p = document.createElement("p");
+        p.innerHTML = `<strong>${name}:</strong> ${text}`;
+        chatBox.appendChild(p);
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }, err => showError(err, chatPath));
+
+      chatInput.addEventListener("keydown", e => {
+        if (e.key === "Enter" && chatInput.value.trim()) {
+          e.preventDefault();
+          const message = chatInput.value.trim();
+          debug(`Envoi d’un nouveau message "${message}" au chemin "${chatPath}"`);
+          chatRef
+            .push({ name: playerName, text: message })
+            .then(() => {
+              debug("Message poussé avec succès.");
+            })
+            .catch(err => showError(err, chatPath + " (push)"));
+          chatInput.value = "";
         }
-        return;
-      }
-      joinCreateContainer.classList.remove("hidden");
-      gameIdInput.addEventListener("input", () => {
-        joinCreateBtn.textContent = gameIdInput.value.trim() ? "Join Game" : "Create Game";
       });
-      joinCreateBtn.onclick = () => {
-        if (!playerName) {
-          alert("Please save your name first.");
-          return;
-        }
-        const enteredId = gameIdInput.value.trim().toUpperCase();
-        if (enteredId) {
-          // Join existing
-          gameId = enteredId;
-          updateURL({ game: gameId });
-          joinCreateContainer.classList.add("hidden");
-          addPlayer();
-          showLobby();
-        } else {
-          // Create new
-          showTokenPrompt();
-        }
-      };
     }
 
-    // 3: Token prompt for host
+    // --- Quand l’hôte clique sur “Create Game” et entre le token ---
     function showTokenPrompt() {
+      debug("showTokenPrompt() appelé");
       tokenContainer.classList.remove("hidden");
       saveTokenBtn.onclick = () => {
         if (!playerName) {
@@ -276,87 +265,161 @@
           return;
         }
         creatorToken = tokenVal;
+        debug(`Token saisi par le host: "${creatorToken}"`);
         setCookie("token", creatorToken);
+
+        // Générer un nouvel ID de jeu
         gameId = generateGameId();
-        updateURL({ token: creatorToken, game: gameId });
-        tokenContainer.classList.add("hidden");
-        joinCreateContainer.classList.add("hidden");
-        isHost = true;
-        addPlayer();
-        showLobby();
+        debug(`Nouvel gameId généré: "${gameId}"`);
+
+        // 1) Écrire d’abord { token } à /games/<gameId>
+        const rootPath = `games/${gameId}`;
+        debug(`Tentative de création de la partie sous "${rootPath}" avec token`);
+        db.ref(rootPath)
+          .set({ token: creatorToken })
+          .then(() => {
+            debug(`✔ Room "${gameId}" créée avec succès (token stocké).`);
+            // 2) Ajouter immédiatement le host comme joueur
+            addPlayer();
+            // 3) Mettre à jour l’URL (seulement game et token)
+            updateURL({ token: creatorToken, game: gameId });
+            tokenContainer.classList.add("hidden");
+            joinCreateContainer.classList.add("hidden");
+            isHost = true;
+            // 4) Afficher la salle (players, chat, host UI)
+            showLobby();
+          })
+          .catch(err => showError(err, rootPath));
       };
     }
 
-    // Host flag
-    if (creatorToken) {
-      isHost = true;
-      setCookie("token", creatorToken);
+    // --- Affiche ou cache les vues selon l’état de la partie ---
+    function showJoinCreate() {
+      debug("showJoinCreate() appelé avec gameId=" + gameId);
+
+      // Si gameId déjà présent, on passe directement à la salle
+      if (gameId) {
+        debug("gameId fourni (“" + gameId + "”) → appel addPlayer() et showLobby()");
+        joinCreateContainer.classList.add("hidden");
+        tokenContainer.classList.add("hidden");
+        addPlayer();
+        showLobby();
+        return;
+      }
+
+      // Sinon, on affiche le formulaire pour taper ou créer
+      joinCreateContainer.classList.remove("hidden");
+      gameIdInput.addEventListener("input", () => {
+        joinCreateBtn.textContent = gameIdInput.value.trim() ? "Join Game" : "Create Game";
+      });
+      joinCreateBtn.onclick = () => {
+        if (!playerName) {
+          alert("Please save your name first.");
+          return;
+        }
+        const enteredId = gameIdInput.value.trim().toUpperCase();
+        if (enteredId) {
+          // Rejoindre une partie existante
+          gameId = enteredId;
+          debug(`Le joueur "${playerName}" rejoint la partie "${gameId}"`);
+          updateURL({ game: gameId });
+          joinCreateContainer.classList.add("hidden");
+          addPlayer();
+          showLobby();
+        } else {
+          // Créer une nouvelle partie → demander le token
+          debug("Aucun gameId entré, on passe à showTokenPrompt()");
+          showTokenPrompt();
+        }
+      };
     }
 
-    // 4: Game Lobby
+    // --- Affichage de la salle (lobby) ---
     function showLobby() {
-      // Hide all upfront blocks
+      debug("showLobby() appelé pour gameId=" + gameId + " / playerName=" + playerName);
+
+      // Cacher tous les blocs précédents
       joinCreateContainer.classList.add("hidden");
       tokenContainer.classList.add("hidden");
       lobbyContainer.classList.remove("hidden");
 
+      // Afficher le gameId et configurer “Copy Link”
       gameIdDisplay.textContent = gameId;
       copyLinkBtn.onclick = () => {
-        // Copy URL with only ?game=
         const link = `${location.origin}${location.pathname}?game=${gameId}`;
+        debug(`Copie du lien: "${link}"`);
         navigator.clipboard.writeText(link).then(() => {
           copyNotice.textContent = "Link copied!";
           setTimeout(() => (copyNotice.textContent = ""), 2000);
         });
       };
 
-      // Players list subscription
-      const playersRef = db.ref(`games/${gameId}/players`);
+      // LISTE DES JOUEURS
+      const playersPath = `games/${gameId}/players`;
+      debug(`Installation du listener pour la liste des joueurs sous "${playersPath}"`);
+      const playersRef = db.ref(playersPath);
+
       playersRef.on("value", snap => {
         const val = snap.val() || {};
-        playersList.innerHTML = '<h3>Players:</h3>' + Object.values(val).map(p => `<p>${p}</p>`).join("");
-      }, showError);
+        debug(`Liste des joueurs mise à jour: ${JSON.stringify(Object.values(val))}`);
+        playersList.innerHTML =
+          "<h3>Players:</h3>" +
+          Object.values(val)
+            .map(p => `<p>${p}</p>`)
+            .join("");
+      }, err => showError(err, playersPath));
 
-      // Chat subscription
-      const chatRef = db.ref(`games/${gameId}/chat`);
-      chatRef.on("child_added", snap => {
-        const { name, text } = snap.val();
-        const p = document.createElement("p");
-        p.innerHTML = `<strong>${name}:</strong> ${text}`;
-        chatBox.appendChild(p);
-        chatBox.scrollTop = chatBox.scrollHeight;
-      }, showError);
-      chatInput.addEventListener("keydown", e => {
-        if (e.key === "Enter" && chatInput.value.trim()) {
-          e.preventDefault();
-          chatRef.push({ name: playerName, text: chatInput.value.trim() }).catch(showError);
-          chatInput.value = "";
-        }
-      });
+      // CHAT
+      setupChat();
 
-      // Host UI
+      // OPTIONS HÔTE vs ATTENTE
       if (isHost) {
+        debug("Affichage de l’UI Host");
         hostOptions.classList.remove("hidden");
         waitingMsg.classList.add("hidden");
       } else {
+        debug("Affichage du message “Waiting for the host”");
         waitingMsg.classList.remove("hidden");
-        // Listen for code published
-        const codeRef = db.ref(`games/${gameId}/code`);
-        codeRef.on("value", snap => {
-          if (snap.exists()) {
-            waitingMsg.classList.add("hidden");
-            const code = snap.val();
-            launchGame(code);
-          }
-        }, showError);
+        // Écoute du code publié par l’hôte
+        const codePath = `games/${gameId}/code`;
+        debug(`Installation du listener pour le code du jeu sous "${codePath}"`);
+        const codeRef = db.ref(codePath);
+        codeRef.on(
+          "value",
+          snap => {
+            if (snap.exists()) {
+              const code = snap.val();
+              debug("Code du jeu reçu depuis Firebase, lancement via document.write()");
+              waitingMsg.classList.add("hidden");
+              launchGame(code);
+            } else {
+              debug("Pas encore de code publié sous " + codePath);
+            }
+          },
+          err => showError(err, codePath)
+        );
       }
     }
 
-    // Test vs Launch
-    testGameBtn.onclick = () => launchGame(codeEditor.value);
-    launchGameBtn.onclick = () => db.ref(`games/${gameId}/code`).set(codeEditor.value).catch(showError);
+    // --- Test/Launch du code du jeu (host et clients) ---
+    testGameBtn.onclick = () => {
+      const code = codeEditor.value;
+      debug("TestGame: launchGame() appelé (host local)");
+      launchGame(code);
+    };
+    launchGameBtn.onclick = () => {
+      const code = codeEditor.value;
+      const codePath = `games/${gameId}/code`;
+      debug(`Tentative d’écriture du code du jeu sous "${codePath}"`);
+      db.ref(codePath)
+        .set(code)
+        .then(() => {
+          debug("Code publié avec succès sous " + codePath);
+        })
+        .catch(err => showError(err, codePath));
+    };
 
-    // Copy LLM Info
+    // --- Copie du prompt LLM (host) ---
     copyLLMBtn.onclick = () => {
       const prompt = `
 You are building a multiplayer browser game in a single HTML file.
@@ -374,25 +437,44 @@ Requirements:
 
 Write a complete HTML/JS implementation following these rules.
       `.trim();
+      debug("Copie du prompt LLM dans le presse-papier");
       navigator.clipboard.writeText(prompt).then(() => alert("LLM prompt copied!"));
     };
 
-    // Replace entire document with the game code
+    // --- Fonction pour remplacer le document par le code du jeu ---
     function launchGame(code) {
+      debug("launchGame() : écriture du code avec document.write()");
       document.open();
       document.write(code);
       document.close();
     }
 
-    // Initial load logic
+    // --- Initialisation au chargement de la page ---
     window.onload = () => {
-      const nameFromCookie = getCookie("name");
-      if (nameFromCookie && !playerNameInput.value) {
-        playerName = nameFromCookie;
-        playerNameInput.value = playerName;
+      console.log("window.onload : lecture de l’URL et des cookies");
+
+      // 1) Pré-remplir playerName si fourni en URL ou cookie
+      const nameParam = urlParams.get("name");
+      if (nameParam) {
+        playerName = nameParam;
+        debug(`playerName initialisé depuis URL: "${playerName}"`);
+        setCookie("name", playerName);
+        document.getElementById("playerName").value = playerName;
+        // On ne cache pas encore “Enter Name” car on doit d’abord masquer via code :
+        enterNameContainer.classList.add("hidden");
+        showJoinCreate();
+      } else {
+        const fromCookie = getCookie("name");
+        if (fromCookie) {
+          playerName = fromCookie;
+          debug(`playerName initialisé depuis cookie: "${playerName}"`);
+          document.getElementById("playerName").value = playerName;
+        }
       }
+
+      // 2) Si gameId + playerName dispo, call addPlayer()/showLobby()
       if (gameId && playerName) {
-        // Both known → skip directly to lobby, auto-add
+        debug(`Onglet chargé avec gameId="${gameId}" et playerName="${playerName}", on auto‐ajoute et showLobby()`);
         enterNameContainer.classList.add("hidden");
         joinCreateContainer.classList.add("hidden");
         tokenContainer.classList.add("hidden");
@@ -400,5 +482,21 @@ Write a complete HTML/JS implementation following these rules.
         showLobby();
       }
     };
-  </script></body>
+
+    // --- Gestion du bouton “Save Name” ---
+    document.getElementById("saveNameBtn").onclick = () => {
+      const nameVal = document.getElementById("playerName").value.trim();
+      if (!nameVal) {
+        alert("Please enter your name.");
+        return;
+      }
+      playerName = nameVal;
+      debug(`playerName sauvegardé: "${playerName}"`);
+      setCookie("name", playerName);
+      updateURL({ name: playerName });
+      enterNameContainer.classList.add("hidden");
+      showJoinCreate();
+    };
+  </script>
+</body>
 </html>
