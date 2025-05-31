@@ -2,6 +2,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="version" content="1.0.1" />
   <title>Multiplayer HTML Game</title>
   <style>
     body {
@@ -187,6 +188,7 @@
     if (nameParam) {
       playerName = nameParam;
       setCookie("name", playerName);
+      playerNameInput.value = playerName;
       enterNameContainer.classList.add("hidden");
       showJoinCreate();
     } else if (getCookie("name")) {
@@ -199,6 +201,7 @@
       if (gameId) {
         // Already have a game ID in URL
         joinCreateContainer.classList.add("hidden");
+        tokenContainer.classList.add("hidden");
         showLobby();
         return;
       }
@@ -346,6 +349,8 @@ Write a complete HTML/JS implementation following these rules.
       }
       if (gameId && playerName) {
         enterNameContainer.classList.add("hidden");
+        joinCreateContainer.classList.add("hidden");
+        tokenContainer.classList.add("hidden");
         showLobby();
       }
     };
