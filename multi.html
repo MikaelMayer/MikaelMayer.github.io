@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="version" content="1.1.7" />
-  <title>Multiplayer HTML Game v1.1.7</title>
+  <meta name="version" content="1.1.8" />
+  <title>Multiplayer HTML Game v1.1.8</title>
   <style>
     body {
       font-family: sans-serif;
@@ -120,7 +120,7 @@
   </style>
 </head>
 <body>
-  <h1>Multiplayer HTML Game v1.1.7</h1>
+  <h1>Multiplayer HTML Game v1.1.8</h1>
 
   <!-- 1: Enter Name -->
   <div id="enterNameContainer">
@@ -229,6 +229,33 @@
       history.replaceState(null, "", url.toString());
     }
 
+    // --- DOM references ---
+    const playerNameInput = document.getElementById("playerName");
+    const enterNameContainer = document.getElementById("enterNameContainer");
+    const joinCreateContainer = document.getElementById("joinCreateContainer");
+    const tokenContainer = document.getElementById("tokenContainer");
+    const lobbyContainer = document.getElementById("lobbyContainer");
+    const codeEditor = document.getElementById("codeEditor");
+    const copyLLMBtn = document.getElementById("copyLLMBtn");
+    const hostOptions = document.getElementById("hostOptions");
+    const hostStartedOptions = document.getElementById("hostStartedOptions");
+    const playersList = document.getElementById("playersList");
+    const chatBox = document.getElementById("chatBox");
+    const chatInput = document.getElementById("chatInput");
+    const gameIdDisplay = document.getElementById("gameIdDisplay");
+    const copyLinkBtn = document.getElementById("copyLinkBtn");
+    const copyNotice = document.getElementById("copyNotice");
+    const saveNameBtn = document.getElementById("saveNameBtn");
+    const joinCreateBtn = document.getElementById("joinCreateBtn");
+    const saveTokenBtn = document.getElementById("saveTokenBtn");
+    const creatorTokenInput = document.getElementById("creatorTokenInput");
+    const gameIdInput = document.getElementById("gameIdInput");
+    const startGameBtn = document.getElementById("startGameBtn");
+    const returnToGameBtn = document.getElementById("returnToGameBtn");
+    const updateCodeBtn = document.getElementById("updateCodeBtn");
+    const resetGameBtn = document.getElementById("resetGameBtn");
+    const waitingMsg = document.getElementById("waitingMsg");
+
     // --- Add or remove player ---
     function addPlayer() {
       if (!gameId || !playerName) return;
@@ -242,6 +269,7 @@
         .catch(err => showError(err, playersPath + " (onDisconnect)"));
     }
 
+    // --- Setup chat listeners ---
     function setupChat() {
       if (!gameId) return;
       const chatPath = `games/${gameId}/chat`;
@@ -264,7 +292,7 @@
       });
     }
 
-    // --- Ensure game root exists; assign first arrival as host if none ---
+    // --- Ensure game root exists; first arrival becomes host ---
     function ensureRootExistsThen(callback) {
       const rootPath = `games/${gameId}`;
       db.ref(rootPath).once("value")
@@ -273,7 +301,6 @@
             callback();
           } else {
             isHost = true;
-            // Prompt for host token
             tokenContainer.classList.remove("hidden");
             saveTokenBtn.onclick = () => {
               const tokenVal = creatorTokenInput.value.trim();
@@ -293,7 +320,7 @@
         .catch(err => showError(err, rootPath + " (existence check)"));
     }
 
-    // --- Join existing game; ask token only if needed to confirm host status ---
+    // --- Join or create flow ---
     function showJoinCreate() {
       if (gameId) {
         joinCreateContainer.classList.add("hidden");
@@ -337,7 +364,6 @@
           joinCreateContainer.classList.add("hidden");
           showJoinCreate();
         } else {
-          // Create new game: generate ID and proceed to ensureRootExistsThen
           gameId = generateGameId();
           updateURL({ game: gameId });
           joinCreateContainer.classList.add("hidden");
@@ -349,7 +375,7 @@
       };
     }
 
-    // --- Determine host vs client and act accordingly ---
+    // --- Determine host vs client ---
     function checkHostViewOrClient() {
       db.ref(`games/${gameId}/token`).once("value")
         .then(snapToken => {
@@ -371,7 +397,7 @@
         .catch(err => showError(err, `games/${gameId}/token (once)`));
     }
 
-    // --- Show lobby for both host and players; host sees code editor & buttons ---
+    // --- Show lobby UI ---
     function showLobby() {
       joinCreateContainer.classList.add("hidden");
       tokenContainer.classList.add("hidden");
@@ -421,7 +447,7 @@
       }
     }
 
-    // --- Show host options once game has started ---
+    // --- Show host options after game start ---
     function showHostStartedOptions() {
       lobbyContainer.classList.remove("hidden");
       hostOptions.classList.add("hidden");
@@ -480,7 +506,7 @@
       db.ref().update(updates).catch(err => showError(err, `games/${gameId}`));
     };
 
-    // --- Copy LLM prompt, entirely in English ---
+    // --- Copy LLM prompt in English only ---
     copyLLMBtn.onclick = () => {
       db.ref(`games/${gameId}/started`).once("value")
         .then(snapStarted => {
@@ -573,7 +599,7 @@ Output a complete HTML/JS diff or instructions to apply this update, preserving 
     };
 
     // --- Save Name button ---
-    document.getElementById("saveNameBtn").onclick = () => {
+    saveNameBtn.onclick = () => {
       const nameVal = playerNameInput.value.trim();
       if (!nameVal) {
         alert("Please enter your name.");
@@ -588,4 +614,3 @@ Output a complete HTML/JS diff or instructions to apply this update, preserving 
   </script>
 </body>
 </html>
-
