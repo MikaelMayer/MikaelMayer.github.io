@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="version" content="1.1.8" />
-  <title>Multiplayer HTML Game v1.1.8</title>
+  <meta name="version" content="1.1.9" />
+  <title>Multiplayer HTML Game v1.1.9</title>
   <style>
     body {
       font-family: sans-serif;
@@ -120,7 +120,7 @@
   </style>
 </head>
 <body>
-  <h1>Multiplayer HTML Game v1.1.8</h1>
+  <h1>Multiplayer HTML Game v1.1.9</h1>
 
   <!-- 1: Enter Name -->
   <div id="enterNameContainer">
@@ -269,12 +269,18 @@
         .catch(err => showError(err, playersPath + " (onDisconnect)"));
     }
 
-    // --- Setup chat listeners ---
+    // --- Setup chat listeners (and clear existing DOM messages) ---
     function setupChat() {
       if (!gameId) return;
+      // Clear any previously‐appended <p> elements:
+      chatBox.innerHTML = "";
+
       const chatPath = `games/${gameId}/chat`;
       const chatRef = db.ref(chatPath);
+
+      // Remove any old "child_added" listener before attaching
       chatRef.off("child_added");
+
       chatRef.on("child_added", snap => {
         const { name, text } = snap.val();
         const p = document.createElement("p");
@@ -282,6 +288,7 @@
         chatBox.appendChild(p);
         chatBox.scrollTop = chatBox.scrollHeight;
       }, err => showError(err, chatPath));
+
       chatInput.addEventListener("keydown", e => {
         if (e.key === "Enter" && chatInput.value.trim()) {
           e.preventDefault();
@@ -300,6 +307,7 @@
           if (snap.exists()) {
             callback();
           } else {
+            // First to create this game → becomes host
             isHost = true;
             tokenContainer.classList.remove("hidden");
             saveTokenBtn.onclick = () => {
