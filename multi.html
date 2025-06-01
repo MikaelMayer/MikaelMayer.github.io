@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="version" content="1.0.6" />
-  <title>Multiplayer HTML Game v1.0.6</title>
+  <meta name="version" content="1.0.8" />
+  <title>Multiplayer HTML Game v1.0.8</title>
   <style>
     body {
       font-family: sans-serif;
@@ -79,7 +79,7 @@
   </style>
 </head>
 <body>
-  <h1>Multiplayer HTML Game v1.0.6 (with Debug)</h1>
+  <h1>Multiplayer HTML Game v1.0.8</h1>
 
   <!-- 1: Enter Name -->
   <div id="enterNameContainer">
@@ -140,11 +140,7 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // --- Utilitaires de débogage ---
-    function debug(msg) {
-      console.log("[DEBUG] " + msg);
-      alert("[DEBUG] " + msg);
-    }
+    // --- Utilitaires d’erreur ---
     function showError(err, path) {
       const fullMsg = `Firebase Error on "${path}": ${err.message}`;
       console.error(fullMsg);
@@ -158,8 +154,6 @@
     let creatorToken = urlParams.get("token") || getCookie("token");
     let isHost = false;
 
-    console.log("Initial URL params: game=", gameId, ", token=", creatorToken, ", name=", urlParams.get("name"));
-
     // Récupère la valeur d’un cookie
     function getCookie(name) {
       const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
@@ -169,7 +163,7 @@
       document.cookie = `${name}=${value}; path=/`;
     }
 
-    // Fonction pour générer un ID de jeu de 8 caractères
+    // Génère un ID de jeu de 8 caractères
     function generateGameId() {
       const chars = "ABCDEFGHJKLMNPRSTUVWXYZ23456789";
       let id = "";
@@ -187,47 +181,29 @@
         else url.searchParams.delete(key);
       });
       history.replaceState(null, "", url.toString());
-      console.log("URL mise à jour vers:", url.toString());
     }
 
-    // --- Fonction qui ajoute un joueur sous /games/<gameId>/players/<playerName> ---
+    // --- Ajoute un joueur sous /games/<gameId>/players/<playerName> ---
     function addPlayer() {
-      debug(`addPlayer() appelé avec gameId="${gameId}", playerName="${playerName}"`);
-      if (!gameId || !playerName) {
-        debug("addPlayer annulé : gameId ou playerName manquant");
-        return;
-      }
-      const path = `games/${gameId}/players/${playerName}`;
-      debug(`Tentative d’écriture au chemin "${path}" avec valeur "${playerName}"`);
-      db.ref(path)
+      if (!gameId || !playerName) return;
+      const playersPath = `games/${gameId}/players/${playerName}`;
+      db.ref(playersPath)
         .set(playerName)
-        .then(() => {
-          debug(`Succès: joueur "${playerName}" ajouté sous "/games/${gameId}/players"`);
-        })
-        .catch(err => showError(err, path));
-
-      // Supprimer automatiquement à la déconnexion
-      db.ref(path)
+        .catch(err => showError(err, playersPath));
+      db.ref(playersPath)
         .onDisconnect()
         .remove()
-        .catch(err => showError(err, path + " (onDisconnect)"));
+        .catch(err => showError(err, playersPath + " (onDisconnect)"));
     }
 
-    // --- Fonction qui met en place le chat sous /games/<gameId>/chat ---
+    // --- Installe le chat sous /games/<gameId>/chat ---
     function setupChat() {
-      debug(`setupChat() appelé pour gameId="${gameId}"`);
-      if (!gameId) {
-        debug("setupChat annulé : gameId manquant");
-        return;
-      }
+      if (!gameId) return;
       const chatPath = `games/${gameId}/chat`;
-      debug(`Installation du listener sur "${chatPath}"`);
       const chatRef = db.ref(chatPath);
 
-      // À chaque nouveau message ajouté
       chatRef.on("child_added", snap => {
         const { name, text } = snap.val();
-        debug(`Nouveau message reçu: { name: "${name}", text: "${text}" }`);
         const p = document.createElement("p");
         p.innerHTML = `<strong>${name}:</strong> ${text}`;
         chatBox.appendChild(p);
@@ -238,21 +214,37 @@
         if (e.key === "Enter" && chatInput.value.trim()) {
           e.preventDefault();
           const message = chatInput.value.trim();
-          debug(`Envoi d’un nouveau message "${message}" au chemin "${chatPath}"`);
           chatRef
             .push({ name: playerName, text: message })
-            .then(() => {
-              debug("Message poussé avec succès.");
-            })
             .catch(err => showError(err, chatPath + " (push)"));
           chatInput.value = "";
         }
       });
     }
 
-    // --- Quand l’hôte clique sur “Create Game” et entre le token ---
+    // --- Crée la racine si token connu, sinon prompt ---
+    function ensureRootExistsThen(callback) {
+      const rootPath = `games/${gameId}`;
+      db.ref(rootPath).once("value")
+        .then(snap => {
+          if (snap.exists()) {
+            callback();
+          } else {
+            if (creatorToken) {
+              db.ref(rootPath)
+                .set({ token: creatorToken })
+                .then(callback)
+                .catch(err => showError(err, rootPath + " (auto-create)"));
+            } else {
+              showTokenPromptAsJoiner();
+            }
+          }
+        })
+        .catch(err => showError(err, rootPath + " (existence check)"));
+    }
+
+    // --- Prompt token pour créer la partie (host) ---
     function showTokenPrompt() {
-      debug("showTokenPrompt() appelé");
       tokenContainer.classList.remove("hidden");
       saveTokenBtn.onclick = () => {
         if (!playerName) {
@@ -265,28 +257,47 @@
           return;
         }
         creatorToken = tokenVal;
-        debug(`Token saisi par le host: "${creatorToken}"`);
         setCookie("token", creatorToken);
-
-        // Générer un nouvel ID de jeu
         gameId = generateGameId();
-        debug(`Nouvel gameId généré: "${gameId}"`);
-
-        // 1) Écrire d’abord { token } à /games/<gameId>
         const rootPath = `games/${gameId}`;
-        debug(`Tentative de création de la partie sous "${rootPath}" avec token`);
         db.ref(rootPath)
           .set({ token: creatorToken })
           .then(() => {
-            debug(`✔ Room "${gameId}" créée avec succès (token stocké).`);
-            // 2) Ajouter immédiatement le host comme joueur
             addPlayer();
-            // 3) Mettre à jour l’URL (seulement game et token)
             updateURL({ token: creatorToken, game: gameId });
             tokenContainer.classList.add("hidden");
             joinCreateContainer.classList.add("hidden");
             isHost = true;
-            // 4) Afficher la salle (players, chat, host UI)
+            showLobby();
+          })
+          .catch(err => showError(err, rootPath));
+      };
+    }
+
+    // --- Prompt token pour rejoindre (joiner) si la racine n'existe pas ---
+    function showTokenPromptAsJoiner() {
+      tokenContainer.classList.remove("hidden");
+      saveTokenBtn.onclick = () => {
+        if (!playerName) {
+          alert("Please save your name first.");
+          return;
+        }
+        const tokenVal = creatorTokenInput.value.trim();
+        if (!tokenVal) {
+          alert("Please enter a token.");
+          return;
+        }
+        creatorToken = tokenVal;
+        setCookie("token", creatorToken);
+        const rootPath = `games/${gameId}`;
+        db.ref(rootPath)
+          .set({ token: creatorToken })
+          .then(() => {
+            addPlayer();
+            updateURL({ token: creatorToken, game: gameId });
+            tokenContainer.classList.add("hidden");
+            joinCreateContainer.classList.add("hidden");
+            isHost = true;
             showLobby();
           })
           .catch(err => showError(err, rootPath));
@@ -295,19 +306,16 @@
 
     // --- Affiche ou cache les vues selon l’état de la partie ---
     function showJoinCreate() {
-      debug("showJoinCreate() appelé avec gameId=" + gameId);
-
-      // Si gameId déjà présent, on passe directement à la salle
       if (gameId) {
-        debug("gameId fourni (“" + gameId + "”) → appel addPlayer() et showLobby()");
         joinCreateContainer.classList.add("hidden");
         tokenContainer.classList.add("hidden");
-        addPlayer();
-        showLobby();
+        ensureRootExistsThen(() => {
+          addPlayer();
+          showLobby();
+        });
         return;
       }
 
-      // Sinon, on affiche le formulaire pour taper ou créer
       joinCreateContainer.classList.remove("hidden");
       gameIdInput.addEventListener("input", () => {
         joinCreateBtn.textContent = gameIdInput.value.trim() ? "Join Game" : "Create Game";
@@ -319,16 +327,14 @@
         }
         const enteredId = gameIdInput.value.trim().toUpperCase();
         if (enteredId) {
-          // Rejoindre une partie existante
           gameId = enteredId;
-          debug(`Le joueur "${playerName}" rejoint la partie "${gameId}"`);
           updateURL({ game: gameId });
           joinCreateContainer.classList.add("hidden");
-          addPlayer();
-          showLobby();
+          ensureRootExistsThen(() => {
+            addPlayer();
+            showLobby();
+          });
         } else {
-          // Créer une nouvelle partie → demander le token
-          debug("Aucun gameId entré, on passe à showTokenPrompt()");
           showTokenPrompt();
         }
       };
@@ -336,32 +342,23 @@
 
     // --- Affichage de la salle (lobby) ---
     function showLobby() {
-      debug("showLobby() appelé pour gameId=" + gameId + " / playerName=" + playerName);
-
-      // Cacher tous les blocs précédents
       joinCreateContainer.classList.add("hidden");
       tokenContainer.classList.add("hidden");
       lobbyContainer.classList.remove("hidden");
 
-      // Afficher le gameId et configurer “Copy Link”
       gameIdDisplay.textContent = gameId;
       copyLinkBtn.onclick = () => {
         const link = `${location.origin}${location.pathname}?game=${gameId}`;
-        debug(`Copie du lien: "${link}"`);
         navigator.clipboard.writeText(link).then(() => {
           copyNotice.textContent = "Link copied!";
           setTimeout(() => (copyNotice.textContent = ""), 2000);
         });
       };
 
-      // LISTE DES JOUEURS
       const playersPath = `games/${gameId}/players`;
-      debug(`Installation du listener pour la liste des joueurs sous "${playersPath}"`);
       const playersRef = db.ref(playersPath);
-
       playersRef.on("value", snap => {
         const val = snap.val() || {};
-        debug(`Liste des joueurs mise à jour: ${JSON.stringify(Object.values(val))}`);
         playersList.innerHTML =
           "<h3>Players:</h3>" +
           Object.values(val)
@@ -369,31 +366,22 @@
             .join("");
       }, err => showError(err, playersPath));
 
-      // CHAT
       setupChat();
 
-      // OPTIONS HÔTE vs ATTENTE
       if (isHost) {
-        debug("Affichage de l’UI Host");
         hostOptions.classList.remove("hidden");
         waitingMsg.classList.add("hidden");
       } else {
-        debug("Affichage du message “Waiting for the host”");
         waitingMsg.classList.remove("hidden");
-        // Écoute du code publié par l’hôte
         const codePath = `games/${gameId}/code`;
-        debug(`Installation du listener pour le code du jeu sous "${codePath}"`);
         const codeRef = db.ref(codePath);
         codeRef.on(
           "value",
           snap => {
             if (snap.exists()) {
               const code = snap.val();
-              debug("Code du jeu reçu depuis Firebase, lancement via document.write()");
               waitingMsg.classList.add("hidden");
               launchGame(code);
-            } else {
-              debug("Pas encore de code publié sous " + codePath);
             }
           },
           err => showError(err, codePath)
@@ -404,18 +392,13 @@
     // --- Test/Launch du code du jeu (host et clients) ---
     testGameBtn.onclick = () => {
       const code = codeEditor.value;
-      debug("TestGame: launchGame() appelé (host local)");
       launchGame(code);
     };
     launchGameBtn.onclick = () => {
       const code = codeEditor.value;
       const codePath = `games/${gameId}/code`;
-      debug(`Tentative d’écriture du code du jeu sous "${codePath}"`);
       db.ref(codePath)
         .set(code)
-        .then(() => {
-          debug("Code publié avec succès sous " + codePath);
-        })
         .catch(err => showError(err, codePath));
     };
 
@@ -437,13 +420,11 @@ Requirements:
 
 Write a complete HTML/JS implementation following these rules.
       `.trim();
-      debug("Copie du prompt LLM dans le presse-papier");
       navigator.clipboard.writeText(prompt).then(() => alert("LLM prompt copied!"));
     };
 
-    // --- Fonction pour remplacer le document par le code du jeu ---
+    // --- Remplace le document par le code du jeu ---
     function launchGame(code) {
-      debug("launchGame() : écriture du code avec document.write()");
       document.open();
       document.write(code);
       document.close();
@@ -451,35 +432,29 @@ Write a complete HTML/JS implementation following these rules.
 
     // --- Initialisation au chargement de la page ---
     window.onload = () => {
-      console.log("window.onload : lecture de l’URL et des cookies");
-
-      // 1) Pré-remplir playerName si fourni en URL ou cookie
       const nameParam = urlParams.get("name");
       if (nameParam) {
         playerName = nameParam;
-        debug(`playerName initialisé depuis URL: "${playerName}"`);
         setCookie("name", playerName);
         document.getElementById("playerName").value = playerName;
-        // On ne cache pas encore “Enter Name” car on doit d’abord masquer via code :
         enterNameContainer.classList.add("hidden");
         showJoinCreate();
       } else {
         const fromCookie = getCookie("name");
         if (fromCookie) {
           playerName = fromCookie;
-          debug(`playerName initialisé depuis cookie: "${playerName}"`);
           document.getElementById("playerName").value = playerName;
         }
       }
 
-      // 2) Si gameId + playerName dispo, call addPlayer()/showLobby()
       if (gameId && playerName) {
-        debug(`Onglet chargé avec gameId="${gameId}" et playerName="${playerName}", on auto‐ajoute et showLobby()`);
         enterNameContainer.classList.add("hidden");
         joinCreateContainer.classList.add("hidden");
         tokenContainer.classList.add("hidden");
-        addPlayer();
-        showLobby();
+        ensureRootExistsThen(() => {
+          addPlayer();
+          showLobby();
+        });
       }
     };
 
@@ -491,7 +466,6 @@ Write a complete HTML/JS implementation following these rules.
         return;
       }
       playerName = nameVal;
-      debug(`playerName sauvegardé: "${playerName}"`);
       setCookie("name", playerName);
       updateURL({ name: playerName });
       enterNameContainer.classList.add("hidden");
