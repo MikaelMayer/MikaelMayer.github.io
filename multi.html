@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="version" content="1.0.8" />
-  <title>Multiplayer HTML Game v1.0.8</title>
+  <meta name="version" content="1.0.9" />
+  <title>Multiplayer HTML Game v1.0.9</title>
   <style>
     body {
       font-family: sans-serif;
@@ -79,7 +79,7 @@
   </style>
 </head>
 <body>
-  <h1>Multiplayer HTML Game v1.0.8</h1>
+  <h1>Multiplayer HTML Game v1.0.9</h1>
 
   <!-- 1: Enter Name -->
   <div id="enterNameContainer">
@@ -201,6 +201,8 @@
       if (!gameId) return;
       const chatPath = `games/${gameId}/chat`;
       const chatRef = db.ref(chatPath);
+      // Désactive tout listener précédent pour éviter les doublons
+      chatRef.off("child_added");
 
       chatRef.on("child_added", snap => {
         const { name, text } = snap.val();
@@ -357,6 +359,7 @@
 
       const playersPath = `games/${gameId}/players`;
       const playersRef = db.ref(playersPath);
+      playersRef.off("value");
       playersRef.on("value", snap => {
         const val = snap.val() || {};
         playersList.innerHTML =
@@ -375,6 +378,7 @@
         waitingMsg.classList.remove("hidden");
         const codePath = `games/${gameId}/code`;
         const codeRef = db.ref(codePath);
+        codeRef.off("value");
         codeRef.on(
           "value",
           snap => {
