@@ -291,8 +291,11 @@
           chatBox.scrollTop = chatBox.scrollHeight;
         }, err => showError(err, chatPath));
         chatInput.addEventListener("keydown", e => {
-          if (e.key === "Enter" && chatInput.value.trim()) {
+          // On desktop, e.key === "Enter". Sur mobile, mieux vaut vérifier e.keyCode === 13.
+          const isEnter = (e.key === "Enter" || e.keyCode === 13);
+          if (isEnter && chatInput.value.trim()) {
             e.preventDefault();
+            e.stopPropagation();
             chatRef.push({ name: window.playerName, text: chatInput.value.trim() })
               .catch(err => showError(err, chatPath + " (push)"));
             chatInput.value = "";
