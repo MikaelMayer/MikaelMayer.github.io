@@ -299,6 +299,7 @@
             chatRef.push({ name: window.playerName, text: chatInput.value.trim() })
               .catch(err => showError(err, chatPath + " (push)"));
             chatInput.value = "";
+            chatInput.focus();  // remettre le curseur dans la zone de chat
           }
         });
       }
