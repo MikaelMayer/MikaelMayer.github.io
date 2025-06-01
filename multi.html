@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="version" content="1.1.4" />
-  <title>Multiplayer HTML Game v1.1.4</title>
+  <meta name="version" content="1.1.7" />
+  <title>Multiplayer HTML Game v1.1.7</title>
   <style>
     body {
       font-family: sans-serif;
@@ -17,6 +17,7 @@
     }
     h1 {
       margin-bottom: 20px;
+      color: #333;
     }
     input[type="text"],
     input[type="password"],
@@ -30,15 +31,33 @@
       box-sizing: border-box;
       border: 1px solid #ccc;
       border-radius: 4px;
+      background: white;
+      color: #333;
+    }
+    input[type="text"]:focus,
+    input[type="password"]:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #007bff;
+      box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
+    }
+    textarea {
+      resize: vertical;
     }
     button {
       background: #007bff;
       color: white;
+      font-weight: bold;
       border: none;
       cursor: pointer;
+      transition: background 0.2s ease;
     }
     button:hover {
       background: #0056b3;
+    }
+    button:disabled {
+      background: #aaa;
+      cursor: not-allowed;
     }
     .hidden {
       display: none !important;
@@ -53,8 +72,15 @@
       padding: 10px;
       box-sizing: border-box;
     }
+    #playersList h3 {
+      margin: 0 0 5px;
+      font-size: 1.1em;
+      color: #444;
+    }
     #playersList p {
-      margin: 5px 0;
+      margin: 4px 0;
+      font-size: 1em;
+      color: #555;
     }
     #chatBox {
       width: 100%;
@@ -68,6 +94,11 @@
       box-sizing: border-box;
       margin-bottom: 5px;
     }
+    #chatBox p {
+      margin: 4px 0;
+      font-size: 0.95em;
+      color: #333;
+    }
     #joinCreateContainer {
       display: flex;
       flex-direction: column;
@@ -76,17 +107,20 @@
       max-width: 400px;
       box-sizing: border-box;
     }
-    #hostStartedOptions button {
-      margin-top: 10px;
-    }
     #codeEditor {
       margin-top: 10px;
       height: 100px;
+      font-family: monospace;
+      color: #333;
+      background: #fafafa;
+    }
+    #hostStartedOptions button {
+      margin-top: 10px;
     }
   </style>
 </head>
 <body>
-  <h1>Multiplayer HTML Game v1.1.4</h1>
+  <h1>Multiplayer HTML Game v1.1.7</h1>
 
   <!-- 1: Enter Name -->
   <div id="enterNameContainer">
@@ -100,9 +134,9 @@
     <button id="joinCreateBtn">Create Game</button>
   </div>
 
-  <!-- 3: Creator token prompt (if needed) -->
+  <!-- 3: Creator token prompt -->
   <div id="tokenContainer" class="hidden">
-    <input type="password" id="creatorTokenInput" placeholder="Enter Creator Token" />
+    <input type="password" id="creatorTokenInput" placeholder="Enter or create a Host Token" />
     <button id="saveTokenBtn">Save Token</button>
   </div>
 
@@ -118,9 +152,7 @@
     <input type="text" id="chatInput" placeholder="Type your message..." />
 
     <!-- Shared code editor -->
-    <textarea id="codeEditor" placeholder="Paste or edit HTML/JS game code here..."></textarea>
-
-    <!-- Copy LLM Info button (behavior changes based on whether game started) -->
+    <textarea id="codeEditor" placeholder="Paste or edit HTML/JS game code here..." class="hidden"></textarea>
     <button id="copyLLMBtn" class="hidden">Copy LLM Info</button>
 
     <!-- Host options before game start -->
@@ -157,21 +189,20 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // --- Utilitaires d’erreur ---
+    // --- Utility for errors ---
     function showError(err, path) {
       const fullMsg = `Firebase Error on "${path}": ${err.message}`;
       console.error(fullMsg);
       alert(fullMsg);
     }
 
-    // --- Lecture initiale des paramètres / cookies ---
+    // --- Read URL params / cookies ---
     const urlParams = new URLSearchParams(location.search);
     let playerName = null;
     let gameId = urlParams.get("game") || null;
-    let creatorToken = urlParams.get("token") || getCookie("token");
+    let creatorToken = urlParams.get("token") || getCookie("token") || "";
     let isHost = false;
 
-    // Récupère la valeur d’un cookie
     function getCookie(name) {
       const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
       return match ? match[2] : null;
@@ -180,7 +211,6 @@
       document.cookie = `${name}=${value}; path=/`;
     }
 
-    // Génère un ID de jeu de 8 caractères
     function generateGameId() {
       const chars = "ABCDEFGHJKLMNPRSTUVWXYZ23456789";
       let id = "";
@@ -190,7 +220,6 @@
       return id;
     }
 
-    // Met à jour l’URL sans recharger la page
     function updateURL(params) {
       const url = new URL(location.href);
       Object.keys(params).forEach(key => {
@@ -200,7 +229,7 @@
       history.replaceState(null, "", url.toString());
     }
 
-    // --- Ajoute un joueur sous /games/<gameId>/players/<playerName> ---
+    // --- Add or remove player ---
     function addPlayer() {
       if (!gameId || !playerName) return;
       const playersPath = `games/${gameId}/players/${playerName}`;
@@ -213,7 +242,6 @@
         .catch(err => showError(err, playersPath + " (onDisconnect)"));
     }
 
-    // --- Installe le chat sous /games/<gameId>/chat ---
     function setupChat() {
       if (!gameId) return;
       const chatPath = `games/${gameId}/chat`;
@@ -226,19 +254,17 @@
         chatBox.appendChild(p);
         chatBox.scrollTop = chatBox.scrollHeight;
       }, err => showError(err, chatPath));
-
       chatInput.addEventListener("keydown", e => {
         if (e.key === "Enter" && chatInput.value.trim()) {
           e.preventDefault();
-          const message = chatInput.value.trim();
-          chatRef.push({ name: playerName, text: message })
+          chatRef.push({ name: playerName, text: chatInput.value.trim() })
             .catch(err => showError(err, chatPath + " (push)"));
           chatInput.value = "";
         }
       });
     }
 
-    // --- Crée la racine si token connu, sinon prompt ---
+    // --- Ensure game root exists; assign first arrival as host if none ---
     function ensureRootExistsThen(callback) {
       const rootPath = `games/${gameId}`;
       db.ref(rootPath).once("value")
@@ -246,96 +272,51 @@
           if (snap.exists()) {
             callback();
           } else {
-            if (creatorToken) {
+            isHost = true;
+            // Prompt for host token
+            tokenContainer.classList.remove("hidden");
+            saveTokenBtn.onclick = () => {
+              const tokenVal = creatorTokenInput.value.trim();
+              if (!tokenVal) {
+                alert("Please create a host token.");
+                return;
+              }
+              creatorToken = tokenVal;
+              setCookie("token", creatorToken);
               db.ref(rootPath)
                 .set({ token: creatorToken, started: false })
                 .then(callback)
-                .catch(err => showError(err, rootPath + " (auto-create)"));
-            } else {
-              showTokenPromptAsJoiner();
-            }
+                .catch(err => showError(err, rootPath + " (create)"));
+            };
           }
         })
         .catch(err => showError(err, rootPath + " (existence check)"));
     }
 
-    // --- Prompt token pour créer la partie (host) ---
-    function showTokenPrompt() {
-      tokenContainer.classList.remove("hidden");
-      saveTokenBtn.onclick = () => {
-        if (!playerName) {
-          alert("Please save your name first.");
-          return;
-        }
-        const tokenVal = creatorTokenInput.value.trim();
-        if (!tokenVal) {
-          alert("Please enter a token.");
-          return;
-        }
-        creatorToken = tokenVal;
-        setCookie("token", creatorToken);
-        gameId = generateGameId();
-        const rootPath = `games/${gameId}`;
-        db.ref(rootPath)
-          .set({ token: creatorToken, started: false })
-          .then(() => {
-            isHost = true;
-            addPlayer();
-            updateURL({ token: creatorToken, game: gameId });
-            tokenContainer.classList.add("hidden");
-            joinCreateContainer.classList.add("hidden");
-            showLobby();
-          })
-          .catch(err => showError(err, rootPath));
-      };
-    }
-
-    // --- Prompt token pour rejoindre (si la partie n'existe pas) ---
-    function showTokenPromptAsJoiner() {
-      tokenContainer.classList.remove("hidden");
-      saveTokenBtn.onclick = () => {
-        if (!playerName) {
-          alert("Please save your name first.");
-          return;
-        }
-        const tokenVal = creatorTokenInput.value.trim();
-        if (!tokenVal) {
-          alert("Please enter a token.");
-          return;
-        }
-        creatorToken = tokenVal;
-        setCookie("token", creatorToken);
-        const rootPath = `games/${gameId}`;
-        db.ref(rootPath)
-          .set({ token: creatorToken, started: false })
-          .then(() => {
-            isHost = true;
-            addPlayer();
-            updateURL({ token: creatorToken, game: gameId });
-            tokenContainer.classList.add("hidden");
-            joinCreateContainer.classList.add("hidden");
-            showLobby();
-          })
-          .catch(err => showError(err, rootPath));
-      };
-    }
-
-    // --- Affiche ou cache les vues selon l’état de la partie ---
+    // --- Join existing game; ask token only if needed to confirm host status ---
     function showJoinCreate() {
       if (gameId) {
         joinCreateContainer.classList.add("hidden");
         tokenContainer.classList.add("hidden");
         ensureRootExistsThen(() => {
-          db.ref(`games/${gameId}/started`).once("value")
-            .then(snap => {
-              if (snap.val() === true) {
-                checkHostViewOrClient();
-              } else {
-                addPlayer();
-                showLobby();
+          db.ref(`games/${gameId}/token`).once("value")
+            .then(snapToken => {
+              const tokenInDb = snapToken.val();
+              if (tokenInDb && creatorToken === tokenInDb) {
+                isHost = true;
               }
+              db.ref(`games/${gameId}/started`).once("value")
+                .then(snapStarted => {
+                  if (snapStarted.val() === true) {
+                    checkHostViewOrClient();
+                  } else {
+                    addPlayer();
+                    showLobby();
+                  }
+                })
+                .catch(err => showError(err, `games/${gameId}/started (once)`));
             })
-            .catch(err => showError(err, `games/${gameId}/started (once)`));
+            .catch(err => showError(err, `games/${gameId}/token (once)`));
         });
         return;
       }
@@ -346,7 +327,7 @@
       });
       joinCreateBtn.onclick = () => {
         if (!playerName) {
-          alert("Please save your name first.");
+          alert("Enter your name first.");
           return;
         }
         const enteredId = gameIdInput.value.trim().toUpperCase();
@@ -354,29 +335,25 @@
           gameId = enteredId;
           updateURL({ game: gameId });
           joinCreateContainer.classList.add("hidden");
-          ensureRootExistsThen(() => {
-            db.ref(`games/${gameId}/started`).once("value")
-              .then(snap => {
-                if (snap.val() === true) {
-                  checkHostViewOrClient();
-                } else {
-                  addPlayer();
-                  showLobby();
-                }
-              })
-              .catch(err => showError(err, `games/${gameId}/started (once)`));
-          });
+          showJoinCreate();
         } else {
-          showTokenPrompt();
+          // Create new game: generate ID and proceed to ensureRootExistsThen
+          gameId = generateGameId();
+          updateURL({ game: gameId });
+          joinCreateContainer.classList.add("hidden");
+          ensureRootExistsThen(() => {
+            addPlayer();
+            showLobby();
+          });
         }
       };
     }
 
-    // --- Détermine si on affiche l’interface Host (avec le jeu démarré) ou Client ---
+    // --- Determine host vs client and act accordingly ---
     function checkHostViewOrClient() {
       db.ref(`games/${gameId}/token`).once("value")
-        .then(snap => {
-          const tokenInDb = snap.val();
+        .then(snapToken => {
+          const tokenInDb = snapToken.val();
           if (creatorToken === tokenInDb) {
             isHost = true;
             showHostStartedOptions();
@@ -394,7 +371,7 @@
         .catch(err => showError(err, `games/${gameId}/token (once)`));
     }
 
-    // --- Affichage de la salle (lobby) pour joueurs non‐host ou host avant démarrage ---
+    // --- Show lobby for both host and players; host sees code editor & buttons ---
     function showLobby() {
       joinCreateContainer.classList.add("hidden");
       tokenContainer.classList.add("hidden");
@@ -409,17 +386,14 @@
         });
       };
 
-      const playersPath = `games/${gameId}/players`;
-      const playersRef = db.ref(playersPath);
+      const playersRef = db.ref(`games/${gameId}/players`);
       playersRef.off("value");
       playersRef.on("value", snap => {
         const val = snap.val() || {};
         playersList.innerHTML =
           "<h3>Players:</h3>" +
-          Object.values(val)
-            .map(p => `<p>${p}</p>`)
-            .join("");
-      }, err => showError(err, playersPath));
+          Object.values(val).map(p => `<p>${p}</p>`).join("");
+      }, err => showError(err, `games/${gameId}/players`));
 
       setupChat();
 
@@ -433,18 +407,21 @@
       }, err => showError(err, `games/${gameId}/started (on)`));
 
       if (isHost) {
+        codeEditor.classList.remove("hidden");
         hostOptions.classList.remove("hidden");
+        copyLLMBtn.classList.remove("hidden");
+        copyLLMBtn.textContent = "Copy LLM Info";
         hostStartedOptions.classList.add("hidden");
         waitingMsg.classList.add("hidden");
-        copyLLMBtn.classList.remove("hidden");
-        copyLLMBtn.textContent = "Copy LLM Info (Initial)";
       } else {
         waitingMsg.classList.remove("hidden");
+        codeEditor.classList.add("hidden");
+        hostOptions.classList.add("hidden");
         copyLLMBtn.classList.add("hidden");
       }
     }
 
-    // --- Affichage des options Host après démarrage ---
+    // --- Show host options once game has started ---
     function showHostStartedOptions() {
       lobbyContainer.classList.remove("hidden");
       hostOptions.classList.add("hidden");
@@ -455,37 +432,29 @@
       chatInput.style.display = "none";
       copyLinkBtn.style.display = "none";
 
-      // Make sure the textarea is still visible for edits
       codeEditor.classList.remove("hidden");
       copyLLMBtn.classList.remove("hidden");
-      copyLLMBtn.textContent = "Copy LLM Info (Update)";
+      copyLLMBtn.textContent = "Copy LLM Info";
 
-      // Return to Game
       returnToGameBtn.onclick = () => {
         db.ref(`games/${gameId}/code`).once("value")
           .then(snap => {
-            if (snap.exists()) {
-              launchGame(snap.val());
-            }
+            if (snap.exists()) launchGame(snap.val());
           })
           .catch(err => showError(err, `games/${gameId}/code (once)`));
       };
 
-      // Update Code for Players
       updateCodeBtn.onclick = () => {
         const newCode = codeEditor.value;
-        db.ref(`games/${gameId}/code`)
-          .set(newCode)
+        db.ref(`games/${gameId}/code`).set(newCode)
           .then(() => {
-            alert("Code updated. Players should reload the page to see new version.");
+            alert("Code updated. Players should reload to see new version.");
           })
           .catch(err => showError(err, `games/${gameId}/code`));
       };
 
-      // Reset Game (End Current Session)
       resetGameBtn.onclick = () => {
-        db.ref(`games/${gameId}/started`)
-          .set(false)
+        db.ref(`games/${gameId}/started`).set(false)
           .then(() => {
             alert("Game reset. Players must reload to return to lobby.");
             hostStartedOptions.classList.add("hidden");
@@ -494,23 +463,24 @@
             document.getElementById("chatBox").style.display = "block";
             chatInput.style.display = "block";
             copyLinkBtn.style.display = "inline-block";
+            codeEditor.classList.remove("hidden");
             copyLLMBtn.classList.add("hidden");
           })
           .catch(err => showError(err, `games/${gameId}/started`));
       };
     }
 
-    // --- Start Game (host) ---
+    // --- Host starts game ---
     startGameBtn.onclick = () => {
       const code = codeEditor.value;
-      const updates = {};
-      updates[`games/${gameId}/code`] = code;
-      updates[`games/${gameId}/started`] = true;
-      db.ref().update(updates)
-        .catch(err => showError(err, `games/${gameId}`));
+      const updates = {
+        [`games/${gameId}/code`]: code,
+        [`games/${gameId}/started`]: true
+      };
+      db.ref().update(updates).catch(err => showError(err, `games/${gameId}`));
     };
 
-    // --- Copy LLM Info (single button) ---
+    // --- Copy LLM prompt, entirely in English ---
     copyLLMBtn.onclick = () => {
       db.ref(`games/${gameId}/started`).once("value")
         .then(snapStarted => {
@@ -518,36 +488,40 @@
           let prompt;
           if (!started) {
             prompt = `
-You are building a multiplayer browser game in a single HTML file.
+You are to generate a complete HTML/JavaScript multiplayer browser game in one file.
 
 Requirements:
-- Each player has a unique name passed via URL parameter 'name'.
-- The game room is identified by 'game' parameter in the URL.
-- The host passes a 'token' parameter in the URL to create the room.
-- Use Firebase Realtime Database at path 'games/${gameId}' to synchronize:
-  - players list at '/players'
-  - chat at '/chat'
-  - game code at '/code'
-  - a boolean '/started' to indicate if game is running
-- Host can update code mid‐game (clients reload manually).
-- Host can reset game (set started=false).
-- Once started==true, clients automatically load code via document.write.
+1. Each player has a unique name passed via URL parameter "name".
+2. The game room is identified by "game" in the URL.
+3. The creator (host) passed a "token" parameter when creating.
+4. Use Firebase Realtime Database at path "games/${gameId}" to synchronize:
+   - /players for the list of connected players
+   - /chat for chat messages
+   - /code for the game’s HTML/JS code
+   - /started as a boolean indicating if the game has begun
+5. The host can post game code under /code and set /started=true.
+6. Once /started is true, all clients automatically load the code via document.write().
+7. The host must be recognized by matching the URL token to /games/${gameId}/token.
+8. The host can update /code mid-game; clients must reload manually to pick up changes.
+9. The host can reset the game by setting /started=false; players then return to lobby.
+10. All functionality must work within a single HTML file.
 
-Write a complete HTML/JS implementation following these rules.
+Output a full HTML/JS implementation that meets these requirements.
             `.trim();
           } else {
             prompt = `
-You are building a multiplayer browser game in a single HTML file. This is the **update** prompt:
+You are to provide an **update** prompt for the existing multiplayer HTML game:
 
 Requirements:
-- The base game code already exists under '/games/${gameId}/code'.
-- The host wants to push a new version of the code without restarting the session.
-- Ensure that when clients reload manually, they load the newest version.
-- All existing players must remain connected under '/games/${gameId}/players'.
-- Maintain chat under '/games/${gameId}/chat'.
-- Maintain the ability to still start or reset via '/games/${gameId}/started'.
+1. The game code already exists under "/games/${gameId}/code".
+2. The host wants to push a new version without restarting the session.
+3. Ensure clients, upon manual reload, load the latest code.
+4. Maintain the list of players under "/games/${gameId}/players".
+5. Maintain chat under "/games/${gameId}/chat".
+6. Preserve the "started" boolean under "/games/${gameId}/started" to know game state.
+7. Provide a diff or patch suggestion to update the code from the previous version.
 
-Write a complete HTML/JS diff or update that applies this new version while preserving the lobby architecture.
+Output a complete HTML/JS diff or instructions to apply this update, preserving the lobby structure.
             `.trim();
           }
           navigator.clipboard.writeText(prompt).then(() => alert("LLM prompt copied!"));
@@ -555,27 +529,27 @@ Write a complete HTML/JS diff or update that applies this new version while pres
         .catch(err => showError(err, `games/${gameId}/started (once for copy)`));
     };
 
-    // --- Launch the code of the game ---
+    // --- Launch game code ---
     function launchGame(code) {
       document.open();
       document.write(code);
       document.close();
     }
 
-    // --- Initialization on page load ---
+    // --- Initialization on load ---
     window.onload = () => {
       const nameParam = urlParams.get("name");
       if (nameParam) {
         playerName = nameParam;
         setCookie("name", playerName);
-        document.getElementById("playerName").value = playerName;
+        playerNameInput.value = playerName;
         enterNameContainer.classList.add("hidden");
         showJoinCreate();
       } else {
         const fromCookie = getCookie("name");
         if (fromCookie) {
           playerName = fromCookie;
-          document.getElementById("playerName").value = playerName;
+          playerNameInput.value = playerName;
         }
       }
 
@@ -593,14 +567,14 @@ Write a complete HTML/JS diff or update that applies this new version while pres
                 showLobby();
               }
             })
-            .catch(err => showError(err, `games/${gameId}/started (once)`));  
+            .catch(err => showError(err, `games/${gameId}/started (once)`));
         });
       }
     };
 
     // --- Save Name button ---
     document.getElementById("saveNameBtn").onclick = () => {
-      const nameVal = document.getElementById("playerName").value.trim();
+      const nameVal = playerNameInput.value.trim();
       if (!nameVal) {
         alert("Please enter your name.");
         return;
