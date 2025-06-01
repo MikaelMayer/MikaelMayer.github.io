@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="version" content="1.1.9" />
-  <title>Multiplayer HTML Game v1.1.9</title>
+  <meta name="version" content="1.1.14" />
+  <title>Multiplayer HTML Game v1.1.14</title>
   <style>
     body {
       font-family: sans-serif;
@@ -120,7 +120,7 @@
   </style>
 </head>
 <body>
-  <h1>Multiplayer HTML Game v1.1.9</h1>
+  <h1>Multiplayer HTML Game v1.1.14</h1>
 
   <!-- 1: Enter Name -->
   <div id="enterNameContainer">
@@ -175,450 +175,441 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
   <script>
-    // --- Config Firebase ---
-    const firebaseConfig = {
-      apiKey: "AIzaSyAAcMZ-dvevYe7IuPSkkdW1ZITQJo8vHqY",
-      authDomain: "htmls-f4326.firebaseapp.com",
-      databaseURL: "https://htmls-f4326-default-rtdb.firebaseio.com",
-      projectId: "htmls-f4326",
-      storageBucket: "htmls-f4326.appspot.com",
-      messagingSenderId: "1091418638117",
-      appId: "1:1091418638117:web:22a03ada0c812b82177ccc",
-      measurementId: "G-NF8DJEP777"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+    // Expose only the variables needed by the multiplayer game:
+    window.db = null;
+    window.playerName = null;
+    window.gameId = null;
 
-    // --- Utility for errors ---
-    function showError(err, path) {
-      const fullMsg = `Firebase Error on "${path}": ${err.message}`;
-      console.error(fullMsg);
-      alert(fullMsg);
-    }
+    (function() {
+      // --- Config Firebase ---
+      const firebaseConfig = {
+        apiKey: "AIzaSyAAcMZ-dvevYe7IuPSkkdW1ZITQJo8vHqY",
+        authDomain: "htmls-f4326.firebaseapp.com",
+        databaseURL: "https://htmls-f4326-default-rtdb.firebaseio.com",
+        projectId: "htmls-f4326",
+        storageBucket: "htmls-f4326.appspot.com",
+        messagingSenderId: "1091418638117",
+        appId: "1:1091418638117:web:22a03ada0c812b82177ccc",
+        measurementId: "G-NF8DJEP777"
+      };
+      firebase.initializeApp(firebaseConfig);
+      // Assign the global reference:
+      window.db = firebase.database();
 
-    // --- Read URL params / cookies ---
-    const urlParams = new URLSearchParams(location.search);
-    let playerName = null;
-    let gameId = urlParams.get("game") || null;
-    let creatorToken = urlParams.get("token") || getCookie("token") || "";
-    let isHost = false;
-
-    function getCookie(name) {
-      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-      return match ? match[2] : null;
-    }
-    function setCookie(name, value) {
-      document.cookie = `${name}=${value}; path=/`;
-    }
-
-    function generateGameId() {
-      const chars = "ABCDEFGHJKLMNPRSTUVWXYZ23456789";
-      let id = "";
-      for (let i = 0; i < 8; i++) {
-        id += chars.charAt(Math.floor(Math.random() * chars.length));
+      // --- Utility for errors ---
+      function showError(err, path) {
+        const fullMsg = `Firebase Error on "${path}": ${err.message}`;
+        console.error(fullMsg);
+        alert(fullMsg);
       }
-      return id;
-    }
 
-    function updateURL(params) {
-      const url = new URL(location.href);
-      Object.keys(params).forEach(key => {
-        if (params[key] !== null) url.searchParams.set(key, params[key]);
-        else url.searchParams.delete(key);
-      });
-      history.replaceState(null, "", url.toString());
-    }
+      // --- Read URL params / cookies ---
+      const urlParams = new URLSearchParams(location.search);
+      window.playerName = null;
+      window.gameId = urlParams.get("game") || null;
+      let creatorToken = urlParams.get("token") || getCookie("token") || "";
+      let isHost = false;
 
-    // --- DOM references ---
-    const playerNameInput = document.getElementById("playerName");
-    const enterNameContainer = document.getElementById("enterNameContainer");
-    const joinCreateContainer = document.getElementById("joinCreateContainer");
-    const tokenContainer = document.getElementById("tokenContainer");
-    const lobbyContainer = document.getElementById("lobbyContainer");
-    const codeEditor = document.getElementById("codeEditor");
-    const copyLLMBtn = document.getElementById("copyLLMBtn");
-    const hostOptions = document.getElementById("hostOptions");
-    const hostStartedOptions = document.getElementById("hostStartedOptions");
-    const playersList = document.getElementById("playersList");
-    const chatBox = document.getElementById("chatBox");
-    const chatInput = document.getElementById("chatInput");
-    const gameIdDisplay = document.getElementById("gameIdDisplay");
-    const copyLinkBtn = document.getElementById("copyLinkBtn");
-    const copyNotice = document.getElementById("copyNotice");
-    const saveNameBtn = document.getElementById("saveNameBtn");
-    const joinCreateBtn = document.getElementById("joinCreateBtn");
-    const saveTokenBtn = document.getElementById("saveTokenBtn");
-    const creatorTokenInput = document.getElementById("creatorTokenInput");
-    const gameIdInput = document.getElementById("gameIdInput");
-    const startGameBtn = document.getElementById("startGameBtn");
-    const returnToGameBtn = document.getElementById("returnToGameBtn");
-    const updateCodeBtn = document.getElementById("updateCodeBtn");
-    const resetGameBtn = document.getElementById("resetGameBtn");
-    const waitingMsg = document.getElementById("waitingMsg");
+      function getCookie(name) {
+        const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+        return match ? match[2] : null;
+      }
+      function setCookie(name, value) {
+        document.cookie = `${name}=${value}; path=/`;
+      }
 
-    // --- Add or remove player ---
-    function addPlayer() {
-      if (!gameId || !playerName) return;
-      const playersPath = `games/${gameId}/players/${playerName}`;
-      db.ref(playersPath)
-        .set(playerName)
-        .catch(err => showError(err, playersPath));
-      db.ref(playersPath)
-        .onDisconnect()
-        .remove()
-        .catch(err => showError(err, playersPath + " (onDisconnect)"));
-    }
-
-    // --- Setup chat listeners (and clear existing DOM messages) ---
-    function setupChat() {
-      if (!gameId) return;
-      // Clear any previously‐appended <p> elements:
-      chatBox.innerHTML = "";
-
-      const chatPath = `games/${gameId}/chat`;
-      const chatRef = db.ref(chatPath);
-
-      // Remove any old "child_added" listener before attaching
-      chatRef.off("child_added");
-
-      chatRef.on("child_added", snap => {
-        const { name, text } = snap.val();
-        const p = document.createElement("p");
-        p.innerHTML = `<strong>${name}:</strong> ${text}`;
-        chatBox.appendChild(p);
-        chatBox.scrollTop = chatBox.scrollHeight;
-      }, err => showError(err, chatPath));
-
-      chatInput.addEventListener("keydown", e => {
-        if (e.key === "Enter" && chatInput.value.trim()) {
-          e.preventDefault();
-          chatRef.push({ name: playerName, text: chatInput.value.trim() })
-            .catch(err => showError(err, chatPath + " (push)"));
-          chatInput.value = "";
+      function generateGameId() {
+        const chars = "ABCDEFGHJKLMNPRSTUVWXYZ23456789";
+        let id = "";
+        for (let i = 0; i < 8; i++) {
+          id += chars.charAt(Math.floor(Math.random() * chars.length));
         }
-      });
-    }
-
-    // --- Ensure game root exists; first arrival becomes host ---
-    function ensureRootExistsThen(callback) {
-      const rootPath = `games/${gameId}`;
-      db.ref(rootPath).once("value")
-        .then(snap => {
-          if (snap.exists()) {
-            callback();
-          } else {
-            // First to create this game → becomes host
-            isHost = true;
-            tokenContainer.classList.remove("hidden");
-            saveTokenBtn.onclick = () => {
-              const tokenVal = creatorTokenInput.value.trim();
-              if (!tokenVal) {
-                alert("Please create a host token.");
-                return;
-              }
-              creatorToken = tokenVal;
-              setCookie("token", creatorToken);
-              db.ref(rootPath)
-                .set({ token: creatorToken, started: false })
-                .then(callback)
-                .catch(err => showError(err, rootPath + " (create)"));
-            };
-          }
-        })
-        .catch(err => showError(err, rootPath + " (existence check)"));
-    }
-
-    // --- Join or create flow ---
-    function showJoinCreate() {
-      if (gameId) {
-        joinCreateContainer.classList.add("hidden");
-        tokenContainer.classList.add("hidden");
-        ensureRootExistsThen(() => {
-          db.ref(`games/${gameId}/token`).once("value")
-            .then(snapToken => {
-              const tokenInDb = snapToken.val();
-              if (tokenInDb && creatorToken === tokenInDb) {
-                isHost = true;
-              }
-              db.ref(`games/${gameId}/started`).once("value")
-                .then(snapStarted => {
-                  if (snapStarted.val() === true) {
-                    checkHostViewOrClient();
-                  } else {
-                    addPlayer();
-                    showLobby();
-                  }
-                })
-                .catch(err => showError(err, `games/${gameId}/started (once)`));
-            })
-            .catch(err => showError(err, `games/${gameId}/token (once)`));
-        });
-        return;
+        return id;
       }
 
-      joinCreateContainer.classList.remove("hidden");
-      gameIdInput.addEventListener("input", () => {
-        joinCreateBtn.textContent = gameIdInput.value.trim() ? "Join Game" : "Create Game";
-      });
-      joinCreateBtn.onclick = () => {
-        if (!playerName) {
-          alert("Enter your name first.");
+      function updateURL(params) {
+        const url = new URL(location.href);
+        Object.keys(params).forEach(key => {
+          if (params[key] !== null) url.searchParams.set(key, params[key]);
+          else url.searchParams.delete(key);
+        });
+        history.replaceState(null, "", url.toString());
+      }
+
+      // --- DOM references ---
+      const playerNameInput = document.getElementById("playerName");
+      const enterNameContainer = document.getElementById("enterNameContainer");
+      const joinCreateContainer = document.getElementById("joinCreateContainer");
+      const tokenContainer = document.getElementById("tokenContainer");
+      const lobbyContainer = document.getElementById("lobbyContainer");
+      const codeEditor = document.getElementById("codeEditor");
+      const copyLLMBtn = document.getElementById("copyLLMBtn");
+      const hostOptions = document.getElementById("hostOptions");
+      const hostStartedOptions = document.getElementById("hostStartedOptions");
+      const playersList = document.getElementById("playersList");
+      const chatBox = document.getElementById("chatBox");
+      const chatInput = document.getElementById("chatInput");
+      const gameIdDisplay = document.getElementById("gameIdDisplay");
+      const copyLinkBtn = document.getElementById("copyLinkBtn");
+      const copyNotice = document.getElementById("copyNotice");
+      const saveNameBtn = document.getElementById("saveNameBtn");
+      const joinCreateBtn = document.getElementById("joinCreateBtn");
+      const saveTokenBtn = document.getElementById("saveTokenBtn");
+      const creatorTokenInput = document.getElementById("creatorTokenInput");
+      const gameIdInput = document.getElementById("gameIdInput");
+      const startGameBtn = document.getElementById("startGameBtn");
+      const returnToGameBtn = document.getElementById("returnToGameBtn");
+      const updateCodeBtn = document.getElementById("updateCodeBtn");
+      const resetGameBtn = document.getElementById("resetGameBtn");
+      const waitingMsg = document.getElementById("waitingMsg");
+
+      // --- Add or remove player ---
+      function addPlayer() {
+        if (!window.gameId || !window.playerName) return;
+        const playersPath = `games/${window.gameId}/players/${window.playerName}`;
+        window.db.ref(playersPath)
+          .set(window.playerName)
+          .catch(err => showError(err, playersPath));
+        window.db.ref(playersPath)
+          .onDisconnect()
+          .remove()
+          .catch(err => showError(err, playersPath + " (onDisconnect)"));
+      }
+
+      // --- Setup chat listeners (and clear existing DOM messages) ---
+      function setupChat() {
+        if (!window.gameId) return;
+        chatBox.innerHTML = "";
+        const chatPath = `games/${window.gameId}/chat`;
+        const chatRef = window.db.ref(chatPath);
+        chatRef.off("child_added");
+        chatRef.on("child_added", snap => {
+          const { name, text } = snap.val();
+          const p = document.createElement("p");
+          p.innerHTML = `<strong>${name}:</strong> ${text}`;
+          chatBox.appendChild(p);
+          chatBox.scrollTop = chatBox.scrollHeight;
+        }, err => showError(err, chatPath));
+        chatInput.addEventListener("keydown", e => {
+          if (e.key === "Enter" && chatInput.value.trim()) {
+            e.preventDefault();
+            chatRef.push({ name: window.playerName, text: chatInput.value.trim() })
+              .catch(err => showError(err, chatPath + " (push)"));
+            chatInput.value = "";
+          }
+        });
+      }
+
+      // --- Ensure game root exists; first arrival becomes host ---
+      function ensureRootExistsThen(callback) {
+        const rootPath = `games/${window.gameId}`;
+        window.db.ref(rootPath).once("value")
+          .then(snap => {
+            if (snap.exists()) {
+              callback();
+            } else {
+              isHost = true;
+              tokenContainer.classList.remove("hidden");
+              saveTokenBtn.onclick = () => {
+                const tokenVal = creatorTokenInput.value.trim();
+                if (!tokenVal) {
+                  alert("Please create a host token.");
+                  return;
+                }
+                creatorToken = tokenVal;
+                setCookie("token", creatorToken);
+                window.db.ref(rootPath)
+                  .set({ token: creatorToken, started: false })
+                  .then(callback)
+                  .catch(err => showError(err, rootPath + " (create)"));
+              };
+            }
+          })
+          .catch(err => showError(err, rootPath + " (existence check)"));
+      }
+
+      // --- Join or create flow ---
+      function showJoinCreate() {
+        if (window.gameId) {
+          joinCreateContainer.classList.add("hidden");
+          tokenContainer.classList.add("hidden");
+          ensureRootExistsThen(() => {
+            window.db.ref(`games/${window.gameId}/token`).once("value")
+              .then(snapToken => {
+                const tokenInDb = snapToken.val();
+                if (tokenInDb && creatorToken === tokenInDb) {
+                  isHost = true;
+                }
+                window.db.ref(`games/${window.gameId}/started`).once("value")
+                  .then(snapStarted => {
+                    if (snapStarted.val() === true) {
+                      checkHostViewOrClient();
+                    } else {
+                      addPlayer();
+                      showLobby();
+                    }
+                  })
+                  .catch(err => showError(err, `games/${window.gameId}/started (once)`));
+              })
+              .catch(err => showError(err, `games/${window.gameId}/token (once)`));
+          });
           return;
         }
-        const enteredId = gameIdInput.value.trim().toUpperCase();
-        if (enteredId) {
-          gameId = enteredId;
-          updateURL({ game: gameId });
-          joinCreateContainer.classList.add("hidden");
+
+        joinCreateContainer.classList.remove("hidden");
+        gameIdInput.addEventListener("input", () => {
+          joinCreateBtn.textContent = gameIdInput.value.trim() ? "Join Game" : "Create Game";
+        });
+        joinCreateBtn.onclick = () => {
+          if (!window.playerName) {
+            alert("Enter your name first.");
+            return;
+          }
+          const enteredId = gameIdInput.value.trim().toUpperCase();
+          if (enteredId) {
+            window.gameId = enteredId;
+            updateURL({ game: window.gameId });
+            joinCreateContainer.classList.add("hidden");
+            showJoinCreate();
+          } else {
+            window.gameId = generateGameId();
+            updateURL({ game: window.gameId });
+            joinCreateContainer.classList.add("hidden");
+            ensureRootExistsThen(() => {
+              addPlayer();
+              showLobby();
+            });
+          }
+        };
+      }
+
+      // --- Determine host vs client ---
+      function checkHostViewOrClient() {
+        window.db.ref(`games/${window.gameId}/token`).once("value")
+          .then(snapToken => {
+            const tokenInDb = snapToken.val();
+            if (creatorToken === tokenInDb) {
+              isHost = true;
+              showHostStartedOptions();
+            } else {
+              isHost = false;
+              window.db.ref(`games/${window.gameId}/code`).once("value")
+                .then(snapCode => {
+                  if (snapCode.exists()) {
+                    launchGame(snapCode.val());
+                  }
+                })
+                .catch(err => showError(err, `games/${window.gameId}/code (once)`));
+            }
+          })
+          .catch(err => showError(err, `games/${window.gameId}/token (once)`));
+      }
+
+      // --- Show lobby UI ---
+      function showLobby() {
+        joinCreateContainer.classList.add("hidden");
+        tokenContainer.classList.add("hidden");
+        lobbyContainer.classList.remove("hidden");
+
+        gameIdDisplay.textContent = window.gameId;
+        copyLinkBtn.onclick = () => {
+          const link = `${location.origin}${location.pathname}?game=${window.gameId}`;
+          navigator.clipboard.writeText(link).then(() => {
+            copyNotice.textContent = "Link copied!";
+            setTimeout(() => (copyNotice.textContent = ""), 2000);
+          });
+        };
+
+        const playersRef = window.db.ref(`games/${window.gameId}/players`);
+        playersRef.off("value");
+        playersRef.on("value", snap => {
+          const val = snap.val() || {};
+          playersList.innerHTML =
+            "<h3>Players:</h3>" +
+            Object.values(val).map(p => `<p>${p}</p>`).join("");
+        }, err => showError(err, `games/${window.gameId}/players`));
+
+        setupChat();
+
+        const startedRef = window.db.ref(`games/${window.gameId}/started`);
+        startedRef.off("value");
+        startedRef.on("value", snap => {
+          if (snap.val() === true) {
+            startedRef.off();
+            checkHostViewOrClient();
+          }
+        }, err => showError(err, `games/${window.gameId}/started (on)`));
+
+        if (isHost) {
+          codeEditor.classList.remove("hidden");
+          hostOptions.classList.remove("hidden");
+          copyLLMBtn.classList.remove("hidden");
+          copyLLMBtn.textContent = "Copy LLM Info";
+          hostStartedOptions.classList.add("hidden");
+          waitingMsg.classList.add("hidden");
+        } else {
+          waitingMsg.classList.remove("hidden");
+          codeEditor.classList.add("hidden");
+          hostOptions.classList.add("hidden");
+          copyLLMBtn.classList.add("hidden");
+        }
+      }
+
+      // --- Show host options after game start ---
+      function showHostStartedOptions() {
+        lobbyContainer.classList.remove("hidden");
+        hostOptions.classList.add("hidden");
+        hostStartedOptions.classList.remove("hidden");
+        waitingMsg.classList.add("hidden");
+        document.getElementById("playersList").style.display = "none";
+        document.getElementById("chatBox").style.display = "none";
+        chatInput.style.display = "none";
+        copyLinkBtn.style.display = "none";
+
+        codeEditor.classList.remove("hidden");
+        copyLLMBtn.classList.remove("hidden");
+        copyLLMBtn.textContent = "Copy LLM Info";
+
+        returnToGameBtn.onclick = () => {
+          window.db.ref(`games/${window.gameId}/code`).once("value")
+            .then(snap => {
+              if (snap.exists()) launchGame(snap.val());
+            })
+            .catch(err => showError(err, `games/${window.gameId}/code (once)`));
+        };
+
+        updateCodeBtn.onclick = () => {
+          const newCode = codeEditor.value;
+          window.db.ref(`games/${window.gameId}/code`).set(newCode)
+            .then(() => {
+              alert("Code updated. Players should reload to see new version.");
+            })
+            .catch(err => showError(err, `games/${window.gameId}/code`));
+        };
+
+        resetGameBtn.onclick = () => {
+          window.db.ref(`games/${window.gameId}/started`).set(false)
+            .then(() => {
+              alert("Game reset. Players must reload to return to lobby.");
+              hostStartedOptions.classList.add("hidden");
+              hostOptions.classList.remove("hidden");
+              document.getElementById("playersList").style.display = "block";
+              document.getElementById("chatBox").style.display = "block";
+              chatInput.style.display = "block";
+              copyLinkBtn.style.display = "inline-block";
+              codeEditor.classList.remove("hidden");
+              copyLLMBtn.classList.add("hidden");
+            })
+            .catch(err => showError(err, `games/${window.gameId}/started`));
+        };
+      }
+
+      // --- Host starts game ---
+      startGameBtn.onclick = () => {
+        const code = codeEditor.value;
+        const updates = {
+          [`games/${window.gameId}/code`]: code,
+          [`games/${window.gameId}/started`]: true
+        };
+        window.db.ref().update(updates).catch(err => showError(err, `games/${window.gameId}`));
+      };
+
+      // --- Copy LLM prompt in English only (unified) ---
+      copyLLMBtn.onclick = () => {
+        window.db.ref(`games/${window.gameId}/started`).once("value")
+          .then(snapStarted => {
+            const started = snapStarted.val();
+            let prompt = `
+You have a Firebase Realtime Database at "games/${window.gameId}" with:
+  • players: a map of playerName → true  
+  • chat: optional list of { name, text }  
+  • code: string containing HTML/JS  
+  • started: boolean indicating game state  
+
+Firebase is initialized and accessible via the global \`db\` variable. The HTML/JS you generate will be loaded via \`document.write()\`. The current user’s name is in the global \`playerName\`. The room ID is in the global \`gameId\`. Interacting with chat is optional. Focus on:
+  1. Listening to database changes under \`games/${window.gameId}\` and updating your own view (players list and chat if used).  
+  2. When a player joins, adding \`playerName\` under \`/games/${window.gameId}/players\`.  
+  3. When chat is used, pushing messages under \`/games/${window.gameId}/chat\`.  
+
+`;
+            if (started) {
+              window.db.ref(`games/${window.gameId}/code`).once("value")
+                .then(snap => {
+                  const existingCode = snap.exists() ? snap.val() : "";
+                  prompt += `
+Here is the existing code:
+${existingCode}
+
+Here are the requested changes:
+- 
+`;
+                  navigator.clipboard.writeText(prompt.trim()).then(() => alert("LLM prompt copied!"));
+                })
+                .catch(err => showError(err, `games/${window.gameId}/code (once for copy)`));
+            } else {
+              navigator.clipboard.writeText(prompt.trim()).then(() => alert("LLM prompt copied!"));
+            }
+          })
+          .catch(err => showError(err, `games/${window.gameId}/started (once for copy)`));
+      };
+
+      // --- Launch game code ---
+      function launchGame(code) {
+        document.open();
+        document.write(code);
+        document.close();
+      }
+
+      // --- Initialization on load ---
+      window.onload = () => {
+        const nameParam = urlParams.get("name");
+        if (nameParam) {
+          window.playerName = nameParam;
+          setCookie("name", window.playerName);
+          playerNameInput.value = window.playerName;
+          enterNameContainer.classList.add("hidden");
           showJoinCreate();
         } else {
-          gameId = generateGameId();
-          updateURL({ game: gameId });
+          const fromCookie = getCookie("name");
+          if (fromCookie) {
+            window.playerName = fromCookie;
+            playerNameInput.value = window.playerName;
+          }
+        }
+
+        if (window.gameId && window.playerName) {
+          enterNameContainer.classList.add("hidden");
           joinCreateContainer.classList.add("hidden");
+          tokenContainer.classList.add("hidden");
           ensureRootExistsThen(() => {
-            addPlayer();
-            showLobby();
+            window.db.ref(`games/${window.gameId}/started`).once("value")
+              .then(snap => {
+                if (snap.val() === true) {
+                  checkHostViewOrClient();
+                } else {
+                  addPlayer();
+                  showLobby();
+                }
+              })
+              .catch(err => showError(err, `games/${window.gameId}/started (once)`));
           });
         }
       };
-    }
 
-    // --- Determine host vs client ---
-    function checkHostViewOrClient() {
-      db.ref(`games/${gameId}/token`).once("value")
-        .then(snapToken => {
-          const tokenInDb = snapToken.val();
-          if (creatorToken === tokenInDb) {
-            isHost = true;
-            showHostStartedOptions();
-          } else {
-            isHost = false;
-            db.ref(`games/${gameId}/code`).once("value")
-              .then(snapCode => {
-                if (snapCode.exists()) {
-                  launchGame(snapCode.val());
-                }
-              })
-              .catch(err => showError(err, `games/${gameId}/code (once)`));
-          }
-        })
-        .catch(err => showError(err, `games/${gameId}/token (once)`));
-    }
-
-    // --- Show lobby UI ---
-    function showLobby() {
-      joinCreateContainer.classList.add("hidden");
-      tokenContainer.classList.add("hidden");
-      lobbyContainer.classList.remove("hidden");
-
-      gameIdDisplay.textContent = gameId;
-      copyLinkBtn.onclick = () => {
-        const link = `${location.origin}${location.pathname}?game=${gameId}`;
-        navigator.clipboard.writeText(link).then(() => {
-          copyNotice.textContent = "Link copied!";
-          setTimeout(() => (copyNotice.textContent = ""), 2000);
-        });
-      };
-
-      const playersRef = db.ref(`games/${gameId}/players`);
-      playersRef.off("value");
-      playersRef.on("value", snap => {
-        const val = snap.val() || {};
-        playersList.innerHTML =
-          "<h3>Players:</h3>" +
-          Object.values(val).map(p => `<p>${p}</p>`).join("");
-      }, err => showError(err, `games/${gameId}/players`));
-
-      setupChat();
-
-      const startedRef = db.ref(`games/${gameId}/started`);
-      startedRef.off("value");
-      startedRef.on("value", snap => {
-        if (snap.val() === true) {
-          startedRef.off();
-          checkHostViewOrClient();
+      // --- Save Name button ---
+      saveNameBtn.onclick = () => {
+        const nameVal = playerNameInput.value.trim();
+        if (!nameVal) {
+          alert("Please enter your name.");
+          return;
         }
-      }, err => showError(err, `games/${gameId}/started (on)`));
-
-      if (isHost) {
-        codeEditor.classList.remove("hidden");
-        hostOptions.classList.remove("hidden");
-        copyLLMBtn.classList.remove("hidden");
-        copyLLMBtn.textContent = "Copy LLM Info";
-        hostStartedOptions.classList.add("hidden");
-        waitingMsg.classList.add("hidden");
-      } else {
-        waitingMsg.classList.remove("hidden");
-        codeEditor.classList.add("hidden");
-        hostOptions.classList.add("hidden");
-        copyLLMBtn.classList.add("hidden");
-      }
-    }
-
-    // --- Show host options after game start ---
-    function showHostStartedOptions() {
-      lobbyContainer.classList.remove("hidden");
-      hostOptions.classList.add("hidden");
-      hostStartedOptions.classList.remove("hidden");
-      waitingMsg.classList.add("hidden");
-      document.getElementById("playersList").style.display = "none";
-      document.getElementById("chatBox").style.display = "none";
-      chatInput.style.display = "none";
-      copyLinkBtn.style.display = "none";
-
-      codeEditor.classList.remove("hidden");
-      copyLLMBtn.classList.remove("hidden");
-      copyLLMBtn.textContent = "Copy LLM Info";
-
-      returnToGameBtn.onclick = () => {
-        db.ref(`games/${gameId}/code`).once("value")
-          .then(snap => {
-            if (snap.exists()) launchGame(snap.val());
-          })
-          .catch(err => showError(err, `games/${gameId}/code (once)`));
-      };
-
-      updateCodeBtn.onclick = () => {
-        const newCode = codeEditor.value;
-        db.ref(`games/${gameId}/code`).set(newCode)
-          .then(() => {
-            alert("Code updated. Players should reload to see new version.");
-          })
-          .catch(err => showError(err, `games/${gameId}/code`));
-      };
-
-      resetGameBtn.onclick = () => {
-        db.ref(`games/${gameId}/started`).set(false)
-          .then(() => {
-            alert("Game reset. Players must reload to return to lobby.");
-            hostStartedOptions.classList.add("hidden");
-            hostOptions.classList.remove("hidden");
-            document.getElementById("playersList").style.display = "block";
-            document.getElementById("chatBox").style.display = "block";
-            chatInput.style.display = "block";
-            copyLinkBtn.style.display = "inline-block";
-            codeEditor.classList.remove("hidden");
-            copyLLMBtn.classList.add("hidden");
-          })
-          .catch(err => showError(err, `games/${gameId}/started`));
-      };
-    }
-
-    // --- Host starts game ---
-    startGameBtn.onclick = () => {
-      const code = codeEditor.value;
-      const updates = {
-        [`games/${gameId}/code`]: code,
-        [`games/${gameId}/started`]: true
-      };
-      db.ref().update(updates).catch(err => showError(err, `games/${gameId}`));
-    };
-
-    // --- Copy LLM prompt in English only ---
-    copyLLMBtn.onclick = () => {
-      db.ref(`games/${gameId}/started`).once("value")
-        .then(snapStarted => {
-          const started = snapStarted.val();
-          let prompt;
-          if (!started) {
-            prompt = `
-You are to generate a complete HTML/JavaScript multiplayer browser game in one file.
-
-Requirements:
-1. Each player has a unique name passed via URL parameter "name".
-2. The game room is identified by "game" in the URL.
-3. The creator (host) passed a "token" parameter when creating.
-4. Use Firebase Realtime Database at path "games/${gameId}" to synchronize:
-   - /players for the list of connected players
-   - /chat for chat messages
-   - /code for the game’s HTML/JS code
-   - /started as a boolean indicating if the game has begun
-5. The host can post game code under /code and set /started=true.
-6. Once /started is true, all clients automatically load the code via document.write().
-7. The host must be recognized by matching the URL token to /games/${gameId}/token.
-8. The host can update /code mid-game; clients must reload manually to pick up changes.
-9. The host can reset the game by setting /started=false; players then return to lobby.
-10. All functionality must work within a single HTML file.
-
-Output a full HTML/JS implementation that meets these requirements.
-            `.trim();
-          } else {
-            prompt = `
-You are to provide an **update** prompt for the existing multiplayer HTML game:
-
-Requirements:
-1. The game code already exists under "/games/${gameId}/code".
-2. The host wants to push a new version without restarting the session.
-3. Ensure clients, upon manual reload, load the latest code.
-4. Maintain the list of players under "/games/${gameId}/players".
-5. Maintain chat under "/games/${gameId}/chat".
-6. Preserve the "started" boolean under "/games/${gameId}/started" to know game state.
-7. Provide a diff or patch suggestion to update the code from the previous version.
-
-Output a complete HTML/JS diff or instructions to apply this update, preserving the lobby structure.
-            `.trim();
-          }
-          navigator.clipboard.writeText(prompt).then(() => alert("LLM prompt copied!"));
-        })
-        .catch(err => showError(err, `games/${gameId}/started (once for copy)`));
-    };
-
-    // --- Launch game code ---
-    function launchGame(code) {
-      document.open();
-      document.write(code);
-      document.close();
-    }
-
-    // --- Initialization on load ---
-    window.onload = () => {
-      const nameParam = urlParams.get("name");
-      if (nameParam) {
-        playerName = nameParam;
-        setCookie("name", playerName);
-        playerNameInput.value = playerName;
+        window.playerName = nameVal;
+        setCookie("name", window.playerName);
+        updateURL({ name: window.playerName });
         enterNameContainer.classList.add("hidden");
         showJoinCreate();
-      } else {
-        const fromCookie = getCookie("name");
-        if (fromCookie) {
-          playerName = fromCookie;
-          playerNameInput.value = playerName;
-        }
-      }
-
-      if (gameId && playerName) {
-        enterNameContainer.classList.add("hidden");
-        joinCreateContainer.classList.add("hidden");
-        tokenContainer.classList.add("hidden");
-        ensureRootExistsThen(() => {
-          db.ref(`games/${gameId}/started`).once("value")
-            .then(snap => {
-              if (snap.val() === true) {
-                checkHostViewOrClient();
-              } else {
-                addPlayer();
-                showLobby();
-              }
-            })
-            .catch(err => showError(err, `games/${gameId}/started (once)`));
-        });
-      }
-    };
-
-    // --- Save Name button ---
-    saveNameBtn.onclick = () => {
-      const nameVal = playerNameInput.value.trim();
-      if (!nameVal) {
-        alert("Please enter your name.");
-        return;
-      }
-      playerName = nameVal;
-      setCookie("name", playerName);
-      updateURL({ name: playerName });
-      enterNameContainer.classList.add("hidden");
-      showJoinCreate();
-    };
+      };
+    })();
   </script>
 </body>
 </html>
