@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="version" content="1.1.14" />
-  <title>Multiplayer HTML Game v1.1.14</title>
+  <meta name="version" content="1.1.15" />
+  <title>Multiplayer HTML Game v1.1.15</title>
   <style>
     body {
       font-family: sans-serif;
@@ -117,10 +117,17 @@
     #hostStartedOptions button {
       margin-top: 10px;
     }
+    /* Emphasize Return to Game button when visible */
+    #returnToGameBtn.emphasis {
+      background: #28a745;
+    }
+    #returnToGameBtn.emphasis:hover {
+      background: #218838;
+    }
   </style>
 </head>
 <body>
-  <h1>Multiplayer HTML Game v1.1.14</h1>
+  <h1>Multiplayer HTML Game v1.1.15</h1>
 
   <!-- 1: Enter Name -->
   <div id="enterNameContainer">
@@ -148,7 +155,7 @@
       <span id="copyNotice" style="color:green"></span>
     </p>
     <div id="playersList"><h3>Players:</h3></div>
-    
+
     <!-- Shared code editor -->
     <textarea id="codeEditor" placeholder="Paste or edit HTML/JS game code here..." class="hidden"></textarea>
     <button id="copyLLMBtn" class="hidden">Copy LLM Info</button>
@@ -165,10 +172,10 @@
       <button id="resetGameBtn">Reset Game (End Current Session)</button>
     </div>
 
+    <p id="waitingMsg" class="hidden">Waiting for the host to start the game...</p>
+
     <div id="chatBox"></div>
     <input type="text" id="chatInput" placeholder="Type your message..." />
-
-    <p id="waitingMsg" class="hidden">Waiting for the host to start the game...</p>
   </div>
 
   <!-- Firebase SDKs -->
@@ -176,7 +183,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
   <script>
-    // Expose only the variables needed by the multiplayer game:
+    // Expose global variables for the generated game
     window.db = null;
     window.playerName = null;
     window.gameId = null;
@@ -194,7 +201,6 @@
         measurementId: "G-NF8DJEP777"
       };
       firebase.initializeApp(firebaseConfig);
-      // Assign the global reference:
       window.db = firebase.database();
 
       // --- Utility for errors ---
@@ -292,15 +298,15 @@
           chatBox.scrollTop = chatBox.scrollHeight;
         }, err => showError(err, chatPath));
         chatInput.addEventListener("keydown", e => {
-          // On desktop, e.key === "Enter". Sur mobile, mieux vaut vérifier e.keyCode === 13.
           const isEnter = (e.key === "Enter" || e.keyCode === 13);
           if (isEnter && chatInput.value.trim()) {
             e.preventDefault();
             e.stopPropagation();
-            chatRef.push({ name: window.playerName, text: chatInput.value.trim() })
-              .catch(err => showError(err, chatPath + " (push)"));
+            const text = chatInput.value.trim();
+            window.db.ref(`games/${window.gameId}/chat`).push({ name: window.playerName, text })
+              .catch(err => showError(err, `games/${window.gameId}/chat (push)`));
             chatInput.value = "";
-            chatInput.focus();  // remettre le curseur dans la zone de chat
+            chatInput.focus();
           }
         });
       }
@@ -450,6 +456,23 @@
           hostOptions.classList.remove("hidden");
           copyLLMBtn.classList.remove("hidden");
           copyLLMBtn.textContent = "Copy LLM Info";
+
+          // fetch existing code to populate editor
+          window.db.ref(`games/${window.gameId}/code`).once("value")
+            .then(snapCode => {
+              if (snapCode.exists()) {
+                codeEditor.value = snapCode.val();
+              }
+            })
+            .catch(err => showError(err, `games/${window.gameId}/code (populate)`));
+
+          // sync codeEditor changes immediately
+          codeEditor.addEventListener("input", () => {
+            const newCode = codeEditor.value;
+            window.db.ref(`games/${window.gameId}/code`).set(newCode)
+              .catch(err => showError(err, `games/${window.gameId}/code (sync)`));
+          });
+
           hostStartedOptions.classList.add("hidden");
           waitingMsg.classList.add("hidden");
         } else {
@@ -474,6 +497,25 @@
         codeEditor.classList.remove("hidden");
         copyLLMBtn.classList.remove("hidden");
         copyLLMBtn.textContent = "Copy LLM Info";
+
+        // fetch existing code to populate editor
+        window.db.ref(`games/${window.gameId}/code`).once("value")
+          .then(snapCode => {
+            if (snapCode.exists()) {
+              codeEditor.value = snapCode.val();
+            }
+          })
+          .catch(err => showError(err, `games/${window.gameId}/code (populate)`));
+
+        // sync codeEditor changes immediately
+        codeEditor.addEventListener("input", () => {
+          const newCode = codeEditor.value;
+          window.db.ref(`games/${window.gameId}/code`).set(newCode)
+            .catch(err => showError(err, `games/${window.gameId}/code (sync)`));
+        });
+
+        // emphasize Return to Game button
+        returnToGameBtn.classList.add("emphasis");
 
         returnToGameBtn.onclick = () => {
           window.db.ref(`games/${window.gameId}/code`).once("value")
@@ -504,6 +546,7 @@
               copyLinkBtn.style.display = "inline-block";
               codeEditor.classList.remove("hidden");
               copyLLMBtn.classList.add("hidden");
+              returnToGameBtn.classList.remove("emphasis");
             })
             .catch(err => showError(err, `games/${window.gameId}/started`));
         };
