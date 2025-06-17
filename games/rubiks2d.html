@@ -1,0 +1,161 @@
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>2D Rubik Flip Animation</title>
+  <style>
+    html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden;
+      display:flex; flex-direction:column; background:#222; color:#fff; font-family:sans-serif; }
+    #controls { display:flex; flex-direction:column; align-items:center; padding:10px; background:#111; }
+    #controls label, #controls select { font-size:1rem; }
+    #controls select { margin-top:5px; padding:4px; }
+    #instructions { margin-top:6px; font-size:0.9rem; color:#ccc; text-align:center; }
+    #game-container { flex:1; display:flex; justify-content:center; align-items:center; }
+    #cubeContainer { position:relative; }
+    #cube { display:grid; background:#444; z-index:1; }
+    .cell { position:relative; display:flex; justify-content:center; align-items:center;
+      border:1px solid #666; background:transparent; overflow:hidden; }
+    .correct { background:lightgreen !important; }
+    .arrow { position:absolute; width:100%; height:100%; pointer-events:none; }
+    #overlay { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:2; }
+    .overlay-item { position:absolute; width:100%; height:100%; box-sizing:border-box;
+      border:1px solid #666; background:transparent; overflow:hidden; }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <label for="sizeSelect">Size:</label>
+    <select id="sizeSelect">
+      <option value="3">3×3</option>
+      <option value="4">4×4</option>
+      <option value="5" selected>5×5</option>
+    </select>
+    <div id="instructions">
+      Swipe a row or column to flip it. Arrows always point to the tile’s final destination.
+    </div>
+  </div>
+  <div id="game-container">
+    <div id="cubeContainer">
+      <div id="cube"></div>
+      <div id="overlay"></div>
+    </div>
+  </div>
+  <script>
+  (function(){
+    const cube=document.getElementById('cube');
+    const overlay=document.getElementById('overlay');
+    const container=document.getElementById('cubeContainer');
+    const sizeSelect=document.getElementById('sizeSelect');
+    let N=parseInt(sizeSelect.value,10);
+    let state=[];
+    let touchStart;function initState(){ state=[]; let num=1;
+  for(let i=0;i<N;i++){ state[i]=[];
+    for(let j=0;j<N;j++) state[i][j]=num++; }}
+
+function createArrow(dx,dy){
+  const dist=Math.hypot(dx,dy);
+  const stroke=2*dist+2;
+  const angle=Math.atan2(dy,dx)*180/Math.PI;
+  const ns='http://www.w3.org/2000/svg';
+  const svg=document.createElementNS(ns,'svg'); svg.setAttribute('viewBox','0 0 100 100'); svg.classList.add('arrow');
+  const g=document.createElementNS(ns,'g'); g.setAttribute('transform',`rotate(${angle},50,50)`);
+  const line=document.createElementNS(ns,'line');
+  line.setAttribute('x1','10'); line.setAttribute('y1','50'); line.setAttribute('x2','90'); line.setAttribute('y2','50');
+  line.setAttribute('stroke','#fff'); line.setAttribute('stroke-width',stroke);
+  const head=document.createElementNS(ns,'polygon'); head.setAttribute('points','90,45 100,50 90,55'); head.setAttribute('fill','#fff');
+  g.append(line,head); svg.appendChild(g);
+  return svg;
+}
+
+function render(){
+  const ctrlH=document.getElementById('controls').offsetHeight;
+  const size=Math.min(window.innerWidth,window.innerHeight-ctrlH);
+  cube.style.width=size+'px'; cube.style.height=size+'px';
+  cube.style.gridTemplate=`repeat(${N},1fr)/repeat(${N},1fr)`;
+  cube.innerHTML='';
+  for(let i=0;i<N;i++){ for(let j=0;j<N;j++){
+    const cell=document.createElement('div'); cell.className='cell';
+    const val=state[i][j];
+    const tr=Math.floor((val-1)/N),tc=(val-1)%N;
+    const dy=tr-i,dx=tc-j;
+    if(dx===0&&dy===0) cell.classList.add('correct');
+    else cell.appendChild(createArrow(dx,dy));
+    cube.appendChild(cell);
+  }}
+}
+
+function applyFlip(type,idx){ const copy=state.map(r=>r.slice());
+  if(type==='row') copy[idx]=state[idx].slice().reverse();
+  else for(let i=0;i<N;i++) copy[i][idx]=state[N-1-i][idx];
+  state=copy;
+}
+
+function animateFlip(type,idx){
+  // hide original arrows
+  if(type==='row'){
+    for(let j=0;j<N;j++){ const a=cube.children[idx*N+j].querySelector('.arrow'); if(a) a.style.visibility='hidden'; }
+  } else {
+    for(let i=0;i<N;i++){ const a=cube.children[i*N+idx].querySelector('.arrow'); if(a) a.style.visibility='hidden'; }
+  }
+  overlay.innerHTML=''; container.style.pointerEvents='none';
+  const rect=cube.getBoundingClientRect();
+  const cellW=rect.width/N, cellH=rect.height/N;
+  const clones=[];
+  if(type==='row'){
+    for(let j=0;j<N;j++){
+      const orig=cube.children[idx*N+j]; const r=orig.getBoundingClientRect();
+      const clone=document.createElement('div'); clone.className='overlay-item';
+      clone.style.width=cellW+'px'; clone.style.height=cellH+'px';
+      clone.style.left=(r.left-rect.left)+'px'; clone.style.top=(r.top-rect.top)+'px';
+      const val=state[idx][j]; const tr=Math.floor((val-1)/N),tc=(val-1)%N;
+      const dxFinal=(N-1-j-j)*cellW, dyFinal=0;
+      clone.appendChild(createArrow(tc-j,tr-idx));
+      overlay.appendChild(clone);
+      clones.push({el:clone,dx:dxFinal,dy:0});
+    }
+  } else {
+    for(let i=0;i<N;i++){
+      const orig=cube.children[i*N+idx]; const r=orig.getBoundingClientRect();
+      const clone=document.createElement('div'); clone.className='overlay-item';
+      clone.style.width=cellW+'px'; clone.style.height=cellH+'px';
+      clone.style.left=(r.left-rect.left)+'px'; clone.style.top=(r.top-rect.top)+'px';
+      const val=state[i][idx]; const tr=Math.floor((val-1)/N),tc=(val-1)%N;
+      const dxFinal=0, dyFinal=(N-1-i-i)*cellH;
+      clone.appendChild(createArrow(tc-idx,tr-i));
+      overlay.appendChild(clone);
+      clones.push({el:clone,dx:0,dy:dyFinal});
+    }
+  }
+  // only translate; arrow remains static
+  requestAnimationFrame(()=>{
+    clones.forEach(({el,dx,dy})=>{
+      el.style.transition='transform 0.4s ease';
+      el.style.transform=`translate(${dx}px,${dy}px)`;
+    });
+  });
+  clones[0].el.addEventListener('transitionend',()=>{
+    applyFlip(type,idx);
+    render(); container.style.pointerEvents=''; overlay.innerHTML='';
+  },{once:true});
+}
+
+function handleSwipe(s,e){ const dx=e.clientX-s.clientX,dy=e.clientY-s.clientY;
+  const abs=Math.abs,th=30; const rect=cube.getBoundingClientRect(),cs=rect.width/N;
+  const sx=s.clientX-rect.left,sy=s.clientY-rect.top;
+  if(abs(dx)>th&&abs(dy)<abs(dx)) animateFlip('row',Math.floor(sy/cs));
+  else if(abs(dy)>th&&abs(dx)<abs(dy)) animateFlip('col',Math.floor(sx/cs));
+}
+
+cube.addEventListener('touchstart',e=>touchStart=e.touches[0]);
+cube.addEventListener('touchend',e=>handleSwipe(touchStart,e.changedTouches[0]));
+sizeSelect.addEventListener('change',()=>{N=parseInt(sizeSelect.value,10);initState();scramble();render();});
+window.addEventListener('resize',render);
+
+function scramble(m=50){const mv=[];for(let i=0;i<N;i++)mv.push({t:'row',idx:i});for(let j=0;j<N;j++)mv.push({t:'col',idx:j});for(let k=0;k<m;k++){const v=mv[Math.floor(Math.random()*mv.length)];applyFlip(v.t,v.idx);} }
+
+initState();scramble();render();
+
+})(); </script>
+
+</body>
+</html>
