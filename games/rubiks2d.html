@@ -46,17 +46,19 @@
   </div>
   <script>
   (function(){
-
-    // Warn the user if they try to leave the page (e.g. via an accidental swipe-back)
-window.addEventListener('beforeunload', function (e) {
-  const msg = 'Did you mean to navigate away? That swipe might have been accidental.';
-  e.returnValue = msg;  // For Chrome, Firefox
-  return msg;           // For older browsers
-});
+    
     const cube=document.getElementById('cube');
     const overlay=document.getElementById('overlay');
     const container=document.getElementById('cubeContainer');
     const sizeSelect=document.getElementById('sizeSelect');
+//Prevent the browser’s swipe-back / overscroll gesture
+container.addEventListener('touchstart', e => {
+  e.preventDefault();
+}, { passive: false });
+
+container.addEventListener('touchmove', e => {
+  e.preventDefault();
+}, { passive: false });
     let N=parseInt(sizeSelect.value,10);
     let state=[];
     let touchStart;function initState(){ state=[]; let num=1;
