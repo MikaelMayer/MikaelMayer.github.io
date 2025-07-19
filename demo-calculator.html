@@ -13,7 +13,7 @@
 
         body {
             font-family: system-ui, -apple-system, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -22,12 +22,12 @@
         }
 
         .calculator {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.7);
             backdrop-filter: blur(20px);
             border-radius: 20px;
             padding: 30px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
             max-width: 350px;
             width: 100%;
         }
@@ -41,11 +41,12 @@
         }
 
         .display {
-            background: rgba(0, 0, 0, 0.3);
-            color: white;
+            background: rgba(0, 0, 0, 0.8);
+            color: #00ff88;
             font-size: 2em;
+            font-weight: 300;
             padding: 20px;
-            border-radius: 10px;
+            border-radius: 15px;
             text-align: right;
             margin-bottom: 20px;
             min-height: 80px;
@@ -53,6 +54,8 @@
             align-items: center;
             justify-content: flex-end;
             word-break: break-all;
+            border: 1px solid rgba(0, 255, 136, 0.2);
+            font-family: 'Courier New', monospace;
         }
 
         .buttons {
@@ -62,21 +65,24 @@
         }
 
         .btn {
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(20, 20, 35, 0.8);
             border: none;
-            border-radius: 10px;
-            color: white;
+            border-radius: 15px;
+            color: #e0e0e0;
             font-size: 1.2em;
-            font-weight: 600;
+            font-weight: 500;
             padding: 20px;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.3s ease;
             border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
         }
 
         .btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: translateY(-2px);
+            background: rgba(40, 40, 60, 0.9);
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+            border-color: rgba(255, 255, 255, 0.2);
         }
 
         .btn:active {
@@ -84,28 +90,40 @@
         }
 
         .btn.operator {
-            background: rgba(255, 107, 107, 0.3);
+            background: rgba(220, 38, 127, 0.4);
+            color: #ff6b9d;
+            border-color: rgba(220, 38, 127, 0.3);
         }
 
         .btn.operator:hover {
-            background: rgba(255, 107, 107, 0.5);
+            background: rgba(220, 38, 127, 0.6);
+            color: white;
+            border-color: rgba(220, 38, 127, 0.5);
         }
 
         .btn.equals {
-            background: rgba(72, 187, 120, 0.3);
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
             grid-column: span 2;
+            border-color: rgba(0, 255, 136, 0.3);
         }
 
         .btn.equals:hover {
-            background: rgba(72, 187, 120, 0.5);
+            background: rgba(0, 255, 136, 0.4);
+            color: white;
+            border-color: rgba(0, 255, 136, 0.5);
         }
 
         .btn.clear {
-            background: rgba(251, 146, 60, 0.3);
+            background: rgba(255, 159, 67, 0.3);
+            color: #ff9f43;
+            border-color: rgba(255, 159, 67, 0.3);
         }
 
         .btn.clear:hover {
-            background: rgba(251, 146, 60, 0.5);
+            background: rgba(255, 159, 67, 0.5);
+            color: white;
+            border-color: rgba(255, 159, 67, 0.5);
         }
 
         .demo-info {
