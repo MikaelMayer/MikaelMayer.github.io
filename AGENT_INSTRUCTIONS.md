@@ -1,50 +1,36 @@
 # 🤖 Agent Web App Creation Instructions
 
-## Quick Preview Setup
+## 📱 Mobile-First Preview System
 
-When creating HTML/JavaScript web applications, use one of these approaches for instant preview:
+**THE RULE: Always write to `preview.html` for instant mobile-friendly preview!**
 
-### Option 1: Direct Preview File
-Create or update `preview.html` in the workspace root. This will be automatically served at:
-- **Local Preview**: `http://localhost:8000/preview` (when preview server is running)
-- **Direct Access**: `file:///workspace/preview.html`
+When creating ANY web application:
 
-### Option 2: Agent Preview Tool
-Use the enhanced preview tool at `/agent-preview.html` which provides:
-- Tabbed editor (HTML/CSS/JS)
-- Live preview iframe
-- Auto-save functionality
-- Template system
-- Share URLs
-
-### Option 3: Overwrite html.html
-Replace the content in `/workspace/html.html` for immediate testing (original concept).
+1. **Always overwrite `/workspace/preview.html`** with your complete app
+2. **User bookmarks this file** on mobile for instant access
+3. **Just refresh the page** to see updates - no servers, no complexity!
 
 ## Instructions for Agents
 
-When asked to create a web application:
+**ALWAYS do this when creating web apps:**
 
-1. **Choose the right approach**:
-   - For simple single-file apps → Use `preview.html`
-   - For complex apps with separate CSS/JS → Use `agent-preview.html`
-   - For testing/iteration → Use `html.html`
-
-2. **Always provide a preview link**:
+1. **Write to `preview.html`** - Never ask where to put it
+2. **Make it mobile-responsive** - Most testing happens on mobile
+3. **Include everything in ONE file** - HTML, CSS, JS all together
+4. **Always provide the magic link**: 
    ```
-   🚀 **Preview your app**: 
-   - Local server: http://localhost:8000/preview
-   - Direct file: file:///workspace/preview.html
-   - Enhanced editor: file:///workspace/agent-preview.html
+   🚀 **Try your app**: file:///workspace/preview.html
+   📱 **Mobile-friendly** - bookmark this link!
    ```
 
-3. **Include these features for better UX**:
-   - Responsive design (mobile-friendly)
-   - Modern CSS with proper typography
+5. **Include these features for better UX**:
+   - **Mobile-first responsive design**
+   - Modern CSS with proper typography  
+   - Touch-friendly buttons and interactions
    - Error handling for JavaScript
-   - Loading states for async operations
-   - Accessible HTML structure
+   - Fast loading (inline everything)
 
-4. **Common libraries you can use** (via CDN):
+6. **Common libraries you can use** (via CDN):
    - **React**: `https://unpkg.com/react@18/umd/react.development.js`
    - **Vue**: `https://unpkg.com/vue@3/dist/vue.global.js`
    - **Alpine.js**: `https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js`
@@ -59,18 +45,15 @@ I've created your [app description] app!
 
 **Features:**
 - [List key features]
-- Responsive design
+- Mobile-responsive design
 - [Any special functionality]
 
-**🚀 Try it now:**
-- **Live preview**: http://localhost:8000/preview
-- **Edit mode**: file:///workspace/agent-preview.html
+**🚀 Try it instantly:**
+**file:///workspace/preview.html**
 
-**Files created:**
-- `preview.html` - The main application
-- [Any other files]
+📱 **Mobile tip**: Bookmark this link for easy access!
 
-The app is ready to use immediately - just click the preview link!
+The app is ready to use immediately - just refresh the page!
 ```
 
 ## Technical Guidelines
@@ -117,49 +100,31 @@ The app is ready to use immediately - just click the preview link!
 - Implement proper event handling
 - Use async/await for promises
 
-## Start Preview Server
+## 📁 Simple File Organization
 
-To start the preview server (if needed):
-```bash
-python3 preview-server.py 8000
-```
-
-Then any agent can create apps that are instantly viewable at `http://localhost:8000/preview`.
-
-## File Organization
-
-For larger apps, organize like this:
 ```
 workspace/
-├── preview.html          # Main preview file
-├── agent-preview.html    # Enhanced editor
-├── html.html            # Original testing tool
-├── apps/
-│   ├── my-app/
-│   │   ├── index.html
-│   │   ├── style.css
-│   │   └── script.js
-│   └── another-app/
-└── AGENT_INSTRUCTIONS.md # This file
+├── preview.html          # 🎯 THE magic preview file (agents always write here)
+├── agent-preview.html    # 🔧 Enhanced editor (optional)
+├── html.html            # 🧪 Original testing tool
+└── AGENT_INSTRUCTIONS.md # 📖 This file
 ```
 
-## Quick Commands
+## 🔗 Quick Access
 
-**Start preview server:**
-```bash
-cd /workspace && python3 preview-server.py
+**The only link you need:**
+```
+file:///workspace/preview.html
 ```
 
-**Test a file directly:**
-```bash
-open file:///workspace/preview.html
-# or
-firefox /workspace/preview.html
-```
+**📱 Mobile setup:**
+1. Open the link once on your mobile browser
+2. Bookmark it for instant access
+3. Any agent-created app appears here immediately
+4. Just refresh to see updates!
 
-**Share via GitHub Pages:**
-```bash
-# If this is a git repo, any agent can create shareable links
-git add . && git commit -m "Add new app" && git push
-# Then: https://username.github.io/repo-name/preview.html
+**🌐 Share via GitHub Pages:**
+If this is a git repo, shareable link is:
+```
+https://username.github.io/repo-name/preview.html
 ```
