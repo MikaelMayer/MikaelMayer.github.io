@@ -229,6 +229,7 @@
     <iframe id="appContainer"></iframe>
 
     <div id="controls" class="controls">
+        <button class="btn" onclick="forceRefresh()">🔄 Force Refresh</button>
         <button class="btn" onclick="toggleFrame()">📱 Toggle Frame</button>
         <button class="btn" onclick="openDirect()">🚀 Open Direct</button>
         <button class="btn" onclick="copyDeployUrl()">🌐 Copy Deploy URL</button>
@@ -279,10 +280,18 @@
                     this.currentUrl = `${this.baseUrl}/${branch}/${path}`;
                     
                     document.getElementById('loadingMessage').textContent = 
-                        `Loading ${path} from ${branch} branch...`;
+                        `Loading ${path} from ${branch} branch... (bypassing cache)`;
                     
-                    // Check if file exists by fetching it
-                    const response = await fetch(this.currentUrl);
+                    // Check if file exists by fetching it with cache-busting
+                    const cacheBuster = Date.now();
+                    const response = await fetch(`${this.currentUrl}?cb=${cacheBuster}`, {
+                        cache: 'no-cache',
+                        headers: {
+                            'Cache-Control': 'no-cache, no-store, must-revalidate',
+                            'Pragma': 'no-cache',
+                            'Expires': '0'
+                        }
+                    });
                     
                     if (!response.ok) {
                         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -439,10 +448,20 @@
                 };
             }
 
+            forceRefresh() {
+                const params = this.parseUrlParams();
+                if (params.path || params.branch) {
+                    this.showNotification('🔄 Force refreshing app...');
+                    this.loadApp(params);
+                } else {
+                    this.showNotification('ℹ️ No app loaded to refresh');
+                }
+            }
+
             showInfo() {
                 const params = this.parseUrlParams();
                 const deployUrl = params.path ? `https://mikaelmayer.github.io/${params.path}` : 'N/A';
-                alert(`Current App Info:\n\nRaw URL: ${this.currentUrl}\nDeploy URL: ${deployUrl}\nBranch: ${params.branch}\nPath: ${params.path}\n\nControls:\n📱 Toggle Frame - Switch between full screen and windowed\n🚀 Open Direct - Open raw GitHub file\n🌐 Copy Deploy URL - Copy permanent GitHub Pages URL\nℹ️ Info - This dialog`);
+                alert(`Current App Info:\n\nRaw URL: ${this.currentUrl}\nDeploy URL: ${deployUrl}\nBranch: ${params.branch}\nPath: ${params.path}\n\nControls:\n🔄 Force Refresh - Bypass cache and reload app\n📱 Toggle Frame - Switch between full screen and windowed\n🚀 Open Direct - Open raw GitHub file\n🌐 Copy Deploy URL - Copy permanent GitHub Pages URL\nℹ️ Info - This dialog`);
             }
         }
 
@@ -455,6 +474,10 @@
         
         function openDirect() {
             preview.openDirect();
+        }
+        
+        function forceRefresh() {
+            preview.forceRefresh();
         }
         
         function copyDeployUrl() {
