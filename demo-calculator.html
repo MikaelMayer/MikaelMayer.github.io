@@ -245,14 +245,14 @@
             <button class="btn" onclick="inputNumber('0')" style="grid-row: span 2;">0</button>
             
             <button class="btn" onclick="inputNumber('.')">.</button>
-            <button class="btn compute" onclick="compute()">=</button>
+            <button class="btn compute" onclick="compute()">↵</button>
         </div>
         
         <div class="demo-info">
-            ✨ <strong>Infix:</strong> 5 + 3 = (auto-compute)<br>
-            🔄 <strong>Prefix:</strong> + 5 3 (shows pending)<br>
-            📚 <strong>Postfix:</strong> 5 3 + (immediate compute)<br>
-            🎯 <strong>"=" button:</strong> Compute/Record to stack
+            ✨ <strong>Infix:</strong> 5 + 3 ↵ (auto-compute)<br>
+            🔄 <strong>Prefix:</strong> + ↵ 5 ↵ 3 ↵ (shows pending)<br>
+            📚 <strong>Postfix:</strong> 5 ↵ 3 ↵ + (immediate compute)<br>
+            🎯 <strong>"↵" button:</strong> Push to stack/Compute
         </div>
     </div>
 
@@ -397,9 +397,11 @@
                 const b = stack.pop();
                 const a = stack.pop();
                 const result = operators[op](a, b);
-                stack.push(result);
                 currentInput = result.toString();
                 updateDisplay();
+                updateStatus();
+            } else {
+                // Not enough operands, show error or wait
                 updateStatus();
             }
         }
