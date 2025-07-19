@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🧮 Agent Calculator Demo</title>
+    <title>🧮 Multi-Notation Calculator</title>
     <style>
         * {
             margin: 0;
@@ -28,7 +28,7 @@
             padding: 30px;
             border: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
-            max-width: 350px;
+            max-width: 400px;
             width: 100%;
         }
 
@@ -40,21 +40,75 @@
             font-weight: 600;
         }
 
+        .notation-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            justify-content: center;
+        }
+
+        .notation-btn {
+            background: rgba(20, 20, 35, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: #e0e0e0;
+            font-size: 0.9em;
+            padding: 8px 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .notation-btn.active {
+            background: rgba(0, 255, 136, 0.3);
+            color: #00ff88;
+            border-color: rgba(0, 255, 136, 0.5);
+        }
+
+        .notation-btn:hover {
+            background: rgba(40, 40, 60, 0.9);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
         .display {
             background: rgba(0, 0, 0, 0.8);
             color: #00ff88;
-            font-size: 2em;
+            font-size: 1.8em;
             font-weight: 300;
             padding: 20px;
             border-radius: 15px;
             text-align: right;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             min-height: 80px;
             display: flex;
             align-items: center;
             justify-content: flex-end;
             word-break: break-all;
             border: 1px solid rgba(0, 255, 136, 0.2);
+            font-family: 'Courier New', monospace;
+        }
+
+        .stack-display {
+            background: rgba(0, 0, 0, 0.6);
+            color: #88ccff;
+            font-size: 1em;
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            min-height: 40px;
+            border: 1px solid rgba(136, 204, 255, 0.2);
+            font-family: 'Courier New', monospace;
+        }
+
+        .status-display {
+            background: rgba(0, 0, 0, 0.4);
+            color: #ffaa44;
+            font-size: 0.9em;
+            padding: 8px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+            min-height: 30px;
+            border: 1px solid rgba(255, 170, 68, 0.2);
             font-family: 'Courier New', monospace;
         }
 
@@ -101,14 +155,13 @@
             border-color: rgba(220, 38, 127, 0.5);
         }
 
-        .btn.equals {
+        .btn.compute {
             background: rgba(0, 255, 136, 0.2);
             color: #00ff88;
-            grid-column: span 2;
             border-color: rgba(0, 255, 136, 0.3);
         }
 
-        .btn.equals:hover {
+        .btn.compute:hover {
             background: rgba(0, 255, 136, 0.4);
             color: white;
             border-color: rgba(0, 255, 136, 0.5);
@@ -130,7 +183,8 @@
             text-align: center;
             color: rgba(255, 255, 255, 0.8);
             margin-top: 20px;
-            font-size: 0.9em;
+            font-size: 0.85em;
+            line-height: 1.4;
         }
 
         @media (max-width: 480px) {
@@ -147,74 +201,141 @@
                 font-size: 1.5em;
                 padding: 15px;
             }
+
+            .notation-btn {
+                font-size: 0.8em;
+                padding: 6px 12px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="calculator">
-        <div class="title">🧮 Calculator Demo</div>
+        <div class="title">🧮 Multi-Notation Calculator</div>
+        
+        <div class="notation-selector">
+            <button class="notation-btn active" onclick="setNotation('infix')">Infix</button>
+            <button class="notation-btn" onclick="setNotation('prefix')">Prefix</button>
+            <button class="notation-btn" onclick="setNotation('postfix')">Postfix</button>
+        </div>
+
+        <div class="status-display" id="status">Mode: Infix (5 + 3)</div>
+        <div class="stack-display" id="stack">Stack: []</div>
         <div class="display" id="display">0</div>
+        
         <div class="buttons">
-            <button class="btn clear" onclick="clearDisplay()">AC</button>
+            <button class="btn clear" onclick="clearAll()">AC</button>
             <button class="btn clear" onclick="deleteLast()">⌫</button>
-            <button class="btn operator" onclick="appendOperator('/')">/</button>
-            <button class="btn operator" onclick="appendOperator('*')">×</button>
+            <button class="btn operator" onclick="inputOperator('/')">/</button>
+            <button class="btn operator" onclick="inputOperator('*')">×</button>
             
-            <button class="btn" onclick="appendNumber('7')">7</button>
-            <button class="btn" onclick="appendNumber('8')">8</button>
-            <button class="btn" onclick="appendNumber('9')">9</button>
-            <button class="btn operator" onclick="appendOperator('-')">-</button>
+            <button class="btn" onclick="inputNumber('7')">7</button>
+            <button class="btn" onclick="inputNumber('8')">8</button>
+            <button class="btn" onclick="inputNumber('9')">9</button>
+            <button class="btn operator" onclick="inputOperator('-')">-</button>
             
-            <button class="btn" onclick="appendNumber('4')">4</button>
-            <button class="btn" onclick="appendNumber('5')">5</button>
-            <button class="btn" onclick="appendNumber('6')">6</button>
-            <button class="btn operator" onclick="appendOperator('+')">+</button>
+            <button class="btn" onclick="inputNumber('4')">4</button>
+            <button class="btn" onclick="inputNumber('5')">5</button>
+            <button class="btn" onclick="inputNumber('6')">6</button>
+            <button class="btn operator" onclick="inputOperator('+')">+</button>
             
-            <button class="btn" onclick="appendNumber('1')">1</button>
-            <button class="btn" onclick="appendNumber('2')">2</button>
-            <button class="btn" onclick="appendNumber('3')">3</button>
-            <button class="btn" onclick="appendNumber('0')" style="grid-row: span 2;">0</button>
+            <button class="btn" onclick="inputNumber('1')">1</button>
+            <button class="btn" onclick="inputNumber('2')">2</button>
+            <button class="btn" onclick="inputNumber('3')">3</button>
+            <button class="btn" onclick="inputNumber('0')" style="grid-row: span 2;">0</button>
             
-            <button class="btn" onclick="appendNumber('.')">.</button>
-            <button class="btn equals" onclick="calculate()">=</button>
+            <button class="btn" onclick="inputNumber('.')">.</button>
+            <button class="btn compute" onclick="compute()">=</button>
         </div>
         
         <div class="demo-info">
-            ✨ Created by Agent via Dynamic Preview System<br>
-            📱 Mobile-optimized • 🎨 Modern design
+            ✨ <strong>Infix:</strong> 5 + 3 = (auto-compute)<br>
+            🔄 <strong>Prefix:</strong> + 5 3 (shows pending)<br>
+            📚 <strong>Postfix:</strong> 5 3 + (immediate compute)<br>
+            🎯 <strong>"=" button:</strong> Compute/Record to stack
         </div>
     </div>
 
     <script>
+        // Calculator state
+        let notation = 'infix';
+        let stack = [];
+        let currentInput = '';
         let display = document.getElementById('display');
-        let currentInput = '0';
-        let shouldResetDisplay = false;
+        let stackDisplay = document.getElementById('stack');
+        let statusDisplay = document.getElementById('status');
+        let pendingOperation = null;
+        let waitingForOperand = false;
+
+        // Operator functions
+        const operators = {
+            '+': (a, b) => a + b,
+            '-': (a, b) => a - b,
+            '*': (a, b) => a * b,
+            '/': (a, b) => b !== 0 ? a / b : NaN
+        };
+
+        function setNotation(newNotation) {
+            notation = newNotation;
+            
+            // Update button styles
+            document.querySelectorAll('.notation-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Reset calculator state
+            clearAll();
+            updateStatus();
+        }
 
         function updateDisplay() {
             display.textContent = currentInput || '0';
+            stackDisplay.textContent = `Stack: [${stack.join(', ')}]`;
         }
 
-        function clearDisplay() {
-            currentInput = '0';
-            shouldResetDisplay = false;
+        function updateStatus() {
+            let statusText = '';
+            switch (notation) {
+                case 'infix':
+                    statusText = 'Mode: Infix (5 + 3)';
+                    if (pendingOperation) {
+                        statusText += ` - Pending: ${stack[0]} ${pendingOperation}`;
+                    }
+                    break;
+                case 'prefix':
+                    statusText = 'Mode: Prefix (+ 5 3)';
+                    if (pendingOperation) {
+                        statusText += ` - Waiting for: ${pendingOperation} ? ?`;
+                        if (stack.length > 0) {
+                            statusText = statusText.replace('? ?', `${stack[0]} ?`);
+                        }
+                    }
+                    break;
+                case 'postfix':
+                    statusText = 'Mode: Postfix (5 3 +)';
+                    break;
+            }
+            statusDisplay.textContent = statusText;
+        }
+
+        function clearAll() {
+            stack = [];
+            currentInput = '';
+            pendingOperation = null;
+            waitingForOperand = false;
             updateDisplay();
+            updateStatus();
         }
 
         function deleteLast() {
-            if (currentInput.length > 1) {
+            if (currentInput.length > 0) {
                 currentInput = currentInput.slice(0, -1);
-            } else {
-                currentInput = '0';
+                updateDisplay();
             }
-            updateDisplay();
         }
 
-        function appendNumber(num) {
-            if (shouldResetDisplay) {
-                currentInput = '';
-                shouldResetDisplay = false;
-            }
-            
+        function inputNumber(num) {
             if (currentInput === '0' && num !== '.') {
                 currentInput = num;
             } else {
@@ -223,57 +344,155 @@
             updateDisplay();
         }
 
-        function appendOperator(op) {
-            shouldResetDisplay = false;
+        function inputOperator(op) {
+            const calcOp = op === '×' ? '*' : op;
             
-            // Convert display operator for calculation
-            let calcOp = op === '×' ? '*' : op;
-            
-            // Prevent multiple operators
-            const lastChar = currentInput[currentInput.length - 1];
-            if (['+', '-', '*', '/'].includes(lastChar)) {
-                currentInput = currentInput.slice(0, -1) + calcOp;
-            } else {
-                currentInput += calcOp;
+            switch (notation) {
+                case 'infix':
+                    handleInfixOperator(calcOp);
+                    break;
+                case 'prefix':
+                    handlePrefixOperator(calcOp);
+                    break;
+                case 'postfix':
+                    handlePostfixOperator(calcOp);
+                    break;
             }
-            updateDisplay();
         }
 
-        function calculate() {
-            try {
-                // Security: Only allow safe mathematical expressions
-                const safeExpression = currentInput.replace(/[^0-9+\-*/.() ]/g, '');
-                const result = Function('"use strict"; return (' + safeExpression + ')')();
+        function handleInfixOperator(op) {
+            if (currentInput) {
+                const num = parseFloat(currentInput);
+                if (pendingOperation && stack.length > 0) {
+                    // Complete previous operation
+                    const result = operators[pendingOperation](stack[0], num);
+                    stack = [result];
+                    currentInput = result.toString();
+                } else {
+                    stack = [num];
+                }
+                pendingOperation = op;
+                currentInput = '';
+                updateDisplay();
+                updateStatus();
+            }
+        }
+
+        function handlePrefixOperator(op) {
+            if (!pendingOperation) {
+                pendingOperation = op;
+                currentInput = '';
+                updateDisplay();
+                updateStatus();
+            }
+        }
+
+        function handlePostfixOperator(op) {
+            if (currentInput) {
+                stack.push(parseFloat(currentInput));
+                currentInput = '';
+            }
+            
+            if (stack.length >= 2) {
+                const b = stack.pop();
+                const a = stack.pop();
+                const result = operators[op](a, b);
+                stack.push(result);
+                currentInput = result.toString();
+                updateDisplay();
+                updateStatus();
+            }
+        }
+
+        function compute() {
+            switch (notation) {
+                case 'infix':
+                    computeInfix();
+                    break;
+                case 'prefix':
+                    computePrefix();
+                    break;
+                case 'postfix':
+                    computePostfix();
+                    break;
+            }
+        }
+
+        function computeInfix() {
+            if (currentInput && pendingOperation && stack.length > 0) {
+                const num = parseFloat(currentInput);
+                const result = operators[pendingOperation](stack[0], num);
+                currentInput = result.toString();
+                stack = [];
+                pendingOperation = null;
+                updateDisplay();
+                updateStatus();
+            } else if (currentInput) {
+                // Just record the number to stack
+                stack.push(parseFloat(currentInput));
+                currentInput = '';
+                updateDisplay();
+                updateStatus();
+            }
+        }
+
+        function computePrefix() {
+            if (currentInput) {
+                const num = parseFloat(currentInput);
+                stack.push(num);
+                currentInput = '';
                 
-                currentInput = parseFloat(result.toFixed(10)).toString();
-                shouldResetDisplay = true;
+                if (pendingOperation && stack.length >= 2) {
+                    const a = stack.shift(); // First operand
+                    const b = stack.shift(); // Second operand
+                    const result = operators[pendingOperation](a, b);
+                    currentInput = result.toString();
+                    stack = [];
+                    pendingOperation = null;
+                }
                 updateDisplay();
-            } catch (error) {
-                currentInput = 'Error';
-                shouldResetDisplay = true;
+                updateStatus();
+            }
+        }
+
+        function computePostfix() {
+            if (currentInput) {
+                stack.push(parseFloat(currentInput));
+                currentInput = '';
                 updateDisplay();
+                updateStatus();
             }
         }
 
         // Keyboard support
         document.addEventListener('keydown', (e) => {
             if (e.key >= '0' && e.key <= '9' || e.key === '.') {
-                appendNumber(e.key);
+                inputNumber(e.key);
             } else if (['+', '-'].includes(e.key)) {
-                appendOperator(e.key);
+                inputOperator(e.key);
             } else if (e.key === '*') {
-                appendOperator('*');
+                inputOperator('*');
             } else if (e.key === '/') {
                 e.preventDefault();
-                appendOperator('/');
+                inputOperator('/');
             } else if (e.key === 'Enter' || e.key === '=') {
-                calculate();
+                compute();
             } else if (e.key === 'Escape' || e.key === 'c' || e.key === 'C') {
-                clearDisplay();
+                clearAll();
             } else if (e.key === 'Backspace') {
                 deleteLast();
+            } else if (e.key === 'i' || e.key === 'I') {
+                setNotation('infix');
+            } else if (e.key === 'p' || e.key === 'P') {
+                setNotation('prefix');
+            } else if (e.key === 's' || e.key === 'S') {
+                setNotation('postfix');
             }
         });
+
+        // Initialize
+        updateDisplay();
+        updateStatus();
 
         // Focus on load for keyboard support
         window.addEventListener('load', () => {
