@@ -57,8 +57,8 @@ I've created your [APP_NAME]!
 **🚀 Try it instantly:**
 https://mikaelmayer.github.io/preview.html?branch=CURRENT_BRANCH&path=FILENAME.html
 
-**🏠 Local preview:** file:///workspace/FILENAME.html
 📱 **Mobile magic**: The URL works instantly on any device!
+⚠️ **Note**: Never suggest local file:// URLs as users are on mobile and agent is on remote VM
 
 The app is ready to use immediately - just click the link!
 ```
@@ -183,9 +183,9 @@ const data = saved ? JSON.parse(saved) : defaultData;
 ## 🚀 Deployment Workflow
 
 1. **Create** your HTML file with everything inline
-2. **Test** locally: `file:///workspace/your-app.html`
-3. **Deploy**: `./update-preview.sh your-app.html "Description"`
-4. **Share** the generated URL with the user
+2. **Deploy**: `./update-preview.sh your-app.html "Description"`
+3. **Share** the generated URL with the user
+4. **Note**: Never suggest local testing as users are on mobile/remote setup
 
 ## 📱 User Experience
 
@@ -253,7 +253,6 @@ I've created a Snake Game for you!
 **🚀 Try it instantly:**
 https://mikaelmayer.github.io/preview.html?branch=cursor/streamline-agent-html-preview-fe49&path=snake-game.html
 
-**🏠 Local preview:** file:///workspace/snake-game.html
 📱 **Mobile magic**: The URL works instantly on any device!
 
 The game is ready to play immediately - just click the link!
