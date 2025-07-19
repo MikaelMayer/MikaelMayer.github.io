@@ -488,10 +488,13 @@
                 currentInput = '';
             }
             
+            // Try to compute before adding the new operator (for infix chaining)
+            tryCompute();
+            
             // Add operator to stack
             stack.push(calcOp);
             
-            // Try to compute if we have enough operands
+            // Try to compute again if we have enough operands
             tryCompute();
             
             updateDisplay();
@@ -518,6 +521,21 @@
         }
 
         function canCompute() {
+            // Check if we can compute with stack + currentInput
+            if (currentInput && stack.length >= 2) {
+                // Check for infix pattern: number operator [currentInput]
+                if (typeof stack[stack.length-2] === 'number' && 
+                    typeof stack[stack.length-1] === 'string') {
+                    return true;
+                }
+                // Check for prefix pattern: operator number [currentInput]  
+                if (typeof stack[stack.length-2] === 'string' && 
+                    typeof stack[stack.length-1] === 'number') {
+                    return true;
+                }
+            }
+            
+            // Check patterns in stack only
             if (stack.length < 3) return false;
             
             // Check for postfix pattern: number number operator (at end)
@@ -545,33 +563,54 @@
         }
 
         function executeComputation() {
-            if (stack.length < 3) return;
-            
-            const last3 = stack.slice(-3);
-            const [first, second, third] = last3;
-            
             let result;
-            let notation;
+            let elementsToRemove = 0;
             
-            // Postfix: number number operator
-            if (typeof first === 'number' && typeof second === 'number' && typeof third === 'string') {
-                result = operators[third](first, second);
-                notation = 'Postfix';
+            // First check if we can compute with currentInput
+            if (currentInput && stack.length >= 2) {
+                const inputNum = parseFloat(currentInput);
+                
+                // Infix pattern: number operator [currentInput]
+                if (typeof stack[stack.length-2] === 'number' && 
+                    typeof stack[stack.length-1] === 'string') {
+                    result = operators[stack[stack.length-1]](stack[stack.length-2], inputNum);
+                    elementsToRemove = 2; // Remove last 2 from stack
+                    currentInput = ''; // Clear current input
+                }
+                // Prefix pattern: operator number [currentInput]
+                else if (typeof stack[stack.length-2] === 'string' && 
+                         typeof stack[stack.length-1] === 'number') {
+                    result = operators[stack[stack.length-2]](stack[stack.length-1], inputNum);
+                    elementsToRemove = 2; // Remove last 2 from stack
+                    currentInput = ''; // Clear current input
+                }
             }
-            // Prefix: operator number number  
-            else if (typeof first === 'string' && typeof second === 'number' && typeof third === 'number') {
-                result = operators[first](second, third);
-                notation = 'Prefix';
-            }
-            // Infix: number operator number
-            else if (typeof first === 'number' && typeof second === 'string' && typeof third === 'number') {
-                result = operators[second](first, third);
-                notation = 'Infix';
+            
+            // If no computation with currentInput, check stack only
+            if (result === undefined && stack.length >= 3) {
+                const last3 = stack.slice(-3);
+                const [first, second, third] = last3;
+                
+                // Postfix: number number operator
+                if (typeof first === 'number' && typeof second === 'number' && typeof third === 'string') {
+                    result = operators[third](first, second);
+                    elementsToRemove = 3;
+                }
+                // Prefix: operator number number  
+                else if (typeof first === 'string' && typeof second === 'number' && typeof third === 'number') {
+                    result = operators[first](second, third);
+                    elementsToRemove = 3;
+                }
+                // Infix: number operator number
+                else if (typeof first === 'number' && typeof second === 'string' && typeof third === 'number') {
+                    result = operators[second](first, third);
+                    elementsToRemove = 3;
+                }
             }
             
             if (result !== undefined) {
                 // Remove the computed elements and replace with result
-                stack.splice(-3, 3, result);
+                stack.splice(-elementsToRemove, elementsToRemove, result);
             }
         }
 
