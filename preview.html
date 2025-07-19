@@ -231,6 +231,7 @@
     <div id="controls" class="controls">
         <button class="btn" onclick="toggleFrame()">📱 Toggle Frame</button>
         <button class="btn" onclick="openDirect()">🚀 Open Direct</button>
+        <button class="btn" onclick="copyDeployUrl()">🌐 Copy Deploy URL</button>
         <button class="btn" onclick="showInfo()">ℹ️ Info</button>
     </div>
 
@@ -376,9 +377,72 @@
                 }
             }
 
+            copyDeployUrl() {
+                const params = this.parseUrlParams();
+                if (params.path) {
+                    // For apps on branches other than master, they need to be merged to master first
+                    const deployUrl = params.branch === 'master' 
+                        ? `https://mikaelmayer.github.io/${params.path}`
+                        : `https://mikaelmayer.github.io/${params.path} (merge to master first)`;
+                    
+                    navigator.clipboard.writeText(`https://mikaelmayer.github.io/${params.path}`).then(() => {
+                        // Show success notification
+                        this.showNotification(`📋 Copied deploy URL!\n\n${deployUrl}\n\n${params.branch !== 'master' ? '⚠️ Note: Merge to master branch for this URL to work' : '✅ Will be live after GitHub Pages updates (~1 min)'}`);
+                    }).catch(() => {
+                        // Fallback for browsers that don't support clipboard API
+                        this.showNotification(`🌐 Deploy URL:\n\nhttps://mikaelmayer.github.io/${params.path}\n\n${params.branch !== 'master' ? '⚠️ Note: Merge to master branch first' : '✅ Will be live after GitHub Pages updates (~1 min)'}\n\n(Manual copy - clipboard API not available)`);
+                    });
+                } else {
+                    this.showNotification('ℹ️ No specific app loaded to get deploy URL');
+                }
+            }
+
+            showNotification(message) {
+                // Create or update notification
+                let notification = document.getElementById('notification');
+                if (!notification) {
+                    notification = document.createElement('div');
+                    notification.id = 'notification';
+                    notification.style.cssText = `
+                        position: fixed;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        background: rgba(0, 0, 0, 0.9);
+                        color: white;
+                        padding: 20px;
+                        border-radius: 10px;
+                        font-family: system-ui, sans-serif;
+                        font-size: 14px;
+                        max-width: 400px;
+                        text-align: center;
+                        z-index: 10000;
+                        white-space: pre-line;
+                        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+                    `;
+                    document.body.appendChild(notification);
+                }
+                
+                notification.textContent = message;
+                notification.style.display = 'block';
+                
+                // Auto-hide after 4 seconds
+                setTimeout(() => {
+                    if (notification) {
+                        notification.style.display = 'none';
+                    }
+                }, 4000);
+                
+                // Click to dismiss
+                notification.onclick = () => {
+                    notification.style.display = 'none';
+                };
+            }
+
             showInfo() {
                 const params = this.parseUrlParams();
-                alert(`Current App Info:\n\nURL: ${this.currentUrl}\nBranch: ${params.branch}\nPath: ${params.path}\n\nControls:\n📱 Toggle Frame - Switch between full screen and windowed\n🚀 Open Direct - Open raw GitHub file\nℹ️ Info - This dialog`);
+                const deployUrl = params.path ? `https://mikaelmayer.github.io/${params.path}` : 'N/A';
+                alert(`Current App Info:\n\nRaw URL: ${this.currentUrl}\nDeploy URL: ${deployUrl}\nBranch: ${params.branch}\nPath: ${params.path}\n\nControls:\n📱 Toggle Frame - Switch between full screen and windowed\n🚀 Open Direct - Open raw GitHub file\n🌐 Copy Deploy URL - Copy permanent GitHub Pages URL\nℹ️ Info - This dialog`);
             }
         }
 
@@ -391,6 +455,10 @@
         
         function openDirect() {
             preview.openDirect();
+        }
+        
+        function copyDeployUrl() {
+            preview.copyDeployUrl();
         }
         
         function showInfo() {

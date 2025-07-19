@@ -36,6 +36,12 @@ The preview system uses dynamic URLs that load any HTML file from any branch:
 - App content is fetched from raw GitHub (instant updates)
 - Best of both worlds: proper rendering + instant content updates!
 
+**Control buttons in preview:**
+- 📱 **Toggle Frame**: Switch between full-screen and windowed view
+- 🚀 **Open Direct**: Open raw GitHub file in new tab
+- 🌐 **Copy Deploy URL**: Copy permanent GitHub Pages URL to clipboard
+- ℹ️ **Info**: Show app details and control explanations
+
 ## 🎯 Response Template
 
 Always respond with this format:
