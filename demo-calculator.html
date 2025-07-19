@@ -522,18 +522,41 @@
 
         function shouldComputeNow() {
             // Check if computing would break existing operator groups
-            // For example, in "5 + * 3 + 9", we should NOT compute "3 + 9" 
-            // because it would break the "(5 +) (* 3) (+ 9)" grouping
+            // But allow computation of complete expressions at the end
             
             // Analyze the current grouping structure
             const groups = analyzeStackForGrouping();
             
-            // If we have multiple partial operator groups, don't compute
-            // This prevents breaking the intended operator chain structure
+            // Check if we have a complete expression that can be computed
+            const hasCompleteExpression = groups.some(g => g.type === 'group' && g.groupType === 'ready-to-compute');
+            
+            // If there's a complete expression, always allow it to compute
+            if (hasCompleteExpression) {
+                return true;
+            }
+            
+            // Check for the pattern where currentInput completes an expression
+            // Example: "243 + * 13 + 9" [currentInput: "2"] should compute "+ 9 2"
+            if (currentInput && stack.length >= 2) {
+                const lastTwo = stack.slice(-2);
+                const [secondLast, last] = lastTwo;
+                
+                // If we have operator + number + [currentInput], this forms a complete expression
+                if (typeof secondLast === 'string' && typeof last === 'number') {
+                    return true; // Allow prefix completion: + 9 2
+                }
+                
+                // If we have number + operator + [currentInput], this forms a complete expression  
+                if (typeof secondLast === 'number' && typeof last === 'string') {
+                    return true; // Allow infix completion: 9 + 2
+                }
+            }
+            
+            // Count partial operator groups
             const partialGroups = groups.filter(g => g.type === 'group' && g.groupType === 'partial-expression');
             
             // If there are multiple partial expressions, it suggests a complex operator chain
-            // Don't compute anything to preserve the structure
+            // Don't compute unless we identified a safe complete expression above
             if (partialGroups.length > 1) {
                 return false;
             }
