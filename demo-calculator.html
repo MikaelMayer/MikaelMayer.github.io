@@ -61,27 +61,29 @@
         }
 
         .stack-display {
-            background: rgba(0, 0, 0, 0.6);
-            padding: 15px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
             border-radius: 15px;
             margin-bottom: 20px;
-            min-height: 60px;
-            border: 1px solid rgba(136, 204, 255, 0.2);
+            min-height: 80px;
+            border: 1px solid rgba(0, 255, 136, 0.2);
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
+            gap: 12px;
             align-items: center;
+            justify-content: flex-end;
+            font-size: 1.8em;
         }
 
         .stack-item {
-            padding: 8px 12px;
-            border-radius: 20px;
-            font-size: 0.9em;
-            font-weight: 500;
+            padding: 12px 16px;
+            border-radius: 25px;
+            font-size: 1em;
+            font-weight: 600;
             display: inline-block;
-            min-width: 30px;
+            min-width: 40px;
             text-align: center;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
             border: 2px solid transparent;
             transition: all 0.3s ease;
         }
@@ -96,6 +98,46 @@
             background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
             color: white;
             border-color: rgba(220, 53, 69, 0.3);
+        }
+
+        .stack-group {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 12px;
+            border-radius: 30px;
+            border: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .stack-group.ready-to-compute {
+            border-color: #00ff88;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.6);
+            animation: pulse-ready 2s infinite;
+        }
+
+        .stack-group.partial-expression {
+            border-color: #ffc107;
+            box-shadow: 0 0 15px rgba(255, 193, 7, 0.5);
+            animation: pulse-partial 2s infinite;
+        }
+
+        .stack-group .stack-item {
+            box-shadow: none;
+            margin: 0;
+        }
+
+        .current-input {
+            color: #00ff88;
+            font-weight: 300;
+            opacity: 0.8;
+            font-style: italic;
+        }
+
+        .empty-display {
+            color: #888;
+            font-style: italic;
+            opacity: 0.6;
         }
 
         .stack-item.highlighted-number {
@@ -120,25 +162,17 @@
             50% { box-shadow: 0 0 25px rgba(220, 53, 69, 1.0), 0 4px 12px rgba(0, 0, 0, 0.4); }
         }
 
-        .stack-label {
-            color: #88ccff;
-            font-size: 0.8em;
-            margin-right: 10px;
-            opacity: 0.8;
+        @keyframes pulse-ready {
+            0%, 100% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.6); }
+            50% { box-shadow: 0 0 30px rgba(0, 255, 136, 0.9); }
         }
 
-        .status-display {
-            background: rgba(0, 0, 0, 0.4);
-            color: #ffaa44;
-            font-size: 0.9em;
-            padding: 8px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            text-align: center;
-            min-height: 30px;
-            border: 1px solid rgba(255, 170, 68, 0.2);
-            font-family: 'Courier New', monospace;
+        @keyframes pulse-partial {
+            0%, 100% { box-shadow: 0 0 15px rgba(255, 193, 7, 0.5); }
+            50% { box-shadow: 0 0 25px rgba(255, 193, 7, 0.8); }
         }
+
+
 
         .buttons {
             display: grid;
@@ -236,9 +270,7 @@
     <div class="calculator">
         <div class="title">🧮 Smart Multi-Notation Calculator</div>
         
-        <div class="status-display" id="status">Smart Mode: Auto-detecting notation...</div>
         <div class="stack-display" id="stack">Stack: []</div>
-        <div class="display" id="display">0</div>
         
         <div class="buttons">
             <button class="btn clear" onclick="clearAll()">AC</button>
@@ -272,9 +304,7 @@
         // Calculator state
         let stack = [];
         let currentInput = '';
-        let display = document.getElementById('display');
         let stackDisplay = document.getElementById('stack');
-        let statusDisplay = document.getElementById('status');
 
         // Operator functions
         const operators = {
@@ -285,133 +315,152 @@
         };
 
         function updateDisplay() {
-            display.textContent = currentInput || '0';
             updateStackDisplay();
         }
 
         function updateStackDisplay() {
             stackDisplay.innerHTML = '';
             
-            // Add stack label
-            const label = document.createElement('span');
-            label.className = 'stack-label';
-            label.textContent = 'Stack:';
-            stackDisplay.appendChild(label);
-            
-            if (stack.length === 0) {
+            if (stack.length === 0 && !currentInput) {
                 const emptyMsg = document.createElement('span');
-                emptyMsg.className = 'stack-label';
-                emptyMsg.textContent = 'Empty';
-                emptyMsg.style.fontStyle = 'italic';
+                emptyMsg.className = 'empty-display';
+                emptyMsg.textContent = '0';
                 stackDisplay.appendChild(emptyMsg);
                 return;
             }
             
-            // Determine what needs highlighting
-            const highlightInfo = getHighlightInfo();
+            // Analyze stack for grouping opportunities
+            const groups = analyzeStackForGrouping();
             
-            stack.forEach((item, index) => {
-                const itemElement = document.createElement('span');
-                itemElement.className = 'stack-item';
-                itemElement.textContent = item;
-                
-                if (typeof item === 'number') {
-                    itemElement.classList.add('number');
-                } else {
-                    itemElement.classList.add('operator');
+            // Render groups
+            groups.forEach(group => {
+                if (group.type === 'single') {
+                    const itemElement = createStackItem(group.item);
+                    stackDisplay.appendChild(itemElement);
+                } else if (group.type === 'group') {
+                    const groupElement = createStackGroup(group.items, group.groupType);
+                    stackDisplay.appendChild(groupElement);
                 }
-                
-                // Apply highlighting based on what's needed
-                if (highlightInfo.highlightIndices.includes(index)) {
-                    if (highlightInfo.needsNumber && typeof item === 'number') {
-                        itemElement.classList.add('highlighted-number');
-                    } else if (highlightInfo.needsOperator && typeof item === 'string') {
-                        itemElement.classList.add('highlighted-operator');
+            });
+            
+            // Add current input if any
+            if (currentInput) {
+                const inputElement = document.createElement('span');
+                inputElement.className = 'current-input';
+                inputElement.textContent = currentInput;
+                stackDisplay.appendChild(inputElement);
+            }
+        }
+
+        function analyzeStackForGrouping() {
+            if (stack.length === 0) return [];
+            
+            const groups = [];
+            let i = 0;
+            
+            while (i < stack.length) {
+                // Look for groupable patterns
+                if (i <= stack.length - 3) {
+                    const triple = [stack[i], stack[i + 1], stack[i + 2]];
+                    
+                    // Check if this is a complete expression
+                    if (isCompleteExpression(triple)) {
+                        groups.push({
+                            type: 'group',
+                            items: triple,
+                            groupType: 'ready-to-compute'
+                        });
+                        i += 3;
+                        continue;
                     }
                 }
                 
-                stackDisplay.appendChild(itemElement);
-            });
+                // Look for partial expressions (pairs)
+                if (i <= stack.length - 2) {
+                    const pair = [stack[i], stack[i + 1]];
+                    
+                    // Check if this forms a meaningful partial expression
+                    if (isPartialExpression(pair, i === stack.length - 2)) {
+                        groups.push({
+                            type: 'group',
+                            items: pair,
+                            groupType: 'partial-expression'
+                        });
+                        i += 2;
+                        continue;
+                    }
+                }
+                
+                // Single item
+                groups.push({
+                    type: 'single',
+                    item: stack[i]
+                });
+                i++;
+            }
+            
+            return groups;
         }
 
-        function getHighlightInfo() {
-            // Determine what's needed to complete an expression
-            if (stack.length === 0) return { highlightIndices: [], needsNumber: false, needsOperator: false };
-            
-            const last = stack[stack.length - 1];
-            const secondLast = stack.length > 1 ? stack[stack.length - 2] : null;
-            const thirdLast = stack.length > 2 ? stack[stack.length - 3] : null;
-            
-            // Check if we can compute with what we have
-            if (stack.length >= 3 && canCompute()) {
-                // We have a complete expression, highlight the last 3 that will be computed
-                return { 
-                    highlightIndices: [stack.length - 3, stack.length - 2, stack.length - 1], 
-                    needsNumber: false, 
-                    needsOperator: false 
-                };
-            }
-            
-            // Check what we need to complete an expression
-            if (stack.length === 1) {
-                if (typeof last === 'number') {
-                    // Need an operator for infix, or another number for postfix
-                    return { highlightIndices: [stack.length - 1], needsNumber: false, needsOperator: true };
-                } else {
-                    // Need a number for prefix
-                    return { highlightIndices: [stack.length - 1], needsNumber: true, needsOperator: false };
-                }
-            }
-            
-            if (stack.length === 2) {
-                if (typeof last === 'number' && typeof secondLast === 'number') {
-                    // Two numbers, need an operator
-                    return { 
-                        highlightIndices: [stack.length - 2, stack.length - 1], 
-                        needsNumber: false, 
-                        needsOperator: true 
-                    };
-                } else if (typeof last === 'string' && typeof secondLast === 'string') {
-                    // Two operators, only highlight the last one (it needs a number)
-                    return { 
-                        highlightIndices: [stack.length - 1], 
-                        needsNumber: true, 
-                        needsOperator: false 
-                    };
-                } else {
-                    // Mixed, need to complete the pattern
-                    return { 
-                        highlightIndices: [stack.length - 2, stack.length - 1], 
-                        needsNumber: typeof last === 'string', 
-                        needsOperator: typeof last === 'number' 
-                    };
-                }
-            }
-            
-            // For longer stacks, highlight the last two elements if they don't form a complete expression
-            return { 
-                highlightIndices: [stack.length - 2, stack.length - 1], 
-                needsNumber: typeof last === 'string', 
-                needsOperator: typeof last === 'number' 
-            };
+        function isCompleteExpression(triple) {
+            const [a, b, c] = triple;
+            return (
+                (typeof a === 'number' && typeof b === 'number' && typeof c === 'string') || // postfix
+                (typeof a === 'string' && typeof b === 'number' && typeof c === 'number') || // prefix
+                (typeof a === 'number' && typeof b === 'string' && typeof c === 'number')    // infix
+            );
         }
 
-        function updateStatus() {
-            const operatorCount = stack.filter(item => typeof item === 'string').length;
-            const numberCount = stack.filter(item => typeof item === 'number').length;
+        function isPartialExpression(pair, isLast) {
+            const [a, b] = pair;
             
-            if (currentInput) {
-                statusDisplay.textContent = `🧠 Smart Mode: ${numberCount} numbers, ${operatorCount} operators in stack + 1 number being entered`;
+            // Only group the last pair if it forms a meaningful partial expression
+            if (!isLast) return false;
+            
+            // Number + operator (waiting for second operand)
+            if (typeof a === 'number' && typeof b === 'string') return true;
+            
+            // Operator + number (prefix, waiting for second operand)
+            if (typeof a === 'string' && typeof b === 'number') return true;
+            
+            // Two numbers (waiting for operator)
+            if (typeof a === 'number' && typeof b === 'number') return true;
+            
+            return false;
+        }
+
+        function createStackItem(item) {
+            const itemElement = document.createElement('span');
+            itemElement.className = 'stack-item';
+            itemElement.textContent = item;
+            
+            if (typeof item === 'number') {
+                itemElement.classList.add('number');
             } else {
-                statusDisplay.textContent = `🧠 Smart Mode: ${numberCount} numbers, ${operatorCount} operators in stack`;
+                itemElement.classList.add('operator');
             }
+            
+            return itemElement;
         }
+
+        function createStackGroup(items, groupType) {
+            const groupElement = document.createElement('div');
+            groupElement.className = `stack-group ${groupType}`;
+            
+            items.forEach(item => {
+                const itemElement = createStackItem(item);
+                groupElement.appendChild(itemElement);
+            });
+            
+            return groupElement;
+        }
+
+
 
         function clearAll() {
             stack = [];
             currentInput = '';
             updateDisplay();
-            updateStatus();
         }
 
         function deleteLast() {
@@ -428,7 +477,6 @@
                 currentInput += num;
             }
             updateDisplay();
-            updateStatus();
         }
 
         function inputOperator(op) {
@@ -447,7 +495,6 @@
             tryCompute();
             
             updateDisplay();
-            updateStatus();
         }
 
         function compute() {
@@ -461,7 +508,6 @@
             tryCompute();
             
             updateDisplay();
-            updateStatus();
         }
 
         function tryCompute() {
@@ -526,9 +572,6 @@
             if (result !== undefined) {
                 // Remove the computed elements and replace with result
                 stack.splice(-3, 3, result);
-                
-                // Show what was computed
-                statusDisplay.textContent = `✅ Computed: ${first} ${second} ${third} = ${result} (${notation})`;
             }
         }
 
@@ -554,7 +597,6 @@
 
         // Initialize
         updateDisplay();
-        updateStatus();
 
         // Focus on load for keyboard support
         window.addEventListener('load', () => {
