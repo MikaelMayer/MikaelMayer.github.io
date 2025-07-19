@@ -359,9 +359,25 @@
             let i = 0;
             
             while (i < stack.length) {
-                // Look for groupable patterns - prioritize longer patterns first
+                // Greedy left-to-right grouping, prioritizing operator building
                 
-                // First try to find complete expressions (ready to compute)
+                // Look for operator patterns first (number + operator, operator + number)
+                if (i <= stack.length - 2) {
+                    const pair = [stack[i], stack[i + 1]];
+                    
+                    // Greedily group operator patterns
+                    if (isPartialExpression(pair, i === stack.length - 2)) {
+                        groups.push({
+                            type: 'group',
+                            items: pair,
+                            groupType: 'partial-expression'
+                        });
+                        i += 2;
+                        continue;
+                    }
+                }
+                
+                // Only look for complete expressions if we can't build operator patterns
                 if (i <= stack.length - 3) {
                     const triple = [stack[i], stack[i + 1], stack[i + 2]];
                     
@@ -372,21 +388,6 @@
                             groupType: 'ready-to-compute'
                         });
                         i += 3;
-                        continue;
-                    }
-                }
-                
-                // Then look for partial expressions (meaningful pairs)
-                if (i <= stack.length - 2) {
-                    const pair = [stack[i], stack[i + 1]];
-                    
-                    if (isPartialExpression(pair, i === stack.length - 2)) {
-                        groups.push({
-                            type: 'group',
-                            items: pair,
-                            groupType: 'partial-expression'
-                        });
-                        i += 2;
                         continue;
                     }
                 }
@@ -414,15 +415,15 @@
         function isPartialExpression(pair, isLast) {
             const [a, b] = pair;
             
-            // Group meaningful pairs anywhere in the stack, not just at the end
+            // Greedily group operator patterns anywhere in the stack
             
-            // Number + operator (waiting for second operand)
+            // Number + operator (partial infix operation)
             if (typeof a === 'number' && typeof b === 'string') return true;
             
-            // Operator + number (prefix, waiting for second operand)
+            // Operator + number (partial prefix operation)
             if (typeof a === 'string' && typeof b === 'number') return true;
             
-            // Two numbers (waiting for operator) - only group if at the end
+            // Two numbers only at the end (waiting for operator)
             if (typeof a === 'number' && typeof b === 'number' && isLast) return true;
             
             return false;
