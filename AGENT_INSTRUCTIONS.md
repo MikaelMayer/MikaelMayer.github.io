@@ -17,20 +17,24 @@ When creating ANY web application:
 1. **Write to `preview.html`** - Never ask where to put it
 2. **Make it mobile-responsive** - Most testing happens on mobile
 3. **Include everything in ONE file** - HTML, CSS, JS all together
-4. **Always provide the magic link**: 
-   ```
-   🚀 **Try your app**: file:///workspace/preview.html
-   📱 **Mobile-friendly** - bookmark this link!
+4. **Commit and push**: Run `./update-preview.sh "App description"`
+5. **Always provide BOTH links**: 
+        ```
+     🚀 **Try your app instantly**: 
+     https://raw.githubusercontent.com/MikaelMayer/MikaelMayer.github.io/master/preview.html
+   
+   🏠 **Local preview**: file:///workspace/preview.html
+   📱 **Mobile tip**: Bookmark the raw GitHub link for instant access anywhere!
    ```
 
-5. **Include these features for better UX**:
+6. **Include these features for better UX**:
    - **Mobile-first responsive design**
    - Modern CSS with proper typography  
    - Touch-friendly buttons and interactions
    - Error handling for JavaScript
    - Fast loading (inline everything)
 
-6. **Common libraries you can use** (via CDN):
+7. **Common libraries you can use** (via CDN):
    - **React**: `https://unpkg.com/react@18/umd/react.development.js`
    - **Vue**: `https://unpkg.com/vue@3/dist/vue.global.js`
    - **Alpine.js**: `https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js`
@@ -49,9 +53,10 @@ I've created your [app description] app!
 - [Any special functionality]
 
 **🚀 Try it instantly:**
-**file:///workspace/preview.html**
+https://raw.githubusercontent.com/MikaelMayer/MikaelMayer.github.io/main/preview.html
 
-📱 **Mobile tip**: Bookmark this link for easy access!
+**🏠 Local preview:** file:///workspace/preview.html
+📱 **Mobile tip**: Bookmark the raw GitHub link for instant access anywhere!
 
 The app is ready to use immediately - just refresh the page!
 ```
@@ -112,19 +117,23 @@ workspace/
 
 ## 🔗 Quick Access
 
-**The only link you need:**
+**🚀 INSTANT raw GitHub link (bookmark this!):**
+```
+https://raw.githubusercontent.com/MikaelMayer/MikaelMayer.github.io/master/preview.html
+```
+
+**📱 Mobile setup:**
+1. Bookmark the raw GitHub link above
+2. Any agent-created app appears instantly (no 1-minute delay!)
+3. Just refresh to see updates immediately
+4. Works on any device with internet
+
+**Local development:**
 ```
 file:///workspace/preview.html
 ```
 
-**📱 Mobile setup:**
-1. Open the link once on your mobile browser
-2. Bookmark it for instant access
-3. Any agent-created app appears here immediately
-4. Just refresh to see updates!
-
-**🌐 Share via GitHub Pages:**
-If this is a git repo, shareable link is:
+**🌐 GitHub Pages (slower, 1-min delay):**
 ```
-https://username.github.io/repo-name/preview.html
+https://mikaelmayer.github.io/preview.html
 ```
