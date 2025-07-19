@@ -22,7 +22,7 @@ The README contains:
 
 The system generates URLs like:
 ```
-https://raw.githubusercontent.com/MikaelMayer/MikaelMayer.github.io/master/preview.html?branch=CURRENT_BRANCH&path=filename.html
+https://mikaelmayer.github.io/preview.html?branch=CURRENT_BRANCH&path=filename.html
 ```
 
 This allows instant access to any app from any branch via raw GitHub content.

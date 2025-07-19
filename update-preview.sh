@@ -21,7 +21,7 @@ echo "📁 File: $FILENAME"
 echo "🌿 Branch: $CURRENT_BRANCH"
 
 if [ "$FILENAME" = "preview.html" ]; then
-    echo "🚀 Instant access: https://raw.githubusercontent.com/MikaelMayer/MikaelMayer.github.io/master/preview.html"
+    echo "🚀 Instant access: https://mikaelmayer.github.io/preview.html"
 else
-    echo "🚀 Instant access: https://raw.githubusercontent.com/MikaelMayer/MikaelMayer.github.io/master/preview.html?branch=$CURRENT_BRANCH&path=$FILENAME"
+    echo "🚀 Instant access: https://mikaelmayer.github.io/preview.html?branch=$CURRENT_BRANCH&path=$FILENAME"
 fi

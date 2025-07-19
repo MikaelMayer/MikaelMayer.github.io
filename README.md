@@ -18,7 +18,7 @@ When asked to create any web application, follow these steps:
 ### 3. **Provide the Magic URL**
 The script will output an instant preview URL like:
 ```
-🚀 Instant access: https://raw.githubusercontent.com/MikaelMayer/MikaelMayer.github.io/master/preview.html?branch=BRANCH_NAME&path=your-app-name.html
+🚀 Instant access: https://mikaelmayer.github.io/preview.html?branch=BRANCH_NAME&path=your-app-name.html
 ```
 
 ## 📱 URL System Explained
@@ -30,6 +30,11 @@ The preview system uses dynamic URLs that load any HTML file from any branch:
   - `preview.html?branch=main&path=calculator.html`
   - `preview.html?branch=feature-game&path=snake.html` 
   - `preview.html?path=todo-app.html` (uses current branch)
+
+**How it works:**
+- `preview.html` is served from GitHub Pages (proper HTML rendering)
+- App content is fetched from raw GitHub (instant updates)
+- Best of both worlds: proper rendering + instant content updates!
 
 ## 🎯 Response Template
 
@@ -44,7 +49,7 @@ I've created your [APP_NAME]!
 - [Any special functionality]
 
 **🚀 Try it instantly:**
-https://raw.githubusercontent.com/MikaelMayer/MikaelMayer.github.io/master/preview.html?branch=CURRENT_BRANCH&path=FILENAME.html
+https://mikaelmayer.github.io/preview.html?branch=CURRENT_BRANCH&path=FILENAME.html
 
 **🏠 Local preview:** file:///workspace/FILENAME.html
 📱 **Mobile magic**: The URL works instantly on any device!
@@ -181,7 +186,7 @@ const data = saved ? JSON.parse(saved) : defaultData;
 The user experience is:
 1. User asks for an app
 2. Agent creates it and provides instant URL
-3. User bookmarks: `https://raw.githubusercontent.com/MikaelMayer/MikaelMayer.github.io/master/preview.html`
+3. User bookmarks: `https://mikaelmayer.github.io/preview.html`
 4. Any future app URLs work with that same bookmark
 5. Apps load instantly via raw GitHub (no delays!)
 
@@ -240,7 +245,7 @@ I've created a Snake Game for you!
 - Smooth animations and modern glassmorphism design
 
 **🚀 Try it instantly:**
-https://raw.githubusercontent.com/MikaelMayer/MikaelMayer.github.io/master/preview.html?branch=cursor/streamline-agent-html-preview-fe49&path=snake-game.html
+https://mikaelmayer.github.io/preview.html?branch=cursor/streamline-agent-html-preview-fe49&path=snake-game.html
 
 **🏠 Local preview:** file:///workspace/snake-game.html
 📱 **Mobile magic**: The URL works instantly on any device!
