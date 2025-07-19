@@ -40,34 +40,7 @@
             font-weight: 600;
         }
 
-        .notation-selector {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            justify-content: center;
-        }
 
-        .notation-btn {
-            background: rgba(20, 20, 35, 0.8);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            color: #e0e0e0;
-            font-size: 0.9em;
-            padding: 8px 16px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .notation-btn.active {
-            background: rgba(0, 255, 136, 0.3);
-            color: #00ff88;
-            border-color: rgba(0, 255, 136, 0.5);
-        }
-
-        .notation-btn:hover {
-            background: rgba(40, 40, 60, 0.9);
-            border-color: rgba(255, 255, 255, 0.2);
-        }
 
         .display {
             background: rgba(0, 0, 0, 0.8);
@@ -201,25 +174,14 @@
                 font-size: 1.5em;
                 padding: 15px;
             }
-
-            .notation-btn {
-                font-size: 0.8em;
-                padding: 6px 12px;
-            }
         }
     </style>
 </head>
 <body>
     <div class="calculator">
-        <div class="title">🧮 Multi-Notation Calculator</div>
+        <div class="title">🧮 Smart Multi-Notation Calculator</div>
         
-        <div class="notation-selector">
-            <button class="notation-btn active" onclick="setNotation('infix')">Infix</button>
-            <button class="notation-btn" onclick="setNotation('prefix')">Prefix</button>
-            <button class="notation-btn" onclick="setNotation('postfix')">Postfix</button>
-        </div>
-
-        <div class="status-display" id="status">Mode: Infix (5 + 3)</div>
+        <div class="status-display" id="status">Smart Mode: Auto-detecting notation...</div>
         <div class="stack-display" id="stack">Stack: []</div>
         <div class="display" id="display">0</div>
         
@@ -249,23 +211,23 @@
         </div>
         
         <div class="demo-info">
-            ✨ <strong>Infix:</strong> 5 + 3 ↵ (auto-compute)<br>
-            🔄 <strong>Prefix:</strong> + ↵ 5 ↵ 3 ↵ (shows pending)<br>
-            📚 <strong>Postfix:</strong> 5 ↵ 3 ↵ + (immediate compute)<br>
-            🎯 <strong>"↵" button:</strong> Push to stack/Compute
+            🧠 <strong>Smart Detection:</strong> Just start typing!<br>
+            ✨ <strong>Infix:</strong> 5 + 3 ↵ → auto-detects & computes<br>
+            🔄 <strong>Prefix:</strong> + ↵ 5 ↵ 3 ↵ → detects & shows pending<br>
+            📚 <strong>Postfix:</strong> 5 ↵ 3 ↵ + → detects & computes immediately
         </div>
     </div>
 
     <script>
         // Calculator state
-        let notation = 'infix';
         let stack = [];
         let currentInput = '';
         let display = document.getElementById('display');
         let stackDisplay = document.getElementById('stack');
         let statusDisplay = document.getElementById('status');
         let pendingOperation = null;
-        let waitingForOperand = false;
+        let detectedNotation = 'unknown';
+        let inputHistory = [];
 
         // Operator functions
         const operators = {
@@ -275,17 +237,39 @@
             '/': (a, b) => b !== 0 ? a / b : NaN
         };
 
-        function setNotation(newNotation) {
-            notation = newNotation;
+        function detectNotation(inputType, value) {
+            inputHistory.push({type: inputType, value: value});
             
-            // Update button styles
-            document.querySelectorAll('.notation-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.classList.add('active');
+            // Keep only last 5 inputs for pattern detection
+            if (inputHistory.length > 5) {
+                inputHistory.shift();
+            }
             
-            // Reset calculator state
-            clearAll();
+            // Pattern detection logic
+            if (inputHistory.length >= 2) {
+                const recent = inputHistory.slice(-2);
+                
+                // Prefix: operator first, then numbers
+                if (recent[0].type === 'operator' && recent[1].type === 'number') {
+                    detectedNotation = 'prefix';
+                }
+                // Infix: number, operator, number pattern
+                else if (inputHistory.length >= 3) {
+                    const last3 = inputHistory.slice(-3);
+                    if (last3[0].type === 'number' && last3[1].type === 'operator' && last3[2].type === 'number') {
+                        detectedNotation = 'infix';
+                    }
+                }
+                // Postfix: two numbers followed by operator
+                else if (stack.length >= 1 && recent[0].type === 'number' && recent[1].type === 'operator') {
+                    detectedNotation = 'postfix';
+                }
+                // Default to infix for number-operator pattern
+                else if (recent[0].type === 'number' && recent[1].type === 'operator') {
+                    detectedNotation = 'infix';
+                }
+            }
+            
             updateStatus();
         }
 
@@ -296,24 +280,31 @@
 
         function updateStatus() {
             let statusText = '';
-            switch (notation) {
+            switch (detectedNotation) {
                 case 'infix':
-                    statusText = 'Mode: Infix (5 + 3)';
+                    statusText = '🔍 Detected: Infix (5 + 3)';
                     if (pendingOperation) {
                         statusText += ` - Pending: ${stack[0]} ${pendingOperation}`;
                     }
                     break;
                 case 'prefix':
-                    statusText = 'Mode: Prefix (+ 5 3)';
+                    statusText = '🔍 Detected: Prefix (+ 5 3)';
                     if (pendingOperation) {
-                        statusText += ` - Waiting for: ${pendingOperation} ? ?`;
+                        statusText += ` - Waiting: ${pendingOperation}`;
                         if (stack.length > 0) {
-                            statusText = statusText.replace('? ?', `${stack[0]} ?`);
+                            statusText += ` ${stack[0]}`;
+                        }
+                        if (stack.length > 1) {
+                            statusText += ` ${stack[1]}`;
                         }
                     }
                     break;
                 case 'postfix':
-                    statusText = 'Mode: Postfix (5 3 +)';
+                    statusText = '🔍 Detected: Postfix (5 3 +)';
+                    break;
+                case 'unknown':
+                default:
+                    statusText = '🧠 Smart Mode: Watching your input pattern...';
                     break;
             }
             statusDisplay.textContent = statusText;
@@ -323,7 +314,8 @@
             stack = [];
             currentInput = '';
             pendingOperation = null;
-            waitingForOperand = false;
+            detectedNotation = 'unknown';
+            inputHistory = [];
             updateDisplay();
             updateStatus();
         }
@@ -347,7 +339,11 @@
         function inputOperator(op) {
             const calcOp = op === '×' ? '*' : op;
             
-            switch (notation) {
+            // Record this as an operator input for pattern detection
+            detectNotation('operator', calcOp);
+            
+            // Handle based on detected or assumed notation
+            switch (detectedNotation) {
                 case 'infix':
                     handleInfixOperator(calcOp);
                     break;
@@ -356,6 +352,22 @@
                     break;
                 case 'postfix':
                     handlePostfixOperator(calcOp);
+                    break;
+                default:
+                    // If unknown, try to determine based on current state
+                    if (currentInput && stack.length === 0) {
+                        // Number then operator - likely infix
+                        detectedNotation = 'infix';
+                        handleInfixOperator(calcOp);
+                    } else if (!currentInput && stack.length === 0) {
+                        // Operator first - likely prefix
+                        detectedNotation = 'prefix';
+                        handlePrefixOperator(calcOp);
+                    } else if (stack.length >= 1) {
+                        // Numbers in stack, operator now - likely postfix
+                        detectedNotation = 'postfix';
+                        handlePostfixOperator(calcOp);
+                    }
                     break;
             }
         }
@@ -407,7 +419,12 @@
         }
 
         function compute() {
-            switch (notation) {
+            // Record this as a number push for pattern detection
+            if (currentInput) {
+                detectNotation('number', parseFloat(currentInput));
+            }
+            
+            switch (detectedNotation) {
                 case 'infix':
                     computeInfix();
                     break;
@@ -416,6 +433,15 @@
                     break;
                 case 'postfix':
                     computePostfix();
+                    break;
+                default:
+                    // Default behavior - just push to stack
+                    if (currentInput) {
+                        stack.push(parseFloat(currentInput));
+                        currentInput = '';
+                        updateDisplay();
+                        updateStatus();
+                    }
                     break;
             }
         }
@@ -481,14 +507,8 @@
                 compute();
             } else if (e.key === 'Escape' || e.key === 'c' || e.key === 'C') {
                 clearAll();
-            } else if (e.key === 'Backspace') {
+                         } else if (e.key === 'Backspace') {
                 deleteLast();
-            } else if (e.key === 'i' || e.key === 'I') {
-                setNotation('infix');
-            } else if (e.key === 'p' || e.key === 'P') {
-                setNotation('prefix');
-            } else if (e.key === 's' || e.key === 'S') {
-                setNotation('postfix');
             }
         });
 
