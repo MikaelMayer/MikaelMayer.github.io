@@ -359,11 +359,12 @@
             let i = 0;
             
             while (i < stack.length) {
-                // Look for groupable patterns
+                // Look for groupable patterns - prioritize longer patterns first
+                
+                // First try to find complete expressions (ready to compute)
                 if (i <= stack.length - 3) {
                     const triple = [stack[i], stack[i + 1], stack[i + 2]];
                     
-                    // Check if this is a complete expression
                     if (isCompleteExpression(triple)) {
                         groups.push({
                             type: 'group',
@@ -375,11 +376,10 @@
                     }
                 }
                 
-                // Look for partial expressions (pairs)
+                // Then look for partial expressions (meaningful pairs)
                 if (i <= stack.length - 2) {
                     const pair = [stack[i], stack[i + 1]];
                     
-                    // Check if this forms a meaningful partial expression
                     if (isPartialExpression(pair, i === stack.length - 2)) {
                         groups.push({
                             type: 'group',
@@ -391,7 +391,7 @@
                     }
                 }
                 
-                // Single item
+                // Single item that couldn't be grouped
                 groups.push({
                     type: 'single',
                     item: stack[i]
@@ -414,8 +414,7 @@
         function isPartialExpression(pair, isLast) {
             const [a, b] = pair;
             
-            // Only group the last pair if it forms a meaningful partial expression
-            if (!isLast) return false;
+            // Group meaningful pairs anywhere in the stack, not just at the end
             
             // Number + operator (waiting for second operand)
             if (typeof a === 'number' && typeof b === 'string') return true;
@@ -423,8 +422,8 @@
             // Operator + number (prefix, waiting for second operand)
             if (typeof a === 'string' && typeof b === 'number') return true;
             
-            // Two numbers (waiting for operator)
-            if (typeof a === 'number' && typeof b === 'number') return true;
+            // Two numbers (waiting for operator) - only group if at the end
+            if (typeof a === 'number' && typeof b === 'number' && isLast) return true;
             
             return false;
         }
