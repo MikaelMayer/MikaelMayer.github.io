@@ -3,40 +3,409 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🤖 Agent Preview</title>
+    <title>🤖 Dynamic Agent Preview</title>
     <style>
+        :root {
+            --primary: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
             font-family: system-ui, -apple-system, sans-serif;
-            margin: 0;
-            padding: 20px;
+            background: var(--bg);
+            color: #1e293b;
+            line-height: 1.6;
+        }
+
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
+            z-index: 1000;
+            transition: opacity 0.3s ease;
+        }
+
+        .loading.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-content {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            max-width: 400px;
+            margin: 20px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: var(--error);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px;
             text-align: center;
         }
+
+        .error h2 {
+            margin-bottom: 10px;
+        }
+
+        .error pre {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
         .welcome {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
             border-radius: 20px;
             padding: 40px;
             border: 1px solid rgba(255, 255, 255, 0.2);
-            max-width: 500px;
+            max-width: 600px;
+            margin: 20px;
+            text-align: center;
         }
-        h1 { margin-bottom: 20px; font-size: 2em; }
-        p { margin-bottom: 15px; opacity: 0.9; line-height: 1.6; }
-        .emoji { font-size: 3em; margin-bottom: 20px; }
+
+        .welcome h1 {
+            margin-bottom: 20px;
+            font-size: 2em;
+        }
+
+        .welcome p {
+            margin-bottom: 15px;
+            opacity: 0.9;
+        }
+
+        .emoji {
+            font-size: 3em;
+            margin-bottom: 20px;
+        }
+
+        .url-info {
+            background: rgba(0, 0, 0, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            text-align: left;
+        }
+
+        .url-info strong {
+            color: var(--primary);
+        }
+
+        #appContainer {
+            width: 100%;
+            height: 100vh;
+            border: none;
+            display: none;
+        }
+
+        .controls {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: var(--surface);
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+            display: none;
+        }
+
+        .controls.visible {
+            display: block;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 5px;
+            background: var(--primary);
+            color: white;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 5px;
+        }
+
+        .btn:hover {
+            background: #1d4ed8;
+        }
+
+        @media (max-width: 768px) {
+            .welcome, .loading-content {
+                margin: 10px;
+                padding: 20px;
+            }
+            
+            .controls {
+                top: 5px;
+                right: 5px;
+                padding: 5px;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="welcome">
-        <div class="emoji">🤖✨</div>
-        <h1>Agent Preview Ready</h1>
-        <p>This file is ready for agents to create amazing apps!</p>
-        <p>Just ask an agent to build something and it will appear here instantly.</p>
-        <p><strong>Bookmark this page</strong> for easy mobile access.</p>
+    <div id="loadingScreen" class="loading">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <h2>Loading App...</h2>
+            <p id="loadingMessage">Fetching from GitHub...</p>
+        </div>
     </div>
+
+    <div id="errorContainer" class="error" style="display: none;">
+        <h2>❌ Failed to Load App</h2>
+        <p id="errorMessage"></p>
+        <pre id="errorDetails"></pre>
+        <button class="btn" onclick="location.reload()">🔄 Retry</button>
+    </div>
+
+    <div id="welcomeScreen" class="loading" style="display: none;">
+        <div class="welcome">
+            <div class="emoji">🤖✨</div>
+            <h1>Dynamic Agent Preview</h1>
+            <p>This system can load any HTML file from any branch!</p>
+            
+            <div class="url-info">
+                <strong>URL Format:</strong><br>
+                preview.html?branch=<em>branch-name</em>&path=<em>file.html</em><br><br>
+                
+                <strong>Examples:</strong><br>
+                ?branch=feature-game&path=snake-game.html<br>
+                ?branch=main&path=calculator.html<br>
+                ?path=my-app.html (uses current branch)<br><br>
+                
+                <strong>Current:</strong> <span id="currentParams">No parameters</span>
+            </div>
+            
+            <p><strong>Ask any agent to create an app and provide the magic URL!</strong></p>
+        </div>
+    </div>
+
+    <iframe id="appContainer"></iframe>
+
+    <div id="controls" class="controls">
+        <button class="btn" onclick="toggleFrame()">📱 Toggle Frame</button>
+        <button class="btn" onclick="openDirect()">🚀 Open Direct</button>
+        <button class="btn" onclick="showInfo()">ℹ️ Info</button>
+    </div>
+
+    <script>
+        class DynamicPreview {
+            constructor() {
+                this.baseUrl = 'https://raw.githubusercontent.com/MikaelMayer/MikaelMayer.github.io';
+                this.defaultBranch = 'master';
+                this.defaultPath = 'preview.html';
+                this.currentUrl = '';
+                this.init();
+            }
+
+            init() {
+                const params = this.parseUrlParams();
+                
+                if (params.branch || params.path) {
+                    this.loadApp(params);
+                } else {
+                    this.showWelcome();
+                }
+            }
+
+            parseUrlParams() {
+                const urlParams = new URLSearchParams(window.location.search);
+                return {
+                    branch: urlParams.get('branch') || this.defaultBranch,
+                    path: urlParams.get('path') || null
+                };
+            }
+
+            async loadApp(params) {
+                this.showLoading();
+                
+                try {
+                    const branch = params.branch || this.defaultBranch;
+                    const path = params.path || this.defaultPath;
+                    
+                    // If no specific path and no branch specified, load default content
+                    if (!params.path && !params.branch) {
+                        this.showWelcome();
+                        return;
+                    }
+                    
+                    this.currentUrl = `${this.baseUrl}/${branch}/${path}`;
+                    
+                    document.getElementById('loadingMessage').textContent = 
+                        `Loading ${path} from ${branch} branch...`;
+                    
+                    // Check if file exists by fetching it
+                    const response = await fetch(this.currentUrl);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const content = await response.text();
+                    
+                    // Check if it's HTML content
+                    if (!content.includes('<html') && !content.includes('<!DOCTYPE')) {
+                        throw new Error('File does not appear to be valid HTML');
+                    }
+                    
+                    this.displayApp(content);
+                    
+                } catch (error) {
+                    this.showError(error, params);
+                }
+            }
+
+            displayApp(content) {
+                const iframe = document.getElementById('appContainer');
+                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                
+                doc.open();
+                doc.write(content);
+                doc.close();
+                
+                // Show the app
+                document.getElementById('loadingScreen').classList.add('hidden');
+                document.getElementById('appContainer').style.display = 'block';
+                document.getElementById('controls').classList.add('visible');
+                
+                // Update page title if possible
+                try {
+                    const title = doc.querySelector('title');
+                    if (title) {
+                        document.title = title.textContent + ' - Agent Preview';
+                    }
+                } catch (e) {
+                    // Ignore cross-origin errors
+                }
+            }
+
+            showWelcome() {
+                const params = this.parseUrlParams();
+                document.getElementById('currentParams').textContent = 
+                    window.location.search || 'No parameters';
+                
+                document.getElementById('loadingScreen').style.display = 'none';
+                document.getElementById('welcomeScreen').style.display = 'flex';
+            }
+
+            showLoading() {
+                document.getElementById('loadingScreen').style.display = 'flex';
+                document.getElementById('loadingScreen').classList.remove('hidden');
+                document.getElementById('welcomeScreen').style.display = 'none';
+                document.getElementById('errorContainer').style.display = 'none';
+                document.getElementById('appContainer').style.display = 'none';
+                document.getElementById('controls').classList.remove('visible');
+            }
+
+            showError(error, params) {
+                document.getElementById('loadingScreen').classList.add('hidden');
+                document.getElementById('errorContainer').style.display = 'block';
+                
+                const errorMsg = document.getElementById('errorMessage');
+                const errorDetails = document.getElementById('errorDetails');
+                
+                errorMsg.textContent = error.message;
+                errorDetails.textContent = `URL: ${this.currentUrl}\nBranch: ${params.branch}\nPath: ${params.path}`;
+            }
+
+            // Control functions
+            toggleFrame() {
+                const iframe = document.getElementById('appContainer');
+                if (iframe.style.height === '100vh') {
+                    iframe.style.height = '80vh';
+                    iframe.style.margin = '10vh 10vw';
+                    iframe.style.borderRadius = '10px';
+                    iframe.style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)';
+                } else {
+                    iframe.style.height = '100vh';
+                    iframe.style.margin = '0';
+                    iframe.style.borderRadius = '0';
+                    iframe.style.boxShadow = 'none';
+                }
+            }
+
+            openDirect() {
+                if (this.currentUrl) {
+                    window.open(this.currentUrl, '_blank');
+                }
+            }
+
+            showInfo() {
+                const params = this.parseUrlParams();
+                alert(`Current App Info:\n\nURL: ${this.currentUrl}\nBranch: ${params.branch}\nPath: ${params.path}\n\nControls:\n📱 Toggle Frame - Switch between full screen and windowed\n🚀 Open Direct - Open raw GitHub file\nℹ️ Info - This dialog`);
+            }
+        }
+
+        // Global functions for controls
+        let preview;
+        
+        function toggleFrame() {
+            preview.toggleFrame();
+        }
+        
+        function openDirect() {
+            preview.openDirect();
+        }
+        
+        function showInfo() {
+            preview.showInfo();
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            preview = new DynamicPreview();
+        });
+
+        // Handle URL changes (back/forward)
+        window.addEventListener('popstate', () => {
+            location.reload();
+        });
+    </script>
 </body>
 </html>
