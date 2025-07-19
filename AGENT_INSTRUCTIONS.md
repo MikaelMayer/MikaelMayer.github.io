@@ -1,31 +1,31 @@
 # 🤖 Agent Web App Creation Instructions
 
-## 📱 Mobile-First Preview System
+## 📖 Main Instructions
 
-**THE RULE: Always write to `preview.html` for instant mobile-friendly preview!**
+**Agents should read `README.md` for complete instructions.**
 
-When creating ANY web application:
+The README contains:
+- Complete workflow for creating apps
+- Technical requirements and examples
+- Response templates
+- Deployment commands
+- URL generation system
 
-1. **Always overwrite `/workspace/preview.html`** with your complete app
-2. **User bookmarks this file** on mobile for instant access
-3. **Just refresh the page** to see updates - no servers, no complexity!
+## 📱 Quick Summary
 
-## Instructions for Agents
+1. **Create** your HTML app in one file (e.g., `game-name.html`)
+2. **Deploy** with `./update-preview.sh filename.html "Description"`
+3. **Provide** the generated instant preview URL
+4. **Ensure** mobile-responsive design
 
-**ALWAYS do this when creating web apps:**
+## 🔗 Dynamic URL System
 
-1. **Write to `preview.html`** - Never ask where to put it
-2. **Make it mobile-responsive** - Most testing happens on mobile
-3. **Include everything in ONE file** - HTML, CSS, JS all together
-4. **Commit and push**: Run `./update-preview.sh "App description"`
-5. **Always provide the MAGIC URL**: 
-   ```
-   🚀 **Try your app instantly**: 
-   https://raw.githubusercontent.com/MikaelMayer/MikaelMayer.github.io/master/preview.html?branch=BRANCH_NAME&path=FILE_NAME.html
-   
-   🏠 **Local preview**: file:///workspace/FILE_NAME.html
-   📱 **Mobile magic**: The URL works instantly on any device!
-   ```
+The system generates URLs like:
+```
+https://raw.githubusercontent.com/MikaelMayer/MikaelMayer.github.io/master/preview.html?branch=CURRENT_BRANCH&path=filename.html
+```
+
+This allows instant access to any app from any branch via raw GitHub content.
 
 6. **Include these features for better UX**:
    - **Mobile-first responsive design**
