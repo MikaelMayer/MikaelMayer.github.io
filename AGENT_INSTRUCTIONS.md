@@ -18,13 +18,13 @@ When creating ANY web application:
 2. **Make it mobile-responsive** - Most testing happens on mobile
 3. **Include everything in ONE file** - HTML, CSS, JS all together
 4. **Commit and push**: Run `./update-preview.sh "App description"`
-5. **Always provide BOTH links**: 
-        ```
-     🚀 **Try your app instantly**: 
-     https://raw.githubusercontent.com/MikaelMayer/MikaelMayer.github.io/master/preview.html
+5. **Always provide the MAGIC URL**: 
+   ```
+   🚀 **Try your app instantly**: 
+   https://raw.githubusercontent.com/MikaelMayer/MikaelMayer.github.io/master/preview.html?branch=BRANCH_NAME&path=FILE_NAME.html
    
-   🏠 **Local preview**: file:///workspace/preview.html
-   📱 **Mobile tip**: Bookmark the raw GitHub link for instant access anywhere!
+   🏠 **Local preview**: file:///workspace/FILE_NAME.html
+   📱 **Mobile magic**: The URL works instantly on any device!
    ```
 
 6. **Include these features for better UX**:
@@ -53,10 +53,10 @@ I've created your [app description] app!
 - [Any special functionality]
 
 **🚀 Try it instantly:**
-https://raw.githubusercontent.com/MikaelMayer/MikaelMayer.github.io/main/preview.html
+https://raw.githubusercontent.com/MikaelMayer/MikaelMayer.github.io/master/preview.html?branch=BRANCH_NAME&path=FILE_NAME.html
 
-**🏠 Local preview:** file:///workspace/preview.html
-📱 **Mobile tip**: Bookmark the raw GitHub link for instant access anywhere!
+**🏠 Local preview:** file:///workspace/FILE_NAME.html
+📱 **Mobile magic**: The URL works instantly on any device!
 
 The app is ready to use immediately - just refresh the page!
 ```
@@ -117,15 +117,21 @@ workspace/
 
 ## 🔗 Quick Access
 
-**🚀 INSTANT raw GitHub link (bookmark this!):**
+**🚀 MAGIC DYNAMIC PREVIEW (bookmark this!):**
 ```
 https://raw.githubusercontent.com/MikaelMayer/MikaelMayer.github.io/master/preview.html
 ```
 
+**🎯 Dynamic URL System:**
+- `preview.html?branch=my-branch&path=my-app.html` - Load specific file from specific branch
+- `preview.html?path=calculator.html` - Load file from current branch
+- `preview.html?branch=feature-game` - Load preview.html from different branch
+- `preview.html` - Show welcome screen with instructions
+
 **📱 Mobile setup:**
-1. Bookmark the raw GitHub link above
-2. Any agent-created app appears instantly (no 1-minute delay!)
-3. Just refresh to see updates immediately
+1. Bookmark the main preview link above
+2. Agents provide custom URLs with branch/path parameters
+3. Apps load instantly from raw GitHub (no 1-minute delay!)
 4. Works on any device with internet
 
 **Local development:**
