@@ -211,10 +211,11 @@
         </div>
         
         <div class="demo-info">
-            🧠 <strong>Smart Detection:</strong> Just start typing!<br>
-            ✨ <strong>Infix:</strong> 5 + 3 ↵ → auto-detects & computes<br>
-            🔄 <strong>Prefix:</strong> + ↵ 5 ↵ 3 ↵ → detects & shows pending<br>
-            📚 <strong>Postfix:</strong> 5 ↵ 3 ↵ + → detects & computes immediately
+            🧠 <strong>Universal Mode:</strong> All notations work automatically!<br>
+            ✨ <strong>Infix:</strong> 5 + 3 → computes instantly<br>
+            🔄 <strong>Prefix:</strong> + 5 3 → computes instantly<br>
+            📚 <strong>Postfix:</strong> 5 3 + → computes instantly<br>
+            🎯 <strong>Magic:</strong> Any complete expression computes immediately
         </div>
     </div>
 
@@ -225,9 +226,6 @@
         let display = document.getElementById('display');
         let stackDisplay = document.getElementById('stack');
         let statusDisplay = document.getElementById('status');
-        let pendingOperation = null;
-        let detectedNotation = 'unknown';
-        let inputHistory = [];
 
         // Operator functions
         const operators = {
@@ -237,85 +235,25 @@
             '/': (a, b) => b !== 0 ? a / b : NaN
         };
 
-        function detectNotation(inputType, value) {
-            inputHistory.push({type: inputType, value: value});
-            
-            // Keep only last 5 inputs for pattern detection
-            if (inputHistory.length > 5) {
-                inputHistory.shift();
-            }
-            
-            // Pattern detection logic
-            if (inputHistory.length >= 2) {
-                const recent = inputHistory.slice(-2);
-                
-                // Prefix: operator first, then numbers
-                if (recent[0].type === 'operator' && recent[1].type === 'number') {
-                    detectedNotation = 'prefix';
-                }
-                // Infix: number, operator, number pattern
-                else if (inputHistory.length >= 3) {
-                    const last3 = inputHistory.slice(-3);
-                    if (last3[0].type === 'number' && last3[1].type === 'operator' && last3[2].type === 'number') {
-                        detectedNotation = 'infix';
-                    }
-                }
-                // Postfix: two numbers followed by operator
-                else if (stack.length >= 1 && recent[0].type === 'number' && recent[1].type === 'operator') {
-                    detectedNotation = 'postfix';
-                }
-                // Default to infix for number-operator pattern
-                else if (recent[0].type === 'number' && recent[1].type === 'operator') {
-                    detectedNotation = 'infix';
-                }
-            }
-            
-            updateStatus();
-        }
-
         function updateDisplay() {
             display.textContent = currentInput || '0';
             stackDisplay.textContent = `Stack: [${stack.join(', ')}]`;
         }
 
         function updateStatus() {
-            let statusText = '';
-            switch (detectedNotation) {
-                case 'infix':
-                    statusText = '🔍 Detected: Infix (5 + 3)';
-                    if (pendingOperation) {
-                        statusText += ` - Pending: ${stack[0]} ${pendingOperation}`;
-                    }
-                    break;
-                case 'prefix':
-                    statusText = '🔍 Detected: Prefix (+ 5 3)';
-                    if (pendingOperation) {
-                        statusText += ` - Waiting: ${pendingOperation}`;
-                        if (stack.length > 0) {
-                            statusText += ` ${stack[0]}`;
-                        }
-                        if (stack.length > 1) {
-                            statusText += ` ${stack[1]}`;
-                        }
-                    }
-                    break;
-                case 'postfix':
-                    statusText = '🔍 Detected: Postfix (5 3 +)';
-                    break;
-                case 'unknown':
-                default:
-                    statusText = '🧠 Smart Mode: Watching your input pattern...';
-                    break;
+            const operatorCount = stack.filter(item => typeof item === 'string').length;
+            const numberCount = stack.filter(item => typeof item === 'number').length;
+            
+            if (currentInput) {
+                statusDisplay.textContent = `🧠 Smart Mode: ${numberCount} numbers, ${operatorCount} operators in stack + 1 number being entered`;
+            } else {
+                statusDisplay.textContent = `🧠 Smart Mode: ${numberCount} numbers, ${operatorCount} operators in stack`;
             }
-            statusDisplay.textContent = statusText;
         }
 
         function clearAll() {
             stack = [];
             currentInput = '';
-            pendingOperation = null;
-            detectedNotation = 'unknown';
-            inputHistory = [];
             updateDisplay();
             updateStatus();
         }
@@ -334,161 +272,107 @@
                 currentInput += num;
             }
             updateDisplay();
+            updateStatus();
         }
 
         function inputOperator(op) {
             const calcOp = op === '×' ? '*' : op;
             
-            // Record this as an operator input for pattern detection
-            detectNotation('operator', calcOp);
-            
-            // Handle based on detected or assumed notation
-            switch (detectedNotation) {
-                case 'infix':
-                    handleInfixOperator(calcOp);
-                    break;
-                case 'prefix':
-                    handlePrefixOperator(calcOp);
-                    break;
-                case 'postfix':
-                    handlePostfixOperator(calcOp);
-                    break;
-                default:
-                    // If unknown, try to determine based on current state
-                    if (currentInput && stack.length === 0) {
-                        // Number then operator - likely infix
-                        detectedNotation = 'infix';
-                        handleInfixOperator(calcOp);
-                    } else if (!currentInput && stack.length === 0) {
-                        // Operator first - likely prefix
-                        detectedNotation = 'prefix';
-                        handlePrefixOperator(calcOp);
-                    } else if (stack.length >= 1) {
-                        // Numbers in stack, operator now - likely postfix
-                        detectedNotation = 'postfix';
-                        handlePostfixOperator(calcOp);
-                    }
-                    break;
-            }
-        }
-
-        function handleInfixOperator(op) {
-            if (currentInput) {
-                const num = parseFloat(currentInput);
-                if (pendingOperation && stack.length > 0) {
-                    // Complete previous operation
-                    const result = operators[pendingOperation](stack[0], num);
-                    stack = [result];
-                    currentInput = result.toString();
-                } else {
-                    stack = [num];
-                }
-                pendingOperation = op;
-                currentInput = '';
-                updateDisplay();
-                updateStatus();
-            }
-        }
-
-        function handlePrefixOperator(op) {
-            if (!pendingOperation) {
-                pendingOperation = op;
-                currentInput = '';
-                updateDisplay();
-                updateStatus();
-            }
-        }
-
-        function handlePostfixOperator(op) {
+            // Push current number to stack if any
             if (currentInput) {
                 stack.push(parseFloat(currentInput));
                 currentInput = '';
             }
             
-            if (stack.length >= 2) {
-                const b = stack.pop();
-                const a = stack.pop();
-                const result = operators[op](a, b);
-                currentInput = result.toString();
-                updateDisplay();
-                updateStatus();
-            } else {
-                // Not enough operands, show error or wait
-                updateStatus();
-            }
+            // Add operator to stack
+            stack.push(calcOp);
+            
+            // Try to compute if we have enough operands
+            tryCompute();
+            
+            updateDisplay();
+            updateStatus();
         }
 
         function compute() {
-            // Record this as a number push for pattern detection
+            // Push current number to stack if any
             if (currentInput) {
-                detectNotation('number', parseFloat(currentInput));
+                stack.push(parseFloat(currentInput));
+                currentInput = '';
             }
             
-            switch (detectedNotation) {
-                case 'infix':
-                    computeInfix();
-                    break;
-                case 'prefix':
-                    computePrefix();
-                    break;
-                case 'postfix':
-                    computePostfix();
-                    break;
-                default:
-                    // Default behavior - just push to stack
-                    if (currentInput) {
-                        stack.push(parseFloat(currentInput));
-                        currentInput = '';
-                        updateDisplay();
-                        updateStatus();
-                    }
-                    break;
+            // Try to compute
+            tryCompute();
+            
+            updateDisplay();
+            updateStatus();
+        }
+
+        function tryCompute() {
+            // Look for patterns that can be computed immediately
+            while (canCompute()) {
+                executeComputation();
             }
         }
 
-        function computeInfix() {
-            if (currentInput && pendingOperation && stack.length > 0) {
-                const num = parseFloat(currentInput);
-                const result = operators[pendingOperation](stack[0], num);
-                currentInput = result.toString();
-                stack = [];
-                pendingOperation = null;
-                updateDisplay();
-                updateStatus();
-            } else if (currentInput) {
-                // Just record the number to stack
-                stack.push(parseFloat(currentInput));
-                currentInput = '';
-                updateDisplay();
-                updateStatus();
+        function canCompute() {
+            if (stack.length < 3) return false;
+            
+            // Check for postfix pattern: number number operator (at end)
+            if (typeof stack[stack.length-3] === 'number' && 
+                typeof stack[stack.length-2] === 'number' && 
+                typeof stack[stack.length-1] === 'string') {
+                return true;
             }
+            
+            // Check for prefix pattern: operator number number (at end)
+            if (typeof stack[stack.length-3] === 'string' && 
+                typeof stack[stack.length-2] === 'number' && 
+                typeof stack[stack.length-1] === 'number') {
+                return true;
+            }
+            
+            // Check for infix pattern: number operator number (at end)
+            if (typeof stack[stack.length-3] === 'number' && 
+                typeof stack[stack.length-2] === 'string' && 
+                typeof stack[stack.length-1] === 'number') {
+                return true;
+            }
+            
+            return false;
         }
 
-        function computePrefix() {
-            if (currentInput) {
-                const num = parseFloat(currentInput);
-                stack.push(num);
-                currentInput = '';
+        function executeComputation() {
+            if (stack.length < 3) return;
+            
+            const last3 = stack.slice(-3);
+            const [first, second, third] = last3;
+            
+            let result;
+            let notation;
+            
+            // Postfix: number number operator
+            if (typeof first === 'number' && typeof second === 'number' && typeof third === 'string') {
+                result = operators[third](first, second);
+                notation = 'Postfix';
+            }
+            // Prefix: operator number number  
+            else if (typeof first === 'string' && typeof second === 'number' && typeof third === 'number') {
+                result = operators[first](second, third);
+                notation = 'Prefix';
+            }
+            // Infix: number operator number
+            else if (typeof first === 'number' && typeof second === 'string' && typeof third === 'number') {
+                result = operators[second](first, third);
+                notation = 'Infix';
+            }
+            
+            if (result !== undefined) {
+                // Remove the computed elements and replace with result
+                stack.splice(-3, 3, result);
                 
-                if (pendingOperation && stack.length >= 2) {
-                    const a = stack.shift(); // First operand
-                    const b = stack.shift(); // Second operand
-                    const result = operators[pendingOperation](a, b);
-                    currentInput = result.toString();
-                    stack = [];
-                    pendingOperation = null;
-                }
-                updateDisplay();
-                updateStatus();
-            }
-        }
-
-        function computePostfix() {
-            if (currentInput) {
-                stack.push(parseFloat(currentInput));
-                currentInput = '';
-                updateDisplay();
-                updateStatus();
+                // Show what was computed
+                statusDisplay.textContent = `✅ Computed: ${first} ${second} ${third} = ${result} (${notation})`;
             }
         }
 
@@ -507,7 +391,7 @@
                 compute();
             } else if (e.key === 'Escape' || e.key === 'c' || e.key === 'C') {
                 clearAll();
-                         } else if (e.key === 'Backspace') {
+            } else if (e.key === 'Backspace') {
                 deleteLast();
             }
         });
