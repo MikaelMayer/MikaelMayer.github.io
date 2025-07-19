@@ -62,14 +62,69 @@
 
         .stack-display {
             background: rgba(0, 0, 0, 0.6);
-            color: #88ccff;
-            font-size: 1em;
-            padding: 10px;
-            border-radius: 10px;
+            padding: 15px;
+            border-radius: 15px;
             margin-bottom: 20px;
-            min-height: 40px;
+            min-height: 60px;
             border: 1px solid rgba(136, 204, 255, 0.2);
-            font-family: 'Courier New', monospace;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .stack-item {
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 500;
+            display: inline-block;
+            min-width: 30px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .stack-item.number {
+            background: linear-gradient(135deg, #e8f4fd 0%, #d1e7dd 100%);
+            color: #0d6efd;
+            border-color: rgba(13, 110, 253, 0.2);
+        }
+
+        .stack-item.operator {
+            background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+            color: white;
+            border-color: rgba(220, 53, 69, 0.3);
+        }
+
+        .stack-item.highlighted-number {
+            border-color: #0d6efd;
+            box-shadow: 0 0 15px rgba(13, 110, 253, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+            animation: pulse-number 1.5s infinite;
+        }
+
+        .stack-item.highlighted-operator {
+            border-color: #dc3545;
+            box-shadow: 0 0 15px rgba(220, 53, 69, 0.7), 0 2px 8px rgba(0, 0, 0, 0.3);
+            animation: pulse-operator 1.5s infinite;
+        }
+
+        @keyframes pulse-number {
+            0%, 100% { box-shadow: 0 0 15px rgba(13, 110, 253, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3); }
+            50% { box-shadow: 0 0 25px rgba(13, 110, 253, 0.8), 0 4px 12px rgba(0, 0, 0, 0.4); }
+        }
+
+        @keyframes pulse-operator {
+            0%, 100% { box-shadow: 0 0 15px rgba(220, 53, 69, 0.7), 0 2px 8px rgba(0, 0, 0, 0.3); }
+            50% { box-shadow: 0 0 25px rgba(220, 53, 69, 1.0), 0 4px 12px rgba(0, 0, 0, 0.4); }
+        }
+
+        .stack-label {
+            color: #88ccff;
+            font-size: 0.8em;
+            margin-right: 10px;
+            opacity: 0.8;
         }
 
         .status-display {
@@ -210,13 +265,7 @@
             <button class="btn compute" onclick="compute()">↵</button>
         </div>
         
-        <div class="demo-info">
-            🧠 <strong>Universal Mode:</strong> All notations work automatically!<br>
-            ✨ <strong>Infix:</strong> 5 + 3 → computes instantly<br>
-            🔄 <strong>Prefix:</strong> + 5 3 → computes instantly<br>
-            📚 <strong>Postfix:</strong> 5 3 + → computes instantly<br>
-            🎯 <strong>Magic:</strong> Any complete expression computes immediately
-        </div>
+
     </div>
 
     <script>
@@ -237,7 +286,114 @@
 
         function updateDisplay() {
             display.textContent = currentInput || '0';
-            stackDisplay.textContent = `Stack: [${stack.join(', ')}]`;
+            updateStackDisplay();
+        }
+
+        function updateStackDisplay() {
+            stackDisplay.innerHTML = '';
+            
+            // Add stack label
+            const label = document.createElement('span');
+            label.className = 'stack-label';
+            label.textContent = 'Stack:';
+            stackDisplay.appendChild(label);
+            
+            if (stack.length === 0) {
+                const emptyMsg = document.createElement('span');
+                emptyMsg.className = 'stack-label';
+                emptyMsg.textContent = 'Empty';
+                emptyMsg.style.fontStyle = 'italic';
+                stackDisplay.appendChild(emptyMsg);
+                return;
+            }
+            
+            // Determine what needs highlighting
+            const highlightInfo = getHighlightInfo();
+            
+            stack.forEach((item, index) => {
+                const itemElement = document.createElement('span');
+                itemElement.className = 'stack-item';
+                itemElement.textContent = item;
+                
+                if (typeof item === 'number') {
+                    itemElement.classList.add('number');
+                } else {
+                    itemElement.classList.add('operator');
+                }
+                
+                // Apply highlighting based on what's needed
+                if (highlightInfo.highlightIndices.includes(index)) {
+                    if (highlightInfo.needsNumber && typeof item === 'number') {
+                        itemElement.classList.add('highlighted-number');
+                    } else if (highlightInfo.needsOperator && typeof item === 'string') {
+                        itemElement.classList.add('highlighted-operator');
+                    }
+                }
+                
+                stackDisplay.appendChild(itemElement);
+            });
+        }
+
+        function getHighlightInfo() {
+            // Determine what's needed to complete an expression
+            if (stack.length === 0) return { highlightIndices: [], needsNumber: false, needsOperator: false };
+            
+            const last = stack[stack.length - 1];
+            const secondLast = stack.length > 1 ? stack[stack.length - 2] : null;
+            const thirdLast = stack.length > 2 ? stack[stack.length - 3] : null;
+            
+            // Check if we can compute with what we have
+            if (stack.length >= 3 && canCompute()) {
+                // We have a complete expression, highlight the last 3 that will be computed
+                return { 
+                    highlightIndices: [stack.length - 3, stack.length - 2, stack.length - 1], 
+                    needsNumber: false, 
+                    needsOperator: false 
+                };
+            }
+            
+            // Check what we need to complete an expression
+            if (stack.length === 1) {
+                if (typeof last === 'number') {
+                    // Need an operator for infix, or another number for postfix
+                    return { highlightIndices: [stack.length - 1], needsNumber: false, needsOperator: true };
+                } else {
+                    // Need a number for prefix
+                    return { highlightIndices: [stack.length - 1], needsNumber: true, needsOperator: false };
+                }
+            }
+            
+            if (stack.length === 2) {
+                if (typeof last === 'number' && typeof secondLast === 'number') {
+                    // Two numbers, need an operator
+                    return { 
+                        highlightIndices: [stack.length - 2, stack.length - 1], 
+                        needsNumber: false, 
+                        needsOperator: true 
+                    };
+                } else if (typeof last === 'string' && typeof secondLast === 'string') {
+                    // Two operators, only highlight the last one (it needs a number)
+                    return { 
+                        highlightIndices: [stack.length - 1], 
+                        needsNumber: true, 
+                        needsOperator: false 
+                    };
+                } else {
+                    // Mixed, need to complete the pattern
+                    return { 
+                        highlightIndices: [stack.length - 2, stack.length - 1], 
+                        needsNumber: typeof last === 'string', 
+                        needsOperator: typeof last === 'number' 
+                    };
+                }
+            }
+            
+            // For longer stacks, highlight the last two elements if they don't form a complete expression
+            return { 
+                highlightIndices: [stack.length - 2, stack.length - 1], 
+                needsNumber: typeof last === 'string', 
+                needsOperator: typeof last === 'number' 
+            };
         }
 
         function updateStatus() {
