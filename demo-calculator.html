@@ -514,10 +514,32 @@
         }
 
         function tryCompute() {
-            // Look for patterns that can be computed immediately
-            while (canCompute()) {
+            // Only compute when it doesn't break the visual grouping structure
+            while (canCompute() && shouldComputeNow()) {
                 executeComputation();
             }
+        }
+
+        function shouldComputeNow() {
+            // Check if computing would break existing operator groups
+            // For example, in "5 + * 3 + 9", we should NOT compute "3 + 9" 
+            // because it would break the "(5 +) (* 3) (+ 9)" grouping
+            
+            // Analyze the current grouping structure
+            const groups = analyzeStackForGrouping();
+            
+            // If we have multiple partial operator groups, don't compute
+            // This prevents breaking the intended operator chain structure
+            const partialGroups = groups.filter(g => g.type === 'group' && g.groupType === 'partial-expression');
+            
+            // If there are multiple partial expressions, it suggests a complex operator chain
+            // Don't compute anything to preserve the structure
+            if (partialGroups.length > 1) {
+                return false;
+            }
+            
+            // If there's only one or no partial groups, it's safe to compute
+            return true;
         }
 
         function canCompute() {
