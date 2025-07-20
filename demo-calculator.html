@@ -19,6 +19,7 @@
             align-items: center;
             justify-content: center;
             padding: 20px;
+            overflow: hidden; /* Disable scrolling */
         }
 
         .calculator {
@@ -65,14 +66,16 @@
             padding: 20px;
             border-radius: 15px;
             margin-bottom: 20px;
-            min-height: 80px;
+            height: 120px; /* Fixed height instead of min-height */
             border: 1px solid rgba(0, 255, 136, 0.2);
             display: flex;
             flex-wrap: wrap;
             gap: 12px;
-            align-items: center;
+            align-items: flex-start;
             justify-content: flex-end;
             font-size: 1.8em;
+            overflow: hidden; /* Prevent internal scrolling */
+            align-content: flex-start;
         }
 
         .stack-item {
@@ -138,6 +141,14 @@
             color: #888;
             font-style: italic;
             opacity: 0.6;
+        }
+
+        .overflow-indicator {
+            color: #888;
+            font-size: 0.8em;
+            opacity: 0.7;
+            align-self: center;
+            padding: 8px 12px;
         }
 
         .stack-item.highlighted-number {
@@ -332,14 +343,15 @@
             // Analyze stack for grouping opportunities
             const groups = analyzeStackForGrouping();
             
-            // Render groups
+            // Calculate display with overflow management
+            const displayElements = [];
+            
+            // Convert groups to display elements
             groups.forEach(group => {
                 if (group.type === 'single') {
-                    const itemElement = createStackItem(group.item);
-                    stackDisplay.appendChild(itemElement);
+                    displayElements.push({ element: createStackItem(group.item), type: 'item' });
                 } else if (group.type === 'group') {
-                    const groupElement = createStackGroup(group.items, group.groupType);
-                    stackDisplay.appendChild(groupElement);
+                    displayElements.push({ element: createStackGroup(group.items, group.groupType), type: 'group' });
                 }
             });
             
@@ -348,8 +360,39 @@
                 const inputElement = document.createElement('span');
                 inputElement.className = 'current-input';
                 inputElement.textContent = currentInput;
-                stackDisplay.appendChild(inputElement);
+                displayElements.push({ element: inputElement, type: 'input' });
             }
+            
+            // Implement overflow logic - show "..." if too many elements
+            const maxDisplayElements = calculateMaxElements();
+            
+            if (displayElements.length > maxDisplayElements) {
+                // Add overflow indicator
+                const overflowElement = document.createElement('span');
+                overflowElement.className = 'overflow-indicator';
+                overflowElement.textContent = '...';
+                stackDisplay.appendChild(overflowElement);
+                
+                // Show only the last elements that fit
+                const elementsToShow = displayElements.slice(-maxDisplayElements);
+                elementsToShow.forEach(({ element }) => {
+                    stackDisplay.appendChild(element);
+                });
+            } else {
+                // Show all elements
+                displayElements.forEach(({ element }) => {
+                    stackDisplay.appendChild(element);
+                });
+            }
+        }
+
+        function calculateMaxElements() {
+            // Estimate how many elements can fit in 3 lines
+            // This is a rough estimate - in practice we'd need to measure actual widths
+            const stackWidth = stackDisplay.clientWidth || 350; // Fallback width
+            const avgElementWidth = 80; // Rough estimate for grouped elements
+            const elementsPerLine = Math.floor(stackWidth / avgElementWidth);
+            return Math.max(elementsPerLine * 3, 6); // At least 6 elements, or 3 lines worth
         }
 
         function analyzeStackForGrouping() {
