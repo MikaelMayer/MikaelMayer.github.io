@@ -486,6 +486,9 @@
             if (currentInput) {
                 stack.push(parseFloat(currentInput));
                 currentInput = '';
+                
+                // After pushing a number, check for immediate collapse
+                collapseOperatorNumber();
             }
             
             // Try to compute before adding the new operator (for infix chaining)
@@ -505,12 +508,34 @@
             if (currentInput) {
                 stack.push(parseFloat(currentInput));
                 currentInput = '';
+                
+                // After pushing a number, check for immediate collapse
+                // Rule: if last element is operator followed by number, compute immediately
+                collapseOperatorNumber();
             }
             
             // Try to compute
             tryCompute();
             
             updateDisplay();
+        }
+
+        function collapseOperatorNumber() {
+            // Check if we can collapse operator + number patterns at the end
+            while (stack.length >= 3) {
+                const last3 = stack.slice(-3);
+                const [first, second, third] = last3;
+                
+                // Prefix pattern: operator number number -> compute
+                if (typeof first === 'string' && typeof second === 'number' && typeof third === 'number') {
+                    const result = operators[first](second, third);
+                    stack.splice(-3, 3, result);
+                    continue;
+                }
+                
+                // Can't collapse further
+                break;
+            }
         }
 
         function tryCompute() {
