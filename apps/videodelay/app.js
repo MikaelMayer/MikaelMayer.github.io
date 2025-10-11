@@ -33,10 +33,20 @@
   }
 
   async function getCameraStream(facingMode) {
-    return navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { exact: facingMode } },
-      audio: false
-    });
+    const attempts = [
+      { video: { facingMode: { exact: facingMode } }, audio: false },
+      { video: { facingMode }, audio: false },
+      { video: true, audio: false }
+    ];
+    let lastError;
+    for (const constraints of attempts) {
+      try {
+        return await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    throw lastError || new Error('getUserMedia failed');
   }
 
   async function startCamera() {
