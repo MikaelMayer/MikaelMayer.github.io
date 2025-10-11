@@ -46,6 +46,18 @@
       border-radius: 50%; background: red; z-index: 6;
       display: none; animation: blink 1s infinite;
     }
+    #versionLabel {
+      position: absolute;
+      top: 15px;
+      left: 40px;
+      z-index: 7;
+      font-family: monospace;
+      font-size: 0.9em;
+      color: white;
+      background: rgba(0,0,0,0.6);
+      padding: 0.2em 0.5em;
+      border-radius: 6px;
+    }
     @keyframes blink {
       0%, 50%, 100% { opacity: 1; }
       25%, 75% { opacity: 0; }
@@ -61,6 +73,7 @@
   <button id="switchBtn">&#8635;</button>
   <button id="recBtn">REC</button>
   <div id="recordDot"></div>
+  <div id="versionLabel">1.0.0</div>
 
   <script src="logic.js"></script>
   <script src="app.js"></script>
