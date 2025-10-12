@@ -245,9 +245,10 @@
     };
     elementRecorder.onstop = () => {
       if (elementRecorderStopResolve) {
-        const chunkType = (elementRecorderChunks.find(c => c && c.type) || {}).type || (elementRecorder && elementRecorder.mimeType) || 'video/webm';
+        const lastChunk = [...elementRecorderChunks].reverse().find(c => c && c.size > 0);
+        const chunkType = (lastChunk && lastChunk.type) || (elementRecorder && elementRecorder.mimeType) || 'video/webm';
         const normalized = normalizeMimeType(chunkType);
-        elementRecorderStopResolve(new Blob(elementRecorderChunks, { type: normalized }));
+        elementRecorderStopResolve(new Blob(lastChunk ? [lastChunk] : [], { type: normalized }));
         elementRecorderStopResolve = null;
       }
     };
@@ -304,9 +305,10 @@
     };
     canvasRecorder.onstop = () => {
       if (canvasRecorderStopResolve) {
-        const chunkType = (canvasRecorderChunks.find(c => c && c.type) || {}).type || (canvasRecorder && canvasRecorder.mimeType) || 'video/webm';
+        const lastChunk = [...canvasRecorderChunks].reverse().find(c => c && c.size > 0);
+        const chunkType = (lastChunk && lastChunk.type) || (canvasRecorder && canvasRecorder.mimeType) || 'video/webm';
         const normalized = normalizeMimeType(chunkType);
-        canvasRecorderStopResolve(new Blob(canvasRecorderChunks, { type: normalized }));
+        canvasRecorderStopResolve(new Blob(lastChunk ? [lastChunk] : [], { type: normalized }));
         canvasRecorderStopResolve = null;
       }
     };
@@ -381,11 +383,11 @@
       }
 
       if (blob && blob.size > 0) {
-        readyToSaveBlob = blob;
-        recBtn.textContent = 'SAVE';
-      } else {
-        recBtn.textContent = 'REC';
+        const ext = getExtensionFromMime(blob.type);
+        const filename = `delayed-recording-${Date.now()}.${ext}`;
+        try { await saveBlobAs(blob, filename); } catch (_) {}
       }
+      recBtn.textContent = 'REC';
       try { recBtn.disabled = false; } catch (_) {}
     }
   }
