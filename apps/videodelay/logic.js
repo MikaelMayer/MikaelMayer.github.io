@@ -48,19 +48,20 @@
 
   // Decide how to record the delayed playback.
   // If the browser supports capturing a media element stream, prefer that.
-  // Otherwise fall back to concatenating chunks (problematic but universal).
+  // Otherwise, if canvas capture is supported, use that.
+  // If neither is supported, report as unsupported. No fallbacks.
   function chooseRecordingStrategy(capabilities) {
-    const canCaptureElement = typeof (capabilities && capabilities.canCaptureElement) === 'boolean'
-      ? capabilities.canCaptureElement
-      : canCaptureElementStream();
-    if (canCaptureElement) return 'element-capture';
-
     const canCaptureCanvas = typeof (capabilities && capabilities.canCaptureCanvas) === 'boolean'
       ? capabilities.canCaptureCanvas
       : canCaptureCanvasStream();
     if (canCaptureCanvas) return 'canvas-capture';
 
-    return 'concat-chunks';
+    const canCaptureElement = typeof (capabilities && capabilities.canCaptureElement) === 'boolean'
+      ? capabilities.canCaptureElement
+      : canCaptureElementStream();
+    if (canCaptureElement) return 'element-capture';
+
+    return 'unsupported';
   }
 
   return {
