@@ -1,6 +1,6 @@
 // apps/videodelay/service-worker.js
 
-const CACHE_NAME = 'delay-camera-cache-v2';
+const CACHE_NAME = 'delay-camera-cache-v1';
 
 // 1) The root URL (“./”) ensures index.html is served at /apps/videodelay/ offline.
 // 2) Then we list each file by its exact relative path:
@@ -9,9 +9,7 @@ const ASSETS_TO_CACHE = [
   './index.html',
   './manifest.json',
   './icon-192.png',
-  './icon-512.png',
-  './logic.js',
-  './app.js'
+  './icon-512.png'
 ];
 
 self.addEventListener('install', event => {
@@ -24,24 +22,11 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('fetch', event => {
-  const req = event.request;
-  const accept = req.headers.get('accept') || '';
-  const isHTML = accept.includes('text/html');
-  if (isHTML) {
-    // Network-first for HTML to avoid stale pages/version labels.
-    event.respondWith(
-      fetch(req).then(resp => {
-        const copy = resp.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(req, copy)).catch(() => {});
-        return resp;
-      }).catch(() => caches.match(req))
-    );
-  } else {
-    // Cache-first for static assets.
-    event.respondWith(
-      caches.match(req).then(cached => cached || fetch(req))
-    );
-  }
+  event.respondWith(
+    caches.match(event.request).then(cachedResponse => {
+      return cachedResponse || fetch(event.request);
+    })
+  );
 });
 
 self.addEventListener('activate', event => {
