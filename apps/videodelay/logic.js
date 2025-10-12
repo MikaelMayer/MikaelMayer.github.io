@@ -29,6 +29,16 @@
     }
   }
 
+  function canCaptureCanvasStream() {
+    try {
+      return typeof HTMLCanvasElement !== 'undefined' &&
+             HTMLCanvasElement.prototype &&
+             typeof HTMLCanvasElement.prototype.captureStream === 'function';
+    } catch (_) {
+      return false;
+    }
+  }
+
   // Naive concatenation of WebM chunks. This is known to be unsafe
   // because WebM containers contain their own headers and timestamps.
   // We keep it for fallback and to write tests that fail first.
@@ -40,10 +50,17 @@
   // If the browser supports capturing a media element stream, prefer that.
   // Otherwise fall back to concatenating chunks (problematic but universal).
   function chooseRecordingStrategy(capabilities) {
-    const canCapture = typeof (capabilities && capabilities.canCaptureElement) === 'boolean'
+    const canCaptureElement = typeof (capabilities && capabilities.canCaptureElement) === 'boolean'
       ? capabilities.canCaptureElement
       : canCaptureElementStream();
-    return canCapture ? 'element-capture' : 'concat-chunks';
+    if (canCaptureElement) return 'element-capture';
+
+    const canCaptureCanvas = typeof (capabilities && capabilities.canCaptureCanvas) === 'boolean'
+      ? capabilities.canCaptureCanvas
+      : canCaptureCanvasStream();
+    if (canCaptureCanvas) return 'canvas-capture';
+
+    return 'concat-chunks';
   }
 
   return {
@@ -51,6 +68,7 @@
     computeDelayMs,
     combineWebMChunks,
     chooseRecordingStrategy,
-    canCaptureElementStream
+    canCaptureElementStream,
+    canCaptureCanvasStream
   };
 }));
