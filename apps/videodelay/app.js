@@ -52,6 +52,74 @@
     return undefined;
   }
 
+  function normalizeMimeType(mime) {
+    if (!mime) return 'video/webm';
+    const base = String(mime).split(';')[0].trim();
+    return base || 'video/webm';
+  }
+
+  function getExtensionFromMime(mime) {
+    const base = normalizeMimeType(mime);
+    switch (base) {
+      case 'video/mp4':
+        return 'mp4';
+      case 'video/ogg':
+        return 'ogv';
+      case 'video/webm':
+      default:
+        return 'webm';
+    }
+  }
+
+  async function saveBlobAs(blob, suggestedName) {
+    // Prefer modern File System Access API when available (desktop Chrome/Edge, some Android browsers)
+    const w = /** @type {any} */ (window);
+    if (typeof w.showSaveFilePicker === 'function') {
+      try {
+        const ext = `.${getExtensionFromMime(blob.type)}`;
+        const handle = await w.showSaveFilePicker({
+          suggestedName,
+          types: [
+            {
+              description: 'Video',
+              accept: { [normalizeMimeType(blob.type)]: [ext] }
+            }
+          ]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return true;
+      } catch (_) {
+        // fall through to anchor-based download
+      }
+    }
+
+    // Fallback: anchor download with object URL
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.rel = 'noopener';
+    a.download = suggestedName;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    let clicked = false;
+    try {
+      a.click();
+      clicked = true;
+    } catch (_) {
+      // Last resort: open new tab (may be blocked in some PWAs/iOS)
+      try { window.open(url, '_blank', 'noopener'); } catch (_) {}
+    } finally {
+      // Revoke after a generous delay to avoid races on slow devices
+      setTimeout(() => {
+        try { a.remove(); } catch (_) {}
+        try { URL.revokeObjectURL(url); } catch (_) {}
+      }, 60000);
+    }
+    return clicked;
+  }
+
   function formatTime(ms) {
     return DelayCamLogic.formatTime(ms);
   }
@@ -175,7 +243,9 @@
     };
     elementRecorder.onstop = () => {
       if (elementRecorderStopResolve) {
-        elementRecorderStopResolve(new Blob(elementRecorderChunks, { type: 'video/webm' }));
+        const chunkType = (elementRecorderChunks.find(c => c && c.type) || {}).type || (elementRecorder && elementRecorder.mimeType) || 'video/webm';
+        const normalized = normalizeMimeType(chunkType);
+        elementRecorderStopResolve(new Blob(elementRecorderChunks, { type: normalized }));
         elementRecorderStopResolve = null;
       }
     };
@@ -232,7 +302,9 @@
     };
     canvasRecorder.onstop = () => {
       if (canvasRecorderStopResolve) {
-        canvasRecorderStopResolve(new Blob(canvasRecorderChunks, { type: 'video/webm' }));
+        const chunkType = (canvasRecorderChunks.find(c => c && c.type) || {}).type || (canvasRecorder && canvasRecorder.mimeType) || 'video/webm';
+        const normalized = normalizeMimeType(chunkType);
+        canvasRecorderStopResolve(new Blob(canvasRecorderChunks, { type: normalized }));
         canvasRecorderStopResolve = null;
       }
     };
@@ -290,22 +362,9 @@
       }
 
       if (blob && blob.size > 0) {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `delayed-recording-${Date.now()}.webm`;
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        try {
-          a.click();
-        } catch (_) {
-          try { window.open(url, '_blank', 'noopener'); } catch (_) {}
-        } finally {
-          setTimeout(() => {
-            try { a.remove(); } catch (_) {}
-            try { URL.revokeObjectURL(url); } catch (_) {}
-          }, 30000);
-        }
+        const ext = getExtensionFromMime(blob.type);
+        const filename = `delayed-recording-${Date.now()}.${ext}`;
+        await saveBlobAs(blob, filename);
       }
     }
   }
