@@ -28,6 +28,15 @@
   let elementRecorderChunks = [];
   let elementRecorderStopResolve = null;
 
+  // Canvas-capture strategy state
+  let canvasEl = null;
+  let canvasCtx = null;
+  let canvasRafId = null;
+  let canvasStream = null;
+  let canvasRecorder = null;
+  let canvasRecorderChunks = [];
+  let canvasRecorderStopResolve = null;
+
   function formatTime(ms) {
     return DelayCamLogic.formatTime(ms);
   }
@@ -171,6 +180,68 @@
     });
   }
 
+  function startCanvasCaptureRecording() {
+    if (!delayedVideo) return;
+    const width = delayedVideo.videoWidth || 1280;
+    const height = delayedVideo.videoHeight || 720;
+    if (!canvasEl) {
+      canvasEl = document.createElement('canvas');
+      canvasEl.width = width;
+      canvasEl.height = height;
+      canvasCtx = canvasEl.getContext('2d');
+    } else {
+      canvasEl.width = width;
+      canvasEl.height = height;
+    }
+
+    function drawFrame() {
+      try {
+        canvasCtx.drawImage(delayedVideo, 0, 0, canvasEl.width, canvasEl.height);
+      } catch (_) {
+        // ignore draw errors (e.g., while switching sources)
+      }
+      canvasRafId = requestAnimationFrame(drawFrame);
+    }
+    canvasRafId = requestAnimationFrame(drawFrame);
+
+    canvasStream = canvasEl.captureStream ? canvasEl.captureStream(30) : null;
+    if (!canvasStream) return;
+
+    canvasRecorderChunks = [];
+    canvasRecorder = new MediaRecorder(canvasStream, { mimeType: 'video/webm; codecs=vp8' });
+    canvasRecorder.ondataavailable = e => {
+      if (e.data && e.data.size > 0) {
+        canvasRecorderChunks.push(e.data);
+      }
+    };
+    canvasRecorder.onstop = () => {
+      if (canvasRecorderStopResolve) {
+        canvasRecorderStopResolve(new Blob(canvasRecorderChunks, { type: 'video/webm' }));
+        canvasRecorderStopResolve = null;
+      }
+    };
+    canvasRecorder.start();
+  }
+
+  function stopCanvasCaptureRecording() {
+    return new Promise(resolve => {
+      canvasRecorderStopResolve = resolve;
+      if (canvasRafId) {
+        cancelAnimationFrame(canvasRafId);
+        canvasRafId = null;
+      }
+      if (canvasStream) {
+        try { canvasStream.getTracks().forEach(t => t.stop()); } catch (_) {}
+        canvasStream = null;
+      }
+      if (canvasRecorder && canvasRecorder.state === 'recording') {
+        canvasRecorder.stop();
+      } else {
+        resolve(new Blob([], { type: 'video/webm' }));
+      }
+    });
+  }
+
   async function toggleRecording() {
     if (!isRecording) {
       isRecording = true;
@@ -179,6 +250,8 @@
       recordDot.style.display = 'block';
       if (recordingStrategy === 'element-capture' && delayedVideo.captureStream) {
         startElementCaptureRecording();
+      } else if (recordingStrategy === 'canvas-capture') {
+        startCanvasCaptureRecording();
       }
     } else {
       isRecording = false;
@@ -188,6 +261,8 @@
       let blob = null;
       if (recordingStrategy === 'element-capture') {
         blob = await stopElementCaptureRecording();
+      } else if (recordingStrategy === 'canvas-capture') {
+        blob = await stopCanvasCaptureRecording();
       } else {
         if (recordedBlobs.length > 0) {
           blob = DelayCamLogic.combineWebMChunks(recordedBlobs);
@@ -223,7 +298,10 @@
       recBtn.style.display = 'block';
 
       // Decide based on runtime capability
-      recordingStrategy = DelayCamLogic.chooseRecordingStrategy({ canCaptureElement: !!delayedVideo.captureStream });
+      recordingStrategy = DelayCamLogic.chooseRecordingStrategy({
+        canCaptureElement: !!(delayedVideo && delayedVideo.captureStream),
+        canCaptureCanvas: !!(typeof HTMLCanvasElement !== 'undefined' && HTMLCanvasElement.prototype && HTMLCanvasElement.prototype.captureStream)
+      });
       playAndRecordLoop(firstChunkBlob, delayMs);
     }
   });
