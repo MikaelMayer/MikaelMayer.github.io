@@ -21,6 +21,7 @@
   let firstChunkBlob;
 
   let isRecording = false;
+  let readyToSaveBlob = null;
 
   // Element-capture strategy state
   let elementRecorder = null;
@@ -100,6 +101,7 @@
     const a = document.createElement('a');
     a.href = url;
     a.rel = 'noopener';
+    a.target = '_blank';
     a.download = suggestedName;
     a.style.display = 'none';
     document.body.appendChild(a);
@@ -334,6 +336,22 @@
 
   async function toggleRecording() {
     if (!isRecording) {
+      // If a previous recording is ready to save, treat this click as the save gesture
+      if (readyToSaveBlob && readyToSaveBlob.size > 0) {
+        const blob = readyToSaveBlob;
+        readyToSaveBlob = null;
+        const ext = getExtensionFromMime(blob.type);
+        const filename = `delayed-recording-${Date.now()}.${ext}`;
+        try {
+          recBtn.disabled = true;
+          await saveBlobAs(blob, filename);
+        } finally {
+          recBtn.disabled = false;
+          recBtn.textContent = 'REC';
+        }
+        return;
+      }
+
       isRecording = true;
       recBtn.textContent = 'STOP';
       recordDot.style.display = 'block';
@@ -351,7 +369,8 @@
       }
     } else {
       isRecording = false;
-      recBtn.textContent = 'REC';
+      recBtn.textContent = '…';
+      try { recBtn.disabled = true; } catch (_) {}
       recordDot.style.display = 'none';
 
       let blob = null;
@@ -362,10 +381,12 @@
       }
 
       if (blob && blob.size > 0) {
-        const ext = getExtensionFromMime(blob.type);
-        const filename = `delayed-recording-${Date.now()}.${ext}`;
-        await saveBlobAs(blob, filename);
+        readyToSaveBlob = blob;
+        recBtn.textContent = 'SAVE';
+      } else {
+        recBtn.textContent = 'REC';
       }
+      try { recBtn.disabled = false; } catch (_) {}
     }
   }
 
