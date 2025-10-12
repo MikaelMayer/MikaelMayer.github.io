@@ -34,16 +34,23 @@ test('loads and can tap to set delay', async ({ page }) => {
 
 // Optional quick record/stop smoke: just toggles without verifying file integrity
 // (fake media will not produce real frames)
-test('can toggle recording without error', async ({ page }) => {
+test('can record then save without error', async ({ page }) => {
   await navigateToDelayCam(page);
   await page.locator('#liveVideo').click({ position: { x: 20, y: 700 } });
   await page.waitForTimeout(300);
   await page.locator('#liveVideo').click({ position: { x: 20, y: 700 } });
   await page.waitForTimeout(200);
-  await page.click('#recBtn');
+  await page.click('#recBtn'); // start
   await page.waitForTimeout(700);
-  await page.click('#recBtn');
-  // If no error, pass. Download prompt is auto-accepted.
+  await page.click('#recBtn'); // stop -> shows SAVE
+  await expect(page.locator('#recBtn')).toHaveText('SAVE');
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.click('#recBtn'), // SAVE triggers download
+  ]);
+  const path = await download.path();
+  const size = (await fs.promises.stat(path)).size;
+  expect(size).toBeGreaterThan(0);
   await expect(page.locator('#recBtn')).toHaveText('REC');
 });
 
@@ -58,9 +65,11 @@ test('two consecutive recordings produce two distinct non-empty downloads', asyn
   // First recording
   await page.click('#recBtn'); // start
   await page.waitForTimeout(700);
+  await page.click('#recBtn'); // stop -> SAVE
+  await expect(page.locator('#recBtn')).toHaveText('SAVE');
   const [download1] = await Promise.all([
     page.waitForEvent('download'),
-    page.click('#recBtn'), // stop triggers download
+    page.click('#recBtn'), // SAVE triggers download
   ]);
   const path1 = await download1.path();
   const size1 = (await fs.promises.stat(path1)).size;
@@ -70,9 +79,11 @@ test('two consecutive recordings produce two distinct non-empty downloads', asyn
   // Second recording
   await page.click('#recBtn'); // start
   await page.waitForTimeout(700);
+  await page.click('#recBtn'); // stop -> SAVE
+  await expect(page.locator('#recBtn')).toHaveText('SAVE');
   const [download2] = await Promise.all([
     page.waitForEvent('download'),
-    page.click('#recBtn'), // stop triggers download
+    page.click('#recBtn'), // SAVE triggers download
   ]);
   const path2 = await download2.path();
   const size2 = (await fs.promises.stat(path2)).size;
