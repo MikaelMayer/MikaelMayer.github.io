@@ -1,5 +1,6 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
+const fs = require('fs');
 
 test.beforeEach(async ({ context, baseURL }) => {
   if (baseURL) {
@@ -46,7 +47,7 @@ test('can toggle recording without error', async ({ page }) => {
   await expect(page.locator('#recBtn')).toHaveText('REC');
 });
 
-test('two consecutive recordings produce two distinct downloads', async ({ page }) => {
+test('two consecutive recordings produce two distinct non-empty downloads', async ({ page }) => {
   await navigateToDelayCam(page);
   await page.locator('#liveVideo').click({ position: { x: 20, y: 700 } });
   await page.waitForTimeout(300);
@@ -62,6 +63,8 @@ test('two consecutive recordings produce two distinct downloads', async ({ page 
     page.click('#recBtn'), // stop triggers download
   ]);
   const path1 = await download1.path();
+  const size1 = (await fs.promises.stat(path1)).size;
+  expect(size1).toBeGreaterThan(0);
   paths.push(path1);
 
   // Second recording
@@ -72,6 +75,8 @@ test('two consecutive recordings produce two distinct downloads', async ({ page 
     page.click('#recBtn'), // stop triggers download
   ]);
   const path2 = await download2.path();
+  const size2 = (await fs.promises.stat(path2)).size;
+  expect(size2).toBeGreaterThan(0);
   paths.push(path2);
 
   expect(paths[0]).not.toBe(paths[1]);

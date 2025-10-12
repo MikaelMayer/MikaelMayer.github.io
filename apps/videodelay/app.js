@@ -21,7 +21,6 @@
   let firstChunkBlob;
 
   let isRecording = false;
-  let recordedBlobs = []; // fallback strategy storage
 
   // Element-capture strategy state
   let elementRecorder = null;
@@ -36,6 +35,22 @@
   let canvasRecorder = null;
   let canvasRecorderChunks = [];
   let canvasRecorderStopResolve = null;
+
+  function chooseBestMimeType() {
+    const candidates = [
+      'video/webm; codecs=vp9',
+      'video/webm; codecs=vp8',
+      'video/webm'
+    ];
+    for (const type of candidates) {
+      try {
+        if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(type)) {
+          return type;
+        }
+      } catch (_) { /* ignore */ }
+    }
+    return undefined;
+  }
 
   function formatTime(ms) {
     return DelayCamLogic.formatTime(ms);
@@ -128,11 +143,6 @@
         delayedVideo.onloadeddata = () => delayedVideo.play();
         delayedVideo.onended = () => {
           URL.revokeObjectURL(url);
-          if (isRecording) {
-            // Always collect chunks as a fallback in case the
-            // primary recording strategy yields an empty blob.
-            recordedBlobs.push(blob);
-          }
           resolve();
         };
         delayedVideo.onerror = () => {
@@ -156,7 +166,8 @@
     const stream = delayedVideo.captureStream ? delayedVideo.captureStream() : null;
     if (!stream) return;
     elementRecorderChunks = [];
-    elementRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp8' });
+    const mimeType = chooseBestMimeType();
+    elementRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
     elementRecorder.ondataavailable = e => {
       if (e.data && e.data.size > 0) {
         elementRecorderChunks.push(e.data);
@@ -168,13 +179,15 @@
         elementRecorderStopResolve = null;
       }
     };
-    elementRecorder.start();
+    // timeslice to ensure data is flushed periodically in headless/fake devices
+    elementRecorder.start(200);
   }
 
   function stopElementCaptureRecording() {
     return new Promise(resolve => {
       elementRecorderStopResolve = resolve;
       if (elementRecorder && elementRecorder.state === 'recording') {
+        try { elementRecorder.requestData(); } catch (_) {}
         elementRecorder.stop();
       } else {
         resolve(new Blob([], { type: 'video/webm' }));
@@ -210,7 +223,8 @@
     if (!canvasStream) return;
 
     canvasRecorderChunks = [];
-    canvasRecorder = new MediaRecorder(canvasStream, { mimeType: 'video/webm; codecs=vp8' });
+    const mimeType = chooseBestMimeType();
+    canvasRecorder = new MediaRecorder(canvasStream, mimeType ? { mimeType } : undefined);
     canvasRecorder.ondataavailable = e => {
       if (e.data && e.data.size > 0) {
         canvasRecorderChunks.push(e.data);
@@ -222,7 +236,8 @@
         canvasRecorderStopResolve = null;
       }
     };
-    canvasRecorder.start();
+    // timeslice ensures non-empty blob in short recordings
+    canvasRecorder.start(200);
   }
 
   function stopCanvasCaptureRecording() {
@@ -237,6 +252,7 @@
         canvasStream = null;
       }
       if (canvasRecorder && canvasRecorder.state === 'recording') {
+        try { canvasRecorder.requestData(); } catch (_) {}
         canvasRecorder.stop();
       } else {
         resolve(new Blob([], { type: 'video/webm' }));
@@ -247,13 +263,19 @@
   async function toggleRecording() {
     if (!isRecording) {
       isRecording = true;
-      recordedBlobs = [];
       recBtn.textContent = 'STOP';
       recordDot.style.display = 'block';
       if (recordingStrategy === 'element-capture' && delayedVideo.captureStream) {
         startElementCaptureRecording();
       } else if (recordingStrategy === 'canvas-capture') {
         startCanvasCaptureRecording();
+      } else {
+        // Unsupported: keep button label consistent but do nothing
+        recBtn.textContent = 'REC';
+        recordDot.style.display = 'none';
+        isRecording = false;
+        overlay.textContent = 'Recording unsupported on this browser';
+        return;
       }
     } else {
       isRecording = false;
@@ -265,15 +287,6 @@
         blob = await stopElementCaptureRecording();
       } else if (recordingStrategy === 'canvas-capture') {
         blob = await stopCanvasCaptureRecording();
-      } else {
-        if (recordedBlobs.length > 0) {
-          blob = DelayCamLogic.combineWebMChunks(recordedBlobs);
-        }
-      }
-
-      // Fallback: if primary strategy produced no data, try concatenated chunks
-      if ((!blob || blob.size === 0) && recordedBlobs.length > 0) {
-        blob = DelayCamLogic.combineWebMChunks(recordedBlobs);
       }
 
       if (blob && blob.size > 0) {
@@ -314,11 +327,15 @@
       miniLive.style.display = 'block';
       recBtn.style.display = 'block';
 
-      // Decide based on runtime capability
+      // Decide based on runtime capability; hide record button if unsupported
       recordingStrategy = DelayCamLogic.chooseRecordingStrategy({
         canCaptureElement: !!(delayedVideo && delayedVideo.captureStream),
         canCaptureCanvas: !!(typeof HTMLCanvasElement !== 'undefined' && HTMLCanvasElement.prototype && HTMLCanvasElement.prototype.captureStream)
       });
+      if (recordingStrategy === 'unsupported') {
+        recBtn.style.display = 'none';
+        overlay.textContent = 'Recording not supported in this browser';
+      }
       playAndRecordLoop(firstChunkBlob, delayMs);
     }
   });
