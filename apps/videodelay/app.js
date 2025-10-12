@@ -128,7 +128,9 @@
         delayedVideo.onloadeddata = () => delayedVideo.play();
         delayedVideo.onended = () => {
           URL.revokeObjectURL(url);
-          if (isRecording && recordingStrategy === 'concat-chunks') {
+          if (isRecording) {
+            // Always collect chunks as a fallback in case the
+            // primary recording strategy yields an empty blob.
             recordedBlobs.push(blob);
           }
           resolve();
@@ -269,13 +271,28 @@
         }
       }
 
-      if (blob) {
+      // Fallback: if primary strategy produced no data, try concatenated chunks
+      if ((!blob || blob.size === 0) && recordedBlobs.length > 0) {
+        blob = DelayCamLogic.combineWebMChunks(recordedBlobs);
+      }
+
+      if (blob && blob.size > 0) {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `delayed-recording-${Date.now()}.webm`;
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 30000);
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        try {
+          a.click();
+        } catch (_) {
+          try { window.open(url, '_blank', 'noopener'); } catch (_) {}
+        } finally {
+          setTimeout(() => {
+            try { a.remove(); } catch (_) {}
+            try { URL.revokeObjectURL(url); } catch (_) {}
+          }, 30000);
+        }
       }
     }
   }

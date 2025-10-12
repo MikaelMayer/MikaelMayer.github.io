@@ -31,18 +31,18 @@
     #switchBtn {
       position: absolute; top: 15px; right: 15px; z-index: 4;
       background: rgba(255,255,255,0.1); color: white; border: 1px solid white;
-      font-size: 1.2em; border-radius: 50%; width: 40px; height: 40px;
+      font-size: 1.4em; border-radius: 50%; width: 56px; height: 56px;
       cursor: pointer; display: flex; align-items: center; justify-content: center;
     }
     #recBtn {
       position: absolute; bottom: 10px; left: 10px; z-index: 5;
       background: rgba(255,255,255,0.1); color: white;
-      border: 1px solid red; font-size: 1em;
-      padding: 0.5em 1em; border-radius: 10px;
+      border: 2px solid red; font-size: 1.2em;
+      padding: 0.8em 1.2em; border-radius: 14px;
       cursor: pointer; display: none;
     }
     #recordDot {
-      position: absolute; top: 15px; left: 15px; width: 16px; height: 16px;
+      position: absolute; top: 15px; left: 15px; width: 20px; height: 20px;
       border-radius: 50%; background: red; z-index: 6;
       display: none; animation: blink 1s infinite;
     }
@@ -73,7 +73,7 @@
   <button id="switchBtn">&#8635;</button>
   <button id="recBtn">REC</button>
   <div id="recordDot"></div>
-  <div id="versionLabel">1.0.0</div>
+  <div id="versionLabel">1.0.1</div>
 
   <script src="logic.js"></script>
   <script src="app.js"></script>
