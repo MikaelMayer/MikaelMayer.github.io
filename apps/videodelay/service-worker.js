@@ -1,6 +1,6 @@
 // apps/videodelay/service-worker.js
 
-const CACHE_NAME = 'delay-camera-cache-v2';
+const CACHE_NAME = 'delay-camera-cache-v3';
 
 // 1) The root URL (“./”) ensures index.html is served at /apps/videodelay/ offline.
 // 2) Then we list each file by its exact relative path:

@@ -37,8 +37,53 @@
   let canvasRecorderChunks = [];
   let canvasRecorderStopResolve = null;
 
+  // Optional silent audio to make containers more widely acceptable (e.g., WhatsApp)
+  let silenceAudioContext = null;
+  let silenceOscillator = null;
+  let silenceGain = null;
+  let silenceDestination = null;
+  let silenceAudioTrack = null;
+
+  function ensureSilenceAudioTrack() {
+    try {
+      if (silenceAudioTrack && silenceAudioTrack.readyState === 'live') return silenceAudioTrack;
+      const AudioContextCtor = (window.AudioContext || window.webkitAudioContext);
+      if (!AudioContextCtor) return null;
+      silenceAudioContext = silenceAudioContext || new AudioContextCtor();
+      silenceDestination = silenceAudioContext.createMediaStreamDestination();
+      silenceOscillator = silenceAudioContext.createOscillator();
+      silenceGain = silenceAudioContext.createGain();
+      // Keep frames flowing but inaudible
+      silenceGain.gain.value = 0.00001;
+      silenceOscillator.connect(silenceGain).connect(silenceDestination);
+      try { silenceOscillator.start(); } catch (_) { /* already started */ }
+      const tracks = silenceDestination.stream.getAudioTracks();
+      silenceAudioTrack = tracks && tracks[0] ? tracks[0] : null;
+      return silenceAudioTrack || null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function cleanupSilenceAudioTrack() {
+    try { if (silenceOscillator) silenceOscillator.stop(); } catch (_) {}
+    try { if (silenceAudioTrack) silenceAudioTrack.stop(); } catch (_) {}
+    try { if (silenceAudioContext && typeof silenceAudioContext.close === 'function') silenceAudioContext.close(); } catch (_) {}
+    silenceOscillator = null;
+    silenceGain = null;
+    silenceDestination = null;
+    silenceAudioTrack = null;
+    silenceAudioContext = null;
+  }
+
   function chooseBestMimeType() {
+    // Prefer MP4/H.264 when available (better compatibility e.g., WhatsApp/iOS)
     const candidates = [
+      // Common H.264 profiles (some browsers only expose bare video/mp4)
+      'video/mp4; codecs="avc1.42E01E,mp4a.40.2"',
+      'video/mp4; codecs="avc1.42E01E"',
+      'video/mp4',
+      // WebM fallbacks
       'video/webm; codecs=vp9',
       'video/webm; codecs=vp8',
       'video/webm'
@@ -118,6 +163,19 @@
       }, 60000);
     }
     return clicked;
+  }
+
+  async function shareBlobOrSave(blob, suggestedName) {
+    // Try native share first (better UX and direct handoff to WhatsApp)
+    try {
+      const file = new File([blob], suggestedName, { type: blob.type || 'video/mp4' });
+      const canShareFiles = typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] });
+      if (canShareFiles && typeof navigator.share === 'function') {
+        await navigator.share({ files: [file], title: 'Delayed recording' });
+        return true;
+      }
+    } catch (_) { /* fallback to save */ }
+    return saveBlobAs(blob, suggestedName);
   }
 
   function formatTime(ms) {
@@ -231,11 +289,18 @@
   let recordingStrategy = DelayCamLogic.chooseRecordingStrategy({});
 
   function startElementCaptureRecording() {
-    const stream = delayedVideo.captureStream ? delayedVideo.captureStream() : null;
-    if (!stream) return;
+    const srcStream = delayedVideo.captureStream ? delayedVideo.captureStream() : null;
+    if (!srcStream) return;
     elementRecorderChunks = [];
+    const recStream = new MediaStream();
+    try { srcStream.getVideoTracks().forEach(t => recStream.addTrack(t)); } catch (_) {}
+    const silentTrack = ensureSilenceAudioTrack();
+    if (silentTrack) {
+      try { recStream.addTrack(silentTrack); } catch (_) {}
+    }
     const mimeType = chooseBestMimeType();
-    elementRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    const options = mimeType ? { mimeType, videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 96_000 } : { videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 96_000 };
+    elementRecorder = new MediaRecorder(recStream, options);
     elementRecorder.ondataavailable = e => {
       if (e.data && e.data.size > 0) {
         elementRecorderChunks.push(e.data);
@@ -262,13 +327,21 @@
       } else {
         resolve(new Blob([], { type: 'video/webm' }));
       }
+      // Clean up optional audio generators
+      cleanupSilenceAudioTrack();
     });
   }
 
   function startCanvasCaptureRecording() {
     if (!delayedVideo) return;
-    const width = delayedVideo.videoWidth || 1280;
-    const height = delayedVideo.videoHeight || 720;
+    const sourceWidth = delayedVideo.videoWidth || 1280;
+    const sourceHeight = delayedVideo.videoHeight || 720;
+    // Constrain to 720p for broad compatibility and shareability
+    const maxWidth = 1280;
+    const maxHeight = 720;
+    const scale = Math.min(maxWidth / sourceWidth, maxHeight / sourceHeight, 1);
+    const width = Math.max(2, Math.floor(sourceWidth * scale));
+    const height = Math.max(2, Math.floor(sourceHeight * scale));
     if (!canvasEl) {
       canvasEl = document.createElement('canvas');
       canvasEl.width = width;
@@ -293,8 +366,15 @@
     if (!canvasStream) return;
 
     canvasRecorderChunks = [];
+    const recStream = new MediaStream();
+    try { canvasStream.getVideoTracks().forEach(t => recStream.addTrack(t)); } catch (_) {}
+    const silentTrack = ensureSilenceAudioTrack();
+    if (silentTrack) {
+      try { recStream.addTrack(silentTrack); } catch (_) {}
+    }
     const mimeType = chooseBestMimeType();
-    canvasRecorder = new MediaRecorder(canvasStream, mimeType ? { mimeType } : undefined);
+    const options = mimeType ? { mimeType, videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 96_000 } : { videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 96_000 };
+    canvasRecorder = new MediaRecorder(recStream, options);
     canvasRecorder.ondataavailable = e => {
       if (e.data && e.data.size > 0) {
         canvasRecorderChunks.push(e.data);
@@ -329,6 +409,8 @@
       } else {
         resolve(new Blob([], { type: 'video/webm' }));
       }
+      // Clean up optional audio generators
+      cleanupSilenceAudioTrack();
     });
   }
 
@@ -342,7 +424,7 @@
         const filename = `delayed-recording-${Date.now()}.${ext}`;
         try {
           recBtn.disabled = true;
-          await saveBlobAs(blob, filename);
+          await shareBlobOrSave(blob, filename);
         } finally {
           recBtn.disabled = false;
           recBtn.textContent = 'REC';

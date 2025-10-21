@@ -39,9 +39,7 @@
     }
   }
 
-  // Naive concatenation of WebM chunks. This is known to be unsafe
-  // because WebM containers contain their own headers and timestamps.
-  // We keep it for fallback and to write tests that fail first.
+  // Naive concatenation of WebM chunks (kept for tests/fallback).
   function combineWebMChunks(chunks) {
     return new Blob(chunks, { type: 'video/webm' });
   }
