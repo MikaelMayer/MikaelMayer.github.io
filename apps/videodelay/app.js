@@ -7,6 +7,7 @@
   const miniLive = document.getElementById('miniLive');
   const overlay = document.getElementById('overlay');
   const switchBtn = document.getElementById('switchBtn');
+  const copyLinkBtn = document.getElementById('copyLinkBtn');
   const recBtn = document.getElementById('recBtn');
   const recordDot = document.getElementById('recordDot');
 
@@ -475,6 +476,7 @@
     tapCount++;
     if (tapCount === 1) {
       switchBtn.style.display = 'none';
+      if (copyLinkBtn) copyLinkBtn.style.display = 'none';
       startStopwatch();
       firstChunkPromise = startRecording();
     } else if (tapCount === 2) {
@@ -504,6 +506,35 @@
     currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
     await startCamera();
   });
+
+  // Copy app link button: visible before setting delay; copies current app URL
+  if (copyLinkBtn) {
+    try {
+      copyLinkBtn.style.display = 'inline-block';
+    } catch (_) {}
+    copyLinkBtn.addEventListener('click', async () => {
+      const url = location.href;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(url);
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = url;
+          ta.setAttribute('readonly', '');
+          ta.style.position = 'absolute';
+          ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+        copyLinkBtn.textContent = 'copied! ✅';
+        setTimeout(() => { try { copyLinkBtn.textContent = 'copy app link 🔗'; } catch (_) {} }, 1500);
+      } catch (_) {
+        // Silent failure; no UX change
+      }
+    });
+  }
 
   miniLive.addEventListener('click', () => {
     location.reload();
