@@ -522,15 +522,33 @@
     await startCamera();
   });
 
-  // Copy app link button: visible before setting delay; copies current app URL
+  // Share/Copy app link button: show early; prefer native share; fallback to clipboard
   if (copyLinkBtn) {
+    const HARD_CODED_APP_URL = 'https://mikaelmayer.github.io/apps/videodelay/';
+    const canNativeShareLink = (() => {
+      try {
+        return typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+      } catch (_) { return false; }
+    })();
+
     try {
       copyLinkBtn.style.display = 'inline-block';
+      copyLinkBtn.textContent = canNativeShareLink ? 'share app link 🔗' : 'copy app link 🔗';
+      copyLinkBtn.setAttribute('aria-label', canNativeShareLink ? 'Share app link' : 'Copy app link');
     } catch (_) {}
+
     copyLinkBtn.addEventListener('click', async () => {
-      // Use the app origin + path to avoid PWA scope oddities
-      const url = `${location.origin}${location.pathname}`;
+      const url = HARD_CODED_APP_URL; // avoid PWA scope issues
       try {
+        if (canNativeShareLink) {
+          try {
+            await navigator.share({ url, title: 'Video Delay Camera' });
+            return;
+          } catch (_) {
+            // fall through to clipboard
+          }
+        }
+
         if (navigator.clipboard && navigator.clipboard.writeText) {
           await navigator.clipboard.writeText(url);
         } else {
@@ -544,10 +562,11 @@
           document.execCommand('copy');
           document.body.removeChild(ta);
         }
+        const previous = copyLinkBtn.textContent;
         copyLinkBtn.textContent = 'copied! ✅';
-        setTimeout(() => { try { copyLinkBtn.textContent = 'copy app link 🔗'; } catch (_) {} }, 1500);
+        setTimeout(() => { try { copyLinkBtn.textContent = previous || (canNativeShareLink ? 'share app link 🔗' : 'copy app link 🔗'); } catch (_) {} }, 1500);
       } catch (_) {
-        // Silent failure; no UX change
+        // no-op
       }
     });
   }
