@@ -35,9 +35,9 @@
       cursor: pointer; display: flex; align-items: center; justify-content: center;
     }
     #copyLinkBtn {
-      position: absolute; top: 15px; right: 84px; z-index: 4;
+      position: absolute; bottom: 15px; right: 15px; z-index: 4;
       background: rgba(255,255,255,0.1); color: white; border: 1px solid white;
-      font-size: 1em; border-radius: 12px; padding: 0.5em 0.8em;
+      font-size: 1em; border-radius: 12px; padding: 0.6em 0.9em;
       cursor: pointer;
     }
     #recBtn {
@@ -93,12 +93,12 @@
   <video id="miniLive" muted autoplay playsinline></video>
 
   <div id="overlay">Tap to set delay</div>
-  <button id="switchBtn">&#8635;</button>
+  <button id="switchBtn" aria-label="Switch camera" title="Switch camera">📸↻</button>
   <button id="copyLinkBtn">copy app link 🔗</button>
   <button id="recBtn">REC</button>
   <button id="cancelBtn">CANCEL</button>
   <div id="recordDot"></div>
-  <div id="versionLabel">1.2.0</div>
+  <div id="versionLabel">1.2.1</div>
 
   <script src="logic.js"></script>
   <script src="app.js"></script>
