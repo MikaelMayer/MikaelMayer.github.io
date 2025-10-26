@@ -7,7 +7,9 @@
   const miniLive = document.getElementById('miniLive');
   const overlay = document.getElementById('overlay');
   const switchBtn = document.getElementById('switchBtn');
+  const copyLinkBtn = document.getElementById('copyLinkBtn');
   const recBtn = document.getElementById('recBtn');
+  const cancelBtn = document.getElementById('cancelBtn');
   const recordDot = document.getElementById('recordDot');
 
   let stream;
@@ -22,6 +24,7 @@
 
   let isRecording = false;
   let readyToSaveBlob = null;
+  let suppressMiniClick = false;
 
   // Element-capture strategy state
   let elementRecorder = null;
@@ -428,13 +431,16 @@
         } finally {
           recBtn.disabled = false;
           recBtn.textContent = 'REC';
+          try { cancelBtn.style.display = 'none'; } catch (_) {}
         }
         return;
       }
 
       isRecording = true;
       recBtn.textContent = 'STOP';
+      try { recBtn.classList.add('recording'); } catch (_) {}
       recordDot.style.display = 'block';
+      try { cancelBtn.style.display = 'inline-block'; } catch (_) {}
       if (recordingStrategy === 'element-capture' && delayedVideo.captureStream) {
         startElementCaptureRecording();
       } else if (recordingStrategy === 'canvas-capture') {
@@ -442,6 +448,7 @@
       } else {
         // Unsupported: keep button label consistent but do nothing
         recBtn.textContent = 'REC';
+        try { recBtn.classList.remove('recording'); } catch (_) {}
         recordDot.style.display = 'none';
         isRecording = false;
         overlay.textContent = 'Recording unsupported on this browser';
@@ -452,6 +459,7 @@
       recBtn.textContent = '…';
       try { recBtn.disabled = true; } catch (_) {}
       recordDot.style.display = 'none';
+      try { recBtn.classList.remove('recording'); } catch (_) {}
 
       let blob = null;
       if (recordingStrategy === 'element-capture') {
@@ -462,9 +470,17 @@
 
       if (blob && blob.size > 0) {
         readyToSaveBlob = blob;
-        recBtn.textContent = 'SAVE';
+        // Label should reflect share capability when available
+        const supportsShare = (function () {
+          try {
+            const file = new File([new Blob(['x'], { type: 'video/webm' })], 'x.webm', { type: 'video/webm' });
+            return !!(navigator && navigator.canShare && navigator.share && navigator.canShare({ files: [file] }));
+          } catch (_) { return false; }
+        }());
+        recBtn.textContent = supportsShare ? 'SHARE' : 'SAVE';
       } else {
         recBtn.textContent = 'REC';
+        try { cancelBtn.style.display = 'none'; } catch (_) {}
       }
       try { recBtn.disabled = false; } catch (_) {}
     }
@@ -475,6 +491,7 @@
     tapCount++;
     if (tapCount === 1) {
       switchBtn.style.display = 'none';
+      if (copyLinkBtn) copyLinkBtn.style.display = 'none';
       startStopwatch();
       firstChunkPromise = startRecording();
     } else if (tapCount === 2) {
@@ -505,11 +522,96 @@
     await startCamera();
   });
 
-  miniLive.addEventListener('click', () => {
+  // Copy app link button: visible before setting delay; copies current app URL
+  if (copyLinkBtn) {
+    try {
+      copyLinkBtn.style.display = 'inline-block';
+    } catch (_) {}
+    copyLinkBtn.addEventListener('click', async () => {
+      // Use the app origin + path to avoid PWA scope oddities
+      const url = `${location.origin}${location.pathname}`;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(url);
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = url;
+          ta.setAttribute('readonly', '');
+          ta.style.position = 'absolute';
+          ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+        copyLinkBtn.textContent = 'copied! ✅';
+        setTimeout(() => { try { copyLinkBtn.textContent = 'copy app link 🔗'; } catch (_) {} }, 1500);
+      } catch (_) {
+        // Silent failure; no UX change
+      }
+    });
+  }
+
+  miniLive.addEventListener('click', (e) => {
+    if (suppressMiniClick) {
+      try { e.preventDefault(); } catch (_) {}
+      return;
+    }
     location.reload();
   });
 
+  // Press-and-hold behavior on the miniature: while pointer is down on #miniLive,
+  // show the live feed on the big screen; when released, restore dual view.
+  (function setupPressHoldSwap() {
+    function showLiveFull() {
+      // Show live in big, hide delayed
+      liveVideo.style.display = 'block';
+      delayedVideo.style.display = 'none';
+      // Hide miniature to avoid recursion/overlay
+      miniLive.style.opacity = '0.4';
+      suppressMiniClick = true;
+    }
+    function restoreDual() {
+      // Restore delayed big + mini live
+      delayedVideo.style.display = 'block';
+      liveVideo.style.display = 'none';
+      miniLive.style.opacity = '1';
+      // Briefly suppress click to avoid accidental reload after press-hold
+      suppressMiniClick = true;
+      setTimeout(() => { suppressMiniClick = false; }, 200);
+    }
+    ['pointerdown','mousedown','touchstart'].forEach(evt => {
+      miniLive.addEventListener(evt, (e) => { e.preventDefault(); showLiveFull(); }, { passive: false });
+    });
+    ['pointerup','pointercancel','mouseleave','mouseup','touchend','touchcancel'].forEach(evt => {
+      miniLive.addEventListener(evt, (e) => { e.preventDefault(); restoreDual(); }, { passive: false });
+    });
+  }());
+
   recBtn.addEventListener('click', () => { void toggleRecording(); });
+
+  // Cancel button: stop current recording (if any) and reset UI to REC
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', async () => {
+      if (isRecording) {
+        // Stop underlying recorders but discard any ready blob
+        isRecording = false;
+        recBtn.textContent = '…';
+        try { recBtn.disabled = true; } catch (_) {}
+        recordDot.style.display = 'none';
+        try { recBtn.classList.remove('recording'); } catch (_) {}
+        if (recordingStrategy === 'element-capture') {
+          await stopElementCaptureRecording();
+        } else if (recordingStrategy === 'canvas-capture') {
+          await stopCanvasCaptureRecording();
+        }
+      }
+      readyToSaveBlob = null; // discard any staged blob
+      recBtn.textContent = 'REC';
+      try { recBtn.disabled = false; } catch (_) {}
+      try { cancelBtn.style.display = 'none'; } catch (_) {}
+    });
+  }
 
   startCamera();
 
