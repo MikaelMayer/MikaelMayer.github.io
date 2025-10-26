@@ -42,9 +42,26 @@
     }
     #recBtn {
       position: absolute; bottom: 10px; left: 10px; z-index: 5;
-      background: rgba(255,255,255,0.1); color: white;
+      background: rgba(255, 0, 0, 0.25); color: white;
       border: 2px solid red; font-size: 1.2em;
       padding: 0.8em 1.2em; border-radius: 14px;
+      cursor: pointer; display: none;
+      transition: background 0.3s ease, transform 0.2s ease;
+    }
+    #recBtn.recording {
+      background: rgba(255, 0, 0, 0.35);
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+      100% { transform: scale(1); }
+    }
+    #cancelBtn {
+      position: absolute; bottom: 10px; left: 120px; z-index: 5;
+      background: rgba(255,255,255,0.1); color: white;
+      border: 2px solid #888; font-size: 1.1em;
+      padding: 0.7em 1.1em; border-radius: 14px;
       cursor: pointer; display: none;
     }
     #recordDot {
@@ -79,8 +96,9 @@
   <button id="switchBtn">&#8635;</button>
   <button id="copyLinkBtn">copy app link 🔗</button>
   <button id="recBtn">REC</button>
+  <button id="cancelBtn">CANCEL</button>
   <div id="recordDot"></div>
-  <div id="versionLabel">1.1.0</div>
+  <div id="versionLabel">1.2.0</div>
 
   <script src="logic.js"></script>
   <script src="app.js"></script>
