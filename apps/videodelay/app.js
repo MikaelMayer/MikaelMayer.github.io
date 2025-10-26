@@ -11,9 +11,13 @@
   const recBtn = document.getElementById('recBtn');
   const cancelBtn = document.getElementById('cancelBtn');
   const recordDot = document.getElementById('recordDot');
+  const zoomControls = document.getElementById('zoomControls');
 
   let stream;
   let currentFacingMode = 'environment';
+  let currentZoomScale = 1;
+  let lastAppliedZoomScale = 1;
+  let ptzSupportedOnCurrentTrack = false;
   let tapCount = 0;
   let delayStartTime = null;
   let delayTimerInterval = null;
@@ -209,6 +213,8 @@
       liveVideo.srcObject = stream;
       miniLive.srcObject = stream;
       await liveVideo.play();
+      // Re-apply desired zoom on the new track (if any)
+      try { await applyZoom(currentZoomScale); } catch (_) {}
     } catch (e) {
       overlay.textContent = 'Camera error';
       console.error(e);
@@ -492,6 +498,7 @@
     if (tapCount === 1) {
       switchBtn.style.display = 'none';
       if (copyLinkBtn) copyLinkBtn.style.display = 'none';
+      if (zoomControls) zoomControls.style.display = 'none';
       startStopwatch();
       firstChunkPromise = startRecording();
     } else if (tapCount === 2) {
@@ -503,6 +510,7 @@
       delayedVideo.style.display = 'block';
       miniLive.style.display = 'block';
       recBtn.style.display = 'block';
+      if (zoomControls) zoomControls.style.display = 'flex';
 
       // Decide based on runtime capability; hide record button if unsupported
       recordingStrategy = DelayCamLogic.chooseRecordingStrategy({
@@ -641,4 +649,96 @@
   if ('serviceWorker' in navigator) {
     try { navigator.serviceWorker.register('service-worker.js'); } catch (_) {}
   }
+
+  // ---- Zoom controls ----
+  const ZOOM_STEPS = Array.from({ length: 5 }, (_, i) => Math.pow(2, i / 4));
+
+  function labelForZoom(scale) {
+    const fixed = (scale === 1 || Math.abs(scale - 2) < 1e-9) ? scale.toFixed(0) : scale.toFixed(1);
+    return `${fixed}x`;
+  }
+
+  function markSelectedZoom(scale) {
+    if (!zoomControls) return;
+    const btns = zoomControls.querySelectorAll('.zoomBtn');
+    btns.forEach(btn => {
+      const val = Number(btn.getAttribute('data-zoom') || '1');
+      if (Math.abs(val - scale) < 1e-6) btn.classList.add('selected');
+      else btn.classList.remove('selected');
+    });
+  }
+
+  function applyCssZoom(scale) {
+    // Keep origin centered while preserving absolute positioning
+    try { liveVideo.style.transformOrigin = 'center center'; } catch (_) {}
+    try { delayedVideo.style.transformOrigin = 'center center'; } catch (_) {}
+    try { liveVideo.style.transform = `scale(${scale})`; } catch (_) {}
+    try { delayedVideo.style.transform = `scale(${scale})`; } catch (_) {}
+  }
+
+  function getCurrentVideoTrack() {
+    try {
+      return stream && stream.getVideoTracks && stream.getVideoTracks()[0] ? stream.getVideoTracks()[0] : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function applyPtzZoomIfSupported(scale) {
+    const track = getCurrentVideoTrack();
+    if (!track || typeof track.getCapabilities !== 'function') return false;
+    let caps;
+    try { caps = track.getCapabilities(); } catch (_) { caps = null; }
+    if (!caps || caps.zoom == null) return false;
+    const zoomCaps = typeof caps.zoom === 'number' ? { min: 1, max: caps.zoom } : caps.zoom;
+    const min = Number.isFinite(zoomCaps.min) ? zoomCaps.min : 1;
+    const max = Number.isFinite(zoomCaps.max) ? zoomCaps.max : Math.max(2, scale);
+    const clamped = Math.min(Math.max(scale, min), max);
+    try {
+      await track.applyConstraints({ advanced: [{ zoom: clamped }] });
+      ptzSupportedOnCurrentTrack = true;
+      return true;
+    } catch (_) {
+      try {
+        await track.applyConstraints({ zoom: clamped });
+        ptzSupportedOnCurrentTrack = true;
+        return true;
+      } catch (_) {
+        ptzSupportedOnCurrentTrack = false;
+        return false;
+      }
+    }
+  }
+
+  async function applyZoom(scale) {
+    currentZoomScale = scale;
+    markSelectedZoom(scale);
+    const appliedPtz = await applyPtzZoomIfSupported(scale);
+    if (!appliedPtz) {
+      applyCssZoom(scale);
+    } else {
+      // Clear CSS transforms when PTZ active
+      try { liveVideo.style.transform = ''; } catch (_) {}
+      try { delayedVideo.style.transform = ''; } catch (_) {}
+    }
+    lastAppliedZoomScale = scale;
+  }
+
+  function setupZoomControls() {
+    if (!zoomControls) return;
+    zoomControls.innerHTML = '';
+    ZOOM_STEPS.forEach(scale => {
+      const btn = document.createElement('button');
+      btn.className = 'zoomBtn';
+      btn.type = 'button';
+      btn.setAttribute('data-zoom', String(scale));
+      btn.textContent = labelForZoom(scale);
+      btn.addEventListener('click', () => { void applyZoom(scale); });
+      zoomControls.appendChild(btn);
+    });
+    // Default selection 1x
+    markSelectedZoom(currentZoomScale);
+  }
+
+  setupZoomControls();
 }());
