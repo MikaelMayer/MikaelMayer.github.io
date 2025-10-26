@@ -542,7 +542,11 @@
       try {
         if (canNativeShareLink) {
           try {
-            await navigator.share({ url, title: 'Video Delay Camera' });
+            await navigator.share({
+              url,
+              title: 'Capture key moments without filling your phone',
+              text: 'Record key soccer moments or catch shooting stars with a delayed camera. Free and ad‑free forever.'
+            });
             return;
           } catch (_) {
             // fall through to clipboard
