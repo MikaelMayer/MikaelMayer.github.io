@@ -44,6 +44,14 @@
   let canvasRecorderChunks = [];
   let canvasRecorderStopResolve = null;
 
+  // Live zoom canvas used to pre-process camera frames for chunk recording when PTZ is unavailable
+  let liveZoomCanvasEl = null;
+  let liveZoomCanvasCtx = null;
+  let liveZoomCanvasRafId = null;
+  let liveZoomCanvasStream = null;
+  let firstRecorderUsesCanvas = false;
+  let firstRecorderCleanup = null;
+
   // Optional silent audio to make containers more widely acceptable (e.g., WhatsApp)
   let silenceAudioContext = null;
   let silenceOscillator = null;
@@ -238,12 +246,65 @@
 
   function startRecording() {
     return new Promise(resolve => {
-      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp8' });
+      // When PTZ is not supported, record from a zoomed canvas so chunks reflect zoom
+      const useCanvas = !ptzSupportedOnCurrentTrack && typeof HTMLCanvasElement !== 'undefined';
+      firstRecorderUsesCanvas = useCanvas;
+      let sourceStream;
+      if (useCanvas) {
+        // Setup a persistent canvas drawing from liveVideo with cropping based on currentZoomScale
+        const sw = liveVideo.videoWidth || 1280;
+        const sh = liveVideo.videoHeight || 720;
+        if (!liveZoomCanvasEl) {
+          liveZoomCanvasEl = document.createElement('canvas');
+          liveZoomCanvasEl.width = Math.max(2, sw);
+          liveZoomCanvasEl.height = Math.max(2, sh);
+          liveZoomCanvasCtx = liveZoomCanvasEl.getContext('2d');
+        } else {
+          liveZoomCanvasEl.width = Math.max(2, sw);
+          liveZoomCanvasEl.height = Math.max(2, sh);
+        }
+
+        function drawLiveZoomed() {
+          try {
+            const scale = Math.max(1, Number(currentZoomScale) || 1);
+            const vw = liveVideo.videoWidth || sw;
+            const vh = liveVideo.videoHeight || sh;
+            if (vw > 0 && vh > 0) {
+              if (scale > 1) {
+                const srcW = Math.max(2, Math.floor(vw / scale));
+                const srcH = Math.max(2, Math.floor(vh / scale));
+                const srcX = Math.floor((vw - srcW) / 2);
+                const srcY = Math.floor((vh - srcH) / 2);
+                liveZoomCanvasCtx.drawImage(liveVideo, srcX, srcY, srcW, srcH, 0, 0, liveZoomCanvasEl.width, liveZoomCanvasEl.height);
+              } else {
+                liveZoomCanvasCtx.drawImage(liveVideo, 0, 0, liveZoomCanvasEl.width, liveZoomCanvasEl.height);
+              }
+            }
+          } catch (_) {}
+          liveZoomCanvasRafId = requestAnimationFrame(drawLiveZoomed);
+        }
+        liveZoomCanvasRafId = requestAnimationFrame(drawLiveZoomed);
+        liveZoomCanvasStream = liveZoomCanvasEl.captureStream ? liveZoomCanvasEl.captureStream(30) : null;
+        sourceStream = liveZoomCanvasStream || stream;
+        firstRecorderCleanup = () => {
+          if (liveZoomCanvasRafId) { cancelAnimationFrame(liveZoomCanvasRafId); liveZoomCanvasRafId = null; }
+          try { if (liveZoomCanvasStream) liveZoomCanvasStream.getTracks().forEach(t => t.stop()); } catch (_) {}
+          liveZoomCanvasStream = null;
+        };
+      } else {
+        sourceStream = stream;
+        firstRecorderCleanup = null;
+      }
+
+      const recorder = new MediaRecorder(sourceStream, { mimeType: 'video/webm; codecs=vp8' });
       let blob;
       recorder.ondataavailable = e => {
         if (e.data && e.data.size > 0) blob = e.data;
       };
-      recorder.onstop = () => resolve(blob);
+      recorder.onstop = () => {
+        try { if (firstRecorderCleanup) firstRecorderCleanup(); } catch (_) {}
+        resolve(blob);
+      };
       recorder.start();
       firstRecorder = recorder;
     });
@@ -253,16 +314,61 @@
     if (firstRecorder && firstRecorder.state === 'recording') {
       firstRecorder.stop();
     }
+    // Cleanup any live-zoom canvas stream used for initial chunk
+    try { if (firstRecorderCleanup) firstRecorderCleanup(); } catch (_) {}
+    firstRecorderCleanup = null;
   }
 
   async function recordChunk(durationMs) {
     return new Promise(resolve => {
-      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp8' });
+      const useCanvas = !ptzSupportedOnCurrentTrack && typeof HTMLCanvasElement !== 'undefined';
+      let localRaf = null;
+      let localCanvas = null;
+      let localCtx = null;
+      let srcStream = stream;
+      if (useCanvas) {
+        const sw = liveVideo.videoWidth || 1280;
+        const sh = liveVideo.videoHeight || 720;
+        localCanvas = document.createElement('canvas');
+        localCanvas.width = Math.max(2, sw);
+        localCanvas.height = Math.max(2, sh);
+        localCtx = localCanvas.getContext('2d');
+        function drawOnce() {
+          try {
+            const scale = Math.max(1, Number(currentZoomScale) || 1);
+            const vw = liveVideo.videoWidth || sw;
+            const vh = liveVideo.videoHeight || sh;
+            if (vw > 0 && vh > 0) {
+              if (scale > 1) {
+                const srcW = Math.max(2, Math.floor(vw / scale));
+                const srcH = Math.max(2, Math.floor(vh / scale));
+                const srcX = Math.floor((vw - srcW) / 2);
+                const srcY = Math.floor((vh - srcH) / 2);
+                localCtx.drawImage(liveVideo, srcX, srcY, srcW, srcH, 0, 0, localCanvas.width, localCanvas.height);
+              } else {
+                localCtx.drawImage(liveVideo, 0, 0, localCanvas.width, localCanvas.height);
+              }
+            }
+          } catch (_) {}
+          localRaf = requestAnimationFrame(drawOnce);
+        }
+        localRaf = requestAnimationFrame(drawOnce);
+        const cap = localCanvas.captureStream ? localCanvas.captureStream(30) : null;
+        if (cap) srcStream = cap;
+      }
+
+      const recorder = new MediaRecorder(srcStream, { mimeType: 'video/webm; codecs=vp8' });
       let blob;
       recorder.ondataavailable = e => {
         if (e.data && e.data.size > 0) blob = e.data;
       };
-      recorder.onstop = () => resolve(blob);
+      recorder.onstop = () => {
+        if (localRaf) { cancelAnimationFrame(localRaf); localRaf = null; }
+        if (srcStream && srcStream !== stream) {
+          try { srcStream.getTracks().forEach(t => t.stop()); } catch (_) {}
+        }
+        resolve(blob);
+      };
       recorder.start();
       setTimeout(() => recorder.stop(), durationMs);
     });
