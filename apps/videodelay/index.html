@@ -42,6 +42,12 @@
       display: flex;
       gap: 8px;
     }
+    /* Avoid overlapping the overlay banner in portrait by pushing zoom controls down */
+    @media (orientation: portrait) {
+      #zoomControls {
+        margin-top: 50px; /* effective top ≈ 130px */
+      }
+    }
     .zoomBtn {
       background: rgba(255,255,255,0.1);
       color: white;
@@ -121,7 +127,7 @@
   <button id="recBtn">REC</button>
   <button id="cancelBtn">CANCEL</button>
   <div id="recordDot"></div>
-  <div id="versionLabel">1.2.2</div>
+  <div id="versionLabel">1.2.3</div>
 
   <script src="logic.js"></script>
   <script src="app.js"></script>
