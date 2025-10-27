@@ -34,6 +34,28 @@
       font-size: 1.4em; border-radius: 50%; width: 56px; height: 56px;
       cursor: pointer; display: flex; align-items: center; justify-content: center;
     }
+    #zoomControls {
+      position: absolute;
+      top: 80px; /* below the switch button */
+      right: 15px;
+      z-index: 4;
+      display: flex;
+      gap: 8px;
+    }
+    .zoomBtn {
+      background: rgba(255,255,255,0.1);
+      color: white;
+      border: 1px solid white;
+      font-size: 0.95em;
+      border-radius: 12px;
+      padding: 0.35em 0.6em;
+      cursor: pointer;
+      user-select: none;
+    }
+    .zoomBtn.selected {
+      background: white;
+      color: black;
+    }
     #copyLinkBtn {
       position: absolute; bottom: 15px; right: 15px; z-index: 4;
       background: rgba(255,255,255,0.1); color: white; border: 1px solid white;
@@ -94,6 +116,7 @@
 
   <div id="overlay">Tap to set delay</div>
   <button id="switchBtn" aria-label="Switch camera" title="Switch camera">📸↻</button>
+  <div id="zoomControls" role="group" aria-label="Zoom controls"></div>
   <button id="copyLinkBtn">copy app link 🔗</button>
   <button id="recBtn">REC</button>
   <button id="cancelBtn">CANCEL</button>

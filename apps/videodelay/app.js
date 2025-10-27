@@ -11,9 +11,13 @@
   const recBtn = document.getElementById('recBtn');
   const cancelBtn = document.getElementById('cancelBtn');
   const recordDot = document.getElementById('recordDot');
+  const zoomControls = document.getElementById('zoomControls');
 
   let stream;
   let currentFacingMode = 'environment';
+  let currentZoomScale = 1;
+  let lastAppliedZoomScale = 1;
+  let ptzSupportedOnCurrentTrack = false;
   let tapCount = 0;
   let delayStartTime = null;
   let delayTimerInterval = null;
@@ -39,6 +43,14 @@
   let canvasRecorder = null;
   let canvasRecorderChunks = [];
   let canvasRecorderStopResolve = null;
+
+  // Live zoom canvas used to pre-process camera frames for chunk recording when PTZ is unavailable
+  let liveZoomCanvasEl = null;
+  let liveZoomCanvasCtx = null;
+  let liveZoomCanvasRafId = null;
+  let liveZoomCanvasStream = null;
+  let firstRecorderUsesCanvas = false;
+  let firstRecorderCleanup = null;
 
   // Optional silent audio to make containers more widely acceptable (e.g., WhatsApp)
   let silenceAudioContext = null;
@@ -209,6 +221,8 @@
       liveVideo.srcObject = stream;
       miniLive.srcObject = stream;
       await liveVideo.play();
+      // Re-apply desired zoom on the new track (if any)
+      try { await applyZoom(currentZoomScale); } catch (_) {}
     } catch (e) {
       overlay.textContent = 'Camera error';
       console.error(e);
@@ -232,12 +246,65 @@
 
   function startRecording() {
     return new Promise(resolve => {
-      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp8' });
+      // When PTZ is not supported, record from a zoomed canvas so chunks reflect zoom
+      const useCanvas = !ptzSupportedOnCurrentTrack && typeof HTMLCanvasElement !== 'undefined';
+      firstRecorderUsesCanvas = useCanvas;
+      let sourceStream;
+      if (useCanvas) {
+        // Setup a persistent canvas drawing from liveVideo with cropping based on currentZoomScale
+        const sw = liveVideo.videoWidth || 1280;
+        const sh = liveVideo.videoHeight || 720;
+        if (!liveZoomCanvasEl) {
+          liveZoomCanvasEl = document.createElement('canvas');
+          liveZoomCanvasEl.width = Math.max(2, sw);
+          liveZoomCanvasEl.height = Math.max(2, sh);
+          liveZoomCanvasCtx = liveZoomCanvasEl.getContext('2d');
+        } else {
+          liveZoomCanvasEl.width = Math.max(2, sw);
+          liveZoomCanvasEl.height = Math.max(2, sh);
+        }
+
+        function drawLiveZoomed() {
+          try {
+            const scale = Math.max(1, Number(currentZoomScale) || 1);
+            const vw = liveVideo.videoWidth || sw;
+            const vh = liveVideo.videoHeight || sh;
+            if (vw > 0 && vh > 0) {
+              if (scale > 1) {
+                const srcW = Math.max(2, Math.floor(vw / scale));
+                const srcH = Math.max(2, Math.floor(vh / scale));
+                const srcX = Math.floor((vw - srcW) / 2);
+                const srcY = Math.floor((vh - srcH) / 2);
+                liveZoomCanvasCtx.drawImage(liveVideo, srcX, srcY, srcW, srcH, 0, 0, liveZoomCanvasEl.width, liveZoomCanvasEl.height);
+              } else {
+                liveZoomCanvasCtx.drawImage(liveVideo, 0, 0, liveZoomCanvasEl.width, liveZoomCanvasEl.height);
+              }
+            }
+          } catch (_) {}
+          liveZoomCanvasRafId = requestAnimationFrame(drawLiveZoomed);
+        }
+        liveZoomCanvasRafId = requestAnimationFrame(drawLiveZoomed);
+        liveZoomCanvasStream = liveZoomCanvasEl.captureStream ? liveZoomCanvasEl.captureStream(30) : null;
+        sourceStream = liveZoomCanvasStream || stream;
+        firstRecorderCleanup = () => {
+          if (liveZoomCanvasRafId) { cancelAnimationFrame(liveZoomCanvasRafId); liveZoomCanvasRafId = null; }
+          try { if (liveZoomCanvasStream) liveZoomCanvasStream.getTracks().forEach(t => t.stop()); } catch (_) {}
+          liveZoomCanvasStream = null;
+        };
+      } else {
+        sourceStream = stream;
+        firstRecorderCleanup = null;
+      }
+
+      const recorder = new MediaRecorder(sourceStream, { mimeType: 'video/webm; codecs=vp8' });
       let blob;
       recorder.ondataavailable = e => {
         if (e.data && e.data.size > 0) blob = e.data;
       };
-      recorder.onstop = () => resolve(blob);
+      recorder.onstop = () => {
+        try { if (firstRecorderCleanup) firstRecorderCleanup(); } catch (_) {}
+        resolve(blob);
+      };
       recorder.start();
       firstRecorder = recorder;
     });
@@ -247,16 +314,61 @@
     if (firstRecorder && firstRecorder.state === 'recording') {
       firstRecorder.stop();
     }
+    // Cleanup any live-zoom canvas stream used for initial chunk
+    try { if (firstRecorderCleanup) firstRecorderCleanup(); } catch (_) {}
+    firstRecorderCleanup = null;
   }
 
   async function recordChunk(durationMs) {
     return new Promise(resolve => {
-      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp8' });
+      const useCanvas = !ptzSupportedOnCurrentTrack && typeof HTMLCanvasElement !== 'undefined';
+      let localRaf = null;
+      let localCanvas = null;
+      let localCtx = null;
+      let srcStream = stream;
+      if (useCanvas) {
+        const sw = liveVideo.videoWidth || 1280;
+        const sh = liveVideo.videoHeight || 720;
+        localCanvas = document.createElement('canvas');
+        localCanvas.width = Math.max(2, sw);
+        localCanvas.height = Math.max(2, sh);
+        localCtx = localCanvas.getContext('2d');
+        function drawOnce() {
+          try {
+            const scale = Math.max(1, Number(currentZoomScale) || 1);
+            const vw = liveVideo.videoWidth || sw;
+            const vh = liveVideo.videoHeight || sh;
+            if (vw > 0 && vh > 0) {
+              if (scale > 1) {
+                const srcW = Math.max(2, Math.floor(vw / scale));
+                const srcH = Math.max(2, Math.floor(vh / scale));
+                const srcX = Math.floor((vw - srcW) / 2);
+                const srcY = Math.floor((vh - srcH) / 2);
+                localCtx.drawImage(liveVideo, srcX, srcY, srcW, srcH, 0, 0, localCanvas.width, localCanvas.height);
+              } else {
+                localCtx.drawImage(liveVideo, 0, 0, localCanvas.width, localCanvas.height);
+              }
+            }
+          } catch (_) {}
+          localRaf = requestAnimationFrame(drawOnce);
+        }
+        localRaf = requestAnimationFrame(drawOnce);
+        const cap = localCanvas.captureStream ? localCanvas.captureStream(30) : null;
+        if (cap) srcStream = cap;
+      }
+
+      const recorder = new MediaRecorder(srcStream, { mimeType: 'video/webm; codecs=vp8' });
       let blob;
       recorder.ondataavailable = e => {
         if (e.data && e.data.size > 0) blob = e.data;
       };
-      recorder.onstop = () => resolve(blob);
+      recorder.onstop = () => {
+        if (localRaf) { cancelAnimationFrame(localRaf); localRaf = null; }
+        if (srcStream && srcStream !== stream) {
+          try { srcStream.getTracks().forEach(t => t.stop()); } catch (_) {}
+        }
+        resolve(blob);
+      };
       recorder.start();
       setTimeout(() => recorder.stop(), durationMs);
     });
@@ -357,7 +469,20 @@
 
     function drawFrame() {
       try {
-        canvasCtx.drawImage(delayedVideo, 0, 0, canvasEl.width, canvasEl.height);
+        const scale = ptzSupportedOnCurrentTrack ? 1 : Math.max(1, Number(currentZoomScale) || 1);
+        const sw = delayedVideo.videoWidth || sourceWidth;
+        const sh = delayedVideo.videoHeight || sourceHeight;
+        if (sw > 0 && sh > 0) {
+          if (scale > 1) {
+            const srcW = Math.max(2, Math.floor(sw / scale));
+            const srcH = Math.max(2, Math.floor(sh / scale));
+            const srcX = Math.floor((sw - srcW) / 2);
+            const srcY = Math.floor((sh - srcH) / 2);
+            canvasCtx.drawImage(delayedVideo, srcX, srcY, srcW, srcH, 0, 0, canvasEl.width, canvasEl.height);
+          } else {
+            canvasCtx.drawImage(delayedVideo, 0, 0, canvasEl.width, canvasEl.height);
+          }
+        }
       } catch (_) {
         // ignore draw errors (e.g., while switching sources)
       }
@@ -641,4 +766,98 @@
   if ('serviceWorker' in navigator) {
     try { navigator.serviceWorker.register('service-worker.js'); } catch (_) {}
   }
+
+  // ---- Zoom controls ----
+  const ZOOM_STEPS = Array.from({ length: 5 }, (_, i) => Math.pow(2, i / 4));
+
+  function labelForZoom(scale) {
+    const fixed = (scale === 1 || Math.abs(scale - 2) < 1e-9) ? scale.toFixed(0) : scale.toFixed(1);
+    return `${fixed}x`;
+  }
+
+  function markSelectedZoom(scale) {
+    if (!zoomControls) return;
+    const btns = zoomControls.querySelectorAll('.zoomBtn');
+    btns.forEach(btn => {
+      const val = Number(btn.getAttribute('data-zoom') || '1');
+      if (Math.abs(val - scale) < 1e-6) btn.classList.add('selected');
+      else btn.classList.remove('selected');
+    });
+  }
+
+  function applyCssZoom(scale) {
+    // Keep origin centered while preserving absolute positioning
+    try { liveVideo.style.transformOrigin = 'center center'; } catch (_) {}
+    try { delayedVideo.style.transformOrigin = 'center center'; } catch (_) {}
+    try { liveVideo.style.transform = `scale(${scale})`; } catch (_) {}
+    try { delayedVideo.style.transform = `scale(${scale})`; } catch (_) {}
+  }
+
+  function getCurrentVideoTrack() {
+    try {
+      return stream && stream.getVideoTracks && stream.getVideoTracks()[0] ? stream.getVideoTracks()[0] : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function applyPtzZoomIfSupported(scale) {
+    const track = getCurrentVideoTrack();
+    if (!track || typeof track.getCapabilities !== 'function') return false;
+    let caps;
+    try { caps = track.getCapabilities(); } catch (_) { caps = null; }
+    if (!caps || caps.zoom == null) return false;
+    const zoomCaps = typeof caps.zoom === 'number' ? { min: 1, max: caps.zoom } : caps.zoom;
+    const min = Number.isFinite(zoomCaps.min) ? zoomCaps.min : 1;
+    const max = Number.isFinite(zoomCaps.max) ? zoomCaps.max : Math.max(2, scale);
+    const clamped = Math.min(Math.max(scale, min), max);
+    try {
+      await track.applyConstraints({ advanced: [{ zoom: clamped }] });
+      ptzSupportedOnCurrentTrack = true;
+      return true;
+    } catch (_) {
+      try {
+        await track.applyConstraints({ zoom: clamped });
+        ptzSupportedOnCurrentTrack = true;
+        return true;
+      } catch (_) {
+        ptzSupportedOnCurrentTrack = false;
+        return false;
+      }
+    }
+  }
+
+  async function applyZoom(scale) {
+    currentZoomScale = scale;
+    markSelectedZoom(scale);
+    const appliedPtz = await applyPtzZoomIfSupported(scale);
+    if (!appliedPtz) {
+      applyCssZoom(scale);
+      // If we are recording via canvas, ensure subsequent frames reflect new zoom
+      // (drawFrame reads currentZoomScale each tick).
+    } else {
+      // Clear CSS transforms when PTZ active
+      try { liveVideo.style.transform = ''; } catch (_) {}
+      try { delayedVideo.style.transform = ''; } catch (_) {}
+    }
+    lastAppliedZoomScale = scale;
+  }
+
+  function setupZoomControls() {
+    if (!zoomControls) return;
+    zoomControls.innerHTML = '';
+    ZOOM_STEPS.forEach(scale => {
+      const btn = document.createElement('button');
+      btn.className = 'zoomBtn';
+      btn.type = 'button';
+      btn.setAttribute('data-zoom', String(scale));
+      btn.textContent = labelForZoom(scale);
+      btn.addEventListener('click', () => { void applyZoom(scale); });
+      zoomControls.appendChild(btn);
+    });
+    // Default selection 1x
+    markSelectedZoom(currentZoomScale);
+  }
+
+  setupZoomControls();
 }());
