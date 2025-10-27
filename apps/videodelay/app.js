@@ -363,7 +363,20 @@
 
     function drawFrame() {
       try {
-        canvasCtx.drawImage(delayedVideo, 0, 0, canvasEl.width, canvasEl.height);
+        const scale = ptzSupportedOnCurrentTrack ? 1 : Math.max(1, Number(currentZoomScale) || 1);
+        const sw = delayedVideo.videoWidth || sourceWidth;
+        const sh = delayedVideo.videoHeight || sourceHeight;
+        if (sw > 0 && sh > 0) {
+          if (scale > 1) {
+            const srcW = Math.max(2, Math.floor(sw / scale));
+            const srcH = Math.max(2, Math.floor(sh / scale));
+            const srcX = Math.floor((sw - srcW) / 2);
+            const srcY = Math.floor((sh - srcH) / 2);
+            canvasCtx.drawImage(delayedVideo, srcX, srcY, srcW, srcH, 0, 0, canvasEl.width, canvasEl.height);
+          } else {
+            canvasCtx.drawImage(delayedVideo, 0, 0, canvasEl.width, canvasEl.height);
+          }
+        }
       } catch (_) {
         // ignore draw errors (e.g., while switching sources)
       }
@@ -498,7 +511,6 @@
     if (tapCount === 1) {
       switchBtn.style.display = 'none';
       if (copyLinkBtn) copyLinkBtn.style.display = 'none';
-      if (zoomControls) zoomControls.style.display = 'none';
       startStopwatch();
       firstChunkPromise = startRecording();
     } else if (tapCount === 2) {
@@ -510,7 +522,6 @@
       delayedVideo.style.display = 'block';
       miniLive.style.display = 'block';
       recBtn.style.display = 'block';
-      if (zoomControls) zoomControls.style.display = 'flex';
 
       // Decide based on runtime capability; hide record button if unsupported
       recordingStrategy = DelayCamLogic.chooseRecordingStrategy({
@@ -716,6 +727,8 @@
     const appliedPtz = await applyPtzZoomIfSupported(scale);
     if (!appliedPtz) {
       applyCssZoom(scale);
+      // If we are recording via canvas, ensure subsequent frames reflect new zoom
+      // (drawFrame reads currentZoomScale each tick).
     } else {
       // Clear CSS transforms when PTZ active
       try { liveVideo.style.transform = ''; } catch (_) {}
