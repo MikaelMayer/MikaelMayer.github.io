@@ -8,7 +8,6 @@ import {
   createParser,
   Literal,
   Regex,
-  Concat,
   Sequence,
   Optional,
   Choice,
@@ -36,26 +35,16 @@ function withSpan(node, span) {
 }
 
 function wsLiteral(text, options = {}) {
-  return Concat(
-    WS({ ctor: `WS:${text}` }),
-    Literal(text, options),
-    {
-      ctor: `wsLiteral(${text})`,
-      projector: (_ws, value) => value,
-      span: 'right',
-    },
-  );
+  const wsCtor = options.wsCtor ?? `WS:${text}`;
+  return WS({ ctor: wsCtor })._i(Literal(text, options), { ctor: `wsLiteral(${text})` });
 }
 
 function wsRegex(regex, options = {}) {
-  return Concat(
-    WS({ ctor: options.wsCtor || 'WS:regex' }),
-    Regex(regex, options),
-    {
-      ctor: options.ctor ? `${options.ctor}:withWS` : 'RegexWithWS',
-      projector: (_ws, value) => value,
-      span: 'right',
-    },
+  const wsCtor = options.wsCtor ?? 'WS:regex';
+  const literalCtor = options.ctor ?? 'RegexToken';
+  return WS({ ctor: wsCtor })._i(
+    Regex(regex, { ...options, ctor: literalCtor }),
+    { ctor: `${literalCtor}:withWS` },
   );
 }
 
@@ -102,11 +91,11 @@ const optionalSign = signParser.Optional(1, { ctor: 'OptionalSign' });
 
 const numberLiteral = numberToken.Map((value, result) => withSpan(Const(value, 0), result.span));
 
-const imagFromNumber = Concat(numberToken, imagUnit, { ctor: 'NumericImag' })
-  .Map(([magnitude], result) => withSpan(Const(0, magnitude), result.span));
+const imagFromNumber = numberToken.i_(imagUnit, { ctor: 'NumericImag' })
+  .Map((magnitude, result) => withSpan(Const(0, magnitude), result.span));
 
-const unitImagLiteral = Concat(optionalSign, imagUnit, { ctor: 'UnitImag' })
-  .Map(([sign], result) => withSpan(Const(0, sign), result.span));
+const unitImagLiteral = optionalSign.i_(imagUnit, { ctor: 'UnitImag' })
+  .Map((sign, result) => withSpan(Const(0, sign), result.span));
 
 const literalParser = Choice([
   imagFromNumber,

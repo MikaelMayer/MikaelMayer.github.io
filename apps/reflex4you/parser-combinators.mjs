@@ -93,6 +93,14 @@ parserPrototype.Concat = function methodConcat(other, options) {
 
 parserPrototype.Then = parserPrototype.Concat;
 
+parserPrototype._i = function methodIgnoreLeft(other, options) {
+  return ConcatRight(this, other, options);
+};
+
+parserPrototype.i_ = function methodIgnoreRight(other, options) {
+  return ConcatLeft(this, other, options);
+};
+
 parserPrototype.Many = function methodMany(options) {
   return Many(this, options);
 };
@@ -162,36 +170,51 @@ export function Chain(parser, nextFactory, { ctor = 'Chain' } = {}) {
   });
 }
 
-export function Concat(left, right, { ctor = 'Concat', projector, span = 'full' } = {}) {
+export function Concat(left, right, { ctor = 'Concat' } = {}) {
   const first = ensureParser(left, 'left parser');
   const second = ensureParser(right, 'right parser');
-  const combine = typeof projector === 'function' ? projector : (a, b) => [a, b];
-
-  function selectSpanStart(mode, initialInput, rightInput) {
-    switch (mode) {
-      case 'full':
-      case 'left':
-        return initialInput;
-      case 'right':
-        return rightInput;
-      default:
-        throw new RangeError(`Unknown span mode "${mode}"`);
-    }
-  }
-
   return createParser(ctor, (input) => {
     const leftResult = first.runNormalized(input);
     if (!leftResult.ok) {
       return leftResult;
     }
-    const rightInput = leftResult.next;
-    const rightResult = second.runNormalized(rightInput);
+    const rightResult = second.runNormalized(leftResult.next);
     if (!rightResult.ok) {
       return rightResult;
     }
-    const value = combine(leftResult.value, rightResult.value, leftResult, rightResult);
-    const spanStart = selectSpanStart(span, input, rightInput);
-    return makeSuccess(ctor, spanStart, rightResult.next, value);
+    return makeSuccess(ctor, input, rightResult.next, [leftResult.value, rightResult.value]);
+  });
+}
+
+export function ConcatLeft(left, right, { ctor = 'ConcatLeft' } = {}) {
+  const first = ensureParser(left, 'left parser');
+  const second = ensureParser(right, 'right parser');
+  return createParser(ctor, (input) => {
+    const leftResult = first.runNormalized(input);
+    if (!leftResult.ok) {
+      return leftResult;
+    }
+    const rightResult = second.runNormalized(leftResult.next);
+    if (!rightResult.ok) {
+      return rightResult;
+    }
+    return makeSuccess(ctor, input, rightResult.next, leftResult.value);
+  });
+}
+
+export function ConcatRight(left, right, { ctor = 'ConcatRight' } = {}) {
+  const first = ensureParser(left, 'left parser');
+  const second = ensureParser(right, 'right parser');
+  return createParser(ctor, (input) => {
+    const leftResult = first.runNormalized(input);
+    if (!leftResult.ok) {
+      return leftResult;
+    }
+    const rightResult = second.runNormalized(leftResult.next);
+    if (!rightResult.ok) {
+      return rightResult;
+    }
+    return makeSuccess(ctor, input, rightResult.next, rightResult.value);
   });
 }
 
