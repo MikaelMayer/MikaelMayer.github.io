@@ -19,3 +19,4 @@
 - [ ] Implement the minimal arithmetic-expression grammar with literals, primitives (`x`, `y`, `z`, `F1`), unary minus, binary `+ - * /`, parentheses, and both composition syntaxes `o(A,B)` / `A $ B`.
 - [ ] Ensure the generated AST nodes carry spans/input refs and normalize operator precedence by emitting parentheses instead of storing metadata.
 - [ ] Integrate the parser output with the existing shader compiler path, surfacing recoverable vs. critical failures with detailed diagnostics for downstream tooling.
+- [ ] Update the UI so a successfully parsed formula rewrites the `?formula=` query parameter (URL-encoded) and the page preloads that value from the query string into the textarea on startup.
