@@ -193,7 +193,7 @@ vec2 ${name}(vec2 z) {
   if (ast.kind === "VarY") {
     return `
 vec2 ${name}(vec2 z) {
-    return vec2(0.0, z.y);
+    return vec2(z.y, 0.0);
 }`.trim();
   }
 

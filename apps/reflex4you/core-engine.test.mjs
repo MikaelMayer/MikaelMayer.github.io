@@ -65,7 +65,7 @@ test('VarX and VarY nodes project components', () => {
   const ast = Add(VarX(), VarY());
   const fragment = buildFragmentSourceFromAST(ast);
   assert.match(fragment, /return vec2\(z\.x, 0\.0\);/);
-  assert.match(fragment, /return vec2\(0\.0, z\.y\);/);
+  assert.match(fragment, /return vec2\(z\.y, 0\.0\);/);
 });
 
 test('evaluateFormulaSource throws on invalid input', () => {
