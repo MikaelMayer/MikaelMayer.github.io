@@ -3,7 +3,7 @@ const { test, expect } = require('@playwright/test');
 const SIMPLE_FORMULA = 'Add(Const(1.0, 0.0), Const(0.0, 1.0))';
 
 test('reflex4you updates formula query param after successful apply', async ({ page }) => {
-  await page.goto('/apps/reflex4you/index.html');
+  await page.goto('/index.html');
 
   const textarea = page.locator('#formula');
   await expect(textarea).toBeVisible();
@@ -20,7 +20,7 @@ test('reflex4you updates formula query param after successful apply', async ({ p
 
 test('reflex4you loads formulas from query string on startup', async ({ page }) => {
   const seededFormula = 'Const(2.0, -1.5)';
-  await page.goto(`/apps/reflex4you/index.html?formula=${encodeURIComponent(seededFormula)}`);
+  await page.goto(`/index.html?formula=${encodeURIComponent(seededFormula)}`);
 
   const textarea = page.locator('#formula');
   await expect(textarea).toHaveValue(seededFormula);
