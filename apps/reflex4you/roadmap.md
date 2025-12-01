@@ -14,7 +14,7 @@
 - [ ] Extract the current inline script from `apps/reflex4you` into separate modules (a reusable core engine plus a thin `index.html` harness) and wire the page via `<script type="module">`.
 - [ ] Add Node-based unit testing plus a Playwright (or similar) smoke test so both the parser helpers and the HTML integration can be exercised automatically.
 - [ ] Review `dafny/Source/DafnyStandardLibraries` parser/core examples to replicate the functional parser patterns we need (skip the proof artifacts).
-- [ ] Implement the zero-allocation `ParserInput` class and the `ParseResult` success/failure classes with ctor/severity metadata, positional spans, and nested failure support.
+- [x] Implement the zero-allocation `ParserInput` class and the `ParseResult` success/failure classes with ctor/severity metadata, positional spans, and nested failure support.
 - [ ] Build the JS parser-combinator toolkit (supporting both standard and builder styles via call overrides) including `Or` as both a combinator and an instance helper.
 - [ ] Implement the minimal arithmetic-expression grammar with literals, primitives (`x`, `y`, `z`, `F1`), unary minus, binary `+ - * /`, parentheses, and both composition syntaxes `o(A,B)` / `A $ B`.
 - [ ] Ensure the generated AST nodes carry spans/input refs and normalize operator precedence by emitting parentheses instead of storing metadata.
