@@ -3,6 +3,7 @@
 ## Prelude
 - Reference syntax spec: [Reflex4You next-level syntax](https://docs.google.com/document/d/11knd8_qb8btwi6nGQYCU743OaVlHiD_EV9DyYl5gXUQ/edit?usp=drivesdk).
 - Shader-compiled target disallows unbounded loops and requires deterministic constructs.
+- Existing `index.html` treats `F1` as the finger-controlled offset (a complex value); the new syntax must preserve that meaning while generalizing usage.
 - All parser inputs must be zero-allocation views (string + start/end) and outputs must carry ctor flag, severity, spans, and links to original input plus nested failures.
 - Parser combinators should mirror Dafny styles: `Or(p, q)` and `p.Or(q)`, implemented via JS call overrides so builder-style chaining also works.
 - Composition syntax `o(A, B)` and `A $ B` both produce composition AST nodes; `$` is not a combinator.
