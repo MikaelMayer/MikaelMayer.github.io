@@ -1,6 +1,7 @@
 # Reflex4You Syntax Roadmap
 
 ## Prelude
+- Reference syntax spec: [Reflex4You next-level syntax](https://docs.google.com/document/d/11knd8_qb8btwi6nGQYCU743OaVlHiD_EV9DyYl5gXUQ/edit?usp=drivesdk).
 - Shader-compiled target disallows unbounded loops and requires deterministic constructs.
 - All parser inputs must be zero-allocation views (string + start/end) and outputs must carry ctor flag, severity, spans, and links to original input plus nested failures.
 - Parser combinators should mirror Dafny styles: `Or(p, q)` and `p.Or(q)`, implemented via JS call overrides so builder-style chaining also works.
