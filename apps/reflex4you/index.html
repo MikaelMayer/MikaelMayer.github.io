@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Reflex GPU demo – full-screen + live formulas</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      font-family: system-ui, sans-serif;
+    }
+
+    /* Fullscreen canvas like in the working version */
+    #glcanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none; /* 1-finger pan on mobile */
+    }
+
+    /* Error bar: tiny, floating above bottom */
+    #error {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 2.4em;
+      padding: 2px 8px;
+      font-size: 11px;
+      color: #ff9b9b;
+      background: rgba(40, 0, 0, 0.85);
+      box-sizing: border-box;
+      max-height: 5em;
+      overflow: auto;
+      display: none;
+      pointer-events: none;
+    }
+
+    /* Formula panel: overlay above rendering, semi-transparent */
+    #formula-panel {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.65); /* transparent over the fractal */
+      color: #ddd;
+      padding: 4px 6px 6px;
+      box-sizing: border-box;
+      display: flex;
+      gap: 4px;
+      align-items: flex-end;
+      pointer-events: auto;
+    }
+
+    #formula-label {
+      font-size: 12px;
+      white-space: nowrap;
+      margin-right: 4px;
+    }
+
+    #formula {
+      flex: 1 1 auto;
+      resize: none;
+      border-radius: 4px;
+      border: 1px solid #555;
+      background: rgba(10, 10, 10, 0.9);
+      color: #eee;
+      font-family: monospace;
+      font-size: 12px;
+      padding: 4px;
+      line-height: 1.3;
+      max-height: 40vh;
+      min-height: 2.4em;
+      transition: min-height 0.15s ease, box-shadow 0.15s ease;
+      box-sizing: border-box;
+    }
+
+    #formula.expanded {
+      min-height: 8em; /* more lines visible when focused */
+      box-shadow: 0 0 0 1px #888;
+    }
+
+    #apply-btn {
+      flex: 0 0 auto;
+      padding: 4px 10px;
+      border-radius: 4px;
+      border: 1px solid #666;
+      background: #222;
+      color: #eee;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    #apply-btn:hover {
+      background: #333;
+    }
+  </style>
+</head>
+<body>
+<canvas id="glcanvas"></canvas>
+
+<div id="error"></div>
+
+<div id="formula-panel">
+  <span id="formula-label">f(z) =</span>
+  <textarea id="formula" spellcheck="false"></textarea>
+  <button id="apply-btn">Apply</button>
+</div>
+
+<script type="text/javascript">
+  // =========================================================
+  // 1. AST constructors – one node = one vec2 nodeK(vec2 z)
+  // =========================================================
+
+  function VarZ() {
+    return { kind: "Var", name: "z" };
+  }
+
+  function Pow(base, exponent) {
+    return { kind: "Pow", base, exponent };
+  }
+
+  function Offset() {
+    // Represents the current pan vector (uniform u_offset)
+    return { kind: "Offset" };
+  }
+
+  function Sub(left, right) {
+    return { kind: "Sub", left, right };
+  }
+
+  function Mul(left, right) {
+    return { kind: "Mul", left, right };
+  }
+
+  function Op(left, right, op) {
+    // op ∈ {"add","sub","mul","mod"}
+    return { kind: "Op", left, right, op };
+  }
+
+  function Add(left, right) {
+    return { kind: "Add", left, right };
+  }
+
+  function Div(left, right) {
+    return { kind: "Div", left, right };
+  }
+
+  function Const(re, im) {
+    // constant function: always returns (re + i im)
+    return { kind: "Const", re, im };
+  }
+
+  function Compose(f, g) {
+    // f(g(z))
+    return { kind: "Compose", f, g };
+  }
+
+  // ---- Default formula: same family you liked ----
+  // f(z) = (z - offset) * (z + offset)
+  let formulaAST = Mul(
+    Sub(VarZ(), Offset()),
+    Op(VarZ(), Offset(), "add")
+  );
+
+  // =========================================================
+  // 2. GLSL codegen: one function per AST node
+  // =========================================================
+
+  let nextNodeId = 0;
+
+  function assignNodeIds(ast) {
+    if (ast._id !== undefined) return;
+    ast._id = nextNodeId++;
+
+    switch (ast.kind) {
+      case "Var":
+      case "Offset":
+      case "Const":
+        break;
+
+      case "Pow":
+        assignNodeIds(ast.base);
+        break;
+
+      case "Sub":
+      case "Mul":
+      case "Op":
+      case "Add":
+      case "Div":
+        assignNodeIds(ast.left);
+        assignNodeIds(ast.right);
+        break;
+
+      case "Compose":
+        assignNodeIds(ast.f);
+        assignNodeIds(ast.g);
+        break;
+
+      default:
+        throw new Error("Unknown AST kind in assignNodeIds: " + ast.kind);
+    }
+  }
+
+  function collectNodesPostOrder(ast, out) {
+    switch (ast.kind) {
+      case "Pow":
+        collectNodesPostOrder(ast.base, out);
+        break;
+
+      case "Sub":
+      case "Mul":
+      case "Op":
+      case "Add":
+      case "Div":
+        collectNodesPostOrder(ast.left, out);
+        collectNodesPostOrder(ast.right, out);
+        break;
+
+      case "Compose":
+        collectNodesPostOrder(ast.f, out);
+        collectNodesPostOrder(ast.g, out);
+        break;
+
+      case "Var":
+      case "Offset":
+      case "Const":
+        break;
+
+      default:
+        throw new Error("Unknown AST kind in collectNodesPostOrder: " + ast.kind);
+    }
+
+    if (!out.includes(ast)) {
+      out.push(ast);
+    }
+  }
+
+  function functionName(ast) {
+    return "node" + ast._id;
+  }
+
+  function generateNodeFunction(ast) {
+    const name = functionName(ast);
+
+    // Var z
+    if (ast.kind === "Var" && ast.name === "z") {
+      return `
+vec2 ${name}(vec2 z) {
+    return z;
+}`.trim();
+    }
+
+    // Offset: ignore z, return u_offset
+    if (ast.kind === "Offset") {
+      return `
+vec2 ${name}(vec2 z) {
+    return u_offset;
+}`.trim();
+    }
+
+    // Const: ignore z, return constant
+    if (ast.kind === "Const") {
+      return `
+vec2 ${name}(vec2 z) {
+    return vec2(${ast.re}, ${ast.im});
+}`.trim();
+    }
+
+    // Pow(base, exponent)
+    if (ast.kind === "Pow") {
+      const baseName = functionName(ast.base);
+      const n = ast.exponent | 0;
+
+      if (n < 0) {
+        throw new Error("Negative exponents not supported in this demo");
+      }
+      if (n === 0) {
+        return `
+vec2 ${name}(vec2 z) {
+    return vec2(1.0, 0.0);
+}`.trim();
+      }
+      if (n === 1) {
+        return `
+vec2 ${name}(vec2 z) {
+    return ${baseName}(z);
+}`.trim();
+      }
+
+      const lines = [];
+      lines.push(`vec2 ${name}(vec2 z) {`);
+      lines.push(`    vec2 acc = ${baseName}(z);`);
+      for (let i = 2; i <= n; i++) {
+        lines.push(`    acc = c_mul(acc, ${baseName}(z));`);
+      }
+      lines.push(`    return acc;`);
+      lines.push(`}`);
+      return lines.join("\n");
+    }
+
+    // Sub(left, right): left(z) - right(z)
+    if (ast.kind === "Sub") {
+      const leftName  = functionName(ast.left);
+      const rightName = functionName(ast.right);
+      return `
+vec2 ${name}(vec2 z) {
+    vec2 a = ${leftName}(z);
+    vec2 b = ${rightName}(z);
+    return a - b;
+}`.trim();
+    }
+
+    // Mul(left, right): complex multiplication
+    if (ast.kind === "Mul") {
+      const leftName  = functionName(ast.left);
+      const rightName = functionName(ast.right);
+      return `
+vec2 ${name}(vec2 z) {
+    vec2 a = ${leftName}(z);
+    vec2 b = ${rightName}(z);
+    return c_mul(a, b);
+}`.trim();
+    }
+
+    // Add(left, right): a + b
+    if (ast.kind === "Add") {
+      const leftName  = functionName(ast.left);
+      const rightName = functionName(ast.right);
+      return `
+vec2 ${name}(vec2 z) {
+    vec2 a = ${leftName}(z);
+    vec2 b = ${rightName}(z);
+    return a + b;
+}`.trim();
+    }
+
+    // Div(left, right): complex division
+    if (ast.kind === "Div") {
+      const leftName  = functionName(ast.left);
+      const rightName = functionName(ast.right);
+      return `
+vec2 ${name}(vec2 z) {
+    vec2 a = ${leftName}(z);
+    vec2 b = ${rightName}(z);
+    float denom = b.x * b.x + b.y * b.y;
+    if (denom < 1e-12) {
+        return vec2(1e10, 1e10);
+    }
+    float realPart = (a.x * b.x + a.y * b.y) / denom;
+    float imagPart = (a.y * b.x - a.x * b.y) / denom;
+    return vec2(realPart, imagPart);
+}`.trim();
+    }
+
+    // Op(left, right, op): generic binary op
+    if (ast.kind === "Op") {
+      const leftName  = functionName(ast.left);
+      const rightName = functionName(ast.right);
+      const op = ast.op;
+      let expr;
+      switch (op) {
+        case "add":
+          expr = "a + b";
+          break;
+        case "sub":
+          expr = "a - b";
+          break;
+        case "mul":
+          expr = "c_mul(a, b)";
+          break;
+        case "mod":
+          expr = "vec2(mod(a.x, b.x), mod(a.y, b.y))";
+          break;
+        default:
+          throw new Error("Unknown Op kind: " + op);
+      }
+      return `
+vec2 ${name}(vec2 z) {
+    vec2 a = ${leftName}(z);
+    vec2 b = ${rightName}(z);
+    return ${expr};
+}`.trim();
+    }
+
+    // Compose(f, g): f(g(z))
+    if (ast.kind === "Compose") {
+      const fName = functionName(ast.f);
+      const gName = functionName(ast.g);
+      return `
+vec2 ${name}(vec2 z) {
+    return ${fName}(${gName}(z));
+}`.trim();
+    }
+
+    throw new Error("Unknown AST node kind in generateNodeFunction: " + ast.kind);
+  }
+
+  function buildNodeFunctionsAndTop(ast) {
+    nextNodeId = 0;
+    assignNodeIds(ast);
+    const nodes = [];
+    collectNodesPostOrder(ast, nodes);
+    const funcs = nodes.map(generateNodeFunction).join("\n\n");
+    const topName = functionName(ast);
+    return { funcs, topName };
+  }
+
+  // =========================================================
+  // 3. Shader templates with placeholders
+  // =========================================================
+
+  const vertexSource = `#version 300 es
+  precision highp float;
+
+  const vec2 POSITIONS[3] = vec2[3](
+    vec2(-1.0, -1.0),
+    vec2( 3.0, -1.0),
+    vec2(-1.0,  3.0)
+  );
+
+  void main() {
+    gl_Position = vec4(POSITIONS[gl_VertexID], 0.0, 1.0);
+  }`;
+
+  const fragmentTemplate = `#version 300 es
+  precision highp float;
+
+  uniform vec2 u_min;        // complex plane min (x,y)
+  uniform vec2 u_max;        // complex plane max (x,y)
+  uniform vec2 u_resolution; // canvas size in pixels
+  uniform vec2 u_offset;     // complex offset (from panning)
+
+  out vec4 outColor;
+
+  const float SQ3 = 1.7320508075688772; // sqrt(3)
+
+  vec2 c_mul(vec2 a, vec2 b) {
+    return vec2(
+      a.x * b.x - a.y * b.y,
+      a.x * b.y + a.y * b.x
+    );
+  }
+
+  /*NODE_FUNCS*/
+
+  vec2 f(vec2 z) {
+    return /*TOP_FUNC*/(z);
+  }
+
+  vec3 reflexColor(vec2 w) {
+    float re = w.x;
+    float im = w.y;
+    float m  = length(w);
+
+    if (m == 0.0) {
+      return vec3(0.0);
+    }
+
+    if (m > 1.0e10 || isnan(m)) {
+      return vec3(1.0);
+    }
+
+    float r = 0.0;
+    float g = 0.0;
+    float b = 0.0;
+
+    float rpm  = re + m;
+    float rpm2 = rpm * rpm;
+    float i2   = im * im;
+    float den  = rpm2 + i2;
+
+    if (im == 0.0 && re <= 0.0) {
+      g = 190.0;
+      b = 190.0;
+    } else {
+      r = 255.0 * (1.0 - i2 / den);
+      g = 255.0 * (0.25 + 0.5 * im * (SQ3 * rpm + im) / den);
+      b = 255.0 * (0.25 - 0.5 * im * (SQ3 * rpm - im) / den);
+    }
+
+    float luminosite = 240.0 * m / (m + 1.0);
+    luminosite = clamp(luminosite, 0.0, 240.0);
+
+    if (luminosite <= 120.0) {
+      float scale = luminosite / 120.0;
+      r *= scale;
+      g *= scale;
+      b *= scale;
+    } else {
+      float k1 = 2.0 - luminosite / 120.0;
+      float k2 = luminosite / 120.0 - 1.0;
+      r = r * k1 + 255.0 * k2;
+      g = g * k1 + 255.0 * k2;
+      b = b * k1 + 255.0 * k2;
+    }
+
+    // swap red/blue, keep green as-is
+    float red   = r / 255.0;
+    float green = g / 255.0;
+    float blue  = b / 255.0;
+    return vec3(red, green, blue);
+  }
+
+  void main() {
+    vec2 uv = gl_FragCoord.xy / u_resolution;
+
+    vec2 z = vec2(
+      mix(u_min.x, u_max.x, uv.x),
+      mix(u_min.y, u_max.y, uv.y)
+    );
+
+    vec2 w = f(z);
+    vec3 rgb = reflexColor(w);
+    outColor = vec4(rgb, 1.0);
+  }`;
+
+  function buildFragmentSourceFromAST(ast) {
+    const { funcs, topName } = buildNodeFunctionsAndTop(ast);
+    return fragmentTemplate
+      .replace("/*NODE_FUNCS*/", funcs)
+      .replace("/*TOP_FUNC*/", topName);
+  }
+
+  // =========================================================
+  // 4. WebGL setup + program rebuild on formula change
+  // =========================================================
+
+  const canvas = document.getElementById('glcanvas');
+  const gl = canvas.getContext('webgl2');
+  if (!gl) {
+    alert('WebGL2 not supported in this browser');
+    throw new Error('WebGL2 not supported');
+  }
+
+  let program = null;
+  let vao = null;
+
+  let uMinLoc = null;
+  let uMaxLoc = null;
+  let uResolutionLoc = null;
+  let uOffsetLoc = null;
+
+  const baseHalfSpan = 4.0;
+  let viewXSpan = 8.0;
+  let viewYSpan = 8.0;
+  let viewXMin = -4.0;
+  let viewXMax =  4.0;
+  let viewYMin = -4.0;
+  let viewYMax =  4.0;
+
+  let offset = { x: 0.0, y: 0.0 };
+  let isDragging = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let startOffsetX = 0.0;
+  let startOffsetY = 0.0;
+
+  function createShader(gl, type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    const ok = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
+    if (!ok) {
+      const info = gl.getShaderInfoLog(shader) || "(no info log)";
+      gl.deleteShader(shader);
+      throw new Error('Could not compile shader:\n' + info + "\n\nSource:\n" + source);
+    }
+    return shader;
+  }
+
+  function createProgram(gl, vertexSrc, fragmentSrc) {
+    const vs = createShader(gl, gl.VERTEX_SHADER, vertexSrc);
+    const fs = createShader(gl, gl.FRAGMENT_SHADER, fragmentSrc);
+    const program = gl.createProgram();
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      const info = gl.getProgramInfoLog(program) || "(no program log)";
+      gl.deleteProgram(program);
+      throw new Error('Could not link program:\n' + info);
+    }
+    return program;
+  }
+
+  function rebuildProgram() {
+    const fragmentSource = buildFragmentSourceFromAST(formulaAST);
+    const newProgram = createProgram(gl, vertexSource, fragmentSource);
+    program = newProgram;
+    gl.useProgram(program);
+
+    if (!vao) {
+      vao = gl.createVertexArray();
+    }
+    gl.bindVertexArray(vao);
+
+    uMinLoc        = gl.getUniformLocation(program, 'u_min');
+    uMaxLoc        = gl.getUniformLocation(program, 'u_max');
+    uResolutionLoc = gl.getUniformLocation(program, 'u_resolution');
+    uOffsetLoc     = gl.getUniformLocation(program, 'u_offset');
+  }
+
+  function resizeCanvasToDisplaySize() {
+    const dpr = window.devicePixelRatio || 1;
+    const displayWidth  = Math.floor(canvas.clientWidth  * dpr);
+    const displayHeight = Math.floor(canvas.clientHeight * dpr);
+
+    if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+      canvas.width  = displayWidth;
+      canvas.height = displayHeight;
+      gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+  }
+
+  function updateView() {
+    const w = canvas.width;
+    const h = canvas.height;
+    if (w === 0 || h === 0) return;
+
+    if (w >= h) {
+      viewXSpan = 2.0 * baseHalfSpan;
+      viewYSpan = viewXSpan * (h / w);
+    } else {
+      viewYSpan = 2.0 * baseHalfSpan;
+      viewXSpan = viewYSpan * (w / h);
+    }
+
+    const xCenter = 0.0;
+    const yCenter = 0.0;
+    viewXMin = xCenter - viewXSpan / 2.0;
+    viewXMax = xCenter + viewXSpan / 2.0;
+    viewYMin = yCenter - viewYSpan / 2.0;
+    viewYMax = yCenter + viewYSpan / 2.0;
+
+    gl.uniform2f(uMinLoc, viewXMin, viewYMin);
+    gl.uniform2f(uMaxLoc, viewXMax, viewYMax);
+  }
+
+  function render() {
+    if (!program) return;
+    resizeCanvasToDisplaySize();
+    gl.uniform2f(uResolutionLoc, canvas.width, canvas.height);
+    updateView();
+    gl.uniform2f(uOffsetLoc, offset.x, offset.y);
+
+    gl.clearColor(0, 0, 0, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    canvas.setPointerCapture(e.pointerId);
+    isDragging = true;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    startOffsetX = offset.x;
+    startOffsetY = offset.y;
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (!isDragging) return;
+
+    const dxCss = e.clientX - dragStartX;
+    const dyCss = e.clientY - dragStartY;
+
+    const dpr = window.devicePixelRatio || 1;
+    const dx = dxCss * dpr;
+    const dy = dyCss * dpr;
+
+    const unitsPerPixelX = viewXSpan / canvas.width;
+    const unitsPerPixelY = viewYSpan / canvas.height;
+
+    const deltaRe =  dx * unitsPerPixelX;
+    const deltaIm = -dy * unitsPerPixelY;
+
+    offset.x = startOffsetX + deltaRe;
+    offset.y = startOffsetY + deltaIm;
+
+    render();
+  });
+
+  function endDrag(e) {
+    if (!isDragging) return;
+    isDragging = false;
+    try {
+      canvas.releasePointerCapture(e.pointerId);
+    } catch (_) {}
+  }
+
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+  canvas.addEventListener('pointerleave', endDrag);
+
+  window.addEventListener('resize', render);
+
+  // =========================================================
+  // 5. Textarea live editing: eval formula → rebuild program
+  // =========================================================
+
+  const formulaTextarea = document.getElementById('formula');
+  const applyBtn = document.getElementById('apply-btn');
+  const errorDiv = document.getElementById('error');
+
+  const defaultFormulaSource =
+    'Mul(Sub(VarZ(), Offset()), Op(VarZ(), Offset(), "add"))';
+
+  formulaTextarea.value = defaultFormulaSource;
+
+  formulaTextarea.addEventListener('focus', () => {
+    formulaTextarea.classList.add('expanded');
+  });
+  formulaTextarea.addEventListener('blur', () => {
+    formulaTextarea.classList.remove('expanded');
+  });
+
+  function showError(msg) {
+    errorDiv.textContent = msg;
+    errorDiv.style.display = 'block';
+  }
+
+  function clearError() {
+    errorDiv.style.display = 'none';
+    errorDiv.textContent = '';
+  }
+
+  function applyFormulaFromTextarea() {
+    clearError();
+    const src = formulaTextarea.value.trim();
+    if (!src) return;
+    try {
+      const ast = eval(src);
+      if (!ast || typeof ast !== 'object' || !ast.kind) {
+        throw new Error("Expression did not return a valid AST node");
+      }
+      formulaAST = ast;
+      rebuildProgram();
+      render();
+    } catch (e) {
+      console.error(e);
+      showError(e.message);
+    }
+  }
+
+  applyBtn.addEventListener('click', applyFormulaFromTextarea);
+
+  formulaTextarea.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      applyFormulaFromTextarea();
+    }
+  });
+
+  // Initial setup
+  try {
+    rebuildProgram();
+    render();
+  } catch (e) {
+    console.error(e);
+    showError(e.message);
+  }
+</script>
+</body>
+</html>
