@@ -5,19 +5,12 @@ import {
   ParseSeverity,
 } from './parser-primitives.mjs';
 
-// Utilities inspired by Dafny's parser modules: parsers are callable functions
-// that also expose builder-style helpers (e.g., p.Or(q)) in addition to the
-// standalone Or(p, q) helpers below.
-
-const severityRank = {
-  [ParseSeverity.info]: 0,
-  [ParseSeverity.recoverable]: 1,
-  [ParseSeverity.error]: 2,
-};
-
 const INTERNAL_IMPL = Symbol('reflex4you.parser.impl');
-
 const parserPrototype = Object.create(Function.prototype);
+
+function normalizeInput(input) {
+  return input instanceof ParserInput ? input : ParserInput.from(input);
+}
 
 function ensureParser(candidate, label = 'parser') {
   if (typeof candidate === 'function' && candidate[INTERNAL_IMPL]) {
@@ -26,17 +19,16 @@ function ensureParser(candidate, label = 'parser') {
   throw new TypeError(`Expected ${label} created via createParser/Combinator.`);
 }
 
-function normalizeInput(input) {
-  return input instanceof ParserInput ? input : ParserInput.from(input);
+function spanBetween(startInput, endInput) {
+  return startInput.createSpan(0, startInput.length - endInput.length);
 }
 
-function success({ ctor, value, input, next, severity = ParseSeverity.info }) {
-  const consumed = input.length - next.length;
-  const span = input.createSpan(0, consumed);
-  return new ParseSuccess({ ctor, value, span, next, severity });
+function makeSuccess(ctor, startInput, endInput, value, severity = ParseSeverity.info) {
+  const span = spanBetween(startInput, endInput);
+  return new ParseSuccess({ ctor, value, span, next: endInput, severity });
 }
 
-function failure({
+function makeFailure({
   ctor,
   input,
   message,
@@ -48,20 +40,16 @@ function failure({
   const resolvedSpan = span ?? input.createSpan(0, 0);
   return new ParseFailure({
     ctor,
-    message,
+    message: message || '',
     severity,
     expected,
     span: resolvedSpan,
-    input: input.root ?? input,
-    children,
+    input: resolvedSpan.input,
+    children: [...children],
   });
 }
 
-function maxSeverity(a, b) {
-  return severityRank[a] >= severityRank[b] ? a : b;
-}
-
-function attachParserHelpers(fn) {
+function attachParserPrototype(fn) {
   Object.setPrototypeOf(fn, parserPrototype);
   return fn;
 }
@@ -70,17 +58,17 @@ export function createParser(ctor, impl) {
   if (typeof impl !== 'function') {
     throw new TypeError('createParser expects an implementation function.');
   }
-  const parser = function run(input) {
-    const normalized = normalizeInput(input);
+  function parser(value) {
+    const normalized = normalizeInput(value);
     return impl(normalized);
-  };
+  }
   parser.ctor = ctor;
   parser[INTERNAL_IMPL] = impl;
   parser.displayName = ctor;
   parser.parse = parser;
   parser.run = parser;
-  parser.runNormalized = (input) => impl(input);
-  return attachParserHelpers(parser);
+  parser.runNormalized = (input) => impl(normalizeInput(input));
+  return attachParserPrototype(parser);
 }
 
 parserPrototype.runNormalized = function runNormalized(input) {
@@ -99,9 +87,11 @@ parserPrototype.Chain = function methodChain(nextFactory, options) {
   return Chain(this, nextFactory, options);
 };
 
-parserPrototype.Then = function methodThen(next, options) {
-  return Then(this, next, options);
+parserPrototype.Concat = function methodConcat(other, options) {
+  return Concat(this, other, options);
 };
+
+parserPrototype.Then = parserPrototype.Concat;
 
 parserPrototype.Many = function methodMany(options) {
   return Many(this, options);
@@ -112,18 +102,23 @@ parserPrototype.Optional = function methodOptional(defaultValue = null, options)
 };
 
 parserPrototype.Label = function methodLabel(expected, message, options) {
+  if (typeof expected === 'object' && expected !== null) {
+    return Label(this, undefined, undefined, expected);
+  }
   return Label(this, expected, message, options);
 };
 
-export function Succeed(value, ctor = 'Succeed') {
-  return createParser(ctor, (input) =>
-    success({ ctor, value, input, next: input })
-  );
+parserPrototype.Sequence = function methodSequence(parsers, options) {
+  return Sequence([this, ...parsers], options);
+};
+
+export function Succeed(value, { ctor = 'Succeed' } = {}) {
+  return createParser(ctor, (input) => makeSuccess(ctor, input, input, value));
 }
 
 export function Fail(message, { ctor = 'Fail', severity = ParseSeverity.error, expected = null } = {}) {
   return createParser(ctor, (input) =>
-    failure({ ctor, input, message, severity, expected })
+    makeFailure({ ctor, input, message, severity, expected })
   );
 }
 
@@ -138,7 +133,13 @@ export function Map(parser, mapper, { ctor = 'Map' } = {}) {
       return result;
     }
     const mapped = mapper(result.value, result);
-    return success({ ctor, value: mapped, input, next: result.next });
+    return new ParseSuccess({
+      ctor,
+      value: mapped,
+      span: result.span,
+      next: result.next,
+      severity: result.severity,
+    });
   });
 }
 
@@ -152,42 +153,74 @@ export function Chain(parser, nextFactory, { ctor = 'Chain' } = {}) {
     if (!head.ok) {
       return head;
     }
-    const nextParser = ensureParser(nextFactory(head.value, head), 'chain continuation');
-    const tail = nextParser.runNormalized(head.next);
+    const tailParser = ensureParser(nextFactory(head.value, head), 'chain continuation');
+    const tail = tailParser.runNormalized(head.next);
     if (!tail.ok) {
       return tail;
     }
-    return success({ ctor, value: tail.value, input, next: tail.next });
+    return makeSuccess(ctor, input, tail.next, tail.value, tail.severity);
   });
 }
 
-export function Then(left, right, { ctor = 'Then', projector } = {}) {
+export function Concat(left, right, { ctor = 'Concat', projector, span = 'full' } = {}) {
   const first = ensureParser(left, 'left parser');
   const second = ensureParser(right, 'right parser');
-  const projectValue =
-    typeof projector === 'function' ? projector : (a, b) => [a, b];
+  const combine = typeof projector === 'function' ? projector : (a, b) => [a, b];
+
+  function selectSpanStart(mode, initialInput, rightInput) {
+    switch (mode) {
+      case 'full':
+      case 'left':
+        return initialInput;
+      case 'right':
+        return rightInput;
+      default:
+        throw new RangeError(`Unknown span mode "${mode}"`);
+    }
+  }
+
   return createParser(ctor, (input) => {
     const leftResult = first.runNormalized(input);
     if (!leftResult.ok) {
       return leftResult;
     }
-    const rightResult = second.runNormalized(leftResult.next);
+    const rightInput = leftResult.next;
+    const rightResult = second.runNormalized(rightInput);
     if (!rightResult.ok) {
       return rightResult;
     }
-    const combinedValue = projectValue(
-      leftResult.value,
-      rightResult.value,
-      leftResult,
-      rightResult,
-    );
-    return success({ ctor, value: combinedValue, input, next: rightResult.next });
+    const value = combine(leftResult.value, rightResult.value, leftResult, rightResult);
+    const spanStart = selectSpanStart(span, input, rightInput);
+    return makeSuccess(ctor, spanStart, rightResult.next, value);
+  });
+}
+
+export function Sequence(parsers, { ctor = 'Sequence', projector } = {}) {
+  if (!Array.isArray(parsers) || parsers.length === 0) {
+    throw new TypeError('Sequence expects an array with at least one parser.');
+  }
+  const normalized = parsers.map((parser, idx) => ensureParser(parser, `sequence[${idx}]`));
+  return createParser(ctor, (input) => {
+    const values = [];
+    const results = [];
+    let current = input;
+    for (const parser of normalized) {
+      const result = parser.runNormalized(current);
+      if (!result.ok) {
+        return result;
+      }
+      values.push(result.value);
+      results.push(result);
+      current = result.next;
+    }
+    const combined = typeof projector === 'function' ? projector(values, results) : values;
+    return makeSuccess(ctor, input, current, combined);
   });
 }
 
 export function Or(left, right, { ctor = 'Or' } = {}) {
-  const first = ensureParser(left, 'left option');
-  const second = ensureParser(right, 'right option');
+  const first = ensureParser(left, 'left parser');
+  const second = ensureParser(right, 'right parser');
   return createParser(ctor, (input) => {
     const leftResult = first.runNormalized(input);
     if (leftResult.ok) {
@@ -197,29 +230,48 @@ export function Or(left, right, { ctor = 'Or' } = {}) {
     if (rightResult.ok) {
       return rightResult;
     }
-    const bestSpan =
-      !leftResult.span || !rightResult.span
-        ? leftResult.span || rightResult.span
-        : leftResult.span.end >= rightResult.span.end
-          ? leftResult.span
-          : rightResult.span;
-    const mergedSeverity = maxSeverity(leftResult.severity, rightResult.severity);
-    return failure({
+    const leftSpan = leftResult.span;
+    const rightSpan = rightResult.span;
+    const span =
+      !leftSpan || !rightSpan
+        ? leftSpan || rightSpan
+        : leftSpan.end >= rightSpan.end
+          ? leftSpan
+          : rightSpan;
+    const severity =
+      leftResult.severity === ParseSeverity.error || rightResult.severity === ParseSeverity.error
+        ? ParseSeverity.error
+        : leftResult.severity === ParseSeverity.recoverable || rightResult.severity === ParseSeverity.recoverable
+          ? ParseSeverity.recoverable
+          : ParseSeverity.info;
+    return makeFailure({
       ctor,
       input,
-      severity: mergedSeverity,
+      severity,
       message: 'No alternatives matched.',
-      expected: null,
-      span: bestSpan,
       children: [leftResult, rightResult],
+      span,
     });
   });
+}
+
+export function Choice(parsers, { ctor = 'Choice' } = {}) {
+  if (!Array.isArray(parsers) || parsers.length === 0) {
+    throw new TypeError('Choice requires at least one parser.');
+  }
+  return parsers.slice(1).reduce(
+    (acc, parser, idx) => Or(acc, ensureParser(parser, `choice[${idx + 1}]`), { ctor }),
+    ensureParser(parsers[0], 'choice[0]'),
+  );
 }
 
 export function Many(parser, { min = 0, max = Infinity, ctor = 'Many' } = {}) {
   const base = ensureParser(parser, 'Many source');
   if (min < 0) {
     throw new RangeError('Many requires min >= 0');
+  }
+  if (!Number.isFinite(max) || max < min) {
+    throw new RangeError('Many requires max >= min and finite.');
   }
   return createParser(ctor, (input) => {
     const values = [];
@@ -238,15 +290,15 @@ export function Many(parser, { min = 0, max = Infinity, ctor = 'Many' } = {}) {
       count += 1;
     }
     if (count < min) {
-      return failure({
+      return makeFailure({
         ctor,
         input,
         message: `Expected at least ${min} repetitions`,
         severity: ParseSeverity.recoverable,
-        expected: `${parser.ctor}×${min}`,
+        expected: `${base.ctor}×${min}`,
       });
     }
-    return success({ ctor, value: values, input, next: current });
+    return makeSuccess(ctor, input, current, values);
   });
 }
 
@@ -257,19 +309,19 @@ export function Optional(parser, defaultValue = null, { ctor = 'Optional' } = {}
     if (result.ok) {
       return result;
     }
-    return success({ ctor, value: defaultValue, input, next: input });
+    return makeSuccess(ctor, input, input, defaultValue);
   });
 }
 
 export function Label(parser, expected, message, { ctor = 'Label', severity = ParseSeverity.recoverable } = {}) {
   const base = ensureParser(parser, 'Label source');
-  const expectation = expected ?? message ?? parser.ctor;
+  const expectation = expected ?? message ?? base.ctor;
   return createParser(ctor, (input) => {
     const result = base.runNormalized(input);
     if (result.ok) {
       return result;
     }
-    return failure({
+    return makeFailure({
       ctor,
       input,
       message: message ?? `Expected ${expectation}`,
@@ -281,14 +333,14 @@ export function Label(parser, expected, message, { ctor = 'Label', severity = Pa
   });
 }
 
-export function literal(text, { ctor = `Literal(${text})`, caseSensitive = true } = {}) {
+export function Literal(text, { ctor = `Literal(${text})`, caseSensitive = true } = {}) {
   if (!text) {
-    throw new TypeError('literal parser requires non-empty text.');
+    throw new TypeError('Literal parser requires non-empty text.');
   }
   const reference = caseSensitive ? text : text.toLowerCase();
   return createParser(ctor, (input) => {
     if (input.length < text.length) {
-      return failure({
+      return makeFailure({
         ctor,
         input,
         message: `Expected "${text}"`,
@@ -298,14 +350,15 @@ export function literal(text, { ctor = `Literal(${text})`, caseSensitive = true 
     }
     let matches = true;
     for (let i = 0; i < text.length; i += 1) {
-      const char = input.buffer[input.start + i];
-      if ((caseSensitive ? char : char.toLowerCase()) !== reference[i]) {
+      const candidate = input.buffer[input.start + i];
+      const normalized = caseSensitive ? candidate : candidate.toLowerCase();
+      if (normalized !== reference[i]) {
         matches = false;
         break;
       }
     }
     if (!matches) {
-      return failure({
+      return makeFailure({
         ctor,
         input,
         message: `Expected "${text}"`,
@@ -314,26 +367,26 @@ export function literal(text, { ctor = `Literal(${text})`, caseSensitive = true 
       });
     }
     const next = input.advance(text.length);
-    return success({ ctor, value: text, input, next });
+    return makeSuccess(ctor, input, next, text);
   });
 }
 
 function ensureStickyRegex(source) {
   const flags = source.flags.includes('y') ? source.flags : `${source.flags}y`;
-  const uniqueFlags = Array.from(new Set(flags.split(''))).join('');
-  return new RegExp(source.source, uniqueFlags);
+  const unique = Array.from(new Set(flags.split(''))).join('');
+  return new RegExp(source.source, unique);
 }
 
-export function regexMatch(regex, { ctor = 'Regex', transform } = {}) {
+export function Regex(regex, { ctor = 'Regex', transform, allowEmpty = false } = {}) {
   if (!(regex instanceof RegExp)) {
-    throw new TypeError('regexMatch expects a RegExp.');
+    throw new TypeError('Regex expects a RegExp instance.');
   }
   const sticky = ensureStickyRegex(regex);
   return createParser(ctor, (input) => {
     sticky.lastIndex = input.start;
     const matches = sticky.exec(input.buffer);
-    if (!matches || matches.index !== input.start || matches[0].length === 0) {
-      return failure({
+    if (!matches || matches.index !== input.start) {
+      return makeFailure({
         ctor,
         input,
         message: `Expected pattern ${regex}`,
@@ -341,10 +394,27 @@ export function regexMatch(regex, { ctor = 'Regex', transform } = {}) {
         expected: regex.toString(),
       });
     }
-    const value = typeof transform === 'function' ? transform(matches) : matches[0];
+    if (!allowEmpty && matches[0].length === 0) {
+      return makeFailure({
+        ctor,
+        input,
+        message: `Pattern ${regex} cannot match empty input`,
+        severity: ParseSeverity.recoverable,
+        expected: regex.toString(),
+      });
+    }
     const next = input.advance(matches[0].length);
-    return success({ ctor, value, input, next });
+    const value = typeof transform === 'function' ? transform(matches) : matches[0];
+    return makeSuccess(ctor, input, next, value);
   });
+}
+
+export function WS({ ctor = 'WS' } = {}) {
+  return Regex(/[ \t\r\n]*/y, { ctor, allowEmpty: true, transform: (match) => match[0] });
+}
+
+export function WS1({ ctor = 'WS1' } = {}) {
+  return Regex(/[ \t\r\n]+/y, { ctor, allowEmpty: false, transform: (match) => match[0] });
 }
 
 export function lazy(factory, { ctor = 'Lazy' } = {}) {
@@ -366,7 +436,7 @@ export function charWhere(predicate, { ctor = 'Char', description = 'character' 
   }
   return createParser(ctor, (input) => {
     if (input.isEmpty()) {
-      return failure({
+      return makeFailure({
         ctor,
         input,
         message: `Expected ${description}`,
@@ -376,7 +446,7 @@ export function charWhere(predicate, { ctor = 'Char', description = 'character' 
     }
     const ch = input.peek();
     if (!predicate(ch)) {
-      return failure({
+      return makeFailure({
         ctor,
         input,
         message: `Unexpected "${ch}"`,
@@ -385,34 +455,10 @@ export function charWhere(predicate, { ctor = 'Char', description = 'character' 
       });
     }
     const next = input.advance(1);
-    return success({ ctor, value: ch, input, next });
+    return makeSuccess(ctor, input, next, ch);
   });
 }
 
 export function anyChar({ ctor = 'AnyChar' } = {}) {
   return charWhere(() => true, { ctor, description: 'any character' });
-}
-
-export function whitespace({ ctor = 'Whitespace' } = {}) {
-  return regexMatch(/[ \r\n\t\f\v]+/y, { ctor });
-}
-
-export function optionalWhitespace({ ctor = 'OptionalWhitespace' } = {}) {
-  return Optional(whitespace({ ctor: `${ctor}:inner` }), '', { ctor });
-}
-
-// Convenience helper for custom tokenization in the arithmetic parser.
-export function consumeWhile(input, predicate) {
-  let idx = 0;
-  while (idx < input.length) {
-    const ch = input.peek(idx);
-    if (!predicate(ch)) {
-      break;
-    }
-    idx += 1;
-  }
-  if (idx === 0) {
-    return null;
-  }
-  return input.advance(idx);
 }

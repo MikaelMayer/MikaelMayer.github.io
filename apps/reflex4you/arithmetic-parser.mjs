@@ -6,8 +6,14 @@ import {
 } from './parser-primitives.mjs';
 import {
   createParser,
-  regexMatch,
-  optionalWhitespace,
+  Literal,
+  Regex,
+  Concat,
+  Sequence,
+  Optional,
+  Choice,
+  lazy,
+  WS,
 } from './parser-combinators.mjs';
 import {
   Const,
@@ -16,372 +22,242 @@ import {
   Mul,
   Div,
   Compose,
-  VarZ,
-  Offset,
   VarX,
   VarY,
+  VarZ,
+  Offset,
 } from './core-engine.mjs';
 
-const numberToken = regexMatch(/[+-]?(?:\d+\.\d+|\d+|\.\d+)(?:[eE][+-]?\d+)?/y, {
-  ctor: 'NumberToken',
-  transform: (match) => ({
-    text: match[0],
-    value: Number(match[0]),
-  }),
-});
+const IDENTIFIER_CHAR = /[A-Za-z0-9_]/;
+const NUMBER_REGEX = /[+-]?(?:\d+\.\d+|\d+|\.\d+)(?:[eE][+-]?\d+)?/y;
 
-const whitespaceParser = optionalWhitespace();
-
-function skipWhitespace(input) {
-  return whitespaceParser.runNormalized(input).next;
+function withSpan(node, span) {
+  return { ...node, span, input: span.input };
 }
 
-function makeFailure(ctor, input, message, expected = null, severity = ParseSeverity.error) {
-  return new ParseFailure({
-    ctor,
-    message,
-    severity,
-    expected,
-    span: input.createSpan(0, 0),
-  });
+function wsLiteral(text, options = {}) {
+  return Concat(
+    WS({ ctor: `WS:${text}` }),
+    Literal(text, options),
+    {
+      ctor: `wsLiteral(${text})`,
+      projector: (_ws, value) => value,
+      span: 'right',
+    },
+  );
 }
 
-function annotateNode(node, startInput, endInput) {
-  if (!node || !startInput || !endInput) {
-    return null;
-  }
-  const consumed = startInput.length - endInput.length;
-  if (consumed < 0) {
-    return null;
-  }
-  const span = startInput.createSpan(0, consumed);
-  node.span = span;
-  node.input = span.input;
-  return span;
+function wsRegex(regex, options = {}) {
+  return Concat(
+    WS({ ctor: options.wsCtor || 'WS:regex' }),
+    Regex(regex, options),
+    {
+      ctor: options.ctor ? `${options.ctor}:withWS` : 'RegexWithWS',
+      projector: (_ws, value) => value,
+      span: 'right',
+    },
+  );
 }
 
-function successWithNode(ctor, node, startInput, endInput, { attachSpan = true } = {}) {
-  const consumed = startInput.length - endInput.length;
-  const span = startInput.createSpan(0, consumed);
-  if (attachSpan) {
-    node.span = span;
-    node.input = span.input;
-  }
-  return new ParseSuccess({
-    ctor,
-    value: node,
-    span,
-    next: endInput,
-  });
-}
-
-const literalParser = createParser('Literal', (input) => {
-  const start = skipWhitespace(input);
-  const numeric = numberToken.runNormalized(start);
-  if (numeric.ok) {
-    let next = numeric.next;
-    let real = numeric.value.value;
-    let imag = 0;
-    if (!next.isEmpty()) {
-      const ch = next.peek();
-      if (ch === 'i' || ch === 'I') {
-        imag = real;
-        real = 0;
-        next = next.advance(1);
-      }
+function keywordLiteral(text, options = {}) {
+  const literal = wsLiteral(text, options);
+  return createParser(`Keyword(${text})`, (input) => {
+    const result = literal.runNormalized(input);
+    if (!result.ok) {
+      return result;
     }
-    const node = Const(real, imag);
-    return successWithNode('Literal', node, start, next);
-  }
-
-  // Handle +i / -i / i shorthand
-  let current = start;
-  if (current.isEmpty()) {
-    return makeFailure('Literal', start, 'Expected literal', 'literal', ParseSeverity.recoverable);
-  }
-  let sign = 1;
-  const first = current.peek();
-  if (first === '+' || first === '-') {
-    sign = first === '-' ? -1 : 1;
-    current = current.advance(1);
-  }
-  if (!current.isEmpty()) {
-    const maybeI = current.peek();
-    if (maybeI === 'i' || maybeI === 'I') {
-      const node = Const(0, sign);
-      const next = current.advance(1);
-      return successWithNode('Literal', node, start, next);
+    const nextChar = result.next.peek();
+    if (nextChar && IDENTIFIER_CHAR.test(nextChar)) {
+      return new ParseFailure({
+        ctor: `Keyword(${text})`,
+        message: `Expected ${text}`,
+        severity: ParseSeverity.recoverable,
+        expected: text,
+        span: result.span,
+        input: result.span.input,
+      });
     }
-  }
-  return makeFailure('Literal', start, 'Expected numeric or imaginary literal', 'literal', ParseSeverity.recoverable);
-});
-
-function readPrimitiveKeyword(input, keyword) {
-  if (input.length < keyword.length) {
-    return null;
-  }
-  for (let i = 0; i < keyword.length; i += 1) {
-    if (input.buffer[input.start + i] !== keyword[i]) {
-      return null;
-    }
-  }
-  const next = input.advance(keyword.length);
-  const nextChar = next.peek();
-  if (nextChar && /[A-Za-z0-9_]/.test(nextChar)) {
-    return null;
-  }
-  return next;
-}
-
-const primitiveParser = createParser('Primitive', (input) => {
-  const start = skipWhitespace(input);
-  if (start.isEmpty()) {
-    return makeFailure('Primitive', start, 'Expected primitive', 'primitive', ParseSeverity.recoverable);
-  }
-  const ch = start.peek();
-  if (ch === 'z') {
-    const next = start.advance(1);
-    const node = VarZ();
-    return successWithNode('Primitive', node, start, next);
-  }
-  if (ch === 'x') {
-    const next = start.advance(1);
-    const node = VarX();
-    return successWithNode('Primitive', node, start, next);
-  }
-  if (ch === 'y') {
-    const next = start.advance(1);
-    const node = VarY();
-    return successWithNode('Primitive', node, start, next);
-  }
-  if (ch === 'F') {
-    const next = readPrimitiveKeyword(start, 'F1');
-    if (!next) {
-      return makeFailure('Primitive', start, 'Expected F1', 'F1', ParseSeverity.recoverable);
-    }
-    const node = Offset();
-    return successWithNode('Primitive', node, start, next);
-  }
-  return makeFailure('Primitive', start, 'Unknown primitive', 'primitive', ParseSeverity.recoverable);
-});
-
-function parseDelimitedExpressionSequence(input) {
-  let current = skipWhitespace(input);
-  if (current.isEmpty() || current.peek() !== '(') {
-    return makeFailure('CompositionCall', current, 'Expected (" following o', '"("', ParseSeverity.error);
-  }
-  current = skipWhitespace(current.advance(1));
-  const first = expressionParser.runNormalized(current);
-  if (!first.ok) {
-    return first;
-  }
-  current = skipWhitespace(first.next);
-  if (current.isEmpty() || current.peek() !== ',') {
-    return makeFailure('CompositionCall', current, 'Expected comma between arguments', '","', ParseSeverity.error);
-  }
-  current = skipWhitespace(current.advance(1));
-  const second = expressionParser.runNormalized(current);
-  if (!second.ok) {
-    return second;
-  }
-  current = skipWhitespace(second.next);
-  if (current.isEmpty() || current.peek() !== ')') {
-    return makeFailure('CompositionCall', current, 'Expected ) after arguments', '")"', ParseSeverity.error);
-  }
-  const afterClose = current.advance(1);
-  return {
-    ok: true,
-    next: afterClose,
-    args: [first.value, second.value],
-  };
-}
-
-const explicitComposeParser = createParser('ExplicitCompose', (input) => {
-  const start = skipWhitespace(input);
-  if (start.isEmpty() || start.peek() !== 'o') {
-    return makeFailure('ExplicitCompose', start, 'Expected o(...)', 'o', ParseSeverity.recoverable);
-  }
-  const afterO = skipWhitespace(start.advance(1));
-  const argsResult = parseDelimitedExpressionSequence(afterO);
-  if (!argsResult.ok) {
-    return argsResult;
-  }
-  const node = Compose(argsResult.args[0], argsResult.args[1]);
-  return successWithNode('ExplicitCompose', node, start, argsResult.next);
-});
-
-const primaryParser = createParser('Primary', (input) => {
-  const start = skipWhitespace(input);
-  if (start.isEmpty()) {
-    return makeFailure('Primary', start, 'Unexpected end of input', 'primary', ParseSeverity.error);
-  }
-  if (start.peek() === '(') {
-    const afterOpen = skipWhitespace(start.advance(1));
-    const inner = expressionParser.runNormalized(afterOpen);
-    if (!inner.ok) {
-      return inner;
-    }
-    const afterExpr = skipWhitespace(inner.next);
-    if (afterExpr.isEmpty() || afterExpr.peek() !== ')') {
-      return makeFailure('Primary', afterExpr, 'Expected ) to close group', '")"', ParseSeverity.error);
-    }
-    const next = afterExpr.advance(1);
-    // keep inner node span as-is but return success for the grouped region
     return new ParseSuccess({
-      ctor: 'Group',
-      value: inner.value,
-      span: start.createSpan(0, start.length - next.length),
-      next,
+      ctor: `Keyword(${text})`,
+      value: result.value,
+      span: result.span,
+      next: result.next,
     });
-  }
-
-  const explicit = explicitComposeParser.runNormalized(start);
-  if (explicit.ok) {
-    return explicit;
-  }
-
-  const literal = literalParser.runNormalized(start);
-  if (literal.ok) {
-    return literal;
-  }
-
-  return primitiveParser.runNormalized(start);
-});
-
-const unaryParser = createParser('Unary', (input) => {
-  let start = skipWhitespace(input);
-  if (!start.isEmpty() && start.peek() === '+') {
-    const afterPlus = skipWhitespace(start.advance(1));
-    return unaryParser.runNormalized(afterPlus);
-  }
-  if (!start.isEmpty() && start.peek() === '-') {
-    const literalAttempt = literalParser.runNormalized(start);
-    if (literalAttempt.ok) {
-      return literalAttempt;
-    }
-    const afterMinus = skipWhitespace(start.advance(1));
-    const operand = unaryParser.runNormalized(afterMinus);
-    if (!operand.ok) {
-      return operand;
-    }
-    const zeroNode = Const(0, 0);
-    annotateNode(zeroNode, start, start);
-    const node = Sub(zeroNode, operand.value);
-    return successWithNode('UnaryNegate', node, start, operand.next);
-  }
-  return primaryParser.runNormalized(start);
-});
-
-function parseLeftAssociativeChain(childParser, operators, ctorName, input) {
-  let current = childParser.runNormalized(input);
-  if (!current.ok) {
-    return current;
-  }
-  let node = current.value;
-  let cursor = current.next;
-  let consumed = false;
-
-  while (true) {
-    const afterWs = skipWhitespace(cursor);
-    if (afterWs.isEmpty()) {
-      break;
-    }
-    const symbol = operators.find((op) => afterWs.peek() === op.symbol);
-    if (!symbol) {
-      break;
-    }
-    consumed = true;
-    let rhsInput = skipWhitespace(afterWs.advance(1));
-    const rhs = childParser.runNormalized(rhsInput);
-    if (!rhs.ok) {
-      return rhs;
-    }
-    node = symbol.builder(node, rhs.value);
-    annotateNode(node, input, rhs.next);
-    cursor = rhs.next;
-  }
-
-  if (!consumed) {
-    return current;
-  }
-
-  const span = input.createSpan(0, input.length - cursor.length);
-  return new ParseSuccess({
-    ctor: ctorName,
-    value: node,
-    span,
-    next: cursor,
   });
 }
 
-const multiplicativeParser = createParser('MulDiv', (input) =>
-  parseLeftAssociativeChain(unaryParser, [
-    { symbol: '*', builder: (l, r) => Mul(l, r) },
-    { symbol: '/', builder: (l, r) => Div(l, r) },
-  ], 'MulDiv', skipWhitespace(input)),
-);
-
-const additiveParser = createParser('AddSub', (input) =>
-  parseLeftAssociativeChain(multiplicativeParser, [
-    { symbol: '+', builder: (l, r) => Add(l, r) },
-    { symbol: '-', builder: (l, r) => Sub(l, r) },
-  ], 'AddSub', skipWhitespace(input)),
-);
-
-const compositionChainParser = createParser('Composition', (input) => {
-  const start = skipWhitespace(input);
-  const head = additiveParser.runNormalized(start);
-  if (!head.ok) {
-    return head;
-  }
-  let node = head.value;
-  let cursor = head.next;
-  let consumed = false;
-
-  while (true) {
-    const afterWs = skipWhitespace(cursor);
-    if (afterWs.isEmpty() || afterWs.peek() !== '$') {
-      break;
-    }
-    consumed = true;
-    let rhsInput = skipWhitespace(afterWs.advance(1));
-    const rhs = additiveParser.runNormalized(rhsInput);
-    if (!rhs.ok) {
-      return rhs;
-    }
-    node = Compose(node, rhs.value);
-    annotateNode(node, start, rhs.next);
-    cursor = rhs.next;
-  }
-
-  if (!consumed) {
-    return head;
-  }
-
-  const span = start.createSpan(0, start.length - cursor.length);
-  return new ParseSuccess({
-    ctor: 'Composition',
-    value: node,
-    span,
-    next: cursor,
-  });
+const numberToken = wsRegex(NUMBER_REGEX, {
+  ctor: 'NumberToken',
+  transform: (match) => Number(match[0]),
 });
 
-const expressionParser = compositionChainParser;
+const imagUnit = wsLiteral('i', { ctor: 'ImagUnit', caseSensitive: false });
+
+const signParser = Choice([
+  wsLiteral('+', { ctor: 'PlusSign' }).Map(() => 1),
+  wsLiteral('-', { ctor: 'MinusSign' }).Map(() => -1),
+], { ctor: 'Sign' });
+
+const optionalSign = signParser.Optional(1, { ctor: 'OptionalSign' });
+
+const numberLiteral = numberToken.Map((value, result) => withSpan(Const(value, 0), result.span));
+
+const imagFromNumber = Concat(numberToken, imagUnit, { ctor: 'NumericImag' })
+  .Map(([magnitude], result) => withSpan(Const(0, magnitude), result.span));
+
+const unitImagLiteral = Concat(optionalSign, imagUnit, { ctor: 'UnitImag' })
+  .Map(([sign], result) => withSpan(Const(0, sign), result.span));
+
+const literalParser = Choice([
+  imagFromNumber,
+  unitImagLiteral,
+  numberLiteral,
+], { ctor: 'Literal' });
+
+const primitiveParser = Choice([
+  keywordLiteral('x', { ctor: 'VarX' }).Map((_, result) => withSpan(VarX(), result.span)),
+  keywordLiteral('y', { ctor: 'VarY' }).Map((_, result) => withSpan(VarY(), result.span)),
+  keywordLiteral('z', { ctor: 'VarZ' }).Map((_, result) => withSpan(VarZ(), result.span)),
+  keywordLiteral('F1', { ctor: 'Offset' }).Map((_, result) => withSpan(Offset(), result.span)),
+], { ctor: 'Primitive' });
+
+let expressionParser;
+const expressionRef = lazy(() => expressionParser, { ctor: 'ExpressionRef' });
+
+const groupedParser = Sequence([
+  wsLiteral('(', { ctor: 'GroupOpen' }),
+  expressionRef,
+  wsLiteral(')', { ctor: 'GroupClose' }),
+], {
+  ctor: 'Group',
+  projector: (values) => values[1],
+}).Map((expr, result) => withSpan(expr, result.span));
+
+const explicitComposeParser = Sequence([
+  wsLiteral('o', { ctor: 'ComposeKeyword' }),
+  wsLiteral('(', { ctor: 'ComposeOpen' }),
+  expressionRef,
+  wsLiteral(',', { ctor: 'ComposeComma' }),
+  expressionRef,
+  wsLiteral(')', { ctor: 'ComposeClose' }),
+], {
+  ctor: 'ExplicitCompose',
+  projector: (values) => ({ first: values[2], second: values[4] }),
+}).Map(({ first, second }, result) => withSpan(Compose(first, second), result.span));
+
+const primaryParser = Choice([
+  explicitComposeParser,
+  groupedParser,
+  literalParser,
+  primitiveParser,
+], { ctor: 'Primary' });
+
+let unaryParser;
+const unaryRef = lazy(() => unaryParser, { ctor: 'UnaryRef' });
+
+const unaryNegative = Sequence([
+  wsLiteral('-', { ctor: 'UnaryMinusSymbol' }),
+  unaryRef,
+], {
+  ctor: 'UnaryMinusSeq',
+  projector: (values) => values[1],
+}).Map((expr, result) => {
+  const zero = withSpan(Const(0, 0), result.span);
+  return withSpan(Sub(zero, expr), result.span);
+});
+
+const unaryPositive = Sequence([
+  wsLiteral('+', { ctor: 'UnaryPlusSymbol' }),
+  unaryRef,
+], {
+  ctor: 'UnaryPlusSeq',
+  projector: (values) => values[1],
+}).Map((expr, result) => withSpan(expr, result.span));
+
+unaryParser = Choice([
+  primaryParser,
+  unaryNegative,
+  unaryPositive,
+], { ctor: 'Unary' });
+
+function leftAssociative(termParser, operatorParser, ctor) {
+  const maybeOperator = operatorParser.Optional(null, { ctor: `${ctor}:maybeOp` });
+  return createParser(ctor, (input) => {
+    const head = termParser.runNormalized(input);
+    if (!head.ok) {
+      return head;
+    }
+    let node = head.value;
+    let cursor = head.next;
+    while (true) {
+      const opResult = maybeOperator.runNormalized(cursor);
+      if (!opResult.ok) {
+        return opResult;
+      }
+      if (opResult.value === null) {
+        break;
+      }
+      const rhs = termParser.runNormalized(opResult.next);
+      if (!rhs.ok) {
+        return rhs;
+      }
+      const span = spanBetween(input, rhs.next);
+      node = withSpan(opResult.value(node, rhs.value), span);
+      cursor = rhs.next;
+    }
+    const span = spanBetween(input, cursor);
+    return new ParseSuccess({ ctor, value: node, span, next: cursor });
+  });
+}
+
+function spanBetween(startInput, endInput) {
+  return startInput.createSpan(0, startInput.length - endInput.length);
+}
+
+const multiplicativeOperators = Choice([
+  wsLiteral('*', { ctor: 'MulOp' }).Map(() => (left, right) => Mul(left, right)),
+  wsLiteral('/', { ctor: 'DivOp' }).Map(() => (left, right) => Div(left, right)),
+], { ctor: 'MulOpChoice' });
+
+const additiveOperators = Choice([
+  wsLiteral('+', { ctor: 'AddOp' }).Map(() => (left, right) => Add(left, right)),
+  wsLiteral('-', { ctor: 'SubOp' }).Map(() => (left, right) => Sub(left, right)),
+], { ctor: 'AddOpChoice' });
+
+const composeOperator = wsLiteral('$', { ctor: 'ComposeOp' }).Map(() => (left, right) => Compose(left, right));
+
+const multiplicativeParser = leftAssociative(unaryParser, multiplicativeOperators, 'MulDiv');
+const additiveParser = leftAssociative(multiplicativeParser, additiveOperators, 'AddSub');
+const compositionChainParser = leftAssociative(additiveParser, composeOperator, 'Composition');
+
+expressionParser = compositionChainParser;
 
 export function parseFormulaInput(input) {
   const normalized = ParserInput.from(input ?? '');
-  const start = skipWhitespace(normalized);
-  if (start.isEmpty()) {
-    return makeFailure('Expression', start, 'Formula cannot be empty', 'expression');
+  if (normalized.toString().trim().length === 0) {
+    return new ParseFailure({
+      ctor: 'Expression',
+      message: 'Formula cannot be empty',
+      severity: ParseSeverity.error,
+      span: normalized.createSpan(0, 0),
+      input: normalized,
+    });
   }
-  const parsed = expressionParser.runNormalized(start);
+  const parsed = expressionParser.runNormalized(normalized);
   if (!parsed.ok) {
     return parsed;
   }
-  const rest = skipWhitespace(parsed.next);
-  if (!rest.isEmpty()) {
-    return makeFailure('TrailingInput', rest, 'Unexpected trailing characters', 'end of formula');
+  const trailing = WS({ ctor: 'TrailingWS' }).runNormalized(parsed.next);
+  const remainder = trailing.next;
+  if (!remainder.isEmpty()) {
+    return new ParseFailure({
+      ctor: 'TrailingInput',
+      message: 'Unexpected trailing characters',
+      severity: ParseSeverity.error,
+      expected: 'end of formula',
+      span: remainder.createSpan(0, Math.min(1, remainder.length)),
+      input: remainder,
+    });
   }
   return parsed;
 }
@@ -399,5 +275,6 @@ export function parseFormulaToAST(source) {
 export const __internal = {
   literalParser,
   primitiveParser,
-  expressionParser,
+  explicitComposeParser,
+  groupedParser,
 };
