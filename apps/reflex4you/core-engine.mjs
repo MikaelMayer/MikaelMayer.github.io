@@ -459,6 +459,7 @@ export class ReflexCore {
     this.viewYMax = 4.0;
 
     this.offset = { x: 0.0, y: 0.0 };
+    this.offsetChangeListeners = [];
     this.isDragging = false;
     this.dragStartX = 0;
     this.dragStartY = 0;
@@ -483,6 +484,51 @@ export class ReflexCore {
 
   getFormulaAST() {
     return this.formulaAST;
+  }
+
+  getOffset() {
+    return { x: this.offset.x, y: this.offset.y };
+  }
+
+  onOffsetChange(listener) {
+    if (typeof listener !== 'function') {
+      return;
+    }
+    this.offsetChangeListeners.push(listener);
+    try {
+      listener(this.getOffset());
+    } catch (err) {
+      console.error('ReflexCore offset listener threw', err);
+    }
+  }
+
+  notifyOffsetChange() {
+    if (!this.offsetChangeListeners.length) {
+      return;
+    }
+    const snapshot = this.getOffset();
+    this.offsetChangeListeners.forEach((listener) => {
+      try {
+        listener(snapshot);
+      } catch (err) {
+        console.error('ReflexCore offset listener threw', err);
+      }
+    });
+  }
+
+  setOffset(x, y, { triggerRender = true } = {}) {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return;
+    }
+    if (x === this.offset.x && y === this.offset.y) {
+      return;
+    }
+    this.offset.x = x;
+    this.offset.y = y;
+    if (triggerRender) {
+      this.render();
+    }
+    this.notifyOffsetChange();
   }
 
   createShader(type, source) {
@@ -598,9 +644,9 @@ export class ReflexCore {
     const unitsPerPixelY = this.viewYSpan / this.canvas.height;
     const deltaRe = dx * unitsPerPixelX;
     const deltaIm = -dy * unitsPerPixelY;
-    this.offset.x = this.startOffsetX + deltaRe;
-    this.offset.y = this.startOffsetY + deltaIm;
-    this.render();
+    const nextRe = this.startOffsetX + deltaRe;
+    const nextIm = this.startOffsetY + deltaIm;
+    this.setOffset(nextRe, nextIm);
   }
 
   handlePointerEnd(e) {

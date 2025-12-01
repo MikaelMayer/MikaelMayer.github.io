@@ -7,6 +7,8 @@ import { parseFormulaInput } from './arithmetic-parser.mjs';
 const canvas = document.getElementById('glcanvas');
 const formulaTextarea = document.getElementById('formula');
 const errorDiv = document.getElementById('error');
+const f1Indicator = document.getElementById('f1-indicator');
+let lastSerializedF1 = null;
 
 const DEFAULT_FORMULA_TEXT = '(z - F1) * (z + F1)';
 
@@ -32,6 +34,103 @@ function updateFormulaQueryParam(source) {
     params.set('formula', source);
   } else {
     params.delete('formula');
+  }
+  const newQuery = params.toString();
+  const newUrl = `${window.location.pathname}${newQuery ? `?${newQuery}` : ''}`;
+  window.history.replaceState({}, '', newUrl);
+}
+
+function roundToTwoDecimals(value) {
+  if (!Number.isFinite(value)) {
+    return NaN;
+  }
+  const rounded = Math.round(value * 100) / 100;
+  return Object.is(rounded, -0) ? 0 : rounded;
+}
+
+function formatNumberForDisplay(value) {
+  const rounded = roundToTwoDecimals(value);
+  if (!Number.isFinite(rounded)) {
+    return '?';
+  }
+  return rounded.toFixed(2).replace(/\.?0+$/, '');
+}
+
+function formatComplexForDisplay(re, im) {
+  if (!Number.isFinite(re) || !Number.isFinite(im)) {
+    return 'F1 = ?';
+  }
+  const sign = im >= 0 ? '+' : '-';
+  const realPart = formatNumberForDisplay(re);
+  const imagPart = formatNumberForDisplay(Math.abs(im));
+  return `F1 = ${realPart} ${sign} ${imagPart} i`;
+}
+
+function formatComplexForQuery(re, im) {
+  if (!Number.isFinite(re) || !Number.isFinite(im)) {
+    return null;
+  }
+  const sign = im >= 0 ? '+' : '-';
+  const realPart = formatNumberForDisplay(re);
+  const imagPart = formatNumberForDisplay(Math.abs(im));
+  return `${realPart}${sign}${imagPart}i`;
+}
+
+function parseComplexString(raw) {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const normalized = trimmed.replace(/\s+/g, '').toLowerCase();
+
+  if (normalized.endsWith('i')) {
+    const core = normalized.slice(0, -1);
+    if (!core.length) {
+      return null;
+    }
+    let splitIdx = -1;
+    for (let i = core.length - 1; i > 0; i--) {
+      const ch = core[i];
+      if (ch === '+' || ch === '-') {
+        splitIdx = i;
+        break;
+      }
+    }
+    if (splitIdx !== -1) {
+      const realPart = core.slice(0, splitIdx) || '0';
+      const imagPart = core.slice(splitIdx) || '0';
+      const re = Number(realPart);
+      const im = Number(imagPart);
+      if (Number.isFinite(re) && Number.isFinite(im)) {
+        return { x: re, y: im };
+      }
+    }
+  }
+
+  const tupleParts = normalized.split(',');
+  if (tupleParts.length === 2) {
+    const re = Number(tupleParts[0]);
+    const im = Number(tupleParts[1]);
+    if (Number.isFinite(re) && Number.isFinite(im)) {
+      return { x: re, y: im };
+    }
+  }
+
+  return null;
+}
+
+function readF1FromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get('F1');
+  return parseComplexString(raw);
+}
+
+function updateF1QueryParam(re, im) {
+  const serialized = formatComplexForQuery(re, im);
+  const params = new URLSearchParams(window.location.search);
+  if (serialized) {
+    params.set('F1', serialized);
+  } else {
+    params.delete('F1');
   }
   const newQuery = params.toString();
   const newUrl = `${window.location.pathname}${newQuery ? `?${newQuery}` : ''}`;
@@ -69,6 +168,8 @@ if (!initialFormulaSource || !initialFormulaSource.trim()) {
   initialFormulaSource = DEFAULT_FORMULA_TEXT;
 }
 
+const initialOffsetFromQuery = readF1FromQuery();
+
 const initialParse = parseFormulaInput(initialFormulaSource);
 let initialAST;
 
@@ -89,6 +190,40 @@ try {
 } catch (err) {
   alert(err.message);
   throw err;
+}
+
+const handleOffsetChange = (offset) => {
+  if (f1Indicator) {
+    f1Indicator.textContent = formatComplexForDisplay(offset.x, offset.y);
+  }
+  const serialized = formatComplexForQuery(offset.x, offset.y);
+  if (serialized !== lastSerializedF1) {
+    lastSerializedF1 = serialized;
+    updateF1QueryParam(offset.x, offset.y);
+  }
+};
+
+if (initialOffsetFromQuery) {
+  reflexCore.setOffset(initialOffsetFromQuery.x, initialOffsetFromQuery.y);
+}
+
+reflexCore.onOffsetChange(handleOffsetChange);
+
+if (f1Indicator) {
+  f1Indicator.addEventListener('click', () => {
+    const currentOffset = reflexCore.getOffset();
+    const currentValue = formatComplexForQuery(currentOffset.x, currentOffset.y) || '0+0i';
+    const next = window.prompt('Set F1 (formats: "a+bi" or "a,b")', currentValue);
+    if (next === null) {
+      return;
+    }
+    const parsed = parseComplexString(next);
+    if (!parsed) {
+      alert('Could not parse F1. Use "a+bi" or "real,imag".');
+      return;
+    }
+    reflexCore.setOffset(parsed.x, parsed.y);
+  });
 }
 
 formulaTextarea.addEventListener('focus', () => {
