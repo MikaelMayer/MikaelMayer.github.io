@@ -34,11 +34,37 @@ test('parses primitives z, x, y, F1', () => {
   assert.equal(add.right.kind, 'Offset');
 });
 
+test('parses F2 primitive', () => {
+  const result = parseFormulaInput('F2 + 1');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.left.kind, 'Offset2');
+});
+
 test('parses function composition forms', () => {
   const result = parseFormulaInput('o(z, F1) $ (z + 1)');
   assert.equal(result.ok, true);
   assert.equal(result.value.kind, 'Compose');
   assert.equal(result.value.f.kind, 'Compose');
+});
+
+test('parses oo(...) shorthand for repeated composition', () => {
+  const result = parseFormulaInput('oo(z + 1, 3)');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Compose');
+});
+
+test('$$ postfix binds tighter than $', () => {
+  const result = parseFormulaInput('z $$ 2 $ F1');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Compose');
+  assert.equal(result.value.g.kind, 'Offset');
+  assert.equal(result.value.f.kind, 'Compose');
+});
+
+test('$$ requires positive integer counts', () => {
+  const result = parseFormulaInput('z $$ 0');
+  assert.equal(result.ok, false);
+  assert.match(result.message, /positive integer/i);
 });
 
 test('parseFormulaToAST throws on invalid formula', () => {

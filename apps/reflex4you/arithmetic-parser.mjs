@@ -294,8 +294,6 @@ const repeatSuffixParser = createParser('RepeatSuffix', (input) => {
   });
 });
 
-const optionalRepeatSuffix = repeatSuffixParser.Optional(null, { ctor: 'RepeatSuffixOptional' });
-
 const repeatComposeParser = createParser('RepeatCompose', (input) => {
   const head = additiveParser.runNormalized(input);
   if (!head.ok) {
@@ -304,11 +302,11 @@ const repeatComposeParser = createParser('RepeatCompose', (input) => {
   let node = head.value;
   let cursor = head.next;
   while (true) {
-    const suffix = optionalRepeatSuffix.runNormalized(cursor);
+    const suffix = repeatSuffixParser.runNormalized(cursor);
     if (!suffix.ok) {
-      return suffix;
-    }
-    if (!suffix.value) {
+      if (suffix.severity === ParseSeverity.error) {
+        return suffix;
+      }
       break;
     }
     const span = spanBetween(input, suffix.next);

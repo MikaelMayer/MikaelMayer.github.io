@@ -7,9 +7,11 @@ import {
   VarX,
   VarY,
   Offset,
+  Offset2,
   Add,
   Compose,
   Const,
+  oo,
   buildFragmentSourceFromAST,
 } from './core-engine.mjs';
 
@@ -34,12 +36,29 @@ test('Compose nodes wrap inner functions correctly', () => {
   assert.equal(composed.f.left.kind, 'Var');
 });
 
+test('oo composes a function multiple times', () => {
+  const base = Add(VarZ(), Const(1, 0));
+  const repeated = oo(base, 3);
+  assert.equal(repeated.kind, 'Compose');
+  assert.equal(repeated.f.kind, 'Compose');
+  assert.equal(repeated.g, base);
+  assert.equal(repeated.f.f, base);
+  assert.equal(repeated.f.g, base);
+});
+
 test('fragment generator embeds node functions and top entry', () => {
   const ast = Add(Const(1, 0), Const(0, 1));
   const fragment = buildFragmentSourceFromAST(ast);
   assert.match(fragment, /vec2 node\d+\(vec2 z\)/);
   assert.match(fragment, /vec2 f\(vec2 z\)/);
   assert.match(fragment, /return node\d+\(z\);/);
+});
+
+test('Offset2 nodes read from the secondary offset uniform', () => {
+  const ast = Offset2();
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /uniform vec2 u_offset2;/);
+  assert.match(fragment, /return u_offset2;/);
 });
 
 test('VarX and VarY nodes project components', () => {
