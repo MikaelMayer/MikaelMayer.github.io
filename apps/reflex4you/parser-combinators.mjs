@@ -93,6 +93,10 @@ parserPrototype.Concat = function methodConcat(other, options) {
 
 parserPrototype.Then = parserPrototype.Concat;
 
+parserPrototype.i_i = function methodIncludeInclude(other, options) {
+  return Concat(this, other, options);
+};
+
 parserPrototype._i = function methodIgnoreLeft(other, options) {
   return ConcatRight(this, other, options);
 };
@@ -101,8 +105,16 @@ parserPrototype.i_ = function methodIgnoreRight(other, options) {
   return ConcatLeft(this, other, options);
 };
 
+parserPrototype._q_q = function methodFailureResetsInput(options) {
+  return FailureResetsInput(this, options);
+};
+
 parserPrototype.Many = function methodMany(options) {
   return Many(this, options);
+};
+
+parserPrototype.Rep = function methodRep(options) {
+  return Rep(this, options);
 };
 
 parserPrototype.Optional = function methodOptional(defaultValue = null, options) {
@@ -322,6 +334,72 @@ export function Many(parser, { min = 0, max = Infinity, ctor = 'Many' } = {}) {
       });
     }
     return makeSuccess(ctor, input, current, values);
+  });
+}
+
+export function FailureResetsInput(parser, { ctor = 'FailureResetsInput' } = {}) {
+  const base = ensureParser(parser, 'FailureResetsInput source');
+  return createParser(ctor, (input) => {
+    const result = base.runNormalized(input);
+    if (!result.ok && result.severity !== ParseSeverity.error) {
+      return makeFailure({
+        ctor,
+        input,
+        message: result.message,
+        severity: result.severity,
+        expected: result.expected,
+        span: input.createSpan(0, 0),
+        children: [result],
+      });
+    }
+    return result;
+  });
+}
+
+export function Rep(parser, {
+  ctor = 'Rep',
+  min = 0,
+  max = Infinity,
+  seed = () => [],
+  append = (acc, value) => {
+    acc.push(value);
+    return acc;
+  },
+  finish = (acc) => acc,
+} = {}) {
+  const base = ensureParser(parser, 'Rep source');
+  if (min < 0) {
+    throw new RangeError('Rep requires min >= 0');
+  }
+  if (!Number.isFinite(max) || max < min) {
+    throw new RangeError('Rep requires finite max >= min');
+  }
+  return createParser(ctor, (input) => {
+    let current = input;
+    let count = 0;
+    let acc = seed();
+    while (count < max) {
+      const result = base.runNormalized(current);
+      if (!result.ok) {
+        break;
+      }
+      if (result.next === current) {
+        throw new Error('Rep parser must consume input on success to avoid infinite loops.');
+      }
+      acc = append(acc, result.value, result, count);
+      current = result.next;
+      count += 1;
+    }
+    if (count < min) {
+      return makeFailure({
+        ctor,
+        input,
+        message: `Expected at least ${min} repetitions`,
+        severity: ParseSeverity.recoverable,
+        expected: `${base.ctor}×${min}`,
+      });
+    }
+    return makeSuccess(ctor, input, current, finish(acc));
   });
 }
 
