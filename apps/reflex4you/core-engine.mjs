@@ -4,6 +4,14 @@
 // AST constructors
 // =========================
 
+export function VarX() {
+  return { kind: "VarX" };
+}
+
+export function VarY() {
+  return { kind: "VarY" };
+}
+
 export function VarZ() {
   return { kind: "Var", name: "z" };
 }
@@ -47,6 +55,8 @@ export function Compose(f, g) {
 export const defaultFormulaSource = 'Mul(Sub(VarZ(), Offset()), Op(VarZ(), Offset(), "add"))';
 
 const formulaGlobals = Object.freeze({
+  VarX,
+  VarY,
   VarZ,
   Pow,
   Offset,
@@ -82,6 +92,8 @@ function assignNodeIds(ast) {
   ast._id = nextNodeId++;
   switch (ast.kind) {
     case "Var":
+    case "VarX":
+    case "VarY":
     case "Offset":
     case "Const":
       return;
@@ -123,6 +135,8 @@ function collectNodesPostOrder(ast, out) {
       collectNodesPostOrder(ast.g, out);
       break;
     case "Var":
+    case "VarX":
+    case "VarY":
     case "Offset":
     case "Const":
       break;
@@ -146,6 +160,20 @@ function generateNodeFunction(ast) {
     return `
 vec2 ${name}(vec2 z) {
     return z;
+}`.trim();
+  }
+
+  if (ast.kind === "VarX") {
+    return `
+vec2 ${name}(vec2 z) {
+    return vec2(z.x, 0.0);
+}`.trim();
+  }
+
+  if (ast.kind === "VarY") {
+    return `
+vec2 ${name}(vec2 z) {
+    return vec2(0.0, z.y);
 }`.trim();
   }
 

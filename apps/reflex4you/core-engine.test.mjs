@@ -4,6 +4,8 @@ import {
   evaluateFormulaSource,
   defaultFormulaSource,
   VarZ,
+  VarX,
+  VarY,
   Offset,
   Add,
   Compose,
@@ -38,6 +40,13 @@ test('fragment generator embeds node functions and top entry', () => {
   assert.match(fragment, /vec2 node\d+\(vec2 z\)/);
   assert.match(fragment, /vec2 f\(vec2 z\)/);
   assert.match(fragment, /return node\d+\(z\);/);
+});
+
+test('VarX and VarY nodes project components', () => {
+  const ast = Add(VarX(), VarY());
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /return vec2\(z\.x, 0\.0\);/);
+  assert.match(fragment, /return vec2\(0\.0, z\.y\);/);
 });
 
 test('evaluateFormulaSource throws on invalid input', () => {

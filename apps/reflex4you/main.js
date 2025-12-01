@@ -1,14 +1,17 @@
 import {
   ReflexCore,
-  defaultFormulaSource,
-  evaluateFormulaSource,
   createDefaultFormulaAST,
 } from './core-engine.mjs';
+import { parseFormulaInput } from './arithmetic-parser.mjs';
 
 const canvas = document.getElementById('glcanvas');
 const formulaTextarea = document.getElementById('formula');
-const applyBtn = document.getElementById('apply-btn');
 const errorDiv = document.getElementById('error');
+
+const DEFAULT_FORMULA_TEXT = '(z - F1) * (z + F1)';
+
+const defaultParseResult = parseFormulaInput(DEFAULT_FORMULA_TEXT);
+const fallbackDefaultAST = defaultParseResult.ok ? defaultParseResult.value : createDefaultFormulaAST();
 
 function readFormulaFromQuery() {
   const params = new URLSearchParams(window.location.search);
@@ -30,7 +33,7 @@ function updateFormulaQueryParam(source) {
   } else {
     params.delete('formula');
   }
-  const newQuery = params.toString(); // encodes via encodeURIComponent under the hood
+  const newQuery = params.toString();
   const newUrl = `${window.location.pathname}${newQuery ? `?${newQuery}` : ''}`;
   window.history.replaceState({}, '', newUrl);
 }
@@ -45,15 +48,37 @@ function clearError() {
   errorDiv.textContent = '';
 }
 
-let initialFormulaSource = readFormulaFromQuery() || defaultFormulaSource;
+function formatCaretIndicator(source, failure) {
+  const displaySource = source.length ? source : '(empty)';
+  const origin = failure?.span?.input?.start ?? 0;
+  const pointer = failure?.span ? failure.span.start - origin : 0;
+  const clamped = Number.isFinite(pointer)
+    ? Math.max(0, Math.min(pointer, source.length))
+    : 0;
+  const caretLine = `${' '.repeat(clamped)}^`;
+  const message = failure?.message || 'Parse error';
+  return `${displaySource}\n${caretLine}\n${message}`;
+}
+
+function showParseError(source, failure) {
+  showError(formatCaretIndicator(source, failure));
+}
+
+let initialFormulaSource = readFormulaFromQuery();
+if (!initialFormulaSource || !initialFormulaSource.trim()) {
+  initialFormulaSource = DEFAULT_FORMULA_TEXT;
+}
+
+const initialParse = parseFormulaInput(initialFormulaSource);
 let initialAST;
-try {
-  initialAST = evaluateFormulaSource(initialFormulaSource);
-} catch (err) {
-  console.error('Failed to evaluate formula from query, falling back to default.', err);
-  initialFormulaSource = defaultFormulaSource;
-  initialAST = createDefaultFormulaAST();
-  showError('Invalid formula in URL. Reverting to default.');
+
+if (initialParse.ok) {
+  initialAST = initialParse.value;
+  clearError();
+} else {
+  console.warn('Failed to parse initial formula, rendering fallback AST.', initialParse);
+  initialAST = fallbackDefaultAST;
+  showParseError(initialFormulaSource, initialParse);
 }
 
 formulaTextarea.value = initialFormulaSource;
@@ -74,32 +99,24 @@ formulaTextarea.addEventListener('blur', () => {
 });
 
 function applyFormulaFromTextarea({ updateQuery = true } = {}) {
-  clearError();
-  const src = formulaTextarea.value.trim();
-  if (!src) {
+  const source = formulaTextarea.value;
+  if (!source.trim()) {
     showError('Formula cannot be empty.');
     return;
   }
-  try {
-    const ast = evaluateFormulaSource(src);
-    reflexCore.setFormulaAST(ast);
-    if (updateQuery) {
-      updateFormulaQueryParam(src);
-    }
-  } catch (e) {
-    console.error(e);
-    showError(e.message);
+  const result = parseFormulaInput(source);
+  if (!result.ok) {
+    showParseError(source, result);
+    return;
+  }
+  clearError();
+  reflexCore.setFormulaAST(result.value);
+  if (updateQuery) {
+    updateFormulaQueryParam(source);
   }
 }
 
-applyBtn.addEventListener('click', () => applyFormulaFromTextarea());
-
-formulaTextarea.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-    e.preventDefault();
-    applyFormulaFromTextarea();
-  }
-});
+formulaTextarea.addEventListener('input', () => applyFormulaFromTextarea());
 
 canvas.addEventListener('pointerdown', (e) => reflexCore.handlePointerDown(e));
 canvas.addEventListener('pointermove', (e) => reflexCore.handlePointerMove(e));
