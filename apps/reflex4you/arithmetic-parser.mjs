@@ -25,6 +25,8 @@ import {
   VarY,
   VarZ,
   Offset,
+  Offset2,
+  oo,
 } from './core-engine.mjs';
 
 const IDENTIFIER_CHAR = /[A-Za-z0-9_]/;
@@ -108,6 +110,7 @@ const primitiveParser = Choice([
   keywordLiteral('y', { ctor: 'VarY' }).Map((_, result) => withSpan(VarY(), result.span)),
   keywordLiteral('z', { ctor: 'VarZ' }).Map((_, result) => withSpan(VarZ(), result.span)),
   keywordLiteral('F1', { ctor: 'Offset' }).Map((_, result) => withSpan(Offset(), result.span)),
+  keywordLiteral('F2', { ctor: 'Offset2' }).Map((_, result) => withSpan(Offset2(), result.span)),
 ], { ctor: 'Primitive' });
 
 let expressionParser;
@@ -134,7 +137,46 @@ const explicitComposeParser = Sequence([
   projector: (values) => ({ first: values[2], second: values[4] }),
 }).Map(({ first, second }, result) => withSpan(Compose(first, second), result.span));
 
+const explicitRepeatComposeParser = createParser('ExplicitRepeatCompose', (input) => {
+  const keyword = wsLiteral('oo', { ctor: 'RepeatComposeKeyword' }).runNormalized(input);
+  if (!keyword.ok) {
+    return keyword;
+  }
+  const open = wsLiteral('(', { ctor: 'RepeatComposeOpen' }).runNormalized(keyword.next);
+  if (!open.ok) {
+    return open;
+  }
+  const fnResult = expressionRef.runNormalized(open.next);
+  if (!fnResult.ok) {
+    return fnResult;
+  }
+  const comma = wsLiteral(',', { ctor: 'RepeatComposeComma' }).runNormalized(fnResult.next);
+  if (!comma.ok) {
+    return comma;
+  }
+  const countResult = numberToken.runNormalized(comma.next);
+  if (!countResult.ok) {
+    return countResult;
+  }
+  const validatedCount = validateRepeatCount(countResult.value, countResult.span);
+  if (validatedCount instanceof ParseFailure) {
+    return validatedCount;
+  }
+  const close = wsLiteral(')', { ctor: 'RepeatComposeClose' }).runNormalized(countResult.next);
+  if (!close.ok) {
+    return close;
+  }
+  const span = spanBetween(input, close.next);
+  return new ParseSuccess({
+    ctor: 'ExplicitRepeatCompose',
+    value: withSpan(oo(fnResult.value, validatedCount), span),
+    span,
+    next: close.next,
+  });
+});
+
 const primaryParser = Choice([
+  explicitRepeatComposeParser,
   explicitComposeParser,
   groupedParser,
   literalParser,
@@ -203,6 +245,20 @@ function spanBetween(startInput, endInput) {
   return startInput.createSpan(0, startInput.length - endInput.length);
 }
 
+function validateRepeatCount(value, span) {
+  if (!Number.isInteger(value) || value < 1) {
+    return new ParseFailure({
+      ctor: 'RepeatCount',
+      message: 'Repeat count must be a positive integer',
+      severity: ParseSeverity.error,
+      expected: 'positive integer repeat count',
+      span,
+      input: span.input,
+    });
+  }
+  return value;
+}
+
 const multiplicativeOperators = Choice([
   wsLiteral('*', { ctor: 'MulOp' }).Map(() => (left, right) => Mul(left, right)),
   wsLiteral('/', { ctor: 'DivOp' }).Map(() => (left, right) => Div(left, right)),
@@ -217,7 +273,58 @@ const composeOperator = wsLiteral('$', { ctor: 'ComposeOp' }).Map(() => (left, r
 
 const multiplicativeParser = leftAssociative(unaryParser, multiplicativeOperators, 'MulDiv');
 const additiveParser = leftAssociative(multiplicativeParser, additiveOperators, 'AddSub');
-const compositionChainParser = leftAssociative(additiveParser, composeOperator, 'Composition');
+const repeatSuffixParser = createParser('RepeatSuffix', (input) => {
+  const opResult = wsLiteral('$$', { ctor: 'RepeatOp' }).runNormalized(input);
+  if (!opResult.ok) {
+    return opResult;
+  }
+  const countResult = numberToken.runNormalized(opResult.next);
+  if (!countResult.ok) {
+    return countResult;
+  }
+  const validatedCount = validateRepeatCount(countResult.value, countResult.span);
+  if (validatedCount instanceof ParseFailure) {
+    return validatedCount;
+  }
+  return new ParseSuccess({
+    ctor: 'RepeatSuffix',
+    value: { count: validatedCount },
+    span: spanBetween(input, countResult.next),
+    next: countResult.next,
+  });
+});
+
+const optionalRepeatSuffix = repeatSuffixParser.Optional(null, { ctor: 'RepeatSuffixOptional' });
+
+const repeatComposeParser = createParser('RepeatCompose', (input) => {
+  const head = additiveParser.runNormalized(input);
+  if (!head.ok) {
+    return head;
+  }
+  let node = head.value;
+  let cursor = head.next;
+  while (true) {
+    const suffix = optionalRepeatSuffix.runNormalized(cursor);
+    if (!suffix.ok) {
+      return suffix;
+    }
+    if (!suffix.value) {
+      break;
+    }
+    const span = spanBetween(input, suffix.next);
+    node = withSpan(oo(node, suffix.value.count), span);
+    cursor = suffix.next;
+  }
+  const span = spanBetween(input, cursor);
+  return new ParseSuccess({
+    ctor: 'RepeatCompose',
+    value: node,
+    span,
+    next: cursor,
+  });
+});
+
+const compositionChainParser = leftAssociative(repeatComposeParser, composeOperator, 'Composition');
 
 expressionParser = compositionChainParser;
 
