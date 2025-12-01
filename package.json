@@ -7,7 +7,8 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "playwright test"
+    "test": "playwright test",
+    "test:node": "node --test apps/reflex4you/core-engine.test.mjs"
   },
   "repository": {
     "type": "git",
