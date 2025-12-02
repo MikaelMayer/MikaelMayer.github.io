@@ -850,7 +850,7 @@ export class ReflexCore {
   }
 
   handlePointerDown(e) {
-    const target = this.pickPointerTarget();
+    const target = this.pickPointerTarget(e);
     if (!target) {
       return;
     }
@@ -901,10 +901,14 @@ export class ReflexCore {
     }
   }
 
-  pickPointerTarget() {
+  pickPointerTarget(e) {
     const hasF1Pointer = Array.from(this.pointerAssignments.values()).some((entry) => entry.target === 'F1');
     const hasF2Pointer = Array.from(this.pointerAssignments.values()).some((entry) => entry.target === 'F2');
     if (!hasF1Pointer) {
+      if (!hasF2Pointer) {
+        const candidate = this.pickClosestFinger(e);
+        return candidate;
+      }
       return 'F1';
     }
     if (!hasF2Pointer) {
@@ -929,6 +933,38 @@ export class ReflexCore {
       re: dx * unitsPerPixelX,
       im: -dy * unitsPerPixelY,
     };
+  }
+
+  clientPositionToComplex(clientX, clientY) {
+    const rect = this.canvas.getBoundingClientRect();
+    if (!rect || rect.width === 0 || rect.height === 0) {
+      return null;
+    }
+    const u = (clientX - rect.left) / rect.width;
+    const v = (clientY - rect.top) / rect.height;
+    if (!Number.isFinite(u) || !Number.isFinite(v)) {
+      return null;
+    }
+    const x = this.viewXMin + u * (this.viewXMax - this.viewXMin);
+    const y = this.viewYMax - v * (this.viewYMax - this.viewYMin);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return null;
+    }
+    return { x, y };
+  }
+
+  pickClosestFinger(e) {
+    const point = this.clientPositionToComplex(e.clientX, e.clientY);
+    if (!point) {
+      return 'F1';
+    }
+    const distToOffset = (offset) => Math.hypot(point.x - offset.x, point.y - offset.y);
+    const distanceF1 = distToOffset(this.getOffset());
+    const distanceF2 = distToOffset(this.getOffset2());
+    if (!Number.isFinite(distanceF2) || distanceF1 <= distanceF2) {
+      return 'F1';
+    }
+    return 'F2';
   }
 
   projectComplexToCanvasNormalized(x, y) {
