@@ -380,7 +380,7 @@ function deriveFingerState(usage) {
 function syncFingerUI() {
   const activeLabels = activeFingerState.slots;
   if (fingerIndicatorStack) {
-    fingerIndicatorStack.style.display = activeLabels.length ? '' : 'none';
+    fingerIndicatorStack.style.display = activeLabels.length ? 'flex' : 'none';
   }
   if (fingerOverlay) {
     fingerOverlay.style.display = activeLabels.length ? 'block' : 'none';
