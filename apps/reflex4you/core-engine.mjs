@@ -70,6 +70,30 @@ export function LessThan(left, right) {
   return { kind: "LessThan", left, right };
 }
 
+export function GreaterThan(left, right) {
+  return { kind: "GreaterThan", left, right };
+}
+
+export function LessThanOrEqual(left, right) {
+  return { kind: "LessThanOrEqual", left, right };
+}
+
+export function GreaterThanOrEqual(left, right) {
+  return { kind: "GreaterThanOrEqual", left, right };
+}
+
+export function Equal(left, right) {
+  return { kind: "Equal", left, right };
+}
+
+export function LogicalAnd(left, right) {
+  return { kind: "LogicalAnd", left, right };
+}
+
+export function LogicalOr(left, right) {
+  return { kind: "LogicalOr", left, right };
+}
+
 export function If(condition, thenBranch, elseBranch) {
   return { kind: "If", condition, thenBranch, elseBranch };
 }
@@ -96,6 +120,10 @@ export function Cos(value) {
 
 export function Ln(value) {
   return { kind: "Ln", value };
+}
+
+export function Abs(value) {
+  return { kind: "Abs", value };
 }
 
 export function oo(f, n) {
@@ -134,6 +162,12 @@ const formulaGlobals = Object.freeze({
   Add,
   Div,
   LessThan,
+  GreaterThan,
+  LessThanOrEqual,
+  GreaterThanOrEqual,
+  Equal,
+  LogicalAnd,
+  LogicalOr,
   If,
   Const,
   Compose,
@@ -141,6 +175,7 @@ const formulaGlobals = Object.freeze({
   Sin,
   Cos,
   Ln,
+  Abs,
   oo,
 });
 
@@ -179,6 +214,7 @@ function assignNodeIds(ast) {
     case "Sin":
     case "Cos":
     case "Ln":
+    case "Abs":
       assignNodeIds(ast.value);
       return;
     case "Sub":
@@ -187,6 +223,12 @@ function assignNodeIds(ast) {
     case "Add":
     case "Div":
     case "LessThan":
+    case "GreaterThan":
+    case "LessThanOrEqual":
+    case "GreaterThanOrEqual":
+    case "Equal":
+    case "LogicalAnd":
+    case "LogicalOr":
       assignNodeIds(ast.left);
       assignNodeIds(ast.right);
       return;
@@ -213,6 +255,7 @@ function collectNodesPostOrder(ast, out) {
     case "Sin":
     case "Cos":
     case "Ln":
+    case "Abs":
       collectNodesPostOrder(ast.value, out);
       break;
     case "Sub":
@@ -221,6 +264,12 @@ function collectNodesPostOrder(ast, out) {
     case "Add":
     case "Div":
     case "LessThan":
+    case "GreaterThan":
+    case "LessThanOrEqual":
+    case "GreaterThanOrEqual":
+    case "Equal":
+    case "LogicalAnd":
+    case "LogicalOr":
       collectNodesPostOrder(ast.left, out);
       collectNodesPostOrder(ast.right, out);
       break;
@@ -402,6 +451,82 @@ vec2 ${name}(vec2 z) {
 }`.trim();
   }
 
+  if (ast.kind === "GreaterThan") {
+    const leftName = functionName(ast.left);
+    const rightName = functionName(ast.right);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 a = ${leftName}(z);
+    vec2 b = ${rightName}(z);
+    float flag = a.x > b.x ? 1.0 : 0.0;
+    return vec2(flag, 0.0);
+}`.trim();
+  }
+
+  if (ast.kind === "LessThanOrEqual") {
+    const leftName = functionName(ast.left);
+    const rightName = functionName(ast.right);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 a = ${leftName}(z);
+    vec2 b = ${rightName}(z);
+    float flag = a.x <= b.x ? 1.0 : 0.0;
+    return vec2(flag, 0.0);
+}`.trim();
+  }
+
+  if (ast.kind === "GreaterThanOrEqual") {
+    const leftName = functionName(ast.left);
+    const rightName = functionName(ast.right);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 a = ${leftName}(z);
+    vec2 b = ${rightName}(z);
+    float flag = a.x >= b.x ? 1.0 : 0.0;
+    return vec2(flag, 0.0);
+}`.trim();
+  }
+
+  if (ast.kind === "Equal") {
+    const leftName = functionName(ast.left);
+    const rightName = functionName(ast.right);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 a = ${leftName}(z);
+    vec2 b = ${rightName}(z);
+    float flag = a.x == b.x ? 1.0 : 0.0;
+    return vec2(flag, 0.0);
+}`.trim();
+  }
+
+  if (ast.kind === "LogicalAnd") {
+    const leftName = functionName(ast.left);
+    const rightName = functionName(ast.right);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 a = ${leftName}(z);
+    vec2 b = ${rightName}(z);
+    float leftTruthy = (a.x != 0.0 || a.y != 0.0) ? 1.0 : 0.0;
+    float rightTruthy = (b.x != 0.0 || b.y != 0.0) ? 1.0 : 0.0;
+    float flag = (leftTruthy > 0.5 && rightTruthy > 0.5) ? 1.0 : 0.0;
+    return vec2(flag, 0.0);
+}`.trim();
+  }
+
+  if (ast.kind === "LogicalOr") {
+    const leftName = functionName(ast.left);
+    const rightName = functionName(ast.right);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 a = ${leftName}(z);
+    vec2 b = ${rightName}(z);
+    float leftTruthy = (a.x != 0.0 || a.y != 0.0) ? 1.0 : 0.0;
+    float rightTruthy = (b.x != 0.0 || b.y != 0.0) ? 1.0 : 0.0;
+    float flag = (leftTruthy > 0.5 || rightTruthy > 0.5) ? 1.0 : 0.0;
+    return vec2(flag, 0.0);
+}`.trim();
+  }
+
   if (ast.kind === "Exp") {
     const valueName = functionName(ast.value);
     return `
@@ -435,6 +560,16 @@ vec2 ${name}(vec2 z) {
 vec2 ${name}(vec2 z) {
     vec2 v = ${valueName}(z);
     return c_ln(v);
+}`.trim();
+  }
+
+  if (ast.kind === "Abs") {
+    const valueName = functionName(ast.value);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 v = ${valueName}(z);
+    float magnitude = length(v);
+    return vec2(magnitude, 0.0);
 }`.trim();
   }
 

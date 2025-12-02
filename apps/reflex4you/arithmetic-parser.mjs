@@ -21,6 +21,12 @@ import {
   Mul,
   Div,
   LessThan,
+  GreaterThan,
+  LessThanOrEqual,
+  GreaterThanOrEqual,
+  Equal,
+  LogicalAnd,
+  LogicalOr,
   Compose,
   VarX,
   VarY,
@@ -30,6 +36,7 @@ import {
   Sin,
   Cos,
   Ln,
+  Abs,
   oo,
   If,
   FingerOffset,
@@ -221,6 +228,7 @@ const elementaryFunctionParser = Choice([
   createUnaryFunctionParser('sin', Sin),
   createUnaryFunctionParser('cos', Cos),
   createUnaryFunctionParser('ln', Ln),
+  createUnaryFunctionParser('abs', Abs),
 ], { ctor: 'ElementaryFunction' });
 
 const primaryParser = Choice([
@@ -431,8 +439,20 @@ const repeatComposeParser = createParser('RepeatCompose', (input) => {
 const compositionChainParser = leftAssociative(repeatComposeParser, composeOperator, 'Composition');
 
 const comparisonOperatorParser = Choice([
+  wsLiteral('<=', { ctor: 'LessThanOrEqualOp' }).Map(
+    () => (left, right) => LessThanOrEqual(left, right),
+  ),
+  wsLiteral('>=', { ctor: 'GreaterThanOrEqualOp' }).Map(
+    () => (left, right) => GreaterThanOrEqual(left, right),
+  ),
+  wsLiteral('==', { ctor: 'EqualsOp' }).Map(
+    () => (left, right) => Equal(left, right),
+  ),
   wsLiteral('<', { ctor: 'LessThanOp' }).Map(
     () => (left, right) => LessThan(left, right),
+  ),
+  wsLiteral('>', { ctor: 'GreaterThanOp' }).Map(
+    () => (left, right) => GreaterThan(left, right),
   ),
 ], { ctor: 'ComparisonOperator' });
 
@@ -469,7 +489,18 @@ const comparisonParser = createParser('Comparison', (input) => {
   });
 });
 
-expressionParser = comparisonParser;
+const logicalAndOperator = wsLiteral('&&', { ctor: 'LogicalAndOp' }).Map(
+  () => (left, right) => LogicalAnd(left, right),
+);
+
+const logicalOrOperator = wsLiteral('||', { ctor: 'LogicalOrOp' }).Map(
+  () => (left, right) => LogicalOr(left, right),
+);
+
+const logicalAndParser = leftAssociative(comparisonParser, logicalAndOperator, 'LogicalAnd');
+const logicalOrParser = leftAssociative(logicalAndParser, logicalOrOperator, 'LogicalOr');
+
+expressionParser = logicalOrParser;
 
 export function parseFormulaInput(input) {
   const normalized = ParserInput.from(input ?? '');
