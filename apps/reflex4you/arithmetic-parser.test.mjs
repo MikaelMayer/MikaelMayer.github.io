@@ -120,6 +120,41 @@ test('parses less-than comparisons using real parts', () => {
   assert.equal(node.right.kind, 'Const');
 });
 
+test('parses the remaining comparison operators', () => {
+  const gt = parseFormulaInput('x > y');
+  assert.equal(gt.ok, true);
+  assert.equal(gt.value.kind, 'GreaterThan');
+
+  const ge = parseFormulaInput('x >= y');
+  assert.equal(ge.ok, true);
+  assert.equal(ge.value.kind, 'GreaterThanOrEqual');
+
+  const le = parseFormulaInput('x <= y');
+  assert.equal(le.ok, true);
+  assert.equal(le.value.kind, 'LessThanOrEqual');
+
+  const eq = parseFormulaInput('x == y');
+  assert.equal(eq.ok, true);
+  assert.equal(eq.value.kind, 'Equal');
+});
+
+test('parses logical and/or with correct precedence', () => {
+  const result = parseFormulaInput('x < y && y < z || z == x');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'LogicalOr');
+  assert.equal(result.value.left.kind, 'LogicalAnd');
+  assert.equal(result.value.left.left.kind, 'LessThan');
+  assert.equal(result.value.left.right.kind, 'LessThan');
+  assert.equal(result.value.right.kind, 'Equal');
+});
+
+test('parses abs() calls as unary functions', () => {
+  const result = parseFormulaInput('abs(z)');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Abs');
+  assert.equal(result.value.value.kind, 'Var');
+});
+
 test('parses if expressions with embedded comparisons', () => {
   const result = parseFormulaInput('if(x < y, x + 1, y + 2)');
   assert.equal(result.ok, true);

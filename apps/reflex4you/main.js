@@ -328,6 +328,7 @@ function detectFingerUsage(ast) {
       case 'Sin':
       case 'Cos':
       case 'Ln':
+      case 'Abs':
         stack.push(node.value);
         break;
       case 'Sub':
@@ -336,6 +337,12 @@ function detectFingerUsage(ast) {
       case 'Add':
       case 'Div':
       case 'LessThan':
+      case 'GreaterThan':
+      case 'LessThanOrEqual':
+      case 'GreaterThanOrEqual':
+      case 'Equal':
+      case 'LogicalAnd':
+      case 'LogicalOr':
         stack.push(node.left, node.right);
         break;
       case 'Compose':

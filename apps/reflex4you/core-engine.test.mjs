@@ -19,7 +19,14 @@ import {
   oo,
   FingerOffset,
   LessThan,
+  GreaterThan,
+  LessThanOrEqual,
+  GreaterThanOrEqual,
+  Equal,
+  LogicalAnd,
+  LogicalOr,
   If,
+  Abs,
   buildFragmentSourceFromAST,
 } from './core-engine.mjs';
 
@@ -121,9 +128,49 @@ test('LessThan nodes compare real parts and emit boolean constants', () => {
   assert.match(fragment, /vec2\(flag, 0\.0\)/);
 });
 
+test('Other comparison nodes emit using real parts', () => {
+  const gt = GreaterThan(Const(1, 0), Const(0, 0));
+  const ge = GreaterThanOrEqual(Const(1, 0), Const(1, 0));
+  const le = LessThanOrEqual(Const(0, 0), Const(1, 0));
+  const eq = Equal(Const(2, 0), Const(3, 0));
+  [gt, ge, le, eq].forEach((ast) => {
+    const fragment = buildFragmentSourceFromAST(ast);
+    if (ast.kind === 'GreaterThan') {
+      assert.match(fragment, /a\.x > b\.x/);
+    }
+    if (ast.kind === 'GreaterThanOrEqual') {
+      assert.match(fragment, /a\.x >= b\.x/);
+    }
+    if (ast.kind === 'LessThanOrEqual') {
+      assert.match(fragment, /a\.x <= b\.x/);
+    }
+    if (ast.kind === 'Equal') {
+      assert.match(fragment, /a\.x == b\.x/);
+    }
+  });
+});
+
+test('Logical operators implement non-zero truthiness', () => {
+  const andAst = LogicalAnd(Const(1, 0), Const(0, 1));
+  const orAst = LogicalOr(Const(0, 0), Const(0, 1));
+  const andFragment = buildFragmentSourceFromAST(andAst);
+  const orFragment = buildFragmentSourceFromAST(orAst);
+  assert.match(andFragment, /leftTruthy/);
+  assert.match(andFragment, /&&/);
+  assert.match(orFragment, /rightTruthy/);
+  assert.match(orFragment, /\|\|/);
+});
+
 test('If nodes mix branches based on non-zero condition', () => {
   const ast = If(Const(1, 0), Const(2, 0), Const(3, 0));
   const fragment = buildFragmentSourceFromAST(ast);
   assert.match(fragment, /vec2 cond =/);
   assert.match(fragment, /mix\(elseValue, thenValue, selector\)/);
+});
+
+test('Abs nodes emit magnitude as real output', () => {
+  const ast = Abs(Add(Const(3, 0), Const(0, 4)));
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /float magnitude = length/);
+  assert.match(fragment, /vec2\(magnitude, 0\.0\)/);
 });
