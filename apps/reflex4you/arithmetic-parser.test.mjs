@@ -94,6 +94,25 @@ test('$$ requires positive integer counts', () => {
   assert.match(result.message, /positive integer/i);
 });
 
+test('parses less-than comparisons using real parts', () => {
+  const result = parseFormulaInput('(z $ F1) < 0');
+  assert.equal(result.ok, true);
+  const node = result.value;
+  assert.equal(node.kind, 'LessThan');
+  assert.equal(node.left.kind, 'Compose');
+  assert.equal(node.right.kind, 'Const');
+});
+
+test('parses if expressions with embedded comparisons', () => {
+  const result = parseFormulaInput('if(x < y, x + 1, y + 2)');
+  assert.equal(result.ok, true);
+  const node = result.value;
+  assert.equal(node.kind, 'If');
+  assert.equal(node.condition.kind, 'LessThan');
+  assert.equal(node.thenBranch.kind, 'Add');
+  assert.equal(node.elseBranch.kind, 'Add');
+});
+
 test('parseFormulaToAST throws on invalid formula', () => {
   assert.throws(() => parseFormulaToAST('('), {
     name: 'SyntaxError',

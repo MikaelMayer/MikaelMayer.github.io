@@ -51,6 +51,14 @@ export function Div(left, right) {
   return { kind: "Div", left, right };
 }
 
+export function LessThan(left, right) {
+  return { kind: "LessThan", left, right };
+}
+
+export function If(condition, thenBranch, elseBranch) {
+  return { kind: "If", condition, thenBranch, elseBranch };
+}
+
 export function Const(re, im) {
   return { kind: "Const", re, im };
 }
@@ -101,6 +109,8 @@ const formulaGlobals = Object.freeze({
   Op,
   Add,
   Div,
+  LessThan,
+  If,
   Const,
   Compose,
   Exp,
@@ -153,8 +163,14 @@ function assignNodeIds(ast) {
     case "Op":
     case "Add":
     case "Div":
+    case "LessThan":
       assignNodeIds(ast.left);
       assignNodeIds(ast.right);
+      return;
+    case "If":
+      assignNodeIds(ast.condition);
+      assignNodeIds(ast.thenBranch);
+      assignNodeIds(ast.elseBranch);
       return;
     case "Compose":
       assignNodeIds(ast.f);
@@ -181,8 +197,14 @@ function collectNodesPostOrder(ast, out) {
     case "Op":
     case "Add":
     case "Div":
+    case "LessThan":
       collectNodesPostOrder(ast.left, out);
       collectNodesPostOrder(ast.right, out);
+      break;
+    case "If":
+      collectNodesPostOrder(ast.condition, out);
+      collectNodesPostOrder(ast.thenBranch, out);
+      collectNodesPostOrder(ast.elseBranch, out);
       break;
     case "Compose":
       collectNodesPostOrder(ast.f, out);
@@ -347,6 +369,18 @@ vec2 ${name}(vec2 z) {
 }`.trim();
   }
 
+  if (ast.kind === "LessThan") {
+    const leftName = functionName(ast.left);
+    const rightName = functionName(ast.right);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 a = ${leftName}(z);
+    vec2 b = ${rightName}(z);
+    float flag = a.x < b.x ? 1.0 : 0.0;
+    return vec2(flag, 0.0);
+}`.trim();
+  }
+
   if (ast.kind === "Exp") {
     const valueName = functionName(ast.value);
     return `
@@ -380,6 +414,20 @@ vec2 ${name}(vec2 z) {
 vec2 ${name}(vec2 z) {
     vec2 v = ${valueName}(z);
     return c_ln(v);
+}`.trim();
+  }
+
+  if (ast.kind === "If") {
+    const condName = functionName(ast.condition);
+    const thenName = functionName(ast.thenBranch);
+    const elseName = functionName(ast.elseBranch);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 cond = ${condName}(z);
+    vec2 thenValue = ${thenName}(z);
+    vec2 elseValue = ${elseName}(z);
+    float selector = (cond.x != 0.0 || cond.y != 0.0) ? 1.0 : 0.0;
+    return mix(elseValue, thenValue, selector);
 }`.trim();
   }
 

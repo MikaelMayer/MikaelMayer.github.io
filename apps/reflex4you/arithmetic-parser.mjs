@@ -20,6 +20,7 @@ import {
   Sub,
   Mul,
   Div,
+  LessThan,
   Compose,
   VarX,
   VarY,
@@ -32,6 +33,7 @@ import {
   Cos,
   Ln,
   oo,
+  If,
 } from './core-engine.mjs';
 
 const IDENTIFIER_CHAR = /[A-Za-z0-9_]/;
@@ -180,6 +182,24 @@ const explicitRepeatComposeParser = createParser('ExplicitRepeatCompose', (input
   });
 });
 
+const ifParser = Sequence([
+  keywordLiteral('if', { ctor: 'IfKeyword' }),
+  wsLiteral('(', { ctor: 'IfOpen' }),
+  expressionRef,
+  wsLiteral(',', { ctor: 'IfComma1' }),
+  expressionRef,
+  wsLiteral(',', { ctor: 'IfComma2' }),
+  expressionRef,
+  wsLiteral(')', { ctor: 'IfClose' }),
+], {
+  ctor: 'IfCall',
+  projector: (values) => ({
+    condition: values[2],
+    thenBranch: values[4],
+    elseBranch: values[6],
+  }),
+}).Map(({ condition, thenBranch, elseBranch }, result) => withSpan(If(condition, thenBranch, elseBranch), result.span));
+
 function createUnaryFunctionParser(name, factory) {
   return Sequence([
     keywordLiteral(name, { ctor: `${name}Keyword` }),
@@ -203,6 +223,7 @@ const primaryParser = Choice([
   explicitRepeatComposeParser,
   explicitComposeParser,
   elementaryFunctionParser,
+  ifParser,
   groupedParser,
   literalParser,
   primitiveParser,
@@ -405,7 +426,46 @@ const repeatComposeParser = createParser('RepeatCompose', (input) => {
 
 const compositionChainParser = leftAssociative(repeatComposeParser, composeOperator, 'Composition');
 
-expressionParser = compositionChainParser;
+const comparisonOperatorParser = Choice([
+  wsLiteral('<', { ctor: 'LessThanOp' }).Map(
+    () => (left, right) => LessThan(left, right),
+  ),
+], { ctor: 'ComparisonOperator' });
+
+const maybeComparisonOperator = comparisonOperatorParser.Optional(null, { ctor: 'MaybeComparisonOp' });
+
+const comparisonParser = createParser('Comparison', (input) => {
+  const leftResult = compositionChainParser.runNormalized(input);
+  if (!leftResult.ok) {
+    return leftResult;
+  }
+  const operatorResult = maybeComparisonOperator.runNormalized(leftResult.next);
+  if (!operatorResult.ok) {
+    return operatorResult;
+  }
+  if (operatorResult.value === null) {
+    const span = spanBetween(input, leftResult.next);
+    return new ParseSuccess({
+      ctor: 'Comparison',
+      value: leftResult.value,
+      span,
+      next: leftResult.next,
+    });
+  }
+  const rightResult = compositionChainParser.runNormalized(operatorResult.next);
+  if (!rightResult.ok) {
+    return rightResult;
+  }
+  const span = spanBetween(input, rightResult.next);
+  return new ParseSuccess({
+    ctor: 'Comparison',
+    value: withSpan(operatorResult.value(leftResult.value, rightResult.value), span),
+    span,
+    next: rightResult.next,
+  });
+});
+
+expressionParser = comparisonParser;
 
 export function parseFormulaInput(input) {
   const normalized = ParserInput.from(input ?? '');

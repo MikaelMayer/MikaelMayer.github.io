@@ -17,6 +17,8 @@ import {
   Cos,
   Ln,
   oo,
+  LessThan,
+  If,
   buildFragmentSourceFromAST,
 } from './core-engine.mjs';
 
@@ -102,4 +104,18 @@ test('elementary functions emit the dedicated helpers', () => {
   assert.match(fragment, /c_cos/);
   assert.match(fragment, /c_sin/);
   assert.match(fragment, /c_exp/);
+});
+
+test('LessThan nodes compare real parts and emit boolean constants', () => {
+  const ast = LessThan(Const(1, 0), Const(0, 0));
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /a\.x < b\.x/);
+  assert.match(fragment, /vec2\(flag, 0\.0\)/);
+});
+
+test('If nodes mix branches based on non-zero condition', () => {
+  const ast = If(Const(1, 0), Const(2, 0), Const(3, 0));
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /vec2 cond =/);
+  assert.match(fragment, /mix\(elseValue, thenValue, selector\)/);
 });
