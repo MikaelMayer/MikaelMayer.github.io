@@ -24,6 +24,10 @@ export function Offset() {
   return { kind: "Offset" };
 }
 
+export function Offset2() {
+  return { kind: "Offset2" };
+}
+
 export function Sub(left, right) {
   return { kind: "Sub", left, right };
 }
@@ -52,6 +56,18 @@ export function Compose(f, g) {
   return { kind: "Compose", f, g };
 }
 
+export function oo(f, n) {
+  const count = Number(n);
+  if (!Number.isInteger(count) || count < 1) {
+    throw new Error("oo expects a positive integer repeat count");
+  }
+  let node = f;
+  for (let i = 1; i < count; i += 1) {
+    node = Compose(node, f);
+  }
+  return node;
+}
+
 export const defaultFormulaSource = 'Mul(Sub(VarZ(), Offset()), Op(VarZ(), Offset(), "add"))';
 
 const formulaGlobals = Object.freeze({
@@ -60,6 +76,7 @@ const formulaGlobals = Object.freeze({
   VarZ,
   Pow,
   Offset,
+  Offset2,
   Sub,
   Mul,
   Op,
@@ -67,6 +84,7 @@ const formulaGlobals = Object.freeze({
   Div,
   Const,
   Compose,
+  oo,
 });
 
 export function evaluateFormulaSource(source, extraGlobals = {}) {
@@ -95,6 +113,7 @@ function assignNodeIds(ast) {
     case "VarX":
     case "VarY":
     case "Offset":
+    case "Offset2":
     case "Const":
       return;
     case "Pow":
@@ -138,6 +157,7 @@ function collectNodesPostOrder(ast, out) {
     case "VarX":
     case "VarY":
     case "Offset":
+    case "Offset2":
     case "Const":
       break;
     default:
@@ -173,7 +193,7 @@ vec2 ${name}(vec2 z) {
   if (ast.kind === "VarY") {
     return `
 vec2 ${name}(vec2 z) {
-    return vec2(0.0, z.y);
+    return vec2(z.y, 0.0);
 }`.trim();
   }
 
@@ -181,6 +201,13 @@ vec2 ${name}(vec2 z) {
     return `
 vec2 ${name}(vec2 z) {
     return u_offset;
+}`.trim();
+  }
+
+  if (ast.kind === "Offset2") {
+    return `
+vec2 ${name}(vec2 z) {
+    return u_offset2;
 }`.trim();
   }
 
@@ -340,6 +367,7 @@ uniform vec2 u_min;
 uniform vec2 u_max;
 uniform vec2 u_resolution;
 uniform vec2 u_offset;
+uniform vec2 u_offset2;
 
 out vec4 outColor;
 
@@ -449,6 +477,7 @@ export class ReflexCore {
     this.uMaxLoc = null;
     this.uResolutionLoc = null;
     this.uOffsetLoc = null;
+    this.uOffset2Loc = null;
 
     this.baseHalfSpan = 4.0;
     this.viewXSpan = 8.0;
@@ -459,12 +488,10 @@ export class ReflexCore {
     this.viewYMax = 4.0;
 
     this.offset = { x: 0.0, y: 0.0 };
+    this.offset2 = { x: 0.0, y: 0.0 };
     this.offsetChangeListeners = [];
-    this.isDragging = false;
-    this.dragStartX = 0;
-    this.dragStartY = 0;
-    this.startOffsetX = 0.0;
-    this.startOffsetY = 0.0;
+    this.offset2ChangeListeners = [];
+    this.pointerAssignments = new Map();
 
     this.formulaAST = initialAST;
 
@@ -490,6 +517,10 @@ export class ReflexCore {
     return { x: this.offset.x, y: this.offset.y };
   }
 
+  getOffset2() {
+    return { x: this.offset2.x, y: this.offset2.y };
+  }
+
   onOffsetChange(listener) {
     if (typeof listener !== 'function') {
       return;
@@ -499,6 +530,18 @@ export class ReflexCore {
       listener(this.getOffset());
     } catch (err) {
       console.error('ReflexCore offset listener threw', err);
+    }
+  }
+
+  onOffset2Change(listener) {
+    if (typeof listener !== 'function') {
+      return;
+    }
+    this.offset2ChangeListeners.push(listener);
+    try {
+      listener(this.getOffset2());
+    } catch (err) {
+      console.error('ReflexCore offset2 listener threw', err);
     }
   }
 
@@ -516,6 +559,20 @@ export class ReflexCore {
     });
   }
 
+  notifyOffset2Change() {
+    if (!this.offset2ChangeListeners.length) {
+      return;
+    }
+    const snapshot = this.getOffset2();
+    this.offset2ChangeListeners.forEach((listener) => {
+      try {
+        listener(snapshot);
+      } catch (err) {
+        console.error('ReflexCore offset2 listener threw', err);
+      }
+    });
+  }
+
   setOffset(x, y, { triggerRender = true } = {}) {
     if (!Number.isFinite(x) || !Number.isFinite(y)) {
       return;
@@ -529,6 +586,21 @@ export class ReflexCore {
       this.render();
     }
     this.notifyOffsetChange();
+  }
+
+  setOffset2(x, y, { triggerRender = true } = {}) {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return;
+    }
+    if (x === this.offset2.x && y === this.offset2.y) {
+      return;
+    }
+    this.offset2.x = x;
+    this.offset2.y = y;
+    if (triggerRender) {
+      this.render();
+    }
+    this.notifyOffset2Change();
   }
 
   createShader(type, source) {
@@ -574,6 +646,7 @@ export class ReflexCore {
     this.uMaxLoc = this.gl.getUniformLocation(this.program, 'u_max');
     this.uResolutionLoc = this.gl.getUniformLocation(this.program, 'u_resolution');
     this.uOffsetLoc = this.gl.getUniformLocation(this.program, 'u_offset');
+    this.uOffset2Loc = this.gl.getUniformLocation(this.program, 'u_offset2');
   }
 
   resizeCanvasToDisplaySize() {
@@ -617,7 +690,12 @@ export class ReflexCore {
     this.resizeCanvasToDisplaySize();
     this.gl.uniform2f(this.uResolutionLoc, this.canvas.width, this.canvas.height);
     this.updateView();
-    this.gl.uniform2f(this.uOffsetLoc, this.offset.x, this.offset.y);
+    if (this.uOffsetLoc) {
+      this.gl.uniform2f(this.uOffsetLoc, this.offset.x, this.offset.y);
+    }
+    if (this.uOffset2Loc) {
+      this.gl.uniform2f(this.uOffset2Loc, this.offset2.x, this.offset2.y);
+    }
 
     this.gl.clearColor(0, 0, 0, 1);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
@@ -625,37 +703,98 @@ export class ReflexCore {
   }
 
   handlePointerDown(e) {
-    this.canvas.setPointerCapture(e.pointerId);
-    this.isDragging = true;
-    this.dragStartX = e.clientX;
-    this.dragStartY = e.clientY;
-    this.startOffsetX = this.offset.x;
-    this.startOffsetY = this.offset.y;
+    const target = this.pickPointerTarget();
+    if (!target) {
+      return;
+    }
+    try {
+      this.canvas.setPointerCapture(e.pointerId);
+    } catch (_) {
+      // ignore
+    }
+    const origin = target === 'F1' ? this.getOffset() : this.getOffset2();
+    this.pointerAssignments.set(e.pointerId, {
+      pointerId: e.pointerId,
+      target,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      originX: origin.x,
+      originY: origin.y,
+    });
   }
 
   handlePointerMove(e) {
-    if (!this.isDragging) return;
-    const dxCss = e.clientX - this.dragStartX;
-    const dyCss = e.clientY - this.dragStartY;
-    const dpr = (typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1;
-    const dx = dxCss * dpr;
-    const dy = dyCss * dpr;
-    const unitsPerPixelX = this.viewXSpan / this.canvas.width;
-    const unitsPerPixelY = this.viewYSpan / this.canvas.height;
-    const deltaRe = dx * unitsPerPixelX;
-    const deltaIm = -dy * unitsPerPixelY;
-    const nextRe = this.startOffsetX + deltaRe;
-    const nextIm = this.startOffsetY + deltaIm;
-    this.setOffset(nextRe, nextIm);
+    const state = this.pointerAssignments.get(e.pointerId);
+    if (!state) {
+      return;
+    }
+    const delta = this.pointerDeltaToComplex(e.clientX - state.startClientX, e.clientY - state.startClientY);
+    if (!delta) {
+      return;
+    }
+    const nextRe = state.originX + delta.re;
+    const nextIm = state.originY + delta.im;
+    if (state.target === 'F1') {
+      this.setOffset(nextRe, nextIm);
+    } else if (state.target === 'F2') {
+      this.setOffset2(nextRe, nextIm);
+    }
   }
 
   handlePointerEnd(e) {
-    if (!this.isDragging) return;
-    this.isDragging = false;
+    const state = this.pointerAssignments.get(e.pointerId);
+    if (!state) {
+      return;
+    }
+    this.pointerAssignments.delete(e.pointerId);
     try {
       this.canvas.releasePointerCapture(e.pointerId);
     } catch (_) {
       // ignore
     }
+  }
+
+  pickPointerTarget() {
+    const hasF1Pointer = Array.from(this.pointerAssignments.values()).some((entry) => entry.target === 'F1');
+    const hasF2Pointer = Array.from(this.pointerAssignments.values()).some((entry) => entry.target === 'F2');
+    if (!hasF1Pointer) {
+      return 'F1';
+    }
+    if (!hasF2Pointer) {
+      return 'F2';
+    }
+    return null;
+  }
+
+  pointerDeltaToComplex(dxCss, dyCss) {
+    const dpr = (typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1;
+    const dx = dxCss * dpr;
+    const dy = dyCss * dpr;
+    if (this.canvas.width === 0 || this.canvas.height === 0) {
+      return null;
+    }
+    const unitsPerPixelX = this.viewXSpan / this.canvas.width;
+    const unitsPerPixelY = this.viewYSpan / this.canvas.height;
+    if (!Number.isFinite(unitsPerPixelX) || !Number.isFinite(unitsPerPixelY)) {
+      return null;
+    }
+    return {
+      re: dx * unitsPerPixelX,
+      im: -dy * unitsPerPixelY,
+    };
+  }
+
+  projectComplexToCanvasNormalized(x, y) {
+    const spanX = this.viewXMax - this.viewXMin;
+    const spanY = this.viewYMax - this.viewYMin;
+    if (spanX === 0 || spanY === 0) {
+      return null;
+    }
+    const u = (x - this.viewXMin) / spanX;
+    const v = (y - this.viewYMin) / spanY;
+    if (!Number.isFinite(u) || !Number.isFinite(v)) {
+      return null;
+    }
+    return { u, v };
   }
 }

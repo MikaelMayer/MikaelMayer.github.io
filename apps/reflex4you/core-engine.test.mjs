@@ -7,9 +7,11 @@ import {
   VarX,
   VarY,
   Offset,
+  Offset2,
   Add,
   Compose,
   Const,
+  oo,
   buildFragmentSourceFromAST,
 } from './core-engine.mjs';
 
@@ -34,6 +36,16 @@ test('Compose nodes wrap inner functions correctly', () => {
   assert.equal(composed.f.left.kind, 'Var');
 });
 
+test('oo composes a function multiple times', () => {
+  const base = Add(VarZ(), Const(1, 0));
+  const repeated = oo(base, 3);
+  assert.equal(repeated.kind, 'Compose');
+  assert.equal(repeated.f.kind, 'Compose');
+  assert.equal(repeated.g, base);
+  assert.equal(repeated.f.f, base);
+  assert.equal(repeated.f.g, base);
+});
+
 test('fragment generator embeds node functions and top entry', () => {
   const ast = Add(Const(1, 0), Const(0, 1));
   const fragment = buildFragmentSourceFromAST(ast);
@@ -42,11 +54,18 @@ test('fragment generator embeds node functions and top entry', () => {
   assert.match(fragment, /return node\d+\(z\);/);
 });
 
+test('Offset2 nodes read from the secondary offset uniform', () => {
+  const ast = Offset2();
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /uniform vec2 u_offset2;/);
+  assert.match(fragment, /return u_offset2;/);
+});
+
 test('VarX and VarY nodes project components', () => {
   const ast = Add(VarX(), VarY());
   const fragment = buildFragmentSourceFromAST(ast);
   assert.match(fragment, /return vec2\(z\.x, 0\.0\);/);
-  assert.match(fragment, /return vec2\(0\.0, z\.y\);/);
+  assert.match(fragment, /return vec2\(z\.y, 0\.0\);/);
 });
 
 test('evaluateFormulaSource throws on invalid input', () => {
