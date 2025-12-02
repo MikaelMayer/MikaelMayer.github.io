@@ -11,6 +11,11 @@ import {
   Add,
   Compose,
   Const,
+  Pow,
+  Exp,
+  Sin,
+  Cos,
+  Ln,
   oo,
   buildFragmentSourceFromAST,
 } from './core-engine.mjs';
@@ -54,6 +59,13 @@ test('fragment generator embeds node functions and top entry', () => {
   assert.match(fragment, /return node\d+\(z\);/);
 });
 
+test('Pow nodes emit exponentiation by squaring and allow negatives', () => {
+  const ast = Pow(Const(1, 0), -3);
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /pow_step_0/);
+  assert.match(fragment, /c_inv/);
+});
+
 test('Offset2 nodes read from the secondary offset uniform', () => {
   const ast = Offset2();
   const fragment = buildFragmentSourceFromAST(ast);
@@ -81,4 +93,13 @@ test('constant nodes retain numeric payload', () => {
   assert.ok(approxEqual(ast.left.im, -2.5));
   assert.ok(approxEqual(ast.right.re, -0.5));
   assert.ok(approxEqual(ast.right.im, 2.5));
+});
+
+test('elementary functions emit the dedicated helpers', () => {
+  const ast = Exp(Sin(Cos(Ln(VarZ()))));
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /c_ln/);
+  assert.match(fragment, /c_cos/);
+  assert.match(fragment, /c_sin/);
+  assert.match(fragment, /c_exp/);
 });

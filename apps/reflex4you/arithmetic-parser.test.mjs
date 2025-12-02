@@ -34,6 +34,33 @@ test('parses primitives z, x, y, F1', () => {
   assert.equal(add.right.kind, 'Offset');
 });
 
+test('parses power operator with integer exponent', () => {
+  const result = parseFormulaInput('z ^ 3');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Pow');
+  assert.equal(result.value.exponent, 3);
+});
+
+test('parses negative exponents', () => {
+  const result = parseFormulaInput('z^-2');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Pow');
+  assert.equal(result.value.exponent, -2);
+});
+
+test('rejects non-integer exponents', () => {
+  const result = parseFormulaInput('z ^ 1.5');
+  assert.equal(result.ok, false);
+  assert.match(result.message, /exponent must be an integer/i);
+});
+
+test('parses exp/sin/cos/ln calls', () => {
+  const result = parseFormulaInput('exp(sin(cos(ln(z))))');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Exp');
+  assert.equal(result.value.value.kind, 'Sin');
+});
+
 test('parses F2 primitive', () => {
   const result = parseFormulaInput('F2 + 1');
   assert.equal(result.ok, true);

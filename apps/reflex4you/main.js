@@ -10,12 +10,19 @@ const errorDiv = document.getElementById('error');
 const f1Indicator = document.getElementById('f1-indicator');
 const f2Indicator = document.getElementById('f2-indicator');
 const fingerOverlay = document.getElementById('finger-overlay');
-const fingerDots = {
-  F1: document.querySelector('[data-finger-dot="F1"]'),
-  F2: document.querySelector('[data-finger-dot="F2"]'),
+const FINGER_IDS = ['F1', 'F2'];
+const fingerDots = FINGER_IDS.reduce((acc, id) => {
+  acc[id] = document.querySelector(`[data-finger-dot="${id}"]`);
+  return acc;
+}, {});
+const fingerIndicators = {
+  F1: f1Indicator,
+  F2: f2Indicator,
 };
-let lastSerializedF1 = null;
-let lastSerializedF2 = null;
+const fingerLastSerialized = {
+  F1: null,
+  F2: null,
+};
 
 const latestOffsets = {
   F1: { x: 0, y: 0 },
@@ -23,6 +30,16 @@ const latestOffsets = {
 };
 
 let activeFingerUsage = { F1: false, F2: false };
+
+function refreshFingerIndicator(finger) {
+  const indicator = fingerIndicators[finger];
+  if (!indicator) {
+    return;
+  }
+  const latest = latestOffsets[finger];
+  indicator.textContent = formatComplexForDisplay(finger, latest.x, latest.y);
+  indicator.style.display = activeFingerUsage[finger] ? '' : 'none';
+}
 
 const DEFAULT_FORMULA_TEXT = '(z - F1) * (z + F1)';
 
@@ -132,6 +149,27 @@ function parseComplexString(raw) {
   return null;
 }
 
+function attachFingerIndicatorPrompt(finger, getOffset, setOffset) {
+  const indicator = fingerIndicators[finger];
+  if (!indicator) {
+    return;
+  }
+  indicator.addEventListener('click', () => {
+    const currentOffset = getOffset();
+    const currentValue = formatComplexForQuery(currentOffset.x, currentOffset.y) || '0+0i';
+    const next = window.prompt(`Set ${finger} (formats: "a+bi" or "a,b")`, currentValue);
+    if (next === null) {
+      return;
+    }
+    const parsed = parseComplexString(next);
+    if (!parsed) {
+      alert(`Could not parse ${finger}. Use "a+bi" or "real,imag".`);
+      return;
+    }
+    setOffset(parsed.x, parsed.y);
+  });
+}
+
 function readFingerFromQuery(label) {
   const params = new URLSearchParams(window.location.search);
   const raw = params.get(label);
@@ -196,6 +234,12 @@ function detectFingerUsage(ast) {
       case 'Pow':
         visit(node.base);
         break;
+      case 'Exp':
+      case 'Sin':
+      case 'Cos':
+      case 'Ln':
+        visit(node.value);
+        break;
       case 'Sub':
       case 'Mul':
       case 'Op':
@@ -221,11 +265,8 @@ function applyFingerVisibility() {
   if (fingerOverlay) {
     fingerOverlay.style.display = hasAnyFinger ? 'block' : 'none';
   }
-  ['F1', 'F2'].forEach((finger) => {
-    const indicator = finger === 'F1' ? f1Indicator : f2Indicator;
-    if (indicator) {
-      indicator.style.display = activeFingerUsage[finger] ? '' : 'none';
-    }
+  FINGER_IDS.forEach((finger) => {
+    refreshFingerIndicator(finger);
     const dot = fingerDots[finger];
     if (dot && !activeFingerUsage[finger]) {
       dot.classList.remove('visible');
@@ -306,21 +347,11 @@ try {
 
 function handleFingerOffsetChange(finger, offset) {
   latestOffsets[finger] = { x: offset.x, y: offset.y };
-  const indicator = finger === 'F1' ? f1Indicator : f2Indicator;
-  if (indicator && activeFingerUsage[finger]) {
-    indicator.textContent = formatComplexForDisplay(finger, offset.x, offset.y);
-  }
+  refreshFingerIndicator(finger);
   const serialized = formatComplexForQuery(offset.x, offset.y);
-  if (finger === 'F1') {
-    if (serialized !== lastSerializedF1) {
-      lastSerializedF1 = serialized;
-      updateFingerQueryParam('F1', offset.x, offset.y);
-    }
-  } else if (finger === 'F2') {
-    if (serialized !== lastSerializedF2) {
-      lastSerializedF2 = serialized;
-      updateFingerQueryParam('F2', offset.x, offset.y);
-    }
+  if (serialized !== fingerLastSerialized[finger]) {
+    fingerLastSerialized[finger] = serialized;
+    updateFingerQueryParam(finger, offset.x, offset.y);
   }
   updateFingerDotPosition(finger);
 }
@@ -339,39 +370,8 @@ reflexCore.onOffsetChange(handleOffsetChange);
 reflexCore.onOffset2Change(handleOffset2Change);
 updateFingerUsageFromAST(initialAST);
 
-if (f1Indicator) {
-  f1Indicator.addEventListener('click', () => {
-    const currentOffset = reflexCore.getOffset();
-    const currentValue = formatComplexForQuery(currentOffset.x, currentOffset.y) || '0+0i';
-    const next = window.prompt('Set F1 (formats: "a+bi" or "a,b")', currentValue);
-    if (next === null) {
-      return;
-    }
-    const parsed = parseComplexString(next);
-    if (!parsed) {
-      alert('Could not parse F1. Use "a+bi" or "real,imag".');
-      return;
-    }
-    reflexCore.setOffset(parsed.x, parsed.y);
-  });
-}
-
-if (f2Indicator) {
-  f2Indicator.addEventListener('click', () => {
-    const currentOffset = reflexCore.getOffset2();
-    const currentValue = formatComplexForQuery(currentOffset.x, currentOffset.y) || '0+0i';
-    const next = window.prompt('Set F2 (formats: "a+bi" or "a,b")', currentValue);
-    if (next === null) {
-      return;
-    }
-    const parsed = parseComplexString(next);
-    if (!parsed) {
-      alert('Could not parse F2. Use "a+bi" or "real,imag".');
-      return;
-    }
-    reflexCore.setOffset2(parsed.x, parsed.y);
-  });
-}
+attachFingerIndicatorPrompt('F1', () => reflexCore.getOffset(), (x, y) => reflexCore.setOffset(x, y));
+attachFingerIndicatorPrompt('F2', () => reflexCore.getOffset2(), (x, y) => reflexCore.setOffset2(x, y));
 
 formulaTextarea.addEventListener('focus', () => {
   formulaTextarea.classList.add('expanded');
