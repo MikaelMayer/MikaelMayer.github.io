@@ -10,6 +10,7 @@ const errorDiv = document.getElementById('error');
 const f1Indicator = document.getElementById('f1-indicator');
 const f2Indicator = document.getElementById('f2-indicator');
 const fingerOverlay = document.getElementById('finger-overlay');
+const rootElement = typeof document !== 'undefined' ? document.documentElement : null;
 const FINGER_IDS = ['F1', 'F2'];
 const fingerDots = FINGER_IDS.reduce((acc, id) => {
   acc[id] = document.querySelector(`[data-finger-dot="${id}"]`);
@@ -31,6 +32,40 @@ const latestOffsets = {
 
 let activeFingerUsage = { F1: false, F2: false };
 
+function updateViewportInsets() {
+  if (typeof window === 'undefined' || !rootElement) {
+    return;
+  }
+  const viewport = window.visualViewport;
+  if (!viewport) {
+    rootElement.style.setProperty('--viewport-top-offset', '0px');
+    rootElement.style.setProperty('--viewport-bottom-offset', '0px');
+    return;
+  }
+  const topOffset = Math.max(viewport.offsetTop || 0, 0);
+  const bottomOffset = Math.max(
+    (window.innerHeight || viewport.height || 0) - viewport.height - (viewport.offsetTop || 0),
+    0,
+  );
+  rootElement.style.setProperty('--viewport-top-offset', `${topOffset}px`);
+  rootElement.style.setProperty('--viewport-bottom-offset', `${bottomOffset}px`);
+}
+
+function setupViewportInsetListeners() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  updateViewportInsets();
+  window.addEventListener('resize', updateViewportInsets);
+  window.addEventListener('orientationchange', updateViewportInsets);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', updateViewportInsets);
+    window.visualViewport.addEventListener('scroll', updateViewportInsets);
+  }
+}
+
+setupViewportInsetListeners();
+
 function refreshFingerIndicator(finger) {
   const indicator = fingerIndicators[finger];
   if (!indicator) {
@@ -38,7 +73,12 @@ function refreshFingerIndicator(finger) {
   }
   const latest = latestOffsets[finger];
   indicator.textContent = formatComplexForDisplay(finger, latest.x, latest.y);
-  indicator.style.display = activeFingerUsage[finger] ? '' : 'none';
+  indicator.style.display = '';
+  if (activeFingerUsage[finger]) {
+    indicator.removeAttribute('data-inactive');
+  } else {
+    indicator.setAttribute('data-inactive', 'true');
+  }
 }
 
 const DEFAULT_FORMULA_TEXT = '(z - F1) * (z + F1)';
