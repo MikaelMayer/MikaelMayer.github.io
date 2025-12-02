@@ -17,6 +17,7 @@ import {
   Cos,
   Ln,
   oo,
+  FingerOffset,
   LessThan,
   If,
   buildFragmentSourceFromAST,
@@ -68,11 +69,18 @@ test('Pow nodes emit exponentiation by squaring and allow negatives', () => {
   assert.match(fragment, /c_inv/);
 });
 
-test('Offset2 nodes read from the secondary offset uniform', () => {
+test('Offset2 nodes read from the fixed offset array', () => {
   const ast = Offset2();
   const fragment = buildFragmentSourceFromAST(ast);
-  assert.match(fragment, /uniform vec2 u_offset2;/);
-  assert.match(fragment, /return u_offset2;/);
+  assert.match(fragment, /uniform vec2 u_fixedOffsets\[3\]/);
+  assert.match(fragment, /return u_fixedOffsets\[1\];/);
+});
+
+test('dynamic fingers read from the dynamic offset array', () => {
+  const ast = FingerOffset('D1');
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /uniform vec2 u_dynamicOffsets\[3\]/);
+  assert.match(fragment, /return u_dynamicOffsets\[0\];/);
 });
 
 test('VarX and VarY nodes project components', () => {

@@ -90,8 +90,17 @@
       box-shadow: 0 0 0 1px #888;
     }
 
-    .finger-indicator {
+    #finger-indicator-stack {
       position: fixed;
+      top: calc(var(--safe-area-top) + var(--viewport-top-offset) + 12px);
+      left: 12px;
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 30;
+    }
+
+    .finger-indicator {
       padding: 6px 12px;
       border: 1px solid rgba(255, 255, 255, 0.4);
       border-radius: 6px;
@@ -101,8 +110,8 @@
       letter-spacing: 0.02em;
       cursor: pointer;
       user-select: none;
-      z-index: 30;
       transition: background 0.15s ease, border-color 0.15s ease;
+      text-align: left;
     }
 
     .finger-indicator:hover,
@@ -112,19 +121,12 @@
       outline: none;
     }
 
-    #f1-indicator {
-      top: calc(var(--safe-area-top) + var(--viewport-top-offset) + 12px);
-      left: 12px;
+    .finger-indicator--fixed {
+      border-color: rgba(114, 176, 255, 0.7);
     }
 
-    #f2-indicator {
-      top: calc(var(--safe-area-top) + var(--viewport-top-offset) + 56px);
-      left: 12px;
-    }
-
-    .finger-indicator[data-inactive="true"] {
-      opacity: 0.6;
-      border-style: dashed;
+    .finger-indicator--dynamic {
+      border-color: rgba(255, 179, 71, 0.7);
     }
 
     #finger-overlay {
@@ -156,26 +158,22 @@
       display: flex;
     }
 
-    .finger-dot[data-finger-dot="F1"] {
+    .finger-dot--fixed {
       border-color: rgba(114, 176, 255, 0.9);
       background: rgba(70, 130, 255, 0.3);
     }
 
-    .finger-dot[data-finger-dot="F2"] {
+    .finger-dot--dynamic {
       border-color: rgba(255, 179, 71, 0.9);
       background: rgba(255, 179, 71, 0.3);
     }
   </style>
 </head>
 <body>
-<button id="f1-indicator" class="finger-indicator" type="button" title="Click to edit F1">F1 = 0 + 0 i</button>
-<button id="f2-indicator" class="finger-indicator" type="button" title="Click to edit F2">F2 = 0 + 0 i</button>
+<div id="finger-indicator-stack" aria-live="polite"></div>
 <canvas id="glcanvas"></canvas>
 
-<div id="finger-overlay" aria-hidden="true">
-  <div class="finger-dot" data-finger-dot="F1">F1</div>
-  <div class="finger-dot" data-finger-dot="F2">F2</div>
-</div>
+<div id="finger-overlay" aria-hidden="true"></div>
 
 <div id="error"></div>
 

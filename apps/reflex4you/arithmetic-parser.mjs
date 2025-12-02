@@ -25,8 +25,6 @@ import {
   VarX,
   VarY,
   VarZ,
-  Offset,
-  Offset2,
   Pow,
   Exp,
   Sin,
@@ -34,6 +32,7 @@ import {
   Ln,
   oo,
   If,
+  FingerOffset,
 } from './core-engine.mjs';
 
 const IDENTIFIER_CHAR = /[A-Za-z0-9_]/;
@@ -112,12 +111,17 @@ const literalParser = Choice([
   numberLiteral,
 ], { ctor: 'Literal' });
 
+const FINGER_TOKENS = ['F1', 'F2', 'F3', 'D1', 'D2', 'D3'];
+
+const fingerLiteralParsers = FINGER_TOKENS.map((label) =>
+  keywordLiteral(label, { ctor: `Finger(${label})` }).Map((_, result) => withSpan(FingerOffset(label), result.span)),
+);
+
 const primitiveParser = Choice([
   keywordLiteral('x', { ctor: 'VarX' }).Map((_, result) => withSpan(VarX(), result.span)),
   keywordLiteral('y', { ctor: 'VarY' }).Map((_, result) => withSpan(VarY(), result.span)),
   keywordLiteral('z', { ctor: 'VarZ' }).Map((_, result) => withSpan(VarZ(), result.span)),
-  keywordLiteral('F1', { ctor: 'Offset' }).Map((_, result) => withSpan(Offset(), result.span)),
-  keywordLiteral('F2', { ctor: 'Offset2' }).Map((_, result) => withSpan(Offset2(), result.span)),
+  ...fingerLiteralParsers,
 ], { ctor: 'Primitive' });
 
 let expressionParser;
