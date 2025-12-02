@@ -17,6 +17,9 @@ import {
   Cos,
   Ln,
   oo,
+  FingerOffset,
+  LessThan,
+  If,
   buildFragmentSourceFromAST,
 } from './core-engine.mjs';
 
@@ -66,11 +69,18 @@ test('Pow nodes emit exponentiation by squaring and allow negatives', () => {
   assert.match(fragment, /c_inv/);
 });
 
-test('Offset2 nodes read from the secondary offset uniform', () => {
+test('Offset2 nodes read from the fixed offset array', () => {
   const ast = Offset2();
   const fragment = buildFragmentSourceFromAST(ast);
-  assert.match(fragment, /uniform vec2 u_offset2;/);
-  assert.match(fragment, /return u_offset2;/);
+  assert.match(fragment, /uniform vec2 u_fixedOffsets\[3\]/);
+  assert.match(fragment, /return u_fixedOffsets\[1\];/);
+});
+
+test('dynamic fingers read from the dynamic offset array', () => {
+  const ast = FingerOffset('D1');
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /uniform vec2 u_dynamicOffsets\[3\]/);
+  assert.match(fragment, /return u_dynamicOffsets\[0\];/);
 });
 
 test('VarX and VarY nodes project components', () => {
@@ -102,4 +112,18 @@ test('elementary functions emit the dedicated helpers', () => {
   assert.match(fragment, /c_cos/);
   assert.match(fragment, /c_sin/);
   assert.match(fragment, /c_exp/);
+});
+
+test('LessThan nodes compare real parts and emit boolean constants', () => {
+  const ast = LessThan(Const(1, 0), Const(0, 0));
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /a\.x < b\.x/);
+  assert.match(fragment, /vec2\(flag, 0\.0\)/);
+});
+
+test('If nodes mix branches based on non-zero condition', () => {
+  const ast = If(Const(1, 0), Const(2, 0), Const(3, 0));
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /vec2 cond =/);
+  assert.match(fragment, /mix\(elseValue, thenValue, selector\)/);
 });

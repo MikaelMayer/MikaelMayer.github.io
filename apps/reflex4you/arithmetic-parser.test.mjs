@@ -31,7 +31,8 @@ test('parses primitives z, x, y, F1', () => {
   const add = result.value;
   assert.equal(add.kind, 'Add');
   assert.equal(add.left.kind, 'Add');
-  assert.equal(add.right.kind, 'Offset');
+  assert.equal(add.right.kind, 'FingerOffset');
+  assert.equal(add.right.slot, 'F1');
 });
 
 test('parses power operator with integer exponent', () => {
@@ -64,7 +65,22 @@ test('parses exp/sin/cos/ln calls', () => {
 test('parses F2 primitive', () => {
   const result = parseFormulaInput('F2 + 1');
   assert.equal(result.ok, true);
-  assert.equal(result.value.left.kind, 'Offset2');
+  assert.equal(result.value.left.kind, 'FingerOffset');
+  assert.equal(result.value.left.slot, 'F2');
+});
+
+test('parses additional finger primitives', () => {
+  const result = parseFormulaInput('F3 + D2 + D3');
+  assert.equal(result.ok, true);
+  const add = result.value;
+  assert.equal(add.kind, 'Add');
+  assert.equal(add.left.kind, 'Add');
+  assert.equal(add.left.left.kind, 'FingerOffset');
+  assert.equal(add.left.left.slot, 'F3');
+  assert.equal(add.left.right.kind, 'FingerOffset');
+  assert.equal(add.left.right.slot, 'D2');
+  assert.equal(add.right.kind, 'FingerOffset');
+  assert.equal(add.right.slot, 'D3');
 });
 
 test('parses function composition forms', () => {
@@ -84,7 +100,8 @@ test('$$ postfix binds tighter than $', () => {
   const result = parseFormulaInput('z $$ 2 $ F1');
   assert.equal(result.ok, true);
   assert.equal(result.value.kind, 'Compose');
-  assert.equal(result.value.g.kind, 'Offset');
+  assert.equal(result.value.g.kind, 'FingerOffset');
+  assert.equal(result.value.g.slot, 'F1');
   assert.equal(result.value.f.kind, 'Compose');
 });
 
@@ -92,6 +109,25 @@ test('$$ requires positive integer counts', () => {
   const result = parseFormulaInput('z $$ 0');
   assert.equal(result.ok, false);
   assert.match(result.message, /positive integer/i);
+});
+
+test('parses less-than comparisons using real parts', () => {
+  const result = parseFormulaInput('(z $ F1) < 0');
+  assert.equal(result.ok, true);
+  const node = result.value;
+  assert.equal(node.kind, 'LessThan');
+  assert.equal(node.left.kind, 'Compose');
+  assert.equal(node.right.kind, 'Const');
+});
+
+test('parses if expressions with embedded comparisons', () => {
+  const result = parseFormulaInput('if(x < y, x + 1, y + 2)');
+  assert.equal(result.ok, true);
+  const node = result.value;
+  assert.equal(node.kind, 'If');
+  assert.equal(node.condition.kind, 'LessThan');
+  assert.equal(node.thenBranch.kind, 'Add');
+  assert.equal(node.elseBranch.kind, 'Add');
 });
 
 test('parseFormulaToAST throws on invalid formula', () => {

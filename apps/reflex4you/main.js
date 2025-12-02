@@ -7,30 +7,33 @@ import { parseFormulaInput } from './arithmetic-parser.mjs';
 const canvas = document.getElementById('glcanvas');
 const formulaTextarea = document.getElementById('formula');
 const errorDiv = document.getElementById('error');
-const f1Indicator = document.getElementById('f1-indicator');
-const f2Indicator = document.getElementById('f2-indicator');
+const fingerIndicatorStack = document.getElementById('finger-indicator-stack');
 const fingerOverlay = document.getElementById('finger-overlay');
 const rootElement = typeof document !== 'undefined' ? document.documentElement : null;
-const FINGER_IDS = ['F1', 'F2'];
-const fingerDots = FINGER_IDS.reduce((acc, id) => {
-  acc[id] = document.querySelector(`[data-finger-dot="${id}"]`);
+
+const FIXED_FINGER_ORDER = ['F1', 'F2', 'F3'];
+const DYNAMIC_FINGER_ORDER = ['D1', 'D2', 'D3'];
+const ALL_FINGER_LABELS = [...FIXED_FINGER_ORDER, ...DYNAMIC_FINGER_ORDER];
+
+const FINGER_METADATA = ALL_FINGER_LABELS.reduce((acc, label) => {
+  acc[label] = {
+    label,
+    type: label.startsWith('F') ? 'fixed' : 'dynamic',
+  };
   return acc;
 }, {});
-const fingerIndicators = {
-  F1: f1Indicator,
-  F2: f2Indicator,
-};
-const fingerLastSerialized = {
-  F1: null,
-  F2: null,
-};
 
-const latestOffsets = {
-  F1: { x: 0, y: 0 },
-  F2: { x: 0, y: 0 },
-};
+const fingerIndicators = new Map();
+const fingerDots = new Map();
+const fingerLastSerialized = {};
+const latestOffsets = {};
 
-let activeFingerUsage = { F1: false, F2: false };
+ALL_FINGER_LABELS.forEach((label) => {
+  fingerLastSerialized[label] = null;
+  latestOffsets[label] = { x: 0, y: 0 };
+});
+
+let activeFingerState = { mode: 'none', slots: [] };
 
 function updateViewportInsets() {
   if (typeof window === 'undefined' || !rootElement) {
@@ -66,19 +69,15 @@ function setupViewportInsetListeners() {
 
 setupViewportInsetListeners();
 
-function refreshFingerIndicator(finger) {
-  const indicator = fingerIndicators[finger];
+function refreshFingerIndicator(label) {
+  const indicator = fingerIndicators.get(label);
   if (!indicator) {
     return;
   }
-  const latest = latestOffsets[finger];
-  indicator.textContent = formatComplexForDisplay(finger, latest.x, latest.y);
-  indicator.style.display = '';
-  if (activeFingerUsage[finger]) {
-    indicator.removeAttribute('data-inactive');
-  } else {
-    indicator.setAttribute('data-inactive', 'true');
-  }
+  const latest = latestOffsets[label];
+  indicator.textContent = formatComplexForDisplay(label, latest.x, latest.y);
+  const isActive = activeFingerState.slots.includes(label);
+  indicator.style.display = isActive ? '' : 'none';
 }
 
 const DEFAULT_FORMULA_TEXT = '(z - F1) * (z + F1)';
@@ -189,25 +188,51 @@ function parseComplexString(raw) {
   return null;
 }
 
-function attachFingerIndicatorPrompt(finger, getOffset, setOffset) {
-  const indicator = fingerIndicators[finger];
-  if (!indicator) {
+function ensureFingerIndicator(label) {
+  if (fingerIndicators.has(label)) {
+    return fingerIndicators.get(label);
+  }
+  const meta = FINGER_METADATA[label];
+  const indicator = document.createElement('button');
+  indicator.type = 'button';
+  indicator.className = `finger-indicator finger-indicator--${meta.type}`;
+  indicator.dataset.finger = label;
+  indicator.title = `Click to edit ${label}`;
+  indicator.addEventListener('click', () => promptFingerValue(label));
+  fingerIndicators.set(label, indicator);
+  return indicator;
+}
+
+function ensureFingerDot(label) {
+  if (!fingerOverlay) {
+    return null;
+  }
+  if (fingerDots.has(label)) {
+    return fingerDots.get(label);
+  }
+  const meta = FINGER_METADATA[label];
+  const dot = document.createElement('div');
+  dot.className = `finger-dot finger-dot--${meta.type}`;
+  dot.dataset.fingerDot = label;
+  dot.textContent = label;
+  fingerOverlay.appendChild(dot);
+  fingerDots.set(label, dot);
+  return dot;
+}
+
+function promptFingerValue(label) {
+  const currentOffset = reflexCore?.getFingerValue(label) ?? { x: 0, y: 0 };
+  const currentValue = formatComplexForQuery(currentOffset.x, currentOffset.y) || '0+0i';
+  const next = window.prompt(`Set ${label} (formats: "a+bi" or "a,b")`, currentValue);
+  if (next === null) {
     return;
   }
-  indicator.addEventListener('click', () => {
-    const currentOffset = getOffset();
-    const currentValue = formatComplexForQuery(currentOffset.x, currentOffset.y) || '0+0i';
-    const next = window.prompt(`Set ${finger} (formats: "a+bi" or "a,b")`, currentValue);
-    if (next === null) {
-      return;
-    }
-    const parsed = parseComplexString(next);
-    if (!parsed) {
-      alert(`Could not parse ${finger}. Use "a+bi" or "real,imag".`);
-      return;
-    }
-    setOffset(parsed.x, parsed.y);
-  });
+  const parsed = parseComplexString(next);
+  if (!parsed) {
+    alert(`Could not parse ${label}. Use "a+bi" or "real,imag".`);
+    return;
+  }
+  reflexCore.setFingerValue(label, parsed.x, parsed.y);
 }
 
 function readFingerFromQuery(label) {
@@ -227,6 +252,24 @@ function updateFingerQueryParam(label, re, im) {
   const newQuery = params.toString();
   const newUrl = `${window.location.pathname}${newQuery ? `?${newQuery}` : ''}`;
   window.history.replaceState({}, '', newUrl);
+}
+
+function clearFingerQueryParam(label) {
+  fingerLastSerialized[label] = null;
+  updateFingerQueryParam(label, Number.NaN, Number.NaN);
+}
+
+function handleFingerValueChange(label, offset) {
+  latestOffsets[label] = { x: offset.x, y: offset.y };
+  refreshFingerIndicator(label);
+  updateFingerDotPosition(label);
+  if (activeFingerState.slots.includes(label)) {
+    const serialized = formatComplexForQuery(offset.x, offset.y);
+    if (serialized !== fingerLastSerialized[label]) {
+      fingerLastSerialized[label] = serialized;
+      updateFingerQueryParam(label, offset.x, offset.y);
+    }
+  }
 }
 
 function showError(msg) {
@@ -256,81 +299,142 @@ function showParseError(source, failure) {
 }
 
 function detectFingerUsage(ast) {
+  const usage = {
+    fixed: new Set(),
+    dynamic: new Set(),
+  };
   if (!ast) {
-    return { F1: false, F2: false };
+    return usage;
   }
-  const usage = { F1: false, F2: false };
-  const visit = (node) => {
-    if (!node || (usage.F1 && usage.F2)) {
-      return;
+  const stack = [ast];
+  while (stack.length) {
+    const node = stack.pop();
+    if (!node) {
+      continue;
+    }
+    if (node.kind === 'FingerOffset') {
+      const slot = node.slot;
+      if (FINGER_METADATA[slot]) {
+        const bucket = FINGER_METADATA[slot].type === 'fixed' ? usage.fixed : usage.dynamic;
+        bucket.add(slot);
+      }
+      continue;
     }
     switch (node.kind) {
-      case 'Offset':
-        usage.F1 = true;
-        break;
-      case 'Offset2':
-        usage.F2 = true;
-        break;
       case 'Pow':
-        visit(node.base);
+        stack.push(node.base);
         break;
       case 'Exp':
       case 'Sin':
       case 'Cos':
       case 'Ln':
-        visit(node.value);
+        stack.push(node.value);
         break;
       case 'Sub':
       case 'Mul':
       case 'Op':
       case 'Add':
       case 'Div':
-        visit(node.left);
-        visit(node.right);
+      case 'LessThan':
+        stack.push(node.left, node.right);
         break;
       case 'Compose':
-        visit(node.f);
-        visit(node.g);
+        stack.push(node.f, node.g);
+        break;
+      case 'If':
+        stack.push(node.condition, node.thenBranch, node.elseBranch);
         break;
       default:
         break;
     }
-  };
-  visit(ast);
+  }
   return usage;
 }
 
-function applyFingerVisibility() {
-  const hasAnyFinger = activeFingerUsage.F1 || activeFingerUsage.F2;
-  if (fingerOverlay) {
-    fingerOverlay.style.display = hasAnyFinger ? 'block' : 'none';
+function deriveFingerState(usage) {
+  const fixedSlots = FIXED_FINGER_ORDER.filter((label) => usage.fixed.has(label));
+  const dynamicSlots = DYNAMIC_FINGER_ORDER.filter((label) => usage.dynamic.has(label));
+  if (fixedSlots.length && dynamicSlots.length) {
+    return {
+      mode: 'invalid',
+      slots: [],
+      error: 'Formulas cannot mix F fingers (F1..F3) with D fingers (D1..D3).',
+    };
   }
-  FINGER_IDS.forEach((finger) => {
-    refreshFingerIndicator(finger);
-    const dot = fingerDots[finger];
-    if (dot && !activeFingerUsage[finger]) {
-      dot.classList.remove('visible');
+  if (fixedSlots.length) {
+    return { mode: 'fixed', slots: fixedSlots };
+  }
+  if (dynamicSlots.length) {
+    return { mode: 'dynamic', slots: dynamicSlots };
+  }
+  return { mode: 'none', slots: [] };
+}
+
+function syncFingerUI() {
+  const activeLabels = activeFingerState.slots;
+  if (fingerIndicatorStack) {
+    fingerIndicatorStack.style.display = activeLabels.length ? '' : 'none';
+  }
+  if (fingerOverlay) {
+    fingerOverlay.style.display = activeLabels.length ? 'block' : 'none';
+  }
+  for (const [label, indicator] of fingerIndicators.entries()) {
+    if (!activeLabels.includes(label)) {
+      indicator.remove();
+      fingerIndicators.delete(label);
+    }
+  }
+  for (const [label, dot] of fingerDots.entries()) {
+    if (!activeLabels.includes(label)) {
+      dot.remove();
+      fingerDots.delete(label);
+    }
+  }
+  activeLabels.forEach((label) => {
+    const indicator = ensureFingerIndicator(label);
+    if (fingerIndicatorStack) {
+      fingerIndicatorStack.appendChild(indicator);
+    }
+    ensureFingerDot(label);
+  });
+}
+
+function applyFingerState(state) {
+  activeFingerState = state;
+  reflexCore?.setActiveFingerMode(state);
+  syncFingerUI();
+  state.slots.forEach((label) => {
+    refreshFingerIndicator(label);
+    updateFingerDotPosition(label);
+  });
+  ALL_FINGER_LABELS.forEach((label) => {
+    if (!state.slots.includes(label)) {
+      clearFingerQueryParam(label);
+      const dot = fingerDots.get(label);
+      if (dot) {
+        dot.classList.remove('visible');
+      }
+    }
+  });
+  state.slots.forEach((label) => {
+    const latest = latestOffsets[label];
+    const serialized = formatComplexForQuery(latest.x, latest.y);
+    if (serialized !== fingerLastSerialized[label]) {
+      fingerLastSerialized[label] = serialized;
+      updateFingerQueryParam(label, latest.x, latest.y);
     }
   });
 }
 
-function updateFingerUsageFromAST(ast) {
-  activeFingerUsage = detectFingerUsage(ast);
-  applyFingerVisibility();
-  updateFingerDotPosition('F1');
-  updateFingerDotPosition('F2');
-}
-
-function updateFingerDotPosition(finger) {
-  const dot = fingerDots[finger];
-  if (!dot) {
+function updateFingerDotPosition(label) {
+  const dot = fingerDots.get(label);
+  if (!dot || !reflexCore || !activeFingerState.slots.includes(label)) {
+    if (dot) {
+      dot.classList.remove('visible');
+    }
     return;
   }
-  if (!reflexCore || !activeFingerUsage[finger]) {
-    dot.classList.remove('visible');
-    return;
-  }
-  const latest = latestOffsets[finger];
+  const latest = latestOffsets[label];
   const projection = reflexCore.projectComplexToCanvasNormalized(latest.x, latest.y);
   if (
     !projection ||
@@ -357,9 +461,6 @@ if (!initialFormulaSource || !initialFormulaSource.trim()) {
   initialFormulaSource = DEFAULT_FORMULA_TEXT;
 }
 
-const initialF1FromQuery = readFingerFromQuery('F1');
-const initialF2FromQuery = readFingerFromQuery('F2');
-
 const initialParse = parseFormulaInput(initialFormulaSource);
 let initialAST;
 
@@ -372,8 +473,11 @@ if (initialParse.ok) {
   showParseError(initialFormulaSource, initialParse);
 }
 
-activeFingerUsage = detectFingerUsage(initialAST);
-applyFingerVisibility();
+const initialUsage = detectFingerUsage(initialAST);
+const initialFingerState = deriveFingerState(initialUsage);
+if (initialFingerState.mode === 'invalid') {
+  showError(initialFingerState.error);
+}
 
 formulaTextarea.value = initialFormulaSource;
 
@@ -385,33 +489,22 @@ try {
   throw err;
 }
 
-function handleFingerOffsetChange(finger, offset) {
-  latestOffsets[finger] = { x: offset.x, y: offset.y };
-  refreshFingerIndicator(finger);
-  const serialized = formatComplexForQuery(offset.x, offset.y);
-  if (serialized !== fingerLastSerialized[finger]) {
-    fingerLastSerialized[finger] = serialized;
-    updateFingerQueryParam(finger, offset.x, offset.y);
+ALL_FINGER_LABELS.forEach((label) => {
+  reflexCore.onFingerChange(label, (offset) => handleFingerValueChange(label, offset));
+});
+
+ALL_FINGER_LABELS.forEach((label) => {
+  const parsed = readFingerFromQuery(label);
+  if (parsed) {
+    reflexCore.setFingerValue(label, parsed.x, parsed.y);
   }
-  updateFingerDotPosition(finger);
+});
+
+if (initialFingerState.mode !== 'invalid') {
+  applyFingerState(initialFingerState);
+} else {
+  applyFingerState({ mode: 'none', slots: [] });
 }
-
-const handleOffsetChange = (offset) => handleFingerOffsetChange('F1', offset);
-const handleOffset2Change = (offset) => handleFingerOffsetChange('F2', offset);
-
-if (initialF1FromQuery) {
-  reflexCore.setOffset(initialF1FromQuery.x, initialF1FromQuery.y);
-}
-if (initialF2FromQuery) {
-  reflexCore.setOffset2(initialF2FromQuery.x, initialF2FromQuery.y);
-}
-
-reflexCore.onOffsetChange(handleOffsetChange);
-reflexCore.onOffset2Change(handleOffset2Change);
-updateFingerUsageFromAST(initialAST);
-
-attachFingerIndicatorPrompt('F1', () => reflexCore.getOffset(), (x, y) => reflexCore.setOffset(x, y));
-attachFingerIndicatorPrompt('F2', () => reflexCore.getOffset2(), (x, y) => reflexCore.setOffset2(x, y));
 
 formulaTextarea.addEventListener('focus', () => {
   formulaTextarea.classList.add('expanded');
@@ -431,9 +524,15 @@ function applyFormulaFromTextarea({ updateQuery = true } = {}) {
     showParseError(source, result);
     return;
   }
+  const usage = detectFingerUsage(result.value);
+  const nextState = deriveFingerState(usage);
+  if (nextState.mode === 'invalid') {
+    showError(nextState.error);
+    return;
+  }
   clearError();
   reflexCore.setFormulaAST(result.value);
-  updateFingerUsageFromAST(result.value);
+  applyFingerState(nextState);
   if (updateQuery) {
     updateFormulaQueryParam(source);
   }
@@ -448,6 +547,5 @@ canvas.addEventListener('pointermove', (e) => reflexCore.handlePointerMove(e));
 });
 
 window.addEventListener('resize', () => {
-  updateFingerDotPosition('F1');
-  updateFingerDotPosition('F2');
+  activeFingerState.slots.forEach((label) => updateFingerDotPosition(label));
 });

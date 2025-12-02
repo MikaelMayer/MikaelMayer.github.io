@@ -23,12 +23,27 @@ export function Pow(base, exponent) {
   return { kind: "Pow", base, exponent };
 }
 
+const FIXED_FINGER_LABELS = Object.freeze(["F1", "F2", "F3"]);
+const DYNAMIC_FINGER_LABELS = Object.freeze(["D1", "D2", "D3"]);
+const ALL_FINGER_LABELS = Object.freeze([...FIXED_FINGER_LABELS, ...DYNAMIC_FINGER_LABELS]);
+
+function validateFingerLabel(slot) {
+  if (!ALL_FINGER_LABELS.includes(slot)) {
+    throw new Error(`Unknown finger slot: ${slot}`);
+  }
+  return slot;
+}
+
+export function FingerOffset(slot) {
+  return { kind: "FingerOffset", slot: validateFingerLabel(slot) };
+}
+
 export function Offset() {
-  return { kind: "Offset" };
+  return FingerOffset("F1");
 }
 
 export function Offset2() {
-  return { kind: "Offset2" };
+  return FingerOffset("F2");
 }
 
 export function Sub(left, right) {
@@ -49,6 +64,14 @@ export function Add(left, right) {
 
 export function Div(left, right) {
   return { kind: "Div", left, right };
+}
+
+export function LessThan(left, right) {
+  return { kind: "LessThan", left, right };
+}
+
+export function If(condition, thenBranch, elseBranch) {
+  return { kind: "If", condition, thenBranch, elseBranch };
 }
 
 export function Const(re, im) {
@@ -87,6 +110,14 @@ export function oo(f, n) {
   return node;
 }
 
+function fingerIndexFromLabel(label) {
+  return Number(label.slice(1)) - 1;
+}
+
+function isFixedFinger(label) {
+  return label[0] === "F";
+}
+
 export const defaultFormulaSource = 'Mul(Sub(VarZ(), Offset()), Op(VarZ(), Offset(), "add"))';
 
 const formulaGlobals = Object.freeze({
@@ -96,11 +127,14 @@ const formulaGlobals = Object.freeze({
   Pow,
   Offset,
   Offset2,
+  FingerOffset,
   Sub,
   Mul,
   Op,
   Add,
   Div,
+  LessThan,
+  If,
   Const,
   Compose,
   Exp,
@@ -135,8 +169,7 @@ function assignNodeIds(ast) {
     case "Var":
     case "VarX":
     case "VarY":
-    case "Offset":
-    case "Offset2":
+    case "FingerOffset":
     case "Const":
       return;
     case "Pow":
@@ -153,8 +186,14 @@ function assignNodeIds(ast) {
     case "Op":
     case "Add":
     case "Div":
+    case "LessThan":
       assignNodeIds(ast.left);
       assignNodeIds(ast.right);
+      return;
+    case "If":
+      assignNodeIds(ast.condition);
+      assignNodeIds(ast.thenBranch);
+      assignNodeIds(ast.elseBranch);
       return;
     case "Compose":
       assignNodeIds(ast.f);
@@ -181,8 +220,14 @@ function collectNodesPostOrder(ast, out) {
     case "Op":
     case "Add":
     case "Div":
+    case "LessThan":
       collectNodesPostOrder(ast.left, out);
       collectNodesPostOrder(ast.right, out);
+      break;
+    case "If":
+      collectNodesPostOrder(ast.condition, out);
+      collectNodesPostOrder(ast.thenBranch, out);
+      collectNodesPostOrder(ast.elseBranch, out);
       break;
     case "Compose":
       collectNodesPostOrder(ast.f, out);
@@ -191,8 +236,7 @@ function collectNodesPostOrder(ast, out) {
     case "Var":
     case "VarX":
     case "VarY":
-    case "Offset":
-    case "Offset2":
+    case "FingerOffset":
     case "Const":
       break;
     default:
@@ -252,17 +296,16 @@ vec2 ${name}(vec2 z) {
 }`.trim();
   }
 
-  if (ast.kind === "Offset") {
+  if (ast.kind === "FingerOffset") {
+    const slot = ast.slot;
+    const index = Number(slot.slice(1)) - 1;
+    const uniform =
+      slot[0] === "F"
+        ? `u_fixedOffsets[${index}]`
+        : `u_dynamicOffsets[${index}]`;
     return `
 vec2 ${name}(vec2 z) {
-    return u_offset;
-}`.trim();
-  }
-
-  if (ast.kind === "Offset2") {
-    return `
-vec2 ${name}(vec2 z) {
-    return u_offset2;
+    return ${uniform};
 }`.trim();
   }
 
@@ -347,6 +390,18 @@ vec2 ${name}(vec2 z) {
 }`.trim();
   }
 
+  if (ast.kind === "LessThan") {
+    const leftName = functionName(ast.left);
+    const rightName = functionName(ast.right);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 a = ${leftName}(z);
+    vec2 b = ${rightName}(z);
+    float flag = a.x < b.x ? 1.0 : 0.0;
+    return vec2(flag, 0.0);
+}`.trim();
+  }
+
   if (ast.kind === "Exp") {
     const valueName = functionName(ast.value);
     return `
@@ -380,6 +435,20 @@ vec2 ${name}(vec2 z) {
 vec2 ${name}(vec2 z) {
     vec2 v = ${valueName}(z);
     return c_ln(v);
+}`.trim();
+  }
+
+  if (ast.kind === "If") {
+    const condName = functionName(ast.condition);
+    const thenName = functionName(ast.thenBranch);
+    const elseName = functionName(ast.elseBranch);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 cond = ${condName}(z);
+    vec2 thenValue = ${thenName}(z);
+    vec2 elseValue = ${elseName}(z);
+    float selector = (cond.x != 0.0 || cond.y != 0.0) ? 1.0 : 0.0;
+    return mix(elseValue, thenValue, selector);
 }`.trim();
   }
 
@@ -452,8 +521,8 @@ precision highp float;
 uniform vec2 u_min;
 uniform vec2 u_max;
 uniform vec2 u_resolution;
-uniform vec2 u_offset;
-uniform vec2 u_offset2;
+uniform vec2 u_fixedOffsets[3];
+uniform vec2 u_dynamicOffsets[3];
 
 out vec4 outColor;
 
@@ -623,8 +692,8 @@ export class ReflexCore {
     this.uMinLoc = null;
     this.uMaxLoc = null;
     this.uResolutionLoc = null;
-    this.uOffsetLoc = null;
-    this.uOffset2Loc = null;
+    this.uFixedOffsetsLoc = null;
+    this.uDynamicOffsetsLoc = null;
 
     this.baseHalfSpan = 4.0;
     this.viewXSpan = 8.0;
@@ -634,11 +703,24 @@ export class ReflexCore {
     this.viewYMin = -4.0;
     this.viewYMax = 4.0;
 
-    this.offset = { x: 0.0, y: 0.0 };
-    this.offset2 = { x: 0.0, y: 0.0 };
-    this.offsetChangeListeners = [];
-    this.offset2ChangeListeners = [];
+    this.fingerValues = new Map();
+    ALL_FINGER_LABELS.forEach((label) => {
+      this.fingerValues.set(label, { x: 0.0, y: 0.0 });
+    });
+
+    this.fingerListeners = new Map();
+    ALL_FINGER_LABELS.forEach((label) => {
+      this.fingerListeners.set(label, new Set());
+    });
+
+    this.fixedOffsetsBuffer = new Float32Array(FIXED_FINGER_LABELS.length * 2);
+    this.dynamicOffsetsBuffer = new Float32Array(DYNAMIC_FINGER_LABELS.length * 2);
+    this.fixedOffsetsDirty = true;
+    this.dynamicOffsetsDirty = true;
+
     this.pointerAssignments = new Map();
+    this.activeFingerMode = 'none';
+    this.activeFingerSlots = [];
 
     this.formulaAST = initialAST;
 
@@ -660,94 +742,124 @@ export class ReflexCore {
     return this.formulaAST;
   }
 
+  setActiveFingerMode({ mode = 'none', slots = [] } = {}) {
+    const normalizedMode = mode === 'fixed' || mode === 'dynamic' ? mode : 'none';
+    const ordering =
+      normalizedMode === 'fixed'
+        ? FIXED_FINGER_LABELS
+        : normalizedMode === 'dynamic'
+          ? DYNAMIC_FINGER_LABELS
+          : [];
+    const normalizedSlots =
+      normalizedMode === 'none'
+        ? []
+        : ordering.filter((label) => slots.includes(label));
+
+    this.activeFingerMode = normalizedMode;
+    this.activeFingerSlots = normalizedSlots;
+    this.releaseAllPointerAssignments();
+  }
+
+  releaseAllPointerAssignments() {
+    if (!this.pointerAssignments.size) {
+      return;
+    }
+    for (const state of this.pointerAssignments.values()) {
+      try {
+        this.canvas.releasePointerCapture(state.pointerId);
+      } catch (_) {
+        // ignore
+      }
+    }
+    this.pointerAssignments.clear();
+  }
+
+  getFingerValue(label) {
+    const slot = validateFingerLabel(label);
+    const value = this.fingerValues.get(slot) || { x: 0, y: 0 };
+    return { x: value.x, y: value.y };
+  }
+
+  setFingerValue(label, x, y, { triggerRender = true } = {}) {
+    const slot = validateFingerLabel(label);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return;
+    }
+    const current = this.fingerValues.get(slot);
+    if (current && current.x === x && current.y === y) {
+      return;
+    }
+    this.fingerValues.set(slot, { x, y });
+    const index = fingerIndexFromLabel(slot);
+    if (isFixedFinger(slot)) {
+      this.fixedOffsetsBuffer[index * 2] = x;
+      this.fixedOffsetsBuffer[index * 2 + 1] = y;
+      this.fixedOffsetsDirty = true;
+    } else {
+      this.dynamicOffsetsBuffer[index * 2] = x;
+      this.dynamicOffsetsBuffer[index * 2 + 1] = y;
+      this.dynamicOffsetsDirty = true;
+    }
+    this.notifyFingerChange(slot);
+    if (triggerRender) {
+      this.render();
+    }
+  }
+
+  onFingerChange(label, listener) {
+    if (typeof listener !== 'function') {
+      return () => {};
+    }
+    const slot = validateFingerLabel(label);
+    const bucket = this.fingerListeners.get(slot);
+    bucket.add(listener);
+    try {
+      listener(this.getFingerValue(slot));
+    } catch (err) {
+      console.error('ReflexCore finger listener threw', err);
+    }
+    return () => {
+      bucket.delete(listener);
+    };
+  }
+
+  notifyFingerChange(label) {
+    const bucket = this.fingerListeners.get(label);
+    if (!bucket || !bucket.size) {
+      return;
+    }
+    const snapshot = this.getFingerValue(label);
+    bucket.forEach((listener) => {
+      try {
+        listener(snapshot);
+      } catch (err) {
+        console.error('ReflexCore finger listener threw', err);
+      }
+    });
+  }
+
   getOffset() {
-    return { x: this.offset.x, y: this.offset.y };
+    return this.getFingerValue('F1');
   }
 
   getOffset2() {
-    return { x: this.offset2.x, y: this.offset2.y };
+    return this.getFingerValue('F2');
+  }
+
+  setOffset(x, y, options) {
+    this.setFingerValue('F1', x, y, options);
+  }
+
+  setOffset2(x, y, options) {
+    this.setFingerValue('F2', x, y, options);
   }
 
   onOffsetChange(listener) {
-    if (typeof listener !== 'function') {
-      return;
-    }
-    this.offsetChangeListeners.push(listener);
-    try {
-      listener(this.getOffset());
-    } catch (err) {
-      console.error('ReflexCore offset listener threw', err);
-    }
+    return this.onFingerChange('F1', listener);
   }
 
   onOffset2Change(listener) {
-    if (typeof listener !== 'function') {
-      return;
-    }
-    this.offset2ChangeListeners.push(listener);
-    try {
-      listener(this.getOffset2());
-    } catch (err) {
-      console.error('ReflexCore offset2 listener threw', err);
-    }
-  }
-
-  notifyOffsetChange() {
-    if (!this.offsetChangeListeners.length) {
-      return;
-    }
-    const snapshot = this.getOffset();
-    this.offsetChangeListeners.forEach((listener) => {
-      try {
-        listener(snapshot);
-      } catch (err) {
-        console.error('ReflexCore offset listener threw', err);
-      }
-    });
-  }
-
-  notifyOffset2Change() {
-    if (!this.offset2ChangeListeners.length) {
-      return;
-    }
-    const snapshot = this.getOffset2();
-    this.offset2ChangeListeners.forEach((listener) => {
-      try {
-        listener(snapshot);
-      } catch (err) {
-        console.error('ReflexCore offset2 listener threw', err);
-      }
-    });
-  }
-
-  setOffset(x, y, { triggerRender = true } = {}) {
-    if (!Number.isFinite(x) || !Number.isFinite(y)) {
-      return;
-    }
-    if (x === this.offset.x && y === this.offset.y) {
-      return;
-    }
-    this.offset.x = x;
-    this.offset.y = y;
-    if (triggerRender) {
-      this.render();
-    }
-    this.notifyOffsetChange();
-  }
-
-  setOffset2(x, y, { triggerRender = true } = {}) {
-    if (!Number.isFinite(x) || !Number.isFinite(y)) {
-      return;
-    }
-    if (x === this.offset2.x && y === this.offset2.y) {
-      return;
-    }
-    this.offset2.x = x;
-    this.offset2.y = y;
-    if (triggerRender) {
-      this.render();
-    }
-    this.notifyOffset2Change();
+    return this.onFingerChange('F2', listener);
   }
 
   createShader(type, source) {
@@ -792,8 +904,10 @@ export class ReflexCore {
     this.uMinLoc = this.gl.getUniformLocation(this.program, 'u_min');
     this.uMaxLoc = this.gl.getUniformLocation(this.program, 'u_max');
     this.uResolutionLoc = this.gl.getUniformLocation(this.program, 'u_resolution');
-    this.uOffsetLoc = this.gl.getUniformLocation(this.program, 'u_offset');
-    this.uOffset2Loc = this.gl.getUniformLocation(this.program, 'u_offset2');
+    this.uFixedOffsetsLoc = this.gl.getUniformLocation(this.program, 'u_fixedOffsets[0]');
+    this.uDynamicOffsetsLoc = this.gl.getUniformLocation(this.program, 'u_dynamicOffsets[0]');
+    this.fixedOffsetsDirty = true;
+    this.dynamicOffsetsDirty = true;
   }
 
   resizeCanvasToDisplaySize() {
@@ -832,17 +946,24 @@ export class ReflexCore {
     this.gl.uniform2f(this.uMaxLoc, this.viewXMax, this.viewYMax);
   }
 
+  uploadFingerUniforms() {
+    if (this.uFixedOffsetsLoc && this.fixedOffsetsDirty) {
+      this.gl.uniform2fv(this.uFixedOffsetsLoc, this.fixedOffsetsBuffer);
+      this.fixedOffsetsDirty = false;
+    }
+    if (this.uDynamicOffsetsLoc && this.dynamicOffsetsDirty) {
+      this.gl.uniform2fv(this.uDynamicOffsetsLoc, this.dynamicOffsetsBuffer);
+      this.dynamicOffsetsDirty = false;
+    }
+  }
+
   render() {
     if (!this.program) return;
     this.resizeCanvasToDisplaySize();
+    this.gl.useProgram(this.program);
+    this.uploadFingerUniforms();
     this.gl.uniform2f(this.uResolutionLoc, this.canvas.width, this.canvas.height);
     this.updateView();
-    if (this.uOffsetLoc) {
-      this.gl.uniform2f(this.uOffsetLoc, this.offset.x, this.offset.y);
-    }
-    if (this.uOffset2Loc) {
-      this.gl.uniform2f(this.uOffset2Loc, this.offset2.x, this.offset2.y);
-    }
 
     this.gl.clearColor(0, 0, 0, 1);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
@@ -850,8 +971,11 @@ export class ReflexCore {
   }
 
   handlePointerDown(e) {
-    const target = this.pickPointerTarget();
-    if (!target) {
+    if (this.activeFingerMode === 'none' || !this.activeFingerSlots.length) {
+      return;
+    }
+    const slot = this.pickPointerTarget(e);
+    if (!slot) {
       return;
     }
     try {
@@ -859,10 +983,10 @@ export class ReflexCore {
     } catch (_) {
       // ignore
     }
-    const origin = target === 'F1' ? this.getOffset() : this.getOffset2();
+    const origin = this.getFingerValue(slot);
     this.pointerAssignments.set(e.pointerId, {
       pointerId: e.pointerId,
-      target,
+      slot,
       startClientX: e.clientX,
       startClientY: e.clientY,
       originX: origin.x,
@@ -881,11 +1005,7 @@ export class ReflexCore {
     }
     const nextRe = state.originX + delta.re;
     const nextIm = state.originY + delta.im;
-    if (state.target === 'F1') {
-      this.setOffset(nextRe, nextIm);
-    } else if (state.target === 'F2') {
-      this.setOffset2(nextRe, nextIm);
-    }
+    this.setFingerValue(state.slot, nextRe, nextIm);
   }
 
   handlePointerEnd(e) {
@@ -901,16 +1021,69 @@ export class ReflexCore {
     }
   }
 
-  pickPointerTarget() {
-    const hasF1Pointer = Array.from(this.pointerAssignments.values()).some((entry) => entry.target === 'F1');
-    const hasF2Pointer = Array.from(this.pointerAssignments.values()).some((entry) => entry.target === 'F2');
-    if (!hasF1Pointer) {
-      return 'F1';
+  pickPointerTarget(event) {
+    if (this.activeFingerMode === 'fixed') {
+      for (const slot of this.activeFingerSlots) {
+        if (!this.isSlotAssigned(slot)) {
+          return slot;
+        }
+      }
+      return null;
     }
-    if (!hasF2Pointer) {
-      return 'F2';
+    if (this.activeFingerMode === 'dynamic') {
+      const available = this.activeFingerSlots.filter((slot) => !this.isSlotAssigned(slot));
+      if (!available.length) {
+        return null;
+      }
+      const pointerPoint = this.clientPointToComplex(event.clientX, event.clientY);
+      if (!pointerPoint) {
+        return available[0];
+      }
+      let bestSlot = available[0];
+      let bestDistance = Infinity;
+      available.forEach((slot) => {
+        const value = this.getFingerValue(slot);
+        const dx = value.x - pointerPoint.x;
+        const dy = value.y - pointerPoint.y;
+        const dist = dx * dx + dy * dy;
+        if (dist < bestDistance) {
+          bestDistance = dist;
+          bestSlot = slot;
+        }
+      });
+      return bestSlot;
     }
     return null;
+  }
+
+  isSlotAssigned(label) {
+    for (const state of this.pointerAssignments.values()) {
+      if (state.slot === label) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  clientPointToComplex(clientX, clientY) {
+    const rect = this.canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      return null;
+    }
+    const u = (clientX - rect.left) / rect.width;
+    const vFromTop = (clientY - rect.top) / rect.height;
+    if (!Number.isFinite(u) || !Number.isFinite(vFromTop)) {
+      return null;
+    }
+    const spanX = this.viewXMax - this.viewXMin;
+    const spanY = this.viewYMax - this.viewYMin;
+    const x = this.viewXMin + u * spanX;
+    const v = 1 - vFromTop;
+    const y = this.viewYMin + v * spanY;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return null;
+    }
+    return { x, y };
   }
 
   pointerDeltaToComplex(dxCss, dyCss) {
