@@ -15,8 +15,10 @@
 - Formatting/export targets (OpenOffice, LaTeX) and symbolic simplification pathways provided by the original parser.
 - Advanced window management features (real-mode rendering, window shifting, PNG/BMP metadata blocks).
 
-## Next Steps
-- Inventory the legacy `functions.h` / `lexeur` feature set to produce a complete parity checklist.
-- Prioritize math primitives that unblock real-world formulas (e.g., random sources, additional trig/hyperbolic ops).
-- Decide how much of the autoscale/simplification pipeline should run in-browser versus as an offline pre-pass.
-- Extend the grammar and shader generator incrementally, adding unit tests per new AST node for confidence.
+## Formula Gaps (to match RenderReflex.cpp)
+- Summation constructs (e.g., `sum(i=a..b, f(i))`) that expand into repeated additions.
+- Product constructs (e.g., `prod(i=a..b, f(i))`) for multiplicative loops.
+- Explicit repeat/iteration macros beyond `oo`/`$$`, such as `repeat(expr, count)` used in macros.
+- Let-style assignments or macro parameters that bind a name once (`let x = ... in ...`).
+- Conditional forms (`if`, `case`) that guard expressions without branching in shader code.
+- Function library entries from `functions.h` (e.g., `tan`, `sinh`, `asin`, `atan2`, `abs`, `max`, `min`) that appear in legacy formulas.
