@@ -26,6 +26,11 @@ import {
   VarZ,
   Offset,
   Offset2,
+  Pow,
+  Exp,
+  Sin,
+  Cos,
+  Ln,
   oo,
 } from './core-engine.mjs';
 
@@ -175,9 +180,29 @@ const explicitRepeatComposeParser = createParser('ExplicitRepeatCompose', (input
   });
 });
 
+function createUnaryFunctionParser(name, factory) {
+  return Sequence([
+    keywordLiteral(name, { ctor: `${name}Keyword` }),
+    wsLiteral('(', { ctor: `${name}Open` }),
+    expressionRef,
+    wsLiteral(')', { ctor: `${name}Close` }),
+  ], {
+    ctor: `${name}Call`,
+    projector: (values) => values[2],
+  }).Map((expr, result) => withSpan(factory(expr), result.span));
+}
+
+const elementaryFunctionParser = Choice([
+  createUnaryFunctionParser('exp', Exp),
+  createUnaryFunctionParser('sin', Sin),
+  createUnaryFunctionParser('cos', Cos),
+  createUnaryFunctionParser('ln', Ln),
+], { ctor: 'ElementaryFunction' });
+
 const primaryParser = Choice([
   explicitRepeatComposeParser,
   explicitComposeParser,
+  elementaryFunctionParser,
   groupedParser,
   literalParser,
   primitiveParser,
@@ -210,6 +235,34 @@ unaryParser = Choice([
   unaryNegative,
   unaryPositive,
 ], { ctor: 'Unary' });
+
+const powerParser = createParser('Power', (input) => {
+  const head = unaryParser.runNormalized(input);
+  if (!head.ok) {
+    return head;
+  }
+  let node = head.value;
+  let cursor = head.next;
+  while (true) {
+    const suffix = powerSuffixParser.runNormalized(cursor);
+    if (!suffix.ok) {
+      if (suffix.severity === ParseSeverity.error) {
+        return suffix;
+      }
+      break;
+    }
+    const span = spanBetween(input, suffix.next);
+    node = withSpan(Pow(node, suffix.value), span);
+    cursor = suffix.next;
+  }
+  const span = spanBetween(input, cursor);
+  return new ParseSuccess({
+    ctor: 'Power',
+    value: node,
+    span,
+    next: cursor,
+  });
+});
 
 function leftAssociative(termParser, operatorParser, ctor) {
   const maybeOperator = operatorParser.Optional(null, { ctor: `${ctor}:maybeOp` });
@@ -259,6 +312,34 @@ function validateRepeatCount(value, span) {
   return value;
 }
 
+const powerSuffixParser = createParser('PowerSuffix', (input) => {
+  const caret = wsLiteral('^', { ctor: 'PowerOp' }).runNormalized(input);
+  if (!caret.ok) {
+    return caret;
+  }
+  const exponentResult = numberToken.runNormalized(caret.next);
+  if (!exponentResult.ok) {
+    return exponentResult;
+  }
+  if (!Number.isInteger(exponentResult.value)) {
+    return new ParseFailure({
+      ctor: 'PowerSuffix',
+      message: 'Exponent must be an integer',
+      severity: ParseSeverity.error,
+      expected: 'integer exponent',
+      span: exponentResult.span,
+      input: exponentResult.span.input,
+    });
+  }
+  const span = spanBetween(input, exponentResult.next);
+  return new ParseSuccess({
+    ctor: 'PowerSuffix',
+    value: exponentResult.value,
+    span,
+    next: exponentResult.next,
+  });
+});
+
 const multiplicativeOperators = Choice([
   wsLiteral('*', { ctor: 'MulOp' }).Map(() => (left, right) => Mul(left, right)),
   wsLiteral('/', { ctor: 'DivOp' }).Map(() => (left, right) => Div(left, right)),
@@ -271,7 +352,7 @@ const additiveOperators = Choice([
 
 const composeOperator = wsLiteral('$', { ctor: 'ComposeOp' }).Map(() => (left, right) => Compose(left, right));
 
-const multiplicativeParser = leftAssociative(unaryParser, multiplicativeOperators, 'MulDiv');
+const multiplicativeParser = leftAssociative(powerParser, multiplicativeOperators, 'MulDiv');
 const additiveParser = leftAssociative(multiplicativeParser, additiveOperators, 'AddSub');
 const repeatSuffixParser = createParser('RepeatSuffix', (input) => {
   const opResult = wsLiteral('$$', { ctor: 'RepeatOp' }).runNormalized(input);

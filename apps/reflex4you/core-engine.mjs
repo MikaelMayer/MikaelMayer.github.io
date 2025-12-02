@@ -17,6 +17,9 @@ export function VarZ() {
 }
 
 export function Pow(base, exponent) {
+  if (!Number.isFinite(exponent) || !Number.isInteger(exponent)) {
+    throw new Error("Pow expects an integer exponent");
+  }
   return { kind: "Pow", base, exponent };
 }
 
@@ -56,6 +59,22 @@ export function Compose(f, g) {
   return { kind: "Compose", f, g };
 }
 
+export function Exp(value) {
+  return { kind: "Exp", value };
+}
+
+export function Sin(value) {
+  return { kind: "Sin", value };
+}
+
+export function Cos(value) {
+  return { kind: "Cos", value };
+}
+
+export function Ln(value) {
+  return { kind: "Ln", value };
+}
+
 export function oo(f, n) {
   const count = Number(n);
   if (!Number.isInteger(count) || count < 1) {
@@ -84,6 +103,10 @@ const formulaGlobals = Object.freeze({
   Div,
   Const,
   Compose,
+  Exp,
+  Sin,
+  Cos,
+  Ln,
   oo,
 });
 
@@ -119,6 +142,12 @@ function assignNodeIds(ast) {
     case "Pow":
       assignNodeIds(ast.base);
       return;
+    case "Exp":
+    case "Sin":
+    case "Cos":
+    case "Ln":
+      assignNodeIds(ast.value);
+      return;
     case "Sub":
     case "Mul":
     case "Op":
@@ -140,6 +169,12 @@ function collectNodesPostOrder(ast, out) {
   switch (ast.kind) {
     case "Pow":
       collectNodesPostOrder(ast.base, out);
+      break;
+    case "Exp":
+    case "Sin":
+    case "Cos":
+    case "Ln":
+      collectNodesPostOrder(ast.value, out);
       break;
     case "Sub":
     case "Mul":
@@ -171,6 +206,26 @@ function collectNodesPostOrder(ast, out) {
 
 function functionName(ast) {
   return "node" + ast._id;
+}
+
+function buildExponentiationSteps(absExponent) {
+  const lines = [];
+  let exp = absExponent;
+  let currentVar = "base";
+  let step = 0;
+  while (exp > 0) {
+    if (exp % 2 === 1) {
+      lines.push(`    acc = c_mul(acc, ${currentVar});`);
+    }
+    exp = Math.floor(exp / 2);
+    if (exp > 0) {
+      const nextVar = `pow_step_${step}`;
+      lines.push(`    vec2 ${nextVar} = c_mul(${currentVar}, ${currentVar});`);
+      currentVar = nextVar;
+      step += 1;
+    }
+  }
+  return lines;
 }
 
 function generateNodeFunction(ast) {
@@ -220,10 +275,7 @@ vec2 ${name}(vec2 z) {
 
   if (ast.kind === "Pow") {
     const baseName = functionName(ast.base);
-    const n = ast.exponent | 0;
-    if (n < 0) {
-      throw new Error("Negative exponents not supported in this demo");
-    }
+    const n = ast.exponent;
     if (n === 0) {
       return `
 vec2 ${name}(vec2 z) {
@@ -236,13 +288,17 @@ vec2 ${name}(vec2 z) {
     return ${baseName}(z);
 }`.trim();
     }
+    const absExponent = Math.abs(n);
     const lines = [];
     lines.push(`vec2 ${name}(vec2 z) {`);
-    lines.push(`    vec2 acc = ${baseName}(z);`);
-    for (let i = 2; i <= n; i++) {
-      lines.push(`    acc = c_mul(acc, ${baseName}(z));`);
+    lines.push(`    vec2 base = ${baseName}(z);`);
+    lines.push(`    vec2 acc = vec2(1.0, 0.0);`);
+    buildExponentiationSteps(absExponent).forEach((line) => lines.push(line));
+    if (n < 0) {
+      lines.push(`    return c_inv(acc);`);
+    } else {
+      lines.push(`    return acc;`);
     }
-    lines.push(`    return acc;`);
     lines.push(`}`);
     return lines.join("\n");
   }
@@ -287,13 +343,43 @@ vec2 ${name}(vec2 z) {
 vec2 ${name}(vec2 z) {
     vec2 a = ${leftName}(z);
     vec2 b = ${rightName}(z);
-    float denom = b.x * b.x + b.y * b.y;
-    if (denom < 1e-12) {
-        return vec2(1e10, 1e10);
-    }
-    float realPart = (a.x * b.x + a.y * b.y) / denom;
-    float imagPart = (a.y * b.x - a.x * b.y) / denom;
-    return vec2(realPart, imagPart);
+    return c_div(a, b);
+}`.trim();
+  }
+
+  if (ast.kind === "Exp") {
+    const valueName = functionName(ast.value);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 v = ${valueName}(z);
+    return c_exp(v);
+}`.trim();
+  }
+
+  if (ast.kind === "Sin") {
+    const valueName = functionName(ast.value);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 v = ${valueName}(z);
+    return c_sin(v);
+}`.trim();
+  }
+
+  if (ast.kind === "Cos") {
+    const valueName = functionName(ast.value);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 v = ${valueName}(z);
+    return c_cos(v);
+}`.trim();
+  }
+
+  if (ast.kind === "Ln") {
+    const valueName = functionName(ast.value);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 v = ${valueName}(z);
+    return c_ln(v);
 }`.trim();
   }
 
@@ -378,6 +464,67 @@ vec2 c_mul(vec2 a, vec2 b) {
     a.x * b.x - a.y * b.y,
     a.x * b.y + a.y * b.x
   );
+}
+
+vec2 c_inv(vec2 z) {
+  float denom = dot(z, z);
+  if (denom < 1e-12) {
+    return vec2(1e10, 1e10);
+  }
+  return vec2(z.x / denom, -z.y / denom);
+}
+
+vec2 c_div(vec2 a, vec2 b) {
+  float denom = dot(b, b);
+  if (denom < 1e-12) {
+    return vec2(1e10, 1e10);
+  }
+  return vec2(
+    (a.x * b.x + a.y * b.y) / denom,
+    (a.y * b.x - a.x * b.y) / denom
+  );
+}
+
+vec2 c_exp(vec2 z) {
+  float expReal = exp(z.x);
+  return vec2(
+    expReal * cos(z.y),
+    expReal * sin(z.y)
+  );
+}
+
+vec2 c_sin(vec2 z) {
+  float sinX = sin(z.x);
+  float cosX = cos(z.x);
+  float expY = exp(z.y);
+  float expNegY = exp(-z.y);
+  float sinhY = 0.5 * (expY - expNegY);
+  float coshY = 0.5 * (expY + expNegY);
+  return vec2(
+    sinX * coshY,
+    cosX * sinhY
+  );
+}
+
+vec2 c_cos(vec2 z) {
+  float sinX = sin(z.x);
+  float cosX = cos(z.x);
+  float expY = exp(z.y);
+  float expNegY = exp(-z.y);
+  float sinhY = 0.5 * (expY - expNegY);
+  float coshY = 0.5 * (expY + expNegY);
+  return vec2(
+    cosX * coshY,
+    -sinX * sinhY
+  );
+}
+
+vec2 c_ln(vec2 z) {
+  float magnitude = length(z);
+  if (magnitude < 1e-12) {
+    return vec2(-1e10, 0.0);
+  }
+  return vec2(log(magnitude), atan(z.y, z.x));
 }
 
 /*NODE_FUNCS*/
