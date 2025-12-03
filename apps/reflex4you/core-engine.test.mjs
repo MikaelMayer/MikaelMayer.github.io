@@ -169,11 +169,12 @@ test('Logical operators implement non-zero truthiness', () => {
   assert.match(orFragment, /\|\|/);
 });
 
-test('If nodes mix branches based on non-zero condition', () => {
+test('If nodes branch based on non-zero condition', () => {
   const ast = If(Const(1, 0), Const(2, 0), Const(3, 0));
   const fragment = buildFragmentSourceFromAST(ast);
   assert.match(fragment, /vec2 cond =/);
-  assert.match(fragment, /mix\(elseValue, thenValue, selector\)/);
+  assert.match(fragment, /bool selector =/);
+  assert.match(fragment, /if \(selector\)/);
 });
 
 test('Abs nodes emit magnitude as real output', () => {
