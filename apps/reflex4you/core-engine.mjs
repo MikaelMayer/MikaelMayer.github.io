@@ -328,8 +328,37 @@ function functionName(ast) {
   return "node" + ast._id;
 }
 
-function setBindingSlotName(binding) {
-  return `set_binding_slot_${binding._id}`;
+function bindingParamName(binding) {
+  return `binding_${binding._id}`;
+}
+
+function bindingLocalName(binding) {
+  return `binding_value_${binding._id}`;
+}
+
+function bindingsForNode(ast, bindingContextMap) {
+  if (!ast || ast._id === undefined) {
+    return [];
+  }
+  return bindingContextMap.get(ast._id) || [];
+}
+
+function formatFunctionSignature(ast, bindingContextMap) {
+  const params = bindingsForNode(ast, bindingContextMap).map((binding) => `vec2 ${bindingParamName(binding)}`);
+  const suffix = params.length ? `, ${params.join(", ")}` : "";
+  return `vec2 ${functionName(ast)}(vec2 z${suffix})`;
+}
+
+function callWithBindings(ast, bindingContextMap, zExpr = "z", overrides) {
+  const bindings = bindingsForNode(ast, bindingContextMap);
+  const args = bindings.map((binding) => {
+    if (overrides && Object.prototype.hasOwnProperty.call(overrides, binding._id)) {
+      return overrides[binding._id];
+    }
+    return bindingParamName(binding);
+  });
+  const joinedArgs = [zExpr, ...args].join(", ");
+  return `${functionName(ast)}(${joinedArgs})`;
 }
 
 function buildExponentiationSteps(absExponent) {
@@ -352,26 +381,26 @@ function buildExponentiationSteps(absExponent) {
   return lines;
 }
 
-function generateNodeFunction(ast) {
-  const name = functionName(ast);
+function generateNodeFunction(ast, bindingContextMap) {
+  const signature = formatFunctionSignature(ast, bindingContextMap);
 
   if (ast.kind === "Var" && ast.name === "z") {
     return `
-vec2 ${name}(vec2 z) {
+${signature} {
     return z;
 }`.trim();
   }
 
   if (ast.kind === "VarX") {
     return `
-vec2 ${name}(vec2 z) {
+${signature} {
     return vec2(z.x, 0.0);
 }`.trim();
   }
 
   if (ast.kind === "VarY") {
     return `
-vec2 ${name}(vec2 z) {
+${signature} {
     return vec2(z.y, 0.0);
 }`.trim();
   }
@@ -384,187 +413,194 @@ vec2 ${name}(vec2 z) {
         ? `u_fixedOffsets[${index}]`
         : `u_dynamicOffsets[${index}]`;
     return `
-vec2 ${name}(vec2 z) {
+${signature} {
     return ${uniform};
 }`.trim();
   }
 
   if (ast.kind === "Const") {
     return `
-vec2 ${name}(vec2 z) {
+${signature} {
     return vec2(${ast.re}, ${ast.im});
 }`.trim();
   }
 
   if (ast.kind === "Conjugate") {
-    const valueName = functionName(ast.value);
+    const valueCall = callWithBindings(ast.value, bindingContextMap);
     return `
-vec2 ${name}(vec2 z) {
-    vec2 inner = ${valueName}(z);
+${signature} {
+    vec2 inner = ${valueCall};
     return vec2(inner.x, -inner.y);
 }`.trim();
   }
 
   if (ast.kind === "SetRef") {
-    const slotName = setBindingSlotName(ast.binding);
+    if (!ast.binding) {
+      throw new Error("SetRef node missing binding reference");
+    }
+    const paramName = bindingParamName(ast.binding);
     return `
-vec2 ${name}(vec2 z) {
-    return ${slotName};
+${signature} {
+    return ${paramName};
 }`.trim();
   }
 
   if (ast.kind === "SetBinding") {
-    const slotName = setBindingSlotName(ast);
-    const valueName = functionName(ast.value);
-    const bodyName = functionName(ast.body);
+    if (!ast.value || !ast.body) {
+      throw new Error("SetBinding node must have value and body");
+    }
+    const valueCall = callWithBindings(ast.value, bindingContextMap);
+    const bindingValueName = bindingLocalName(ast);
+    const overrides = { [ast._id]: bindingValueName };
+    const bodyCall = callWithBindings(ast.body, bindingContextMap, "z", overrides);
     return `
-vec2 ${name}(vec2 z) {
-    ${slotName} = ${valueName}(z);
-    return ${bodyName}(z);
+${signature} {
+    vec2 ${bindingValueName} = ${valueCall};
+    return ${bodyCall};
 }`.trim();
   }
 
   if (ast.kind === "Pow") {
-    const baseName = functionName(ast.base);
     const n = ast.exponent;
     if (n === 0) {
       return `
-vec2 ${name}(vec2 z) {
+${signature} {
     return vec2(1.0, 0.0);
 }`.trim();
     }
     if (n === 1) {
+      const baseCall = callWithBindings(ast.base, bindingContextMap);
       return `
-vec2 ${name}(vec2 z) {
-    return ${baseName}(z);
+${signature} {
+    return ${baseCall};
 }`.trim();
     }
     const absExponent = Math.abs(n);
     const lines = [];
-    lines.push(`vec2 ${name}(vec2 z) {`);
-    lines.push(`    vec2 base = ${baseName}(z);`);
-    lines.push(`    vec2 acc = vec2(1.0, 0.0);`);
+    lines.push(`${signature} {`);
+    lines.push(`    vec2 base = ${callWithBindings(ast.base, bindingContextMap)};`);
+    lines.push("    vec2 acc = vec2(1.0, 0.0);");
     buildExponentiationSteps(absExponent).forEach((line) => lines.push(line));
     if (n < 0) {
-      lines.push(`    return c_inv(acc);`);
+      lines.push("    return c_inv(acc);");
     } else {
-      lines.push(`    return acc;`);
+      lines.push("    return acc;");
     }
-    lines.push(`}`);
+    lines.push("}");
     return lines.join("\n");
   }
 
   if (ast.kind === "Sub") {
-    const leftName = functionName(ast.left);
-    const rightName = functionName(ast.right);
+    const leftCall = callWithBindings(ast.left, bindingContextMap);
+    const rightCall = callWithBindings(ast.right, bindingContextMap);
     return `
-vec2 ${name}(vec2 z) {
-    vec2 a = ${leftName}(z);
-    vec2 b = ${rightName}(z);
+${signature} {
+    vec2 a = ${leftCall};
+    vec2 b = ${rightCall};
     return a - b;
 }`.trim();
   }
 
   if (ast.kind === "Mul") {
-    const leftName = functionName(ast.left);
-    const rightName = functionName(ast.right);
+    const leftCall = callWithBindings(ast.left, bindingContextMap);
+    const rightCall = callWithBindings(ast.right, bindingContextMap);
     return `
-vec2 ${name}(vec2 z) {
-    vec2 a = ${leftName}(z);
-    vec2 b = ${rightName}(z);
+${signature} {
+    vec2 a = ${leftCall};
+    vec2 b = ${rightCall};
     return c_mul(a, b);
 }`.trim();
   }
 
   if (ast.kind === "Add") {
-    const leftName = functionName(ast.left);
-    const rightName = functionName(ast.right);
+    const leftCall = callWithBindings(ast.left, bindingContextMap);
+    const rightCall = callWithBindings(ast.right, bindingContextMap);
     return `
-vec2 ${name}(vec2 z) {
-    vec2 a = ${leftName}(z);
-    vec2 b = ${rightName}(z);
+${signature} {
+    vec2 a = ${leftCall};
+    vec2 b = ${rightCall};
     return a + b;
 }`.trim();
   }
 
   if (ast.kind === "Div") {
-    const leftName = functionName(ast.left);
-    const rightName = functionName(ast.right);
+    const leftCall = callWithBindings(ast.left, bindingContextMap);
+    const rightCall = callWithBindings(ast.right, bindingContextMap);
     return `
-vec2 ${name}(vec2 z) {
-    vec2 a = ${leftName}(z);
-    vec2 b = ${rightName}(z);
+${signature} {
+    vec2 a = ${leftCall};
+    vec2 b = ${rightCall};
     return c_div(a, b);
 }`.trim();
   }
 
   if (ast.kind === "LessThan") {
-    const leftName = functionName(ast.left);
-    const rightName = functionName(ast.right);
+    const leftCall = callWithBindings(ast.left, bindingContextMap);
+    const rightCall = callWithBindings(ast.right, bindingContextMap);
     return `
-vec2 ${name}(vec2 z) {
-    vec2 a = ${leftName}(z);
-    vec2 b = ${rightName}(z);
+${signature} {
+    vec2 a = ${leftCall};
+    vec2 b = ${rightCall};
     float flag = a.x < b.x ? 1.0 : 0.0;
     return vec2(flag, 0.0);
 }`.trim();
   }
 
   if (ast.kind === "GreaterThan") {
-    const leftName = functionName(ast.left);
-    const rightName = functionName(ast.right);
+    const leftCall = callWithBindings(ast.left, bindingContextMap);
+    const rightCall = callWithBindings(ast.right, bindingContextMap);
     return `
-vec2 ${name}(vec2 z) {
-    vec2 a = ${leftName}(z);
-    vec2 b = ${rightName}(z);
+${signature} {
+    vec2 a = ${leftCall};
+    vec2 b = ${rightCall};
     float flag = a.x > b.x ? 1.0 : 0.0;
     return vec2(flag, 0.0);
 }`.trim();
   }
 
   if (ast.kind === "LessThanOrEqual") {
-    const leftName = functionName(ast.left);
-    const rightName = functionName(ast.right);
+    const leftCall = callWithBindings(ast.left, bindingContextMap);
+    const rightCall = callWithBindings(ast.right, bindingContextMap);
     return `
-vec2 ${name}(vec2 z) {
-    vec2 a = ${leftName}(z);
-    vec2 b = ${rightName}(z);
+${signature} {
+    vec2 a = ${leftCall};
+    vec2 b = ${rightCall};
     float flag = a.x <= b.x ? 1.0 : 0.0;
     return vec2(flag, 0.0);
 }`.trim();
   }
 
   if (ast.kind === "GreaterThanOrEqual") {
-    const leftName = functionName(ast.left);
-    const rightName = functionName(ast.right);
+    const leftCall = callWithBindings(ast.left, bindingContextMap);
+    const rightCall = callWithBindings(ast.right, bindingContextMap);
     return `
-vec2 ${name}(vec2 z) {
-    vec2 a = ${leftName}(z);
-    vec2 b = ${rightName}(z);
+${signature} {
+    vec2 a = ${leftCall};
+    vec2 b = ${rightCall};
     float flag = a.x >= b.x ? 1.0 : 0.0;
     return vec2(flag, 0.0);
 }`.trim();
   }
 
   if (ast.kind === "Equal") {
-    const leftName = functionName(ast.left);
-    const rightName = functionName(ast.right);
+    const leftCall = callWithBindings(ast.left, bindingContextMap);
+    const rightCall = callWithBindings(ast.right, bindingContextMap);
     return `
-vec2 ${name}(vec2 z) {
-    vec2 a = ${leftName}(z);
-    vec2 b = ${rightName}(z);
+${signature} {
+    vec2 a = ${leftCall};
+    vec2 b = ${rightCall};
     float flag = a.x == b.x ? 1.0 : 0.0;
     return vec2(flag, 0.0);
 }`.trim();
   }
 
   if (ast.kind === "LogicalAnd") {
-    const leftName = functionName(ast.left);
-    const rightName = functionName(ast.right);
+    const leftCall = callWithBindings(ast.left, bindingContextMap);
+    const rightCall = callWithBindings(ast.right, bindingContextMap);
     return `
-vec2 ${name}(vec2 z) {
-    vec2 a = ${leftName}(z);
-    vec2 b = ${rightName}(z);
+${signature} {
+    vec2 a = ${leftCall};
+    vec2 b = ${rightCall};
     float leftTruthy = (a.x != 0.0 || a.y != 0.0) ? 1.0 : 0.0;
     float rightTruthy = (b.x != 0.0 || b.y != 0.0) ? 1.0 : 0.0;
     float flag = (leftTruthy > 0.5 && rightTruthy > 0.5) ? 1.0 : 0.0;
@@ -573,12 +609,12 @@ vec2 ${name}(vec2 z) {
   }
 
   if (ast.kind === "LogicalOr") {
-    const leftName = functionName(ast.left);
-    const rightName = functionName(ast.right);
+    const leftCall = callWithBindings(ast.left, bindingContextMap);
+    const rightCall = callWithBindings(ast.right, bindingContextMap);
     return `
-vec2 ${name}(vec2 z) {
-    vec2 a = ${leftName}(z);
-    vec2 b = ${rightName}(z);
+${signature} {
+    vec2 a = ${leftCall};
+    vec2 b = ${rightCall};
     float leftTruthy = (a.x != 0.0 || a.y != 0.0) ? 1.0 : 0.0;
     float rightTruthy = (b.x != 0.0 || b.y != 0.0) ? 1.0 : 0.0;
     float flag = (leftTruthy > 0.5 || rightTruthy > 0.5) ? 1.0 : 0.0;
@@ -587,69 +623,69 @@ vec2 ${name}(vec2 z) {
   }
 
   if (ast.kind === "Exp") {
-    const valueName = functionName(ast.value);
+    const valueCall = callWithBindings(ast.value, bindingContextMap);
     return `
-vec2 ${name}(vec2 z) {
-    vec2 v = ${valueName}(z);
+${signature} {
+    vec2 v = ${valueCall};
     return c_exp(v);
 }`.trim();
   }
 
   if (ast.kind === "Sin") {
-    const valueName = functionName(ast.value);
+    const valueCall = callWithBindings(ast.value, bindingContextMap);
     return `
-vec2 ${name}(vec2 z) {
-    vec2 v = ${valueName}(z);
+${signature} {
+    vec2 v = ${valueCall};
     return c_sin(v);
 }`.trim();
   }
 
   if (ast.kind === "Cos") {
-    const valueName = functionName(ast.value);
+    const valueCall = callWithBindings(ast.value, bindingContextMap);
     return `
-vec2 ${name}(vec2 z) {
-    vec2 v = ${valueName}(z);
+${signature} {
+    vec2 v = ${valueCall};
     return c_cos(v);
 }`.trim();
   }
 
   if (ast.kind === "Ln") {
-    const valueName = functionName(ast.value);
+    const valueCall = callWithBindings(ast.value, bindingContextMap);
     return `
-vec2 ${name}(vec2 z) {
-    vec2 v = ${valueName}(z);
+${signature} {
+    vec2 v = ${valueCall};
     return c_ln(v);
 }`.trim();
   }
 
   if (ast.kind === "Abs") {
-    const valueName = functionName(ast.value);
+    const valueCall = callWithBindings(ast.value, bindingContextMap);
     return `
-vec2 ${name}(vec2 z) {
-    vec2 v = ${valueName}(z);
+${signature} {
+    vec2 v = ${valueCall};
     float magnitude = length(v);
     return vec2(magnitude, 0.0);
 }`.trim();
   }
 
   if (ast.kind === "If") {
-    const condName = functionName(ast.condition);
-    const thenName = functionName(ast.thenBranch);
-    const elseName = functionName(ast.elseBranch);
+    const condCall = callWithBindings(ast.condition, bindingContextMap);
+    const thenCall = callWithBindings(ast.thenBranch, bindingContextMap);
+    const elseCall = callWithBindings(ast.elseBranch, bindingContextMap);
     return `
-vec2 ${name}(vec2 z) {
-    vec2 cond = ${condName}(z);
+${signature} {
+    vec2 cond = ${condCall};
     bool selector = (cond.x != 0.0 || cond.y != 0.0);
     if (selector) {
-        return ${thenName}(z);
+        return ${thenCall};
     }
-    return ${elseName}(z);
+    return ${elseCall};
 }`.trim();
   }
 
   if (ast.kind === "Op") {
-    const leftName = functionName(ast.left);
-    const rightName = functionName(ast.right);
+    const leftCall = callWithBindings(ast.left, bindingContextMap);
+    const rightCall = callWithBindings(ast.right, bindingContextMap);
     let expr;
     switch (ast.op) {
       case "add":
@@ -668,38 +704,101 @@ vec2 ${name}(vec2 z) {
         throw new Error("Unknown Op kind: " + ast.op);
     }
     return `
-vec2 ${name}(vec2 z) {
-    vec2 a = ${leftName}(z);
-    vec2 b = ${rightName}(z);
+${signature} {
+    vec2 a = ${leftCall};
+    vec2 b = ${rightCall};
     return ${expr};
 }`.trim();
   }
 
   if (ast.kind === "Compose") {
-    const fName = functionName(ast.f);
-    const gName = functionName(ast.g);
+    const innerCall = callWithBindings(ast.g, bindingContextMap);
+    const composedCall = callWithBindings(ast.f, bindingContextMap, innerCall);
     return `
-vec2 ${name}(vec2 z) {
-    return ${fName}(${gName}(z));
+${signature} {
+    return ${composedCall};
 }`.trim();
   }
 
   throw new Error("Unknown AST node kind in generateNodeFunction: " + ast.kind);
 }
 
+function buildBindingContextMap(ast) {
+  const map = new Map();
+  const stack = [];
+
+  function visit(node) {
+    if (!node || node._id === undefined) {
+      return;
+    }
+    map.set(node._id, stack.slice());
+    switch (node.kind) {
+      case "Pow":
+        visit(node.base);
+        break;
+      case "Exp":
+      case "Sin":
+      case "Cos":
+      case "Ln":
+      case "Abs":
+      case "Conjugate":
+        visit(node.value);
+        break;
+      case "Sub":
+      case "Mul":
+      case "Op":
+      case "Add":
+      case "Div":
+      case "LessThan":
+      case "GreaterThan":
+      case "LessThanOrEqual":
+      case "GreaterThanOrEqual":
+      case "Equal":
+      case "LogicalAnd":
+      case "LogicalOr":
+        visit(node.left);
+        visit(node.right);
+        break;
+      case "If":
+        visit(node.condition);
+        visit(node.thenBranch);
+        visit(node.elseBranch);
+        break;
+      case "SetBinding":
+        visit(node.value);
+        stack.push(node);
+        visit(node.body);
+        stack.pop();
+        break;
+      case "Compose":
+        visit(node.f);
+        visit(node.g);
+        break;
+      case "SetRef":
+      case "Var":
+      case "VarX":
+      case "VarY":
+      case "FingerOffset":
+      case "Const":
+        break;
+      default:
+        throw new Error("Unknown AST kind in buildBindingContextMap: " + node.kind);
+    }
+  }
+
+  visit(ast);
+  return map;
+}
+
 function buildNodeFunctionsAndTop(ast) {
   nextNodeId = 0;
   assignNodeIds(ast);
+  const bindingContextMap = buildBindingContextMap(ast);
   const nodes = [];
   collectNodesPostOrder(ast, nodes);
-  const slotDecls = nodes
-    .filter((node) => node.kind === "SetBinding")
-    .map((node) => `vec2 ${setBindingSlotName(node)};`)
-    .join("\n");
-  const funcBodies = nodes.map(generateNodeFunction).join("\n\n");
-  const funcs = slotDecls ? `${slotDecls}\n\n${funcBodies}` : funcBodies;
+  const funcBodies = nodes.map((node) => generateNodeFunction(node, bindingContextMap)).join("\n\n");
   const topName = functionName(ast);
-  return { funcs, topName };
+  return { funcs: funcBodies, topName };
 }
 
 const vertexSource = `#version 300 es

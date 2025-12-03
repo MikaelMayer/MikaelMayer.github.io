@@ -18,6 +18,8 @@ import {
   Ln,
   oo,
   FingerOffset,
+  SetBindingNode,
+  SetRef,
   LessThan,
   GreaterThan,
   LessThanOrEqual,
@@ -175,6 +177,25 @@ test('If nodes branch based on non-zero condition', () => {
   assert.match(fragment, /vec2 cond =/);
   assert.match(fragment, /bool selector =/);
   assert.match(fragment, /if \(selector\)/);
+});
+
+test('Set bindings are threaded through parameters instead of globals', () => {
+  const binding = SetBindingNode('c', VarZ(), null);
+  const reference = SetRef('c', binding);
+  binding.body = Add(reference, VarZ());
+  const fragment = buildFragmentSourceFromAST(binding);
+  assert.doesNotMatch(fragment, /set_binding_slot_/);
+  assert.match(fragment, /vec2 node\d+\(vec2 z, vec2 binding_\d+\)/);
+  assert.match(fragment, /return binding_\d+;/);
+});
+
+test('Set bindings propagate into child calls', () => {
+  const binding = SetBindingNode('c', VarZ(), null);
+  const reference = SetRef('c', binding);
+  binding.body = If(Const(1, 0), reference, VarZ());
+  const fragment = buildFragmentSourceFromAST(binding);
+  assert.match(fragment, /vec2 node\d+\(vec2 z, vec2 binding_\d+\)/);
+  assert.match(fragment, /node\d+\(z, binding_\d+\)/);
 });
 
 test('Abs nodes emit magnitude as real output', () => {
