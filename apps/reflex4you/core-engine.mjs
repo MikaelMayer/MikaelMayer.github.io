@@ -639,10 +639,11 @@ vec2 ${name}(vec2 z) {
     return `
 vec2 ${name}(vec2 z) {
     vec2 cond = ${condName}(z);
-    vec2 thenValue = ${thenName}(z);
-    vec2 elseValue = ${elseName}(z);
-    float selector = (cond.x != 0.0 || cond.y != 0.0) ? 1.0 : 0.0;
-    return mix(elseValue, thenValue, selector);
+    bool selector = (cond.x != 0.0 || cond.y != 0.0);
+    if (selector) {
+        return ${thenName}(z);
+    }
+    return ${elseName}(z);
 }`.trim();
   }
 
