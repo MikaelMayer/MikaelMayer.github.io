@@ -176,3 +176,45 @@ test('parseFormulaInput rejects trailing input', () => {
   assert.equal(result.ok, false);
   assert.equal(result.expected, 'end of formula');
 });
+
+test('parses constant j shorthand', () => {
+  const result = parseFormulaInput('j');
+  assert.equal(result.ok, true);
+  const node = result.value;
+  assert.equal(node.kind, 'Const');
+  assert.equal(node.re, -0.5);
+  assert.ok(Math.abs(node.im - Math.sqrt(3) / 2) < 1e-9);
+});
+
+test('parses conj() calls as conjugate nodes', () => {
+  const result = parseFormulaInput('conj(z)');
+  assert.equal(result.ok, true);
+  const node = result.value;
+  assert.equal(node.kind, 'Conjugate');
+  assert.equal(node.value.kind, 'Var');
+});
+
+test('comp(...) expands iterative compositions', () => {
+  const result = parseFormulaInput('comp(v^2+z, v, 0, 2)');
+  assert.equal(result.ok, true);
+  const ast = result.value;
+  assert.equal(ast.kind, 'Add');
+  assert.equal(ast.left.kind, 'Pow');
+  assert.equal(ast.left.base.kind, 'Add');
+  assert.equal(ast.left.exponent, 2);
+  assert.equal(ast.left.base.right.kind, 'Var');
+  assert.equal(ast.right.kind, 'Var');
+});
+
+test('comp with zero iterations returns the seed expression', () => {
+  const result = parseFormulaInput('comp(v+1, v, z, 0)');
+  assert.equal(result.ok, true);
+  const ast = result.value;
+  assert.equal(ast.kind, 'Var');
+});
+
+test('standalone iteration variables are rejected', () => {
+  const result = parseFormulaInput('v + 1');
+  assert.equal(result.ok, false);
+  assert.match(result.message, /comp/i);
+});

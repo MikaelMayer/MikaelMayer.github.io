@@ -37,6 +37,7 @@ import {
   Cos,
   Ln,
   Abs,
+  Conjugate,
   oo,
   If,
   FingerOffset,
@@ -44,6 +45,12 @@ import {
 
 const IDENTIFIER_CHAR = /[A-Za-z0-9_]/;
 const NUMBER_REGEX = /[+-]?(?:\d+\.\d+|\d+|\.\d+)(?:[eE][+-]?\d+)?/y;
+const SQRT3_OVER_2 = Math.sqrt(3) / 2;
+const ITERATION_VARIABLE_NAME = 'v';
+
+function createPlaceholderVar(name) {
+  return { kind: 'PlaceholderVar', name };
+}
 
 function withSpan(node, span) {
   return { ...node, span, input: span.input };
@@ -112,10 +119,14 @@ const imagFromNumber = numberToken.i_(imagUnit, { ctor: 'NumericImag' })
 const unitImagLiteral = optionalSign.i_(imagUnit, { ctor: 'UnitImag' })
   .Map((sign, result) => withSpan(Const(0, sign), result.span));
 
+const jLiteral = keywordLiteral('j', { ctor: 'ConstJ', caseSensitive: false })
+  .Map((_, result) => withSpan(Const(-0.5, SQRT3_OVER_2), result.span));
+
 const literalParser = Choice([
   imagFromNumber,
   unitImagLiteral,
   numberLiteral,
+  jLiteral,
 ], { ctor: 'Literal' });
 
 const FINGER_TOKENS = ['F1', 'F2', 'F3', 'D1', 'D2', 'D3'];
@@ -124,11 +135,18 @@ const fingerLiteralParsers = FINGER_TOKENS.map((label) =>
   keywordLiteral(label, { ctor: `Finger(${label})` }).Map((_, result) => withSpan(FingerOffset(label), result.span)),
 );
 
+const iterationVariableLiteral = keywordLiteral(ITERATION_VARIABLE_NAME, { ctor: 'IterationVar' })
+  .Map((_, result) => withSpan(createPlaceholderVar(ITERATION_VARIABLE_NAME), result.span));
+
+const iterationVariableNameParser = keywordLiteral(ITERATION_VARIABLE_NAME, { ctor: 'IterationName' })
+  .Map(() => ITERATION_VARIABLE_NAME);
+
 const primitiveParser = Choice([
   keywordLiteral('x', { ctor: 'VarX' }).Map((_, result) => withSpan(VarX(), result.span)),
   keywordLiteral('y', { ctor: 'VarY' }).Map((_, result) => withSpan(VarY(), result.span)),
   keywordLiteral('z', { ctor: 'VarZ' }).Map((_, result) => withSpan(VarZ(), result.span)),
   ...fingerLiteralParsers,
+  iterationVariableLiteral,
 ], { ctor: 'Primitive' });
 
 let expressionParser;
@@ -193,6 +211,67 @@ const explicitRepeatComposeParser = createParser('ExplicitRepeatCompose', (input
   });
 });
 
+const compParser = createParser('CompCall', (input) => {
+  const keyword = keywordLiteral('comp', { ctor: 'CompKeyword' }).runNormalized(input);
+  if (!keyword.ok) {
+    return keyword;
+  }
+  const open = wsLiteral('(', { ctor: 'CompOpen' }).runNormalized(keyword.next);
+  if (!open.ok) {
+    return open;
+  }
+  const bodyResult = expressionRef.runNormalized(open.next);
+  if (!bodyResult.ok) {
+    return bodyResult;
+  }
+  const comma1 = wsLiteral(',', { ctor: 'CompComma1' }).runNormalized(bodyResult.next);
+  if (!comma1.ok) {
+    return comma1;
+  }
+  const nameResult = iterationVariableNameParser.runNormalized(comma1.next);
+  if (!nameResult.ok) {
+    return nameResult;
+  }
+  const comma2 = wsLiteral(',', { ctor: 'CompComma2' }).runNormalized(nameResult.next);
+  if (!comma2.ok) {
+    return comma2;
+  }
+  const seedResult = expressionRef.runNormalized(comma2.next);
+  if (!seedResult.ok) {
+    return seedResult;
+  }
+  const comma3 = wsLiteral(',', { ctor: 'CompComma3' }).runNormalized(seedResult.next);
+  if (!comma3.ok) {
+    return comma3;
+  }
+  const countResult = numberToken.runNormalized(comma3.next);
+  if (!countResult.ok) {
+    return countResult;
+  }
+  const validatedCount = validateCompIterationCount(countResult.value, countResult.span);
+  if (validatedCount instanceof ParseFailure) {
+    return validatedCount;
+  }
+  const close = wsLiteral(')', { ctor: 'CompClose' }).runNormalized(countResult.next);
+  if (!close.ok) {
+    return close;
+  }
+  const span = spanBetween(input, close.next);
+  const value = buildCompAST({
+    body: bodyResult.value,
+    placeholder: nameResult.value,
+    seed: seedResult.value,
+    iterations: validatedCount,
+    span,
+  });
+  return new ParseSuccess({
+    ctor: 'CompCall',
+    value,
+    span,
+    next: close.next,
+  });
+});
+
 const ifParser = Sequence([
   keywordLiteral('if', { ctor: 'IfKeyword' }),
   wsLiteral('(', { ctor: 'IfOpen' }),
@@ -229,10 +308,12 @@ const elementaryFunctionParser = Choice([
   createUnaryFunctionParser('cos', Cos),
   createUnaryFunctionParser('ln', Ln),
   createUnaryFunctionParser('abs', Abs),
+  createUnaryFunctionParser('conj', Conjugate),
 ], { ctor: 'ElementaryFunction' });
 
 const primaryParser = Choice([
   explicitRepeatComposeParser,
+  compParser,
   explicitComposeParser,
   elementaryFunctionParser,
   ifParser,
@@ -331,6 +412,183 @@ function spanBetween(startInput, endInput) {
   return startInput.createSpan(0, startInput.length - endInput.length);
 }
 
+function buildCompAST({ body, placeholder, seed, iterations, span }) {
+  let current = cloneAst(seed);
+  for (let i = 0; i < iterations; i += 1) {
+    current = substitutePlaceholder(body, placeholder, current);
+  }
+  if (span) {
+    current.span = span;
+    current.input = span.input;
+  }
+  return current;
+}
+
+function substitutePlaceholder(node, placeholder, replacement) {
+  if (!node || typeof node !== 'object') {
+    return node;
+  }
+  if (node.kind === 'PlaceholderVar') {
+    if (node.name === placeholder) {
+      return cloneAst(replacement);
+    }
+    return cloneAst(node);
+  }
+  switch (node.kind) {
+    case 'Const':
+    case 'Var':
+    case 'VarX':
+    case 'VarY':
+    case 'FingerOffset':
+      return cloneAst(node);
+    case 'Pow':
+      return { ...node, base: substitutePlaceholder(node.base, placeholder, replacement) };
+    case 'Exp':
+    case 'Sin':
+    case 'Cos':
+    case 'Ln':
+    case 'Abs':
+    case 'Conjugate':
+      return { ...node, value: substitutePlaceholder(node.value, placeholder, replacement) };
+    case 'Sub':
+    case 'Mul':
+    case 'Op':
+    case 'Add':
+    case 'Div':
+    case 'LessThan':
+    case 'GreaterThan':
+    case 'LessThanOrEqual':
+    case 'GreaterThanOrEqual':
+    case 'Equal':
+    case 'LogicalAnd':
+    case 'LogicalOr':
+      return {
+        ...node,
+        left: substitutePlaceholder(node.left, placeholder, replacement),
+        right: substitutePlaceholder(node.right, placeholder, replacement),
+      };
+    case 'Compose':
+      return {
+        ...node,
+        f: substitutePlaceholder(node.f, placeholder, replacement),
+        g: substitutePlaceholder(node.g, placeholder, replacement),
+      };
+    case 'If':
+      return {
+        ...node,
+        condition: substitutePlaceholder(node.condition, placeholder, replacement),
+        thenBranch: substitutePlaceholder(node.thenBranch, placeholder, replacement),
+        elseBranch: substitutePlaceholder(node.elseBranch, placeholder, replacement),
+      };
+    default:
+      return cloneAst(node);
+  }
+}
+
+function cloneAst(node) {
+  if (!node || typeof node !== 'object') {
+    return node;
+  }
+  switch (node.kind) {
+    case 'Const':
+    case 'Var':
+    case 'VarX':
+    case 'VarY':
+    case 'FingerOffset':
+    case 'PlaceholderVar':
+      return { ...node };
+    case 'Pow':
+      return { ...node, base: cloneAst(node.base) };
+    case 'Exp':
+    case 'Sin':
+    case 'Cos':
+    case 'Ln':
+    case 'Abs':
+    case 'Conjugate':
+      return { ...node, value: cloneAst(node.value) };
+    case 'Sub':
+    case 'Mul':
+    case 'Op':
+    case 'Add':
+    case 'Div':
+    case 'LessThan':
+    case 'GreaterThan':
+    case 'LessThanOrEqual':
+    case 'GreaterThanOrEqual':
+    case 'Equal':
+    case 'LogicalAnd':
+    case 'LogicalOr':
+      return {
+        ...node,
+        left: cloneAst(node.left),
+        right: cloneAst(node.right),
+      };
+    case 'Compose':
+      return { ...node, f: cloneAst(node.f), g: cloneAst(node.g) };
+    case 'If':
+      return {
+        ...node,
+        condition: cloneAst(node.condition),
+        thenBranch: cloneAst(node.thenBranch),
+        elseBranch: cloneAst(node.elseBranch),
+      };
+    default:
+      throw new Error(`Unknown AST kind in cloneAst: ${node.kind}`);
+  }
+}
+
+function findFirstPlaceholderNode(ast) {
+  if (!ast || typeof ast !== 'object') {
+    return null;
+  }
+  const stack = [ast];
+  while (stack.length) {
+    const node = stack.pop();
+    if (!node || typeof node !== 'object') {
+      continue;
+    }
+    if (node.kind === 'PlaceholderVar') {
+      return node;
+    }
+    switch (node.kind) {
+      case 'Pow':
+        stack.push(node.base);
+        break;
+      case 'Exp':
+      case 'Sin':
+      case 'Cos':
+      case 'Ln':
+      case 'Abs':
+      case 'Conjugate':
+        stack.push(node.value);
+        break;
+      case 'Sub':
+      case 'Mul':
+      case 'Op':
+      case 'Add':
+      case 'Div':
+      case 'LessThan':
+      case 'GreaterThan':
+      case 'LessThanOrEqual':
+      case 'GreaterThanOrEqual':
+      case 'Equal':
+      case 'LogicalAnd':
+      case 'LogicalOr':
+        stack.push(node.left, node.right);
+        break;
+      case 'If':
+        stack.push(node.condition, node.thenBranch, node.elseBranch);
+        break;
+      case 'Compose':
+        stack.push(node.f, node.g);
+        break;
+      default:
+        break;
+    }
+  }
+  return null;
+}
+
 function validateRepeatCount(value, span) {
   if (!Number.isInteger(value) || value < 1) {
     return new ParseFailure({
@@ -338,6 +596,20 @@ function validateRepeatCount(value, span) {
       message: 'Repeat count must be a positive integer',
       severity: ParseSeverity.error,
       expected: 'positive integer repeat count',
+      span,
+      input: span.input,
+    });
+  }
+  return value;
+}
+
+function validateCompIterationCount(value, span) {
+  if (!Number.isInteger(value) || value < 0) {
+    return new ParseFailure({
+      ctor: 'CompIterations',
+      message: 'comp iteration count must be a non-negative integer',
+      severity: ParseSeverity.error,
+      expected: 'non-negative integer iteration count',
       span,
       input: span.input,
     });
@@ -527,6 +799,18 @@ export function parseFormulaInput(input) {
       expected: 'end of formula',
       span: remainder.createSpan(0, Math.min(1, remainder.length)),
       input: remainder,
+    });
+  }
+  const placeholderNode = findFirstPlaceholderNode(parsed.value);
+  if (placeholderNode) {
+    const span = placeholderNode.span ?? normalized.createSpan(0, 0);
+    return new ParseFailure({
+      ctor: 'PlaceholderVar',
+      message: `Placeholder variable "${placeholderNode.name}" is only allowed inside comp(...)`,
+      severity: ParseSeverity.error,
+      expected: 'comp(...) placeholder usage',
+      span,
+      input: span.input || normalized,
     });
   }
   return parsed;
