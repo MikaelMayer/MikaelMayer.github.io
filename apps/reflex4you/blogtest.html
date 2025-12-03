@@ -66,9 +66,13 @@
 
       <div class="instructions">
         <p>
-          Include a single script tag:
-          <code>&lt;script type="module" src="./reflex-embed.js"&gt;&lt;/script&gt;</code>. The embed
-          loader auto-detects every element with <code>reflex-formula</code> and wires it up.
+          Host the helper once and reference it via an absolute URL. For GitHub Pages the script will
+          live at
+          <code>https://mikaelmayer.github.io/apps/reflex4you/reflex-embed.js</code>. After tagging
+          <code>0.1.0</code> you can also load the immutable jsDelivr copy at
+          <code
+            >https://cdn.jsdelivr.net/gh/MikaelMayer/MikaelMayer.github.io@0.1.0/apps/reflex4you/reflex-embed.js</code
+          >.
         </p>
       </div>
 
@@ -88,6 +92,9 @@
       <div class="reflex-block" reflex-formula="1 + z"></div>
     </article>
 
-    <script type="module" src="./reflex-embed.js"></script>
+    <script
+      type="module"
+      src="https://cdn.jsdelivr.net/gh/MikaelMayer/MikaelMayer.github.io@0.1.0/apps/reflex4you/reflex-embed.js"
+    ></script>
   </body>
 </html>
