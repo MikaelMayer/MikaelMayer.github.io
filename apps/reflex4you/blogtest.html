@@ -46,6 +46,14 @@
         background: rgba(255, 255, 255, 0.08);
         font-size: 0.95em;
       }
+      pre {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 0.9rem;
+        border-radius: 10px;
+        overflow-x: auto;
+        font-size: 0.9em;
+        margin-top: 0.75rem;
+      }
       .instructions {
         font-size: 0.95em;
         color: #a3a3c1;
@@ -66,10 +74,16 @@
 
       <div class="instructions">
         <p>
-          Host the helper once and reference it via an absolute URL. For GitHub Pages the script will
-          live at
-          <code>https://mikaelmayer.github.io/apps/reflex4you/reflex-embed.js</code>. After tagging
-          <code>0.1.0</code> you can also load the immutable jsDelivr copy at
+          Add a container for each live canvas, then load the Reflex helper script once per page. The
+          snippet below is enough to light up another HTML document:
+        </p>
+        <pre><code>&lt;div class="reflex-block" reflex-formula="(z - 1) * (z + 1)"&gt;&lt;/div&gt;
+&lt;script type="module" src="https://cdn.jsdelivr.net/gh/MikaelMayer/MikaelMayer.github.io@0.1.0/apps/reflex4you/reflex-embed.js"&gt;&lt;/script&gt;</code></pre>
+        <p>Drop more <code>div</code>s with different <code>reflex-formula</code> values as needed.</p>
+        <p>
+          Host the helper once and reference it via an absolute URL. For GitHub Pages the script lives
+          at <code>https://mikaelmayer.github.io/apps/reflex4you/reflex-embed.js</code>, and the
+          immutable jsDelivr copy is
           <code
             >https://cdn.jsdelivr.net/gh/MikaelMayer/MikaelMayer.github.io@0.1.0/apps/reflex4you/reflex-embed.js</code
           >.
