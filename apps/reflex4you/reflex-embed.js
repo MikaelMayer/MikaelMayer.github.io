@@ -102,17 +102,72 @@ export function attachReflexToElement(element, options = {}) {
     errorOverlay = attachErrorOverlay(element, message);
   }
 
+  let attributeObserver = null;
+  let currentFormulaSource = formulaSource;
+  let currentError = error;
+
+  const applyFormulaSource = (nextSource) => {
+    const normalized = (nextSource ?? '').trim();
+    const { ast: nextAST, error: nextError } = parseFormulaOrFallback(normalized);
+    currentFormulaSource = normalized;
+    currentError = nextError;
+    if (nextError) {
+      const message = formatCaretIndicator(normalized, nextError);
+      console.warn('Reflex embed falling back to default formula due to parse error:', nextError);
+      if (!errorOverlay) {
+        errorOverlay = attachErrorOverlay(element, message);
+      } else {
+        errorOverlay.textContent = message;
+      }
+    } else if (errorOverlay) {
+      if (errorOverlay.isConnected) {
+        errorOverlay.remove();
+      }
+      errorOverlay = null;
+    }
+    reflexCore.setFormulaAST(nextAST);
+  };
+
+  const refreshFromAttribute = () => {
+    applyFormulaSource(element.getAttribute('reflex-formula') ?? '');
+  };
+
+  if (options.observeAttributes !== false && typeof MutationObserver !== 'undefined') {
+    attributeObserver = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'reflex-formula') {
+          refreshFromAttribute();
+          break;
+        }
+      }
+    });
+    attributeObserver.observe(element, {
+      attributes: true,
+      attributeFilter: ['reflex-formula'],
+    });
+  }
+
   const instance = {
     element,
     canvas,
     core: reflexCore,
     resizeObserver,
-    formulaSource,
-    error,
+    get formulaSource() {
+      return currentFormulaSource;
+    },
+    get error() {
+      return currentError;
+    },
+    refreshFromAttribute,
+    updateFormulaSource: applyFormulaSource,
     destroy() {
       if (resizeObserver) {
         resizeObserver.disconnect();
         resizeObserver = null;
+      }
+      if (attributeObserver) {
+        attributeObserver.disconnect();
+        attributeObserver = null;
       }
       reflexCore.releaseAllPointerAssignments();
       if (canvas.isConnected) {

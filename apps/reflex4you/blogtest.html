@@ -54,6 +54,39 @@
         font-size: 0.9em;
         margin-top: 0.75rem;
       }
+      .formula-editor {
+        width: 100%;
+        min-height: 120px;
+        margin-top: 0.75rem;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(0, 0, 0, 0.35);
+        color: #f8f8ff;
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        font-size: 0.95em;
+        padding: 0.75rem;
+        resize: vertical;
+      }
+      .code-copy {
+        cursor: pointer;
+        border: 1px solid rgba(58, 58, 183, 0.4);
+        transition: border-color 160ms ease, background 160ms ease;
+      }
+      .code-copy:hover {
+        border-color: rgba(90, 90, 255, 0.8);
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .copy-status {
+        font-size: 0.85em;
+        color: #7f7fb3;
+        margin-top: 0.35rem;
+      }
+      .copy-status--success {
+        color: #71d08c;
+      }
+      .copy-status--error {
+        color: #ff9b71;
+      }
       .instructions {
         font-size: 0.95em;
         color: #a3a3c1;
@@ -84,6 +117,23 @@
           drop in as many Reflex blocks as you like:
         </p>
         <pre><code>&lt;script type="module" src="https://cdn.jsdelivr.net/gh/MikaelMayer/MikaelMayer.github.io@0.1.0/apps/reflex4you/reflex-embed.js"&gt;&lt;/script&gt;</code></pre>
+        <p>
+          Now if you want to integrate the Reflex with a specific formula, edit it here and watch the
+          embed code update instantly:
+        </p>
+        <textarea
+          class="formula-editor"
+          id="liveFormulaInput"
+        >(z - (-0.61-2.47i)) * (z - (-0.4-0.92i)) / (z - (-0.34+1.42i)) / 2 $$ 100</textarea>
+        <p>You just copy paste the following code into your web page:</p>
+        <pre class="code-copy" id="liveEmbedCode"><code id="liveEmbedCodeText"></code></pre>
+        <div class="copy-status" id="liveEmbedCopyStatus">Click to copy</div>
+        <p>You would then obtain the following display in your blog post:</p>
+        <div
+          class="reflex-block reflex-block--tall"
+          id="liveFormulaPreview"
+          reflex-formula="(z - (-0.61-2.47i)) * (z - (-0.4-0.92i)) / (z - (-0.34+1.42i)) / 2 $$ 100"
+        ></div>
         <p>
           That's it. Every <code>div</code> with a <code>reflex-formula</code> attribute becomes a
           live canvas driven by the reader's browser.
@@ -119,5 +169,68 @@
       type="module"
       src="https://cdn.jsdelivr.net/gh/MikaelMayer/MikaelMayer.github.io@0.1.0/apps/reflex4you/reflex-embed.js"
     ></script>
+    <script>
+      (function () {
+        const formulaInput = document.getElementById('liveFormulaInput');
+        const codeBlock = document.getElementById('liveEmbedCode');
+        const codeText = document.getElementById('liveEmbedCodeText');
+        const copyStatus = document.getElementById('liveEmbedCopyStatus');
+        const previewBlock = document.getElementById('liveFormulaPreview');
+        if (!formulaInput || !codeBlock || !codeText || !previewBlock || !copyStatus) {
+          return;
+        }
+
+        const defaultFormula = formulaInput.value.trim();
+        const buildEmbedCode = (formula) =>
+          `<div class="reflex-block reflex-block--tall" reflex-formula="${formula}"></div>`;
+
+        let latestCode = buildEmbedCode(defaultFormula);
+        let resetTimer = null;
+
+        function updateEmbedFromInput() {
+          const raw = formulaInput.value;
+          const normalized = raw.trim() || defaultFormula;
+          previewBlock.setAttribute('reflex-formula', normalized);
+          latestCode = buildEmbedCode(normalized);
+          codeText.textContent = latestCode;
+        }
+
+        function setCopyStatus(message, variant) {
+          copyStatus.textContent = message;
+          copyStatus.classList.remove('copy-status--success', 'copy-status--error');
+          if (variant) {
+            copyStatus.classList.add(variant);
+          }
+          if (resetTimer) {
+            clearTimeout(resetTimer);
+          }
+          resetTimer = setTimeout(() => {
+            copyStatus.textContent = 'Click to copy';
+            copyStatus.classList.remove('copy-status--success', 'copy-status--error');
+          }, 2000);
+        }
+
+        formulaInput.addEventListener('input', updateEmbedFromInput);
+
+        codeBlock.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(latestCode);
+            setCopyStatus('Copied!', 'copy-status--success');
+          } catch (err) {
+            setCopyStatus('Press ⌘/Ctrl+C to copy', 'copy-status--error');
+          }
+        });
+
+        updateEmbedFromInput();
+
+        const bootstrapIfReady = () => {
+          if (window.ReflexEmbed?.bootstrap) {
+            window.ReflexEmbed.bootstrap();
+          }
+        };
+        window.addEventListener('reflex-embed-ready', bootstrapIfReady, { once: true });
+        bootstrapIfReady();
+      })();
+    </script>
   </body>
 </html>
