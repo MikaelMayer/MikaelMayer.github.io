@@ -27,6 +27,7 @@ import {
   LogicalOr,
   If,
   Abs,
+  Conjugate,
   buildFragmentSourceFromAST,
 } from './core-engine.mjs';
 
@@ -119,6 +120,13 @@ test('elementary functions emit the dedicated helpers', () => {
   assert.match(fragment, /c_cos/);
   assert.match(fragment, /c_sin/);
   assert.match(fragment, /c_exp/);
+});
+
+test('Conjugate nodes flip the imaginary component', () => {
+  const ast = Conjugate(VarZ());
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /vec2 inner =/);
+  assert.match(fragment, /vec2\(inner\.x, -inner\.y\)/);
 });
 
 test('LessThan nodes compare real parts and emit boolean constants', () => {

@@ -126,6 +126,10 @@ export function Abs(value) {
   return { kind: "Abs", value };
 }
 
+export function Conjugate(value) {
+  return { kind: "Conjugate", value };
+}
+
 export function oo(f, n) {
   const count = Number(n);
   if (!Number.isInteger(count) || count < 1) {
@@ -176,6 +180,7 @@ const formulaGlobals = Object.freeze({
   Cos,
   Ln,
   Abs,
+  Conjugate,
   oo,
 });
 
@@ -215,6 +220,7 @@ function assignNodeIds(ast) {
     case "Cos":
     case "Ln":
     case "Abs":
+    case "Conjugate":
       assignNodeIds(ast.value);
       return;
     case "Sub":
@@ -256,6 +262,7 @@ function collectNodesPostOrder(ast, out) {
     case "Cos":
     case "Ln":
     case "Abs":
+    case "Conjugate":
       collectNodesPostOrder(ast.value, out);
       break;
     case "Sub":
@@ -362,6 +369,15 @@ vec2 ${name}(vec2 z) {
     return `
 vec2 ${name}(vec2 z) {
     return vec2(${ast.re}, ${ast.im});
+}`.trim();
+  }
+
+  if (ast.kind === "Conjugate") {
+    const valueName = functionName(ast.value);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 inner = ${valueName}(z);
+    return vec2(inner.x, -inner.y);
 }`.trim();
   }
 
