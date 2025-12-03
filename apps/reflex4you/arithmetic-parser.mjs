@@ -41,6 +41,8 @@ import {
   oo,
   If,
   FingerOffset,
+  SetBindingNode,
+  SetRef,
 } from './core-engine.mjs';
 
 const IDENTIFIER_CHAR = /[A-Za-z0-9_]/;
@@ -53,8 +55,8 @@ function createPlaceholderVar(name) {
   return { kind: 'PlaceholderVar', name };
 }
 
-function createNamedVar(name) {
-  return { kind: 'NamedVar', name };
+function createIdentifier(name) {
+  return { kind: 'Identifier', name };
 }
 
 function withSpan(node, span) {
@@ -173,14 +175,14 @@ const identifierToken = wsRegex(IDENTIFIER_REGEX, {
   transform: (match) => match[0],
 });
 
-const namedVariableReferenceParser = createParser('NamedVariable', (input) => {
+const identifierReferenceParser = createParser('Identifier', (input) => {
   const identifier = identifierToken.runNormalized(input);
   if (!identifier.ok) {
     return identifier;
   }
   return new ParseSuccess({
-    ctor: 'NamedVariable',
-    value: withSpan(createNamedVar(identifier.value), identifier.span),
+    ctor: 'Identifier',
+    value: withSpan(createIdentifier(identifier.value), identifier.span),
     span: identifier.span,
     next: identifier.next,
   });
@@ -215,7 +217,7 @@ const primitiveParser = Choice([
   keywordLiteral('z', { ctor: 'VarZ' }).Map((_, result) => withSpan(VarZ(), result.span)),
   ...fingerLiteralParsers,
   iterationVariableLiteral,
-  namedVariableReferenceParser,
+  identifierReferenceParser,
 ], { ctor: 'Primitive' });
 
 let expressionParser;
@@ -509,7 +511,8 @@ function substitutePlaceholder(node, placeholder, replacement) {
     case 'VarX':
     case 'VarY':
     case 'FingerOffset':
-    case 'NamedVar':
+    case 'Identifier':
+    case 'SetRef':
       return cloneAst(node);
     case 'Pow':
       return { ...node, base: substitutePlaceholder(node.base, placeholder, replacement) };
@@ -550,79 +553,15 @@ function substitutePlaceholder(node, placeholder, replacement) {
         thenBranch: substitutePlaceholder(node.thenBranch, placeholder, replacement),
         elseBranch: substitutePlaceholder(node.elseBranch, placeholder, replacement),
       };
-    default:
-      return cloneAst(node);
-  }
-}
-
-function substituteNamedVariable(node, targetName, replacement) {
-  if (!node || typeof node !== 'object') {
-    return node;
-  }
-  if (node.kind === 'NamedVar') {
-    if (node.name === targetName) {
-      return cloneAst(replacement);
-    }
-    return cloneAst(node);
-  }
-  switch (node.kind) {
-    case 'Const':
-    case 'Var':
-    case 'VarX':
-    case 'VarY':
-    case 'FingerOffset':
-    case 'PlaceholderVar':
-      return cloneAst(node);
-    case 'Pow':
-      return { ...node, base: substituteNamedVariable(node.base, targetName, replacement) };
-    case 'Exp':
-    case 'Sin':
-    case 'Cos':
-    case 'Ln':
-    case 'Abs':
-    case 'Conjugate':
-      return { ...node, value: substituteNamedVariable(node.value, targetName, replacement) };
-    case 'Sub':
-    case 'Mul':
-    case 'Op':
-    case 'Add':
-    case 'Div':
-    case 'LessThan':
-    case 'GreaterThan':
-    case 'LessThanOrEqual':
-    case 'GreaterThanOrEqual':
-    case 'Equal':
-    case 'LogicalAnd':
-    case 'LogicalOr':
+    case 'SetBinding':
       return {
         ...node,
-        left: substituteNamedVariable(node.left, targetName, replacement),
-        right: substituteNamedVariable(node.right, targetName, replacement),
-      };
-    case 'Compose':
-      return {
-        ...node,
-        f: substituteNamedVariable(node.f, targetName, replacement),
-        g: substituteNamedVariable(node.g, targetName, replacement),
-      };
-    case 'If':
-      return {
-        ...node,
-        condition: substituteNamedVariable(node.condition, targetName, replacement),
-        thenBranch: substituteNamedVariable(node.thenBranch, targetName, replacement),
-        elseBranch: substituteNamedVariable(node.elseBranch, targetName, replacement),
+        value: substitutePlaceholder(node.value, placeholder, replacement),
+        body: substitutePlaceholder(node.body, placeholder, replacement),
       };
     default:
       return cloneAst(node);
   }
-}
-
-function applySetBinding({ name, value, body, span }) {
-  const substituted = substituteNamedVariable(body, name, value);
-  if (substituted && typeof substituted === 'object') {
-    return withSpan(substituted, span);
-  }
-  return substituted;
 }
 
 function cloneAst(node) {
@@ -636,8 +575,15 @@ function cloneAst(node) {
     case 'VarY':
     case 'FingerOffset':
     case 'PlaceholderVar':
-    case 'NamedVar':
+    case 'Identifier':
+    case 'SetRef':
       return { ...node };
+    case 'SetBinding':
+      return {
+        ...node,
+        value: cloneAst(node.value),
+        body: cloneAst(node.body),
+      };
     case 'Pow':
       return { ...node, base: cloneAst(node.base) };
     case 'Exp':
@@ -675,6 +621,86 @@ function cloneAst(node) {
       };
     default:
       throw new Error(`Unknown AST kind in cloneAst: ${node.kind}`);
+  }
+}
+
+function substituteIdentifierWithClone(node, targetName, replacement) {
+  if (!node || typeof node !== 'object') {
+    return node;
+  }
+  if (node.kind === 'Identifier') {
+    if (node.name === targetName) {
+      const cloned = cloneAst(replacement);
+      if (node.span) {
+        cloned.span = node.span;
+        cloned.input = node.input;
+      }
+      return cloned;
+    }
+    return cloneAst(node);
+  }
+  switch (node.kind) {
+    case 'Const':
+    case 'Var':
+    case 'VarX':
+    case 'VarY':
+    case 'FingerOffset':
+    case 'PlaceholderVar':
+    case 'SetRef':
+      return cloneAst(node);
+    case 'Pow':
+      return { ...node, base: substituteIdentifierWithClone(node.base, targetName, replacement) };
+    case 'Exp':
+    case 'Sin':
+    case 'Cos':
+    case 'Ln':
+    case 'Abs':
+    case 'Conjugate':
+      return { ...node, value: substituteIdentifierWithClone(node.value, targetName, replacement) };
+    case 'Sub':
+    case 'Mul':
+    case 'Op':
+    case 'Add':
+    case 'Div':
+    case 'LessThan':
+    case 'GreaterThan':
+    case 'LessThanOrEqual':
+    case 'GreaterThanOrEqual':
+    case 'Equal':
+    case 'LogicalAnd':
+    case 'LogicalOr':
+      return {
+        ...node,
+        left: substituteIdentifierWithClone(node.left, targetName, replacement),
+        right: substituteIdentifierWithClone(node.right, targetName, replacement),
+      };
+    case 'Compose':
+      return {
+        ...node,
+        f: substituteIdentifierWithClone(node.f, targetName, replacement),
+        g: substituteIdentifierWithClone(node.g, targetName, replacement),
+      };
+    case 'If':
+      return {
+        ...node,
+        condition: substituteIdentifierWithClone(node.condition, targetName, replacement),
+        thenBranch: substituteIdentifierWithClone(node.thenBranch, targetName, replacement),
+        elseBranch: substituteIdentifierWithClone(node.elseBranch, targetName, replacement),
+      };
+    case 'SetBinding': {
+      const nextValue = substituteIdentifierWithClone(node.value, targetName, replacement);
+      const nextBody =
+        node.name === targetName
+          ? cloneAst(node.body)
+          : substituteIdentifierWithClone(node.body, targetName, replacement);
+      return {
+        ...node,
+        value: nextValue,
+        body: nextBody,
+      };
+    }
+    default:
+      return cloneAst(node);
   }
 }
 
@@ -723,6 +749,9 @@ function findFirstPlaceholderNode(ast) {
       case 'Compose':
         stack.push(node.f, node.g);
         break;
+      case 'SetBinding':
+        stack.push(node.value, node.body);
+        break;
       default:
         break;
     }
@@ -730,7 +759,7 @@ function findFirstPlaceholderNode(ast) {
   return null;
 }
 
-function findFirstNamedVar(ast) {
+function findFirstLetBinding(ast) {
   if (!ast || typeof ast !== 'object') {
     return null;
   }
@@ -740,7 +769,7 @@ function findFirstNamedVar(ast) {
     if (!node || typeof node !== 'object') {
       continue;
     }
-    if (node.kind === 'NamedVar') {
+    if (node.kind === 'LetBinding') {
       return node;
     }
     switch (node.kind) {
@@ -775,8 +804,150 @@ function findFirstNamedVar(ast) {
       case 'Compose':
         stack.push(node.f, node.g);
         break;
+      case 'SetBinding':
+        stack.push(node.value, node.body);
+        break;
       default:
         break;
+    }
+  }
+  return null;
+}
+
+function eliminateTopLevelLets(ast, input) {
+  let current = ast;
+  while (current && typeof current === 'object' && current.kind === 'LetBinding') {
+    const substituted = substituteIdentifierWithClone(current.body, current.name, current.value);
+    if (current.span && substituted && typeof substituted === 'object') {
+      substituted.span = current.span;
+      substituted.input = current.input;
+    }
+    current = substituted;
+  }
+  const nestedLet = findFirstLetBinding(current);
+  if (nestedLet) {
+    const span = nestedLet.span ?? input.createSpan(0, 0);
+    return new ParseFailure({
+      ctor: 'LetBinding',
+      message: 'let bindings are only allowed at the top level',
+      severity: ParseSeverity.error,
+      expected: 'top-level let',
+      span,
+      input: span.input || input,
+    });
+  }
+  return current;
+}
+
+function resolveSetReferences(ast, input) {
+  const env = [];
+  function visit(node) {
+    if (!node || typeof node !== 'object') {
+      return null;
+    }
+    switch (node.kind) {
+      case 'SetBinding': {
+        const valueErr = visit(node.value);
+        if (valueErr) {
+          return valueErr;
+        }
+        env.push(node);
+        const bodyErr = visit(node.body);
+        env.pop();
+        return bodyErr;
+      }
+      case 'Identifier': {
+        const binding = findBindingForName(env, node.name);
+        if (!binding) {
+          const span = node.span ?? input.createSpan(0, 0);
+          return new ParseFailure({
+            ctor: 'Identifier',
+            message: `Unknown variable "${node.name}". Introduce it with "set ${node.name} = value in ..."`,
+            severity: ParseSeverity.error,
+            expected: 'set binding',
+            span,
+            input: span.input || input,
+          });
+        }
+        const resolved = SetRef(node.name, binding);
+        resolved.span = node.span;
+        resolved.input = node.input;
+        Object.assign(node, resolved);
+        return null;
+      }
+      case 'LetBinding':
+        return new ParseFailure({
+          ctor: 'LetBinding',
+          message: 'let bindings are only allowed at the top level',
+          severity: ParseSeverity.error,
+          expected: 'top-level let',
+          span: node.span ?? input.createSpan(0, 0),
+          input: (node.span && node.span.input) || input,
+        });
+      case 'Const':
+      case 'Var':
+      case 'VarX':
+      case 'VarY':
+      case 'FingerOffset':
+      case 'PlaceholderVar':
+      case 'SetRef':
+        return null;
+      case 'Pow':
+        return visit(node.base);
+      case 'Exp':
+      case 'Sin':
+      case 'Cos':
+      case 'Ln':
+      case 'Abs':
+      case 'Conjugate':
+        return visit(node.value);
+      case 'Sub':
+      case 'Mul':
+      case 'Op':
+      case 'Add':
+      case 'Div':
+      case 'LessThan':
+      case 'GreaterThan':
+      case 'LessThanOrEqual':
+      case 'GreaterThanOrEqual':
+      case 'Equal':
+      case 'LogicalAnd':
+      case 'LogicalOr': {
+        const leftErr = visit(node.left);
+        if (leftErr) {
+          return leftErr;
+        }
+        return visit(node.right);
+      }
+      case 'Compose': {
+        const fErr = visit(node.f);
+        if (fErr) {
+          return fErr;
+        }
+        return visit(node.g);
+      }
+      case 'If': {
+        const condErr = visit(node.condition);
+        if (condErr) {
+          return condErr;
+        }
+        const thenErr = visit(node.thenBranch);
+        if (thenErr) {
+          return thenErr;
+        }
+        return visit(node.elseBranch);
+      }
+      default:
+        return null;
+    }
+  }
+  return visit(ast);
+}
+
+function findBindingForName(env, name) {
+  for (let i = env.length - 1; i >= 0; i -= 1) {
+    if (env[i].name === name) {
+      return env[i];
     }
   }
   return null;
@@ -995,12 +1166,10 @@ const setBindingParser = createParser('SetBinding', (input) => {
     return bodyResult;
   }
   const span = spanBetween(input, bodyResult.next);
-  const value = applySetBinding({
-    name: nameResult.value,
-    value: valueResult.value,
-    body: bodyResult.value,
+  const value = withSpan(
+    SetBindingNode(nameResult.value, valueResult.value, bodyResult.value),
     span,
-  });
+  );
   return new ParseSuccess({
     ctor: 'SetBinding',
     value,
@@ -1009,7 +1178,59 @@ const setBindingParser = createParser('SetBinding', (input) => {
   });
 });
 
+const letKeyword = keywordLiteral('let', { ctor: 'LetKeyword' });
+const letEqualsLiteral = wsLiteral('=', { ctor: 'LetEquals' });
+
+const letBindingParser = createParser('LetBinding', (input) => {
+  const keyword = letKeyword.runNormalized(input);
+  if (!keyword.ok) {
+    return keyword;
+  }
+  const nameResult = bindingIdentifierParser.runNormalized(keyword.next);
+  if (!nameResult.ok) {
+    return nameResult;
+  }
+  const equalsResult = letEqualsLiteral.runNormalized(nameResult.next);
+  if (!equalsResult.ok) {
+    return equalsResult;
+  }
+  const valueResult = expressionRef.runNormalized(equalsResult.next);
+  if (!valueResult.ok) {
+    return valueResult;
+  }
+  const inResult = inKeyword.runNormalized(valueResult.next);
+  if (!inResult.ok) {
+    return inResult;
+  }
+  const bodyResult = expressionRef.runNormalized(inResult.next);
+  if (!bodyResult.ok) {
+    return bodyResult;
+  }
+  const span = spanBetween(input, bodyResult.next);
+  const value = {
+    kind: 'LetBinding',
+    name: nameResult.value,
+    value: valueResult.value,
+    body: bodyResult.value,
+    span,
+    input: span.input,
+  };
+  return new ParseSuccess({
+    ctor: 'LetBinding',
+    value,
+    span,
+    next: bodyResult.next,
+  });
+});
+
 expressionParser = createParser('Expression', (input) => {
+  const letResult = letBindingParser.runNormalized(input);
+  if (letResult.ok) {
+    return letResult;
+  }
+  if (letResult.severity === ParseSeverity.error) {
+    return letResult;
+  }
   const setResult = setBindingParser.runNormalized(input);
   if (setResult.ok) {
     return setResult;
@@ -1047,6 +1268,15 @@ export function parseFormulaInput(input) {
       input: remainder,
     });
   }
+  const letReduced = eliminateTopLevelLets(parsed.value, normalized);
+  if (letReduced instanceof ParseFailure) {
+    return letReduced;
+  }
+  const resolveError = resolveSetReferences(letReduced, normalized);
+  if (resolveError instanceof ParseFailure) {
+    return resolveError;
+  }
+  parsed.value = letReduced;
   const placeholderNode = findFirstPlaceholderNode(parsed.value);
   if (placeholderNode) {
     const span = placeholderNode.span ?? normalized.createSpan(0, 0);
@@ -1055,18 +1285,6 @@ export function parseFormulaInput(input) {
       message: `Placeholder variable "${placeholderNode.name}" is only allowed inside comp(...)`,
       severity: ParseSeverity.error,
       expected: 'comp(...) placeholder usage',
-      span,
-      input: span.input || normalized,
-    });
-  }
-  const namedVarNode = findFirstNamedVar(parsed.value);
-  if (namedVarNode) {
-    const span = namedVarNode.span ?? normalized.createSpan(0, 0);
-    return new ParseFailure({
-      ctor: 'NamedVar',
-      message: `Unknown variable "${namedVarNode.name}". Introduce it with "set ${namedVarNode.name} = value in ..."`,
-      severity: ParseSeverity.error,
-      expected: 'set binding',
       span,
       input: span.input || normalized,
     });
@@ -1091,9 +1309,12 @@ export const __internal = {
   groupedParser,
   setBindingParser,
   bindingIdentifierParser,
-  namedVariableReferenceParser,
+  identifierReferenceParser,
   setKeyword,
   inKeyword,
   setEqualsLiteral,
   expressionParser,
+  letBindingParser,
+  letKeyword,
+  letEqualsLiteral,
 };

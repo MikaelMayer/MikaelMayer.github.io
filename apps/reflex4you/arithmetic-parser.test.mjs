@@ -165,32 +165,42 @@ test('parses if expressions with embedded comparisons', () => {
   assert.equal(node.elseBranch.kind, 'Add');
 });
 
-test('set bindings inline named variables', () => {
+test('set bindings produce scoped nodes with shared slots', () => {
   const result = parseFormulaInput('set foo = x + 1 in foo * foo');
   assert.equal(result.ok, true);
   const ast = result.value;
-  assert.equal(ast.kind, 'Mul');
-  assert.equal(ast.left.kind, 'Add');
-  assert.equal(ast.right.kind, 'Add');
-  assert.notStrictEqual(ast.left, ast.right);
+  assert.equal(ast.kind, 'SetBinding');
+  assert.equal(ast.name, 'foo');
+  assert.equal(ast.value.kind, 'Add');
+  assert.equal(ast.body.kind, 'Mul');
+  assert.equal(ast.body.left.kind, 'SetRef');
+  assert.equal(ast.body.right.kind, 'SetRef');
+  assert.strictEqual(ast.body.left.binding, ast);
+  assert.strictEqual(ast.body.right.binding, ast);
 });
 
 test('set bindings associate weaker than $$ and $', () => {
   const result = parseFormulaInput('set f = z $$ 2 in f $ f');
   assert.equal(result.ok, true);
   const ast = result.value;
-  assert.equal(ast.kind, 'Compose');
-  assert.equal(ast.f.kind, 'Compose');
-  assert.equal(ast.g.kind, 'Compose');
+  assert.equal(ast.kind, 'SetBinding');
+  assert.equal(ast.value.kind, 'Compose');
+  assert.equal(ast.body.kind, 'Compose');
+  assert.equal(ast.body.f.kind, 'SetRef');
+  assert.equal(ast.body.g.kind, 'SetRef');
 });
 
 test('set bindings can reference and shadow earlier names', () => {
   const result = parseFormulaInput('set a = 1 in set a = a + 1 in a');
   assert.equal(result.ok, true);
-  const ast = result.value;
-  assert.equal(ast.kind, 'Add');
-  assert.equal(ast.left.kind, 'Const');
-  assert.equal(ast.right.kind, 'Const');
+  const outer = result.value;
+  assert.equal(outer.kind, 'SetBinding');
+  assert.equal(outer.name, 'a');
+  const inner = outer.body;
+  assert.equal(inner.kind, 'SetBinding');
+  assert.equal(inner.value.kind, 'Add');
+  assert.equal(inner.body.kind, 'SetRef');
+  assert.strictEqual(inner.body.binding, inner);
 });
 
 test('set binding rejects reserved identifiers', () => {
@@ -203,6 +213,21 @@ test('referencing undefined variables is rejected', () => {
   const result = parseFormulaInput('foo + 1');
   assert.equal(result.ok, false);
   assert.match(result.message, /unknown variable/i);
+});
+
+test('top-level let inlines its right-hand side in the body', () => {
+  const result = parseFormulaInput('let f = z + 1 in f $ f');
+  assert.equal(result.ok, true);
+  const ast = result.value;
+  assert.equal(ast.kind, 'Compose');
+  assert.equal(ast.f.kind, 'Add');
+  assert.equal(ast.g.kind, 'Add');
+});
+
+test('nested let bindings are rejected', () => {
+  const result = parseFormulaInput('set a = let f = z in f in a');
+  assert.equal(result.ok, false);
+  assert.match(result.message, /top level/i);
 });
 
 test('parseFormulaToAST throws on invalid formula', () => {
