@@ -41,15 +41,22 @@ import {
   oo,
   If,
   FingerOffset,
+  SetBindingNode,
+  SetRef,
 } from './core-engine.mjs';
 
 const IDENTIFIER_CHAR = /[A-Za-z0-9_]/;
 const NUMBER_REGEX = /[+-]?(?:\d+\.\d+|\d+|\.\d+)(?:[eE][+-]?\d+)?/y;
 const SQRT3_OVER_2 = Math.sqrt(3) / 2;
 const ITERATION_VARIABLE_NAME = 'v';
+const IDENTIFIER_REGEX = /[A-Za-z_][A-Za-z0-9_]*/y;
 
 function createPlaceholderVar(name) {
   return { kind: 'PlaceholderVar', name };
+}
+
+function createIdentifier(name) {
+  return { kind: 'Identifier', name };
 }
 
 function withSpan(node, span) {
@@ -103,6 +110,7 @@ const numberToken = wsRegex(NUMBER_REGEX, {
 });
 
 const imagUnit = wsLiteral('i', { ctor: 'ImagUnit', caseSensitive: false });
+const tightImagUnit = Literal('i', { ctor: 'ImagUnitTight', caseSensitive: false });
 
 const signParser = Choice([
   wsLiteral('+', { ctor: 'PlusSign' }).Map(() => 1),
@@ -113,7 +121,7 @@ const optionalSign = signParser.Optional(1, { ctor: 'OptionalSign' });
 
 const numberLiteral = numberToken.Map((value, result) => withSpan(Const(value, 0), result.span));
 
-const imagFromNumber = numberToken.i_(imagUnit, { ctor: 'NumericImag' })
+const imagFromNumber = numberToken.i_(tightImagUnit, { ctor: 'NumericImag' })
   .Map((magnitude, result) => withSpan(Const(0, magnitude), result.span));
 
 const unitImagLiteral = optionalSign.i_(imagUnit, { ctor: 'UnitImag' })
@@ -135,11 +143,73 @@ const fingerLiteralParsers = FINGER_TOKENS.map((label) =>
   keywordLiteral(label, { ctor: `Finger(${label})` }).Map((_, result) => withSpan(FingerOffset(label), result.span)),
 );
 
+const RESERVED_BINDING_NAMES = new Set([
+  'set',
+  'in',
+  'if',
+  'exp',
+  'sin',
+  'cos',
+  'ln',
+  'abs',
+  'conj',
+  'oo',
+  'comp',
+  'o',
+  'x',
+  'y',
+  'z',
+  'j',
+  ITERATION_VARIABLE_NAME,
+  ...FINGER_TOKENS,
+]);
+
 const iterationVariableLiteral = keywordLiteral(ITERATION_VARIABLE_NAME, { ctor: 'IterationVar' })
   .Map((_, result) => withSpan(createPlaceholderVar(ITERATION_VARIABLE_NAME), result.span));
 
 const iterationVariableNameParser = keywordLiteral(ITERATION_VARIABLE_NAME, { ctor: 'IterationName' })
   .Map(() => ITERATION_VARIABLE_NAME);
+
+const identifierToken = wsRegex(IDENTIFIER_REGEX, {
+  ctor: 'IdentifierToken',
+  transform: (match) => match[0],
+});
+
+const identifierReferenceParser = createParser('Identifier', (input) => {
+  const identifier = identifierToken.runNormalized(input);
+  if (!identifier.ok) {
+    return identifier;
+  }
+  return new ParseSuccess({
+    ctor: 'Identifier',
+    value: withSpan(createIdentifier(identifier.value), identifier.span),
+    span: identifier.span,
+    next: identifier.next,
+  });
+});
+
+const bindingIdentifierParser = createParser('BindingIdentifier', (input) => {
+  const identifier = identifierToken.runNormalized(input);
+  if (!identifier.ok) {
+    return identifier;
+  }
+  if (RESERVED_BINDING_NAMES.has(identifier.value)) {
+    return new ParseFailure({
+      ctor: 'BindingIdentifier',
+      message: `"${identifier.value}" is a reserved identifier and cannot be bound with set`,
+      severity: ParseSeverity.error,
+      expected: 'non-reserved identifier',
+      span: identifier.span,
+      input: identifier.span.input,
+    });
+  }
+  return new ParseSuccess({
+    ctor: 'BindingIdentifier',
+    value: identifier.value,
+    span: identifier.span,
+    next: identifier.next,
+  });
+});
 
 const primitiveParser = Choice([
   keywordLiteral('x', { ctor: 'VarX' }).Map((_, result) => withSpan(VarX(), result.span)),
@@ -147,6 +217,7 @@ const primitiveParser = Choice([
   keywordLiteral('z', { ctor: 'VarZ' }).Map((_, result) => withSpan(VarZ(), result.span)),
   ...fingerLiteralParsers,
   iterationVariableLiteral,
+  identifierReferenceParser,
 ], { ctor: 'Primitive' });
 
 let expressionParser;
@@ -440,6 +511,8 @@ function substitutePlaceholder(node, placeholder, replacement) {
     case 'VarX':
     case 'VarY':
     case 'FingerOffset':
+    case 'Identifier':
+    case 'SetRef':
       return cloneAst(node);
     case 'Pow':
       return { ...node, base: substitutePlaceholder(node.base, placeholder, replacement) };
@@ -480,6 +553,12 @@ function substitutePlaceholder(node, placeholder, replacement) {
         thenBranch: substitutePlaceholder(node.thenBranch, placeholder, replacement),
         elseBranch: substitutePlaceholder(node.elseBranch, placeholder, replacement),
       };
+    case 'SetBinding':
+      return {
+        ...node,
+        value: substitutePlaceholder(node.value, placeholder, replacement),
+        body: substitutePlaceholder(node.body, placeholder, replacement),
+      };
     default:
       return cloneAst(node);
   }
@@ -496,7 +575,15 @@ function cloneAst(node) {
     case 'VarY':
     case 'FingerOffset':
     case 'PlaceholderVar':
+    case 'Identifier':
+    case 'SetRef':
       return { ...node };
+    case 'SetBinding':
+      return {
+        ...node,
+        value: cloneAst(node.value),
+        body: cloneAst(node.body),
+      };
     case 'Pow':
       return { ...node, base: cloneAst(node.base) };
     case 'Exp':
@@ -534,6 +621,86 @@ function cloneAst(node) {
       };
     default:
       throw new Error(`Unknown AST kind in cloneAst: ${node.kind}`);
+  }
+}
+
+function substituteIdentifierWithClone(node, targetName, replacement) {
+  if (!node || typeof node !== 'object') {
+    return node;
+  }
+  if (node.kind === 'Identifier') {
+    if (node.name === targetName) {
+      const cloned = cloneAst(replacement);
+      if (node.span) {
+        cloned.span = node.span;
+        cloned.input = node.input;
+      }
+      return cloned;
+    }
+    return cloneAst(node);
+  }
+  switch (node.kind) {
+    case 'Const':
+    case 'Var':
+    case 'VarX':
+    case 'VarY':
+    case 'FingerOffset':
+    case 'PlaceholderVar':
+    case 'SetRef':
+      return cloneAst(node);
+    case 'Pow':
+      return { ...node, base: substituteIdentifierWithClone(node.base, targetName, replacement) };
+    case 'Exp':
+    case 'Sin':
+    case 'Cos':
+    case 'Ln':
+    case 'Abs':
+    case 'Conjugate':
+      return { ...node, value: substituteIdentifierWithClone(node.value, targetName, replacement) };
+    case 'Sub':
+    case 'Mul':
+    case 'Op':
+    case 'Add':
+    case 'Div':
+    case 'LessThan':
+    case 'GreaterThan':
+    case 'LessThanOrEqual':
+    case 'GreaterThanOrEqual':
+    case 'Equal':
+    case 'LogicalAnd':
+    case 'LogicalOr':
+      return {
+        ...node,
+        left: substituteIdentifierWithClone(node.left, targetName, replacement),
+        right: substituteIdentifierWithClone(node.right, targetName, replacement),
+      };
+    case 'Compose':
+      return {
+        ...node,
+        f: substituteIdentifierWithClone(node.f, targetName, replacement),
+        g: substituteIdentifierWithClone(node.g, targetName, replacement),
+      };
+    case 'If':
+      return {
+        ...node,
+        condition: substituteIdentifierWithClone(node.condition, targetName, replacement),
+        thenBranch: substituteIdentifierWithClone(node.thenBranch, targetName, replacement),
+        elseBranch: substituteIdentifierWithClone(node.elseBranch, targetName, replacement),
+      };
+    case 'SetBinding': {
+      const nextValue = substituteIdentifierWithClone(node.value, targetName, replacement);
+      const nextBody =
+        node.name === targetName
+          ? cloneAst(node.body)
+          : substituteIdentifierWithClone(node.body, targetName, replacement);
+      return {
+        ...node,
+        value: nextValue,
+        body: nextBody,
+      };
+    }
+    default:
+      return cloneAst(node);
   }
 }
 
@@ -582,8 +749,205 @@ function findFirstPlaceholderNode(ast) {
       case 'Compose':
         stack.push(node.f, node.g);
         break;
+      case 'SetBinding':
+        stack.push(node.value, node.body);
+        break;
       default:
         break;
+    }
+  }
+  return null;
+}
+
+function findFirstLetBinding(ast) {
+  if (!ast || typeof ast !== 'object') {
+    return null;
+  }
+  const stack = [ast];
+  while (stack.length) {
+    const node = stack.pop();
+    if (!node || typeof node !== 'object') {
+      continue;
+    }
+    if (node.kind === 'LetBinding') {
+      return node;
+    }
+    switch (node.kind) {
+      case 'Pow':
+        stack.push(node.base);
+        break;
+      case 'Exp':
+      case 'Sin':
+      case 'Cos':
+      case 'Ln':
+      case 'Abs':
+      case 'Conjugate':
+        stack.push(node.value);
+        break;
+      case 'Sub':
+      case 'Mul':
+      case 'Op':
+      case 'Add':
+      case 'Div':
+      case 'LessThan':
+      case 'GreaterThan':
+      case 'LessThanOrEqual':
+      case 'GreaterThanOrEqual':
+      case 'Equal':
+      case 'LogicalAnd':
+      case 'LogicalOr':
+        stack.push(node.left, node.right);
+        break;
+      case 'If':
+        stack.push(node.condition, node.thenBranch, node.elseBranch);
+        break;
+      case 'Compose':
+        stack.push(node.f, node.g);
+        break;
+      case 'SetBinding':
+        stack.push(node.value, node.body);
+        break;
+      default:
+        break;
+    }
+  }
+  return null;
+}
+
+function eliminateTopLevelLets(ast, input) {
+  let current = ast;
+  while (current && typeof current === 'object' && current.kind === 'LetBinding') {
+    const substituted = substituteIdentifierWithClone(current.body, current.name, current.value);
+    if (current.span && substituted && typeof substituted === 'object') {
+      substituted.span = current.span;
+      substituted.input = current.input;
+    }
+    current = substituted;
+  }
+  const nestedLet = findFirstLetBinding(current);
+  if (nestedLet) {
+    const span = nestedLet.span ?? input.createSpan(0, 0);
+    return new ParseFailure({
+      ctor: 'LetBinding',
+      message: 'let bindings are only allowed at the top level',
+      severity: ParseSeverity.error,
+      expected: 'top-level let',
+      span,
+      input: span.input || input,
+    });
+  }
+  return current;
+}
+
+function resolveSetReferences(ast, input) {
+  const env = [];
+  function visit(node) {
+    if (!node || typeof node !== 'object') {
+      return null;
+    }
+    switch (node.kind) {
+      case 'SetBinding': {
+        const valueErr = visit(node.value);
+        if (valueErr) {
+          return valueErr;
+        }
+        env.push(node);
+        const bodyErr = visit(node.body);
+        env.pop();
+        return bodyErr;
+      }
+      case 'Identifier': {
+        const binding = findBindingForName(env, node.name);
+        if (!binding) {
+          const span = node.span ?? input.createSpan(0, 0);
+          return new ParseFailure({
+            ctor: 'Identifier',
+            message: `Unknown variable "${node.name}". Introduce it with "set ${node.name} = value in ..."`,
+            severity: ParseSeverity.error,
+            expected: 'set binding',
+            span,
+            input: span.input || input,
+          });
+        }
+        const resolved = SetRef(node.name, binding);
+        resolved.span = node.span;
+        resolved.input = node.input;
+        Object.assign(node, resolved);
+        return null;
+      }
+      case 'LetBinding':
+        return new ParseFailure({
+          ctor: 'LetBinding',
+          message: 'let bindings are only allowed at the top level',
+          severity: ParseSeverity.error,
+          expected: 'top-level let',
+          span: node.span ?? input.createSpan(0, 0),
+          input: (node.span && node.span.input) || input,
+        });
+      case 'Const':
+      case 'Var':
+      case 'VarX':
+      case 'VarY':
+      case 'FingerOffset':
+      case 'PlaceholderVar':
+      case 'SetRef':
+        return null;
+      case 'Pow':
+        return visit(node.base);
+      case 'Exp':
+      case 'Sin':
+      case 'Cos':
+      case 'Ln':
+      case 'Abs':
+      case 'Conjugate':
+        return visit(node.value);
+      case 'Sub':
+      case 'Mul':
+      case 'Op':
+      case 'Add':
+      case 'Div':
+      case 'LessThan':
+      case 'GreaterThan':
+      case 'LessThanOrEqual':
+      case 'GreaterThanOrEqual':
+      case 'Equal':
+      case 'LogicalAnd':
+      case 'LogicalOr': {
+        const leftErr = visit(node.left);
+        if (leftErr) {
+          return leftErr;
+        }
+        return visit(node.right);
+      }
+      case 'Compose': {
+        const fErr = visit(node.f);
+        if (fErr) {
+          return fErr;
+        }
+        return visit(node.g);
+      }
+      case 'If': {
+        const condErr = visit(node.condition);
+        if (condErr) {
+          return condErr;
+        }
+        const thenErr = visit(node.thenBranch);
+        if (thenErr) {
+          return thenErr;
+        }
+        return visit(node.elseBranch);
+      }
+      default:
+        return null;
+    }
+  }
+  return visit(ast);
+}
+
+function findBindingForName(env, name) {
+  for (let i = env.length - 1; i >= 0; i -= 1) {
+    if (env[i].name === name) {
+      return env[i];
     }
   }
   return null;
@@ -772,7 +1136,110 @@ const logicalOrOperator = wsLiteral('||', { ctor: 'LogicalOrOp' }).Map(
 const logicalAndParser = leftAssociative(comparisonParser, logicalAndOperator, 'LogicalAnd');
 const logicalOrParser = leftAssociative(logicalAndParser, logicalOrOperator, 'LogicalOr');
 
-expressionParser = logicalOrParser;
+const setKeyword = keywordLiteral('set', { ctor: 'SetKeyword' });
+const inKeyword = keywordLiteral('in', { ctor: 'SetInKeyword' });
+const setEqualsLiteral = wsLiteral('=', { ctor: 'SetEquals' });
+
+const setBindingParser = createParser('SetBinding', (input) => {
+  const keyword = setKeyword.runNormalized(input);
+  if (!keyword.ok) {
+    return keyword;
+  }
+  const nameResult = bindingIdentifierParser.runNormalized(keyword.next);
+  if (!nameResult.ok) {
+    return nameResult;
+  }
+  const equalsResult = setEqualsLiteral.runNormalized(nameResult.next);
+  if (!equalsResult.ok) {
+    return equalsResult;
+  }
+  const valueResult = expressionRef.runNormalized(equalsResult.next);
+  if (!valueResult.ok) {
+    return valueResult;
+  }
+  const inResult = inKeyword.runNormalized(valueResult.next);
+  if (!inResult.ok) {
+    return inResult;
+  }
+  const bodyResult = expressionRef.runNormalized(inResult.next);
+  if (!bodyResult.ok) {
+    return bodyResult;
+  }
+  const span = spanBetween(input, bodyResult.next);
+  const value = withSpan(
+    SetBindingNode(nameResult.value, valueResult.value, bodyResult.value),
+    span,
+  );
+  return new ParseSuccess({
+    ctor: 'SetBinding',
+    value,
+    span,
+    next: bodyResult.next,
+  });
+});
+
+const letKeyword = keywordLiteral('let', { ctor: 'LetKeyword' });
+const letEqualsLiteral = wsLiteral('=', { ctor: 'LetEquals' });
+
+const letBindingParser = createParser('LetBinding', (input) => {
+  const keyword = letKeyword.runNormalized(input);
+  if (!keyword.ok) {
+    return keyword;
+  }
+  const nameResult = bindingIdentifierParser.runNormalized(keyword.next);
+  if (!nameResult.ok) {
+    return nameResult;
+  }
+  const equalsResult = letEqualsLiteral.runNormalized(nameResult.next);
+  if (!equalsResult.ok) {
+    return equalsResult;
+  }
+  const valueResult = expressionRef.runNormalized(equalsResult.next);
+  if (!valueResult.ok) {
+    return valueResult;
+  }
+  const inResult = inKeyword.runNormalized(valueResult.next);
+  if (!inResult.ok) {
+    return inResult;
+  }
+  const bodyResult = expressionRef.runNormalized(inResult.next);
+  if (!bodyResult.ok) {
+    return bodyResult;
+  }
+  const span = spanBetween(input, bodyResult.next);
+  const value = {
+    kind: 'LetBinding',
+    name: nameResult.value,
+    value: valueResult.value,
+    body: bodyResult.value,
+    span,
+    input: span.input,
+  };
+  return new ParseSuccess({
+    ctor: 'LetBinding',
+    value,
+    span,
+    next: bodyResult.next,
+  });
+});
+
+expressionParser = createParser('Expression', (input) => {
+  const letResult = letBindingParser.runNormalized(input);
+  if (letResult.ok) {
+    return letResult;
+  }
+  if (letResult.severity === ParseSeverity.error) {
+    return letResult;
+  }
+  const setResult = setBindingParser.runNormalized(input);
+  if (setResult.ok) {
+    return setResult;
+  }
+  if (setResult.severity === ParseSeverity.error) {
+    return setResult;
+  }
+  return logicalOrParser.runNormalized(input);
+});
 
 export function parseFormulaInput(input) {
   const normalized = ParserInput.from(input ?? '');
@@ -801,6 +1268,15 @@ export function parseFormulaInput(input) {
       input: remainder,
     });
   }
+  const letReduced = eliminateTopLevelLets(parsed.value, normalized);
+  if (letReduced instanceof ParseFailure) {
+    return letReduced;
+  }
+  const resolveError = resolveSetReferences(letReduced, normalized);
+  if (resolveError instanceof ParseFailure) {
+    return resolveError;
+  }
+  parsed.value = letReduced;
   const placeholderNode = findFirstPlaceholderNode(parsed.value);
   if (placeholderNode) {
     const span = placeholderNode.span ?? normalized.createSpan(0, 0);
@@ -831,4 +1307,14 @@ export const __internal = {
   primitiveParser,
   explicitComposeParser,
   groupedParser,
+  setBindingParser,
+  bindingIdentifierParser,
+  identifierReferenceParser,
+  setKeyword,
+  inKeyword,
+  setEqualsLiteral,
+  expressionParser,
+  letBindingParser,
+  letKeyword,
+  letEqualsLiteral,
 };

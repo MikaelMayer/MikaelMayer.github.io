@@ -142,6 +142,14 @@ export function oo(f, n) {
   return node;
 }
 
+export function SetBindingNode(name, value, body) {
+  return { kind: "SetBinding", name, value, body };
+}
+
+export function SetRef(name, binding = null) {
+  return { kind: "SetRef", name, binding };
+}
+
 function fingerIndexFromLabel(label) {
   return Number(label.slice(1)) - 1;
 }
@@ -243,6 +251,12 @@ function assignNodeIds(ast) {
       assignNodeIds(ast.thenBranch);
       assignNodeIds(ast.elseBranch);
       return;
+    case "SetBinding":
+      assignNodeIds(ast.value);
+      assignNodeIds(ast.body);
+      return;
+    case "SetRef":
+      return;
     case "Compose":
       assignNodeIds(ast.f);
       assignNodeIds(ast.g);
@@ -285,6 +299,12 @@ function collectNodesPostOrder(ast, out) {
       collectNodesPostOrder(ast.thenBranch, out);
       collectNodesPostOrder(ast.elseBranch, out);
       break;
+    case "SetBinding":
+      collectNodesPostOrder(ast.value, out);
+      collectNodesPostOrder(ast.body, out);
+      break;
+    case "SetRef":
+      break;
     case "Compose":
       collectNodesPostOrder(ast.f, out);
       collectNodesPostOrder(ast.g, out);
@@ -306,6 +326,10 @@ function collectNodesPostOrder(ast, out) {
 
 function functionName(ast) {
   return "node" + ast._id;
+}
+
+function setBindingSlotName(binding) {
+  return `set_binding_slot_${binding._id}`;
 }
 
 function buildExponentiationSteps(absExponent) {
@@ -378,6 +402,25 @@ vec2 ${name}(vec2 z) {
 vec2 ${name}(vec2 z) {
     vec2 inner = ${valueName}(z);
     return vec2(inner.x, -inner.y);
+}`.trim();
+  }
+
+  if (ast.kind === "SetRef") {
+    const slotName = setBindingSlotName(ast.binding);
+    return `
+vec2 ${name}(vec2 z) {
+    return ${slotName};
+}`.trim();
+  }
+
+  if (ast.kind === "SetBinding") {
+    const slotName = setBindingSlotName(ast);
+    const valueName = functionName(ast.value);
+    const bodyName = functionName(ast.body);
+    return `
+vec2 ${name}(vec2 z) {
+    ${slotName} = ${valueName}(z);
+    return ${bodyName}(z);
 }`.trim();
   }
 
@@ -648,7 +691,12 @@ function buildNodeFunctionsAndTop(ast) {
   assignNodeIds(ast);
   const nodes = [];
   collectNodesPostOrder(ast, nodes);
-  const funcs = nodes.map(generateNodeFunction).join("\n\n");
+  const slotDecls = nodes
+    .filter((node) => node.kind === "SetBinding")
+    .map((node) => `vec2 ${setBindingSlotName(node)};`)
+    .join("\n");
+  const funcBodies = nodes.map(generateNodeFunction).join("\n\n");
+  const funcs = slotDecls ? `${slotDecls}\n\n${funcBodies}` : funcBodies;
   const topName = functionName(ast);
   return { funcs, topName };
 }
