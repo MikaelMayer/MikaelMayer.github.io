@@ -2,6 +2,7 @@ import { ReflexCore, createDefaultFormulaAST } from './core-engine.mjs';
 import { parseFormulaInput } from './arithmetic-parser.mjs';
 
 const instanceMap = new WeakMap();
+let autoBootstrapScheduled = false;
 
 function formatCaretIndicator(source, failure) {
   const displaySource = source && source.length ? source : '(empty)';
@@ -153,10 +154,34 @@ export function bootstrapReflexEmbeds(options = {}) {
   });
 }
 
+function scheduleAutoBootstrap() {
+  if (autoBootstrapScheduled || typeof window === 'undefined' || typeof document === 'undefined') {
+    return;
+  }
+  autoBootstrapScheduled = true;
+  const run = () => {
+    try {
+      if (window.ReflexEmbed?.bootstrap) {
+        window.ReflexEmbed.bootstrap();
+      }
+    } catch (err) {
+      console.error('ReflexEmbed auto-bootstrap failed', err);
+    }
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', run, { once: true });
+  } else if (typeof queueMicrotask === 'function') {
+    queueMicrotask(run);
+  } else {
+    Promise.resolve().then(run).catch(() => {});
+  }
+}
+
 if (typeof window !== 'undefined') {
   window.ReflexEmbed = window.ReflexEmbed || {};
   window.ReflexEmbed.attach = attachReflexToElement;
   window.ReflexEmbed.detach = detachReflexFromElement;
   window.ReflexEmbed.bootstrap = bootstrapReflexEmbeds;
   window.dispatchEvent(new Event('reflex-embed-ready'));
+  scheduleAutoBootstrap();
 }
