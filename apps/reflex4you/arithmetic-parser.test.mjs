@@ -165,6 +165,46 @@ test('parses if expressions with embedded comparisons', () => {
   assert.equal(node.elseBranch.kind, 'Add');
 });
 
+test('set bindings inline named variables', () => {
+  const result = parseFormulaInput('set foo = x + 1 in foo * foo');
+  assert.equal(result.ok, true);
+  const ast = result.value;
+  assert.equal(ast.kind, 'Mul');
+  assert.equal(ast.left.kind, 'Add');
+  assert.equal(ast.right.kind, 'Add');
+  assert.notStrictEqual(ast.left, ast.right);
+});
+
+test('set bindings associate weaker than $$ and $', () => {
+  const result = parseFormulaInput('set f = z $$ 2 in f $ f');
+  assert.equal(result.ok, true);
+  const ast = result.value;
+  assert.equal(ast.kind, 'Compose');
+  assert.equal(ast.f.kind, 'Compose');
+  assert.equal(ast.g.kind, 'Compose');
+});
+
+test('set bindings can reference and shadow earlier names', () => {
+  const result = parseFormulaInput('set a = 1 in set a = a + 1 in a');
+  assert.equal(result.ok, true);
+  const ast = result.value;
+  assert.equal(ast.kind, 'Add');
+  assert.equal(ast.left.kind, 'Const');
+  assert.equal(ast.right.kind, 'Const');
+});
+
+test('set binding rejects reserved identifiers', () => {
+  const result = parseFormulaInput('set x = 1 in x + 1');
+  assert.equal(result.ok, false);
+  assert.match(result.message, /reserved identifier/i);
+});
+
+test('referencing undefined variables is rejected', () => {
+  const result = parseFormulaInput('foo + 1');
+  assert.equal(result.ok, false);
+  assert.match(result.message, /unknown variable/i);
+});
+
 test('parseFormulaToAST throws on invalid formula', () => {
   assert.throws(() => parseFormulaToAST('('), {
     name: 'SyntaxError',
