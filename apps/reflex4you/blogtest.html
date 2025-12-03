@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Reflex Embed – Blog Demo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        margin: 0;
+        padding: 2rem;
+        background: #0c0c0f;
+        color: #f0f0f5;
+        line-height: 1.6;
+      }
+      article {
+        max-width: 960px;
+        margin: 0 auto;
+      }
+      h1,
+      h2 {
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+      }
+      p {
+        margin-top: 0;
+      }
+      .reflex-block {
+        border-radius: 16px;
+        margin: 1.5rem 0;
+        min-height: 320px;
+        background: #000;
+        position: relative;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+        overflow: hidden;
+      }
+      .reflex-block--tall {
+        min-height: 420px;
+      }
+      code {
+        padding: 0.1rem 0.4rem;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.08);
+        font-size: 0.95em;
+      }
+      .instructions {
+        font-size: 0.95em;
+        color: #a3a3c1;
+        border-left: 4px solid #3a3ab7;
+        padding-left: 0.75rem;
+        margin: 1.5rem 0;
+      }
+    </style>
+  </head>
+  <body>
+    <article>
+      <h1>Embedding Reflex in Blog Posts</h1>
+      <p>
+        Drop a <code>div</code> with a fixed height, add a
+        <code>reflex-formula</code> attribute, and include the loader scripts at the end of the
+        page. Each block becomes a live Reflex canvas.
+      </p>
+
+      <div class="instructions">
+        <p>Required scripts:</p>
+        <ol>
+          <li><code>&lt;script type="module" src="./reflex-embed.js"&gt;&lt;/script&gt;</code></li>
+          <li>
+            A short inline script that calls
+            <code>window.ReflexEmbed.bootstrap()</code> (shown at the bottom of this file).
+          </li>
+        </ol>
+      </div>
+
+      <h2>Classic polynomial</h2>
+      <p>The zero set of <code>(z - 1) * (z + 1)</code> renders cleanly with two mirrored pockets.</p>
+      <div class="reflex-block" reflex-formula="(z - 1) * (z + 1)"></div>
+
+      <h2>Rational function</h2>
+      <p>
+        You can juxtapose multiple blocks with different heights. This one shows
+        <code>(z^2 + 1) / (z - i)</code>.
+      </p>
+      <div class="reflex-block reflex-block--tall" reflex-formula="(z ^ 2 + 1) / (z - i)"></div>
+
+      <h2>Quick iterations</h2>
+      <p>Throw any ad-hoc expression, such as <code>1 + z</code>, into its own block.</p>
+      <div class="reflex-block" reflex-formula="1 + z"></div>
+    </article>
+
+    <script type="module" src="./reflex-embed.js"></script>
+    <script>
+      const startReflexEmbeds = () => {
+        if (window.ReflexEmbed?.bootstrap) {
+          window.ReflexEmbed.bootstrap();
+        }
+      };
+      if (window.ReflexEmbed?.bootstrap) {
+        startReflexEmbeds();
+      } else {
+        window.addEventListener('reflex-embed-ready', startReflexEmbeds, { once: true });
+      }
+    </script>
+  </body>
+</html>
