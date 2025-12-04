@@ -771,6 +771,7 @@ precision highp float;
 uniform vec2 u_min;
 uniform vec2 u_max;
 uniform vec2 u_resolution;
+uniform vec2 u_viewportOffset;
 uniform vec2 u_fixedOffsets[3];
 uniform vec2 u_dynamicOffsets[3];
 
@@ -937,7 +938,7 @@ vec3 reflexColor(vec2 w) {
 }
 
 void main() {
-  vec2 uv = gl_FragCoord.xy / u_resolution;
+  vec2 uv = (gl_FragCoord.xy - u_viewportOffset) / u_resolution;
 
   vec2 z = vec2(
     mix(u_min.x, u_max.x, uv.x),
@@ -973,6 +974,7 @@ export class ReflexCore {
     this.uMinLoc = null;
     this.uMaxLoc = null;
     this.uResolutionLoc = null;
+    this.uViewportOffsetLoc = null;
     this.uFixedOffsetsLoc = null;
     this.uDynamicOffsetsLoc = null;
 
@@ -1004,6 +1006,7 @@ export class ReflexCore {
     this.activeFingerSlots = [];
 
     this.formulaAST = initialAST;
+    this.renderRegion = null;
 
     this.rebuildProgram();
     this.render();
@@ -1185,6 +1188,7 @@ export class ReflexCore {
     this.uMinLoc = this.gl.getUniformLocation(this.program, 'u_min');
     this.uMaxLoc = this.gl.getUniformLocation(this.program, 'u_max');
     this.uResolutionLoc = this.gl.getUniformLocation(this.program, 'u_resolution');
+    this.uViewportOffsetLoc = this.gl.getUniformLocation(this.program, 'u_viewportOffset');
     this.uFixedOffsetsLoc = this.gl.getUniformLocation(this.program, 'u_fixedOffsets[0]');
     this.uDynamicOffsetsLoc = this.gl.getUniformLocation(this.program, 'u_dynamicOffsets[0]');
     this.fixedOffsetsDirty = true;
@@ -1204,27 +1208,36 @@ export class ReflexCore {
   }
 
   updateView() {
-    const w = this.canvas.width;
-    const h = this.canvas.height;
-    if (w === 0 || h === 0) return;
-
-    if (w >= h) {
-      this.viewXSpan = 2.0 * this.baseHalfSpan;
-      this.viewYSpan = this.viewXSpan * (h / w);
-    } else {
-      this.viewYSpan = 2.0 * this.baseHalfSpan;
-      this.viewXSpan = this.viewYSpan * (w / h);
-    }
-
-    const xCenter = 0.0;
-    const yCenter = 0.0;
-    this.viewXMin = xCenter - this.viewXSpan / 2.0;
-    this.viewXMax = xCenter + this.viewXSpan / 2.0;
-    this.viewYMin = yCenter - this.viewYSpan / 2.0;
-    this.viewYMax = yCenter + this.viewYSpan / 2.0;
+    const span = 2.0 * this.baseHalfSpan;
+    this.viewXSpan = span;
+    this.viewYSpan = span;
+    this.viewXMin = -this.baseHalfSpan;
+    this.viewXMax = this.baseHalfSpan;
+    this.viewYMin = -this.baseHalfSpan;
+    this.viewYMax = this.baseHalfSpan;
 
     this.gl.uniform2f(this.uMinLoc, this.viewXMin, this.viewYMin);
     this.gl.uniform2f(this.uMaxLoc, this.viewXMax, this.viewYMax);
+  }
+
+  computeRenderRegion() {
+    const width = this.canvas.width;
+    const height = this.canvas.height;
+    if (width === 0 || height === 0) {
+      this.renderRegion = null;
+      return null;
+    }
+    const size = Math.min(width, height);
+    if (size === 0) {
+      this.renderRegion = null;
+      return null;
+    }
+    const offsetX = Math.floor((width - size) / 2);
+    const offsetBottom = Math.floor((height - size) / 2);
+    const offsetTop = height - size - offsetBottom;
+    const region = { offsetX, offsetBottom, offsetTop, size };
+    this.renderRegion = region;
+    return region;
   }
 
   uploadFingerUniforms() {
@@ -1243,11 +1256,29 @@ export class ReflexCore {
     this.resizeCanvasToDisplaySize();
     this.gl.useProgram(this.program);
     this.uploadFingerUniforms();
-    this.gl.uniform2f(this.uResolutionLoc, this.canvas.width, this.canvas.height);
-    this.updateView();
+    const canvasWidth = this.canvas.width;
+    const canvasHeight = this.canvas.height;
+    if (canvasWidth === 0 || canvasHeight === 0) {
+      this.renderRegion = null;
+      return;
+    }
 
+    // Clear the full canvas before drawing the square viewport.
+    this.gl.viewport(0, 0, canvasWidth, canvasHeight);
     this.gl.clearColor(0, 0, 0, 1);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+
+    const region = this.computeRenderRegion();
+    if (!region) {
+      return;
+    }
+
+    this.gl.viewport(region.offsetX, region.offsetBottom, region.size, region.size);
+    this.gl.uniform2f(this.uResolutionLoc, region.size, region.size);
+    if (this.uViewportOffsetLoc) {
+      this.gl.uniform2f(this.uViewportOffsetLoc, region.offsetX, region.offsetBottom);
+    }
+    this.updateView();
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 3);
   }
 
@@ -1318,7 +1349,7 @@ export class ReflexCore {
       }
       const pointerPoint = this.clientPointToComplex(event.clientX, event.clientY);
       if (!pointerPoint) {
-        return available[0];
+        return null;
       }
       let bestSlot = available[0];
       let bestDistance = Infinity;
@@ -1348,11 +1379,27 @@ export class ReflexCore {
 
   clientPointToComplex(clientX, clientY) {
     const rect = this.canvas.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) {
+    const region = this.renderRegion;
+    if (rect.width === 0 || rect.height === 0 || !region) {
       return null;
     }
-    const u = (clientX - rect.left) / rect.width;
-    const vFromTop = (clientY - rect.top) / rect.height;
+    const scaleX = this.canvas.width / rect.width;
+    const scaleY = this.canvas.height / rect.height;
+    const px = (clientX - rect.left) * scaleX;
+    const pyFromTop = (clientY - rect.top) * scaleY;
+    if (!Number.isFinite(px) || !Number.isFinite(pyFromTop)) {
+      return null;
+    }
+    if (
+      px < region.offsetX ||
+      px > region.offsetX + region.size ||
+      pyFromTop < region.offsetTop ||
+      pyFromTop > region.offsetTop + region.size
+    ) {
+      return null;
+    }
+    const u = (px - region.offsetX) / region.size;
+    const vFromTop = (pyFromTop - region.offsetTop) / region.size;
     if (!Number.isFinite(u) || !Number.isFinite(vFromTop)) {
       return null;
     }
@@ -1369,19 +1416,17 @@ export class ReflexCore {
 
   pointerDeltaToComplex(dxCss, dyCss) {
     const dpr = (typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1;
-    const dx = dxCss * dpr;
-    const dy = dyCss * dpr;
-    if (this.canvas.width === 0 || this.canvas.height === 0) {
+    const region = this.renderRegion;
+    if (!region || region.size === 0) {
       return null;
     }
-    const unitsPerPixelX = this.viewXSpan / this.canvas.width;
-    const unitsPerPixelY = this.viewYSpan / this.canvas.height;
-    if (!Number.isFinite(unitsPerPixelX) || !Number.isFinite(unitsPerPixelY)) {
+    const unitsPerPixel = this.viewXSpan / region.size;
+    if (!Number.isFinite(unitsPerPixel)) {
       return null;
     }
     return {
-      re: dx * unitsPerPixelX,
-      im: -dy * unitsPerPixelY,
+      re: dxCss * dpr * unitsPerPixel,
+      im: -dyCss * dpr * unitsPerPixel,
     };
   }
 
@@ -1391,11 +1436,19 @@ export class ReflexCore {
     if (spanX === 0 || spanY === 0) {
       return null;
     }
-    const u = (x - this.viewXMin) / spanX;
-    const v = (y - this.viewYMin) / spanY;
-    if (!Number.isFinite(u) || !Number.isFinite(v)) {
+    const uSquare = (x - this.viewXMin) / spanX;
+    const vSquare = (y - this.viewYMin) / spanY;
+    if (!Number.isFinite(uSquare) || !Number.isFinite(vSquare)) {
       return null;
     }
-    return { u, v };
+    const region = this.renderRegion;
+    const width = this.canvas.width;
+    const height = this.canvas.height;
+    if (!region || width === 0 || height === 0) {
+      return { u: uSquare, v: vSquare };
+    }
+    const normalizedU = (region.offsetX + uSquare * region.size) / width;
+    const normalizedV = (region.offsetBottom + vSquare * region.size) / height;
+    return { u: normalizedU, v: normalizedV };
   }
 }
