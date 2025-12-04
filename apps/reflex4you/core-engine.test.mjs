@@ -15,6 +15,8 @@ import {
   Exp,
   Sin,
   Cos,
+  Tan,
+  Atan,
   Ln,
   oo,
   FingerOffset,
@@ -28,6 +30,7 @@ import {
   If,
   Abs,
   Conjugate,
+  Atan2,
   buildFragmentSourceFromAST,
 } from './core-engine.mjs';
 
@@ -120,6 +123,20 @@ test('elementary functions emit the dedicated helpers', () => {
   assert.match(fragment, /c_cos/);
   assert.match(fragment, /c_sin/);
   assert.match(fragment, /c_exp/);
+});
+
+test('tan and atan nodes emit their helpers', () => {
+  const ast = Tan(Atan(VarZ()));
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /c_tan/);
+  assert.match(fragment, /c_atan/);
+});
+
+test('atan2 nodes emit real-angle helpers', () => {
+  const ast = Atan2(VarY(), VarX());
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /c_atan2/);
+  assert.match(fragment, /atan/);
 });
 
 test('Conjugate nodes flip the imaginary component', () => {

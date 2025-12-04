@@ -62,6 +62,21 @@ test('parses exp/sin/cos/ln calls', () => {
   assert.equal(result.value.value.kind, 'Sin');
 });
 
+test('parses tan and atan calls', () => {
+  const result = parseFormulaInput('tan(atan(z))');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Tan');
+  assert.equal(result.value.value.kind, 'Atan');
+});
+
+test('parses atan2 calls with two arguments', () => {
+  const result = parseFormulaInput('atan2(y, x)');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Atan2');
+  assert.equal(result.value.left.kind, 'VarY');
+  assert.equal(result.value.right.kind, 'VarX');
+});
+
 test('parses F2 primitive', () => {
   const result = parseFormulaInput('F2 + 1');
   assert.equal(result.ok, true);

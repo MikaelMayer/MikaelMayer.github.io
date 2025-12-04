@@ -35,9 +35,12 @@ import {
   Exp,
   Sin,
   Cos,
+  Tan,
+  Atan,
   Ln,
   Abs,
   Conjugate,
+  Atan2,
   oo,
   If,
   FingerOffset,
@@ -150,6 +153,9 @@ const RESERVED_BINDING_NAMES = new Set([
   'exp',
   'sin',
   'cos',
+  'tan',
+  'atan',
+  'atan2',
   'ln',
   'abs',
   'conj',
@@ -373,19 +379,38 @@ function createUnaryFunctionParser(name, factory) {
   }).Map((expr, result) => withSpan(factory(expr), result.span));
 }
 
+function createBinaryFunctionParser(name, factory) {
+  return Sequence([
+    keywordLiteral(name, { ctor: `${name}Keyword` }),
+    wsLiteral('(', { ctor: `${name}Open` }),
+    expressionRef,
+    wsLiteral(',', { ctor: `${name}Comma` }),
+    expressionRef,
+    wsLiteral(')', { ctor: `${name}Close` }),
+  ], {
+    ctor: `${name}Call`,
+    projector: (values) => ({ first: values[2], second: values[4] }),
+  }).Map(({ first, second }, result) => withSpan(factory(first, second), result.span));
+}
+
 const elementaryFunctionParser = Choice([
   createUnaryFunctionParser('exp', Exp),
   createUnaryFunctionParser('sin', Sin),
   createUnaryFunctionParser('cos', Cos),
+  createUnaryFunctionParser('tan', Tan),
+  createUnaryFunctionParser('atan', Atan),
   createUnaryFunctionParser('ln', Ln),
   createUnaryFunctionParser('abs', Abs),
   createUnaryFunctionParser('conj', Conjugate),
 ], { ctor: 'ElementaryFunction' });
 
+const atan2Parser = createBinaryFunctionParser('atan2', Atan2);
+
 const primaryParser = Choice([
   explicitRepeatComposeParser,
   compParser,
   explicitComposeParser,
+  atan2Parser,
   elementaryFunctionParser,
   ifParser,
   groupedParser,
@@ -519,6 +544,8 @@ function substitutePlaceholder(node, placeholder, replacement) {
     case 'Exp':
     case 'Sin':
     case 'Cos':
+    case 'Tan':
+    case 'Atan':
     case 'Ln':
     case 'Abs':
     case 'Conjugate':
@@ -535,6 +562,7 @@ function substitutePlaceholder(node, placeholder, replacement) {
     case 'Equal':
     case 'LogicalAnd':
     case 'LogicalOr':
+    case 'Atan2':
       return {
         ...node,
         left: substitutePlaceholder(node.left, placeholder, replacement),
@@ -589,6 +617,8 @@ function cloneAst(node) {
     case 'Exp':
     case 'Sin':
     case 'Cos':
+    case 'Tan':
+    case 'Atan':
     case 'Ln':
     case 'Abs':
     case 'Conjugate':
@@ -605,6 +635,7 @@ function cloneAst(node) {
     case 'Equal':
     case 'LogicalAnd':
     case 'LogicalOr':
+    case 'Atan2':
       return {
         ...node,
         left: cloneAst(node.left),
@@ -653,6 +684,8 @@ function substituteIdentifierWithClone(node, targetName, replacement) {
     case 'Exp':
     case 'Sin':
     case 'Cos':
+    case 'Tan':
+    case 'Atan':
     case 'Ln':
     case 'Abs':
     case 'Conjugate':
@@ -669,6 +702,7 @@ function substituteIdentifierWithClone(node, targetName, replacement) {
     case 'Equal':
     case 'LogicalAnd':
     case 'LogicalOr':
+    case 'Atan2':
       return {
         ...node,
         left: substituteIdentifierWithClone(node.left, targetName, replacement),
@@ -724,6 +758,8 @@ function findFirstPlaceholderNode(ast) {
       case 'Exp':
       case 'Sin':
       case 'Cos':
+      case 'Tan':
+      case 'Atan':
       case 'Ln':
       case 'Abs':
       case 'Conjugate':
@@ -741,6 +777,7 @@ function findFirstPlaceholderNode(ast) {
       case 'Equal':
       case 'LogicalAnd':
       case 'LogicalOr':
+      case 'Atan2':
         stack.push(node.left, node.right);
         break;
       case 'If':
@@ -779,6 +816,8 @@ function findFirstLetBinding(ast) {
       case 'Exp':
       case 'Sin':
       case 'Cos':
+      case 'Tan':
+      case 'Atan':
       case 'Ln':
       case 'Abs':
       case 'Conjugate':
@@ -796,6 +835,7 @@ function findFirstLetBinding(ast) {
       case 'Equal':
       case 'LogicalAnd':
       case 'LogicalOr':
+      case 'Atan2':
         stack.push(node.left, node.right);
         break;
       case 'If':
@@ -897,6 +937,8 @@ function resolveSetReferences(ast, input) {
       case 'Exp':
       case 'Sin':
       case 'Cos':
+      case 'Tan':
+      case 'Atan':
       case 'Ln':
       case 'Abs':
       case 'Conjugate':
@@ -912,7 +954,8 @@ function resolveSetReferences(ast, input) {
       case 'GreaterThanOrEqual':
       case 'Equal':
       case 'LogicalAnd':
-      case 'LogicalOr': {
+      case 'LogicalOr':
+      case 'Atan2': {
         const leftErr = visit(node.left);
         if (leftErr) {
           return leftErr;
