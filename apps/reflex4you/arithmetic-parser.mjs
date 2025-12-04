@@ -40,7 +40,6 @@ import {
   Ln,
   Abs,
   Conjugate,
-  Atan2,
   oo,
   If,
   FingerOffset,
@@ -155,7 +154,6 @@ const RESERVED_BINDING_NAMES = new Set([
   'cos',
   'tan',
   'atan',
-  'atan2',
   'ln',
   'abs',
   'conj',
@@ -379,19 +377,47 @@ function createUnaryFunctionParser(name, factory) {
   }).Map((expr, result) => withSpan(factory(expr), result.span));
 }
 
-function createBinaryFunctionParser(name, factory) {
-  return Sequence([
-    keywordLiteral(name, { ctor: `${name}Keyword` }),
-    wsLiteral('(', { ctor: `${name}Open` }),
-    expressionRef,
-    wsLiteral(',', { ctor: `${name}Comma` }),
-    expressionRef,
-    wsLiteral(')', { ctor: `${name}Close` }),
-  ], {
-    ctor: `${name}Call`,
-    projector: (values) => ({ first: values[2], second: values[4] }),
-  }).Map(({ first, second }, result) => withSpan(factory(first, second), result.span));
-}
+const lnParser = createParser('LnCall', (input) => {
+  const keyword = keywordLiteral('ln', { ctor: 'lnKeyword' }).runNormalized(input);
+  if (!keyword.ok) {
+    return keyword;
+  }
+  const open = wsLiteral('(', { ctor: 'lnOpen' }).runNormalized(keyword.next);
+  if (!open.ok) {
+    return open;
+  }
+  const valueResult = expressionRef.runNormalized(open.next);
+  if (!valueResult.ok) {
+    return valueResult;
+  }
+
+  let cursor = valueResult.next;
+  let branchNode = null;
+  const comma = wsLiteral(',', { ctor: 'lnComma' }).runNormalized(cursor);
+  if (comma.ok) {
+    const branchResult = expressionRef.runNormalized(comma.next);
+    if (!branchResult.ok) {
+      return branchResult;
+    }
+    branchNode = branchResult.value;
+    cursor = branchResult.next;
+  } else if (comma.severity === ParseSeverity.error) {
+    return comma;
+  }
+
+  const close = wsLiteral(')', { ctor: 'lnClose' }).runNormalized(cursor);
+  if (!close.ok) {
+    return close;
+  }
+
+  const span = spanBetween(input, close.next);
+  return new ParseSuccess({
+    ctor: 'LnCall',
+    value: withSpan(Ln(valueResult.value, branchNode), span),
+    span,
+    next: close.next,
+  });
+});
 
 const elementaryFunctionParser = Choice([
   createUnaryFunctionParser('exp', Exp),
@@ -399,18 +425,15 @@ const elementaryFunctionParser = Choice([
   createUnaryFunctionParser('cos', Cos),
   createUnaryFunctionParser('tan', Tan),
   createUnaryFunctionParser('atan', Atan),
-  createUnaryFunctionParser('ln', Ln),
+  lnParser,
   createUnaryFunctionParser('abs', Abs),
   createUnaryFunctionParser('conj', Conjugate),
 ], { ctor: 'ElementaryFunction' });
-
-const atan2Parser = createBinaryFunctionParser('atan2', Atan2);
 
 const primaryParser = Choice([
   explicitRepeatComposeParser,
   compParser,
   explicitComposeParser,
-  atan2Parser,
   elementaryFunctionParser,
   ifParser,
   groupedParser,
@@ -546,10 +569,16 @@ function substitutePlaceholder(node, placeholder, replacement) {
     case 'Cos':
     case 'Tan':
     case 'Atan':
-    case 'Ln':
     case 'Abs':
     case 'Conjugate':
       return { ...node, value: substitutePlaceholder(node.value, placeholder, replacement) };
+    case 'Ln': {
+      const nextValue = substitutePlaceholder(node.value, placeholder, replacement);
+      const nextBranch = node.branch
+        ? substitutePlaceholder(node.branch, placeholder, replacement)
+        : null;
+      return { ...node, value: nextValue, branch: nextBranch };
+    }
     case 'Sub':
     case 'Mul':
     case 'Op':
@@ -562,7 +591,6 @@ function substitutePlaceholder(node, placeholder, replacement) {
     case 'Equal':
     case 'LogicalAnd':
     case 'LogicalOr':
-    case 'Atan2':
       return {
         ...node,
         left: substitutePlaceholder(node.left, placeholder, replacement),
@@ -619,10 +647,15 @@ function cloneAst(node) {
     case 'Cos':
     case 'Tan':
     case 'Atan':
-    case 'Ln':
     case 'Abs':
     case 'Conjugate':
       return { ...node, value: cloneAst(node.value) };
+    case 'Ln':
+      return {
+        ...node,
+        value: cloneAst(node.value),
+        branch: node.branch ? cloneAst(node.branch) : null,
+      };
     case 'Sub':
     case 'Mul':
     case 'Op':
@@ -635,7 +668,6 @@ function cloneAst(node) {
     case 'Equal':
     case 'LogicalAnd':
     case 'LogicalOr':
-    case 'Atan2':
       return {
         ...node,
         left: cloneAst(node.left),
@@ -686,10 +718,16 @@ function substituteIdentifierWithClone(node, targetName, replacement) {
     case 'Cos':
     case 'Tan':
     case 'Atan':
-    case 'Ln':
     case 'Abs':
     case 'Conjugate':
       return { ...node, value: substituteIdentifierWithClone(node.value, targetName, replacement) };
+    case 'Ln': {
+      const nextValue = substituteIdentifierWithClone(node.value, targetName, replacement);
+      const nextBranch = node.branch
+        ? substituteIdentifierWithClone(node.branch, targetName, replacement)
+        : null;
+      return { ...node, value: nextValue, branch: nextBranch };
+    }
     case 'Sub':
     case 'Mul':
     case 'Op':
@@ -702,7 +740,6 @@ function substituteIdentifierWithClone(node, targetName, replacement) {
     case 'Equal':
     case 'LogicalAnd':
     case 'LogicalOr':
-    case 'Atan2':
       return {
         ...node,
         left: substituteIdentifierWithClone(node.left, targetName, replacement),
@@ -764,6 +801,9 @@ function findFirstPlaceholderNode(ast) {
       case 'Abs':
       case 'Conjugate':
         stack.push(node.value);
+        if (node.kind === 'Ln' && node.branch) {
+          stack.push(node.branch);
+        }
         break;
       case 'Sub':
       case 'Mul':
@@ -777,7 +817,6 @@ function findFirstPlaceholderNode(ast) {
       case 'Equal':
       case 'LogicalAnd':
       case 'LogicalOr':
-      case 'Atan2':
         stack.push(node.left, node.right);
         break;
       case 'If':
@@ -822,6 +861,9 @@ function findFirstLetBinding(ast) {
       case 'Abs':
       case 'Conjugate':
         stack.push(node.value);
+        if (node.kind === 'Ln' && node.branch) {
+          stack.push(node.branch);
+        }
         break;
       case 'Sub':
       case 'Mul':
@@ -835,7 +877,6 @@ function findFirstLetBinding(ast) {
       case 'Equal':
       case 'LogicalAnd':
       case 'LogicalOr':
-      case 'Atan2':
         stack.push(node.left, node.right);
         break;
       case 'If':
@@ -934,15 +975,24 @@ function resolveSetReferences(ast, input) {
         return null;
       case 'Pow':
         return visit(node.base);
-      case 'Exp':
-      case 'Sin':
-      case 'Cos':
-      case 'Tan':
-      case 'Atan':
-      case 'Ln':
-      case 'Abs':
-      case 'Conjugate':
-        return visit(node.value);
+    case 'Exp':
+    case 'Sin':
+    case 'Cos':
+    case 'Tan':
+    case 'Atan':
+    case 'Abs':
+    case 'Conjugate':
+      return visit(node.value);
+    case 'Ln': {
+      const valueErr = visit(node.value);
+      if (valueErr) {
+        return valueErr;
+      }
+      if (node.branch) {
+        return visit(node.branch);
+      }
+      return null;
+    }
       case 'Sub':
       case 'Mul':
       case 'Op':
@@ -952,10 +1002,9 @@ function resolveSetReferences(ast, input) {
       case 'GreaterThan':
       case 'LessThanOrEqual':
       case 'GreaterThanOrEqual':
-      case 'Equal':
-      case 'LogicalAnd':
-      case 'LogicalOr':
-      case 'Atan2': {
+    case 'Equal':
+    case 'LogicalAnd':
+    case 'LogicalOr': {
         const leftErr = visit(node.left);
         if (leftErr) {
           return leftErr;

@@ -30,7 +30,6 @@ import {
   If,
   Abs,
   Conjugate,
-  Atan2,
   buildFragmentSourceFromAST,
 } from './core-engine.mjs';
 
@@ -132,11 +131,11 @@ test('tan and atan nodes emit their helpers', () => {
   assert.match(fragment, /c_atan/);
 });
 
-test('atan2 nodes emit real-angle helpers', () => {
-  const ast = Atan2(VarY(), VarX());
+test('ln nodes support branch shifts via second argument', () => {
+  const ast = Ln(VarZ(), VarX());
   const fragment = buildFragmentSourceFromAST(ast);
-  assert.match(fragment, /c_atan2/);
-  assert.match(fragment, /atan/);
+  assert.match(fragment, /c_ln_branch/);
+  assert.match(fragment, /branchShift/);
 });
 
 test('Conjugate nodes flip the imaginary component', () => {

@@ -69,12 +69,14 @@ test('parses tan and atan calls', () => {
   assert.equal(result.value.value.kind, 'Atan');
 });
 
-test('parses atan2 calls with two arguments', () => {
-  const result = parseFormulaInput('atan2(y, x)');
+test('parses ln calls with optional branch shift', () => {
+  const result = parseFormulaInput('ln(z, x + 1)');
   assert.equal(result.ok, true);
-  assert.equal(result.value.kind, 'Atan2');
-  assert.equal(result.value.left.kind, 'VarY');
-  assert.equal(result.value.right.kind, 'VarX');
+  const node = result.value;
+  assert.equal(node.kind, 'Ln');
+  assert.equal(node.value.kind, 'Var');
+  assert.equal(node.branch.kind, 'Add');
+  assert.equal(node.branch.left.kind, 'VarX');
 });
 
 test('parses F2 primitive', () => {
