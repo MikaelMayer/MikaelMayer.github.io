@@ -2,7 +2,8 @@
 const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({
-  testDir: './tests',
+  testDir: '.',
+  testMatch: /^(tests|apps\/reflex4you\/tests)\/.*\.spec\.js$/,
   timeout: 60000,
   retries: 0,
   use: {
