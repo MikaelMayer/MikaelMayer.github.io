@@ -348,6 +348,10 @@ function detectFingerUsage(ast) {
       case 'Compose':
         stack.push(node.f, node.g);
         break;
+      case 'SetBinding':
+      case 'LetBinding':
+        stack.push(node.value, node.body);
+        break;
       case 'If':
         stack.push(node.condition, node.thenBranch, node.elseBranch);
         break;
