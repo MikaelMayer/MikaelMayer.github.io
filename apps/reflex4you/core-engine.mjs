@@ -727,6 +727,8 @@ uniform vec2 u_dynamicOffsets[3];
 out vec4 outColor;
 
 const float SQ3 = 1.7320508075688772;
+const float COLOR_MIN_MAG = 1.0e-6;
+const float COLOR_MIN_DEN = 1.0e-12;
 
 vec2 c_mul(vec2 a, vec2 b) {
   return vec2(
@@ -807,7 +809,7 @@ vec3 reflexColor(vec2 w) {
   float im = w.y;
   float m  = length(w);
 
-  if (m == 0.0) {
+  if (m <= COLOR_MIN_MAG) {
     return vec3(0.0);
   }
 
@@ -822,7 +824,7 @@ vec3 reflexColor(vec2 w) {
   float rpm  = re + m;
   float rpm2 = rpm * rpm;
   float i2   = im * im;
-  float den  = rpm2 + i2;
+  float den  = max(rpm2 + i2, COLOR_MIN_DEN);
 
   if (im == 0.0 && re <= 0.0) {
     g = 190.0;
