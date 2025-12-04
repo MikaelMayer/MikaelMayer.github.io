@@ -327,9 +327,16 @@ function detectFingerUsage(ast) {
       case 'Exp':
       case 'Sin':
       case 'Cos':
-      case 'Ln':
+      case 'Tan':
+      case 'Atan':
       case 'Abs':
         stack.push(node.value);
+        break;
+      case 'Ln':
+        stack.push(node.value);
+        if (node.branch) {
+          stack.push(node.branch);
+        }
         break;
       case 'Sub':
       case 'Mul':

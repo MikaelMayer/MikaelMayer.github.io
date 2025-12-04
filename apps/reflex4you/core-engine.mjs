@@ -65,7 +65,6 @@ export function Add(left, right) {
 export function Div(left, right) {
   return { kind: "Div", left, right };
 }
-
 export function LessThan(left, right) {
   return { kind: "LessThan", left, right };
 }
@@ -118,8 +117,16 @@ export function Cos(value) {
   return { kind: "Cos", value };
 }
 
-export function Ln(value) {
-  return { kind: "Ln", value };
+export function Tan(value) {
+  return { kind: "Tan", value };
+}
+
+export function Atan(value) {
+  return { kind: "Atan", value };
+}
+
+export function Ln(value, branch = null) {
+  return { kind: "Ln", value, branch };
 }
 
 export function Abs(value) {
@@ -186,6 +193,8 @@ const formulaGlobals = Object.freeze({
   Exp,
   Sin,
   Cos,
+  Tan,
+  Atan,
   Ln,
   Abs,
   Conjugate,
@@ -226,10 +235,17 @@ function assignNodeIds(ast) {
     case "Exp":
     case "Sin":
     case "Cos":
-    case "Ln":
+    case "Tan":
+    case "Atan":
     case "Abs":
     case "Conjugate":
       assignNodeIds(ast.value);
+      return;
+    case "Ln":
+      assignNodeIds(ast.value);
+      if (ast.branch) {
+        assignNodeIds(ast.branch);
+      }
       return;
     case "Sub":
     case "Mul":
@@ -274,10 +290,17 @@ function collectNodesPostOrder(ast, out) {
     case "Exp":
     case "Sin":
     case "Cos":
-    case "Ln":
+    case "Tan":
+    case "Atan":
     case "Abs":
     case "Conjugate":
       collectNodesPostOrder(ast.value, out);
+      break;
+    case "Ln":
+      collectNodesPostOrder(ast.value, out);
+      if (ast.branch) {
+        collectNodesPostOrder(ast.branch, out);
+      }
       break;
     case "Sub":
     case "Mul":
@@ -613,12 +636,39 @@ vec2 ${name}(vec2 z) {
 }`.trim();
   }
 
-  if (ast.kind === "Ln") {
+  if (ast.kind === "Tan") {
     const valueName = functionName(ast.value);
     return `
 vec2 ${name}(vec2 z) {
     vec2 v = ${valueName}(z);
+    return c_tan(v);
+}`.trim();
+  }
+
+  if (ast.kind === "Ln") {
+    const valueName = functionName(ast.value);
+    if (ast.branch) {
+      const branchName = functionName(ast.branch);
+      return `
+vec2 ${name}(vec2 z) {
+    vec2 v = ${valueName}(z);
+    vec2 branchShift = ${branchName}(z);
+    return c_ln_branch(v, branchShift.x);
+}`.trim();
+    }
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 v = ${valueName}(z);
     return c_ln(v);
+}`.trim();
+  }
+
+  if (ast.kind === "Atan") {
+    const valueName = functionName(ast.value);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 v = ${valueName}(z);
+    return c_atan(v);
 }`.trim();
   }
 
@@ -729,6 +779,8 @@ out vec4 outColor;
 const float SQ3 = 1.7320508075688772;
 const float COLOR_MIN_MAG = 1.0e-6;
 const float COLOR_MIN_DEN = 1.0e-12;
+const float PI = 3.141592653589793;
+const float TAU = 6.283185307179586;
 
 vec2 c_mul(vec2 a, vec2 b) {
   return vec2(
@@ -790,12 +842,39 @@ vec2 c_cos(vec2 z) {
   );
 }
 
-vec2 c_ln(vec2 z) {
+vec2 c_tan(vec2 z) {
+  vec2 s = c_sin(z);
+  vec2 c = c_cos(z);
+  return c_div(s, c);
+}
+
+float wrapAngleToRange(float angle, float center) {
+  float shifted = angle - center;
+  float normalized = shifted - TAU * floor((shifted + PI) / TAU);
+  return normalized + center;
+}
+
+vec2 c_ln_branch(vec2 z, float center) {
   float magnitude = length(z);
   if (magnitude < 1e-12) {
     return vec2(-1e10, 0.0);
   }
-  return vec2(log(magnitude), atan(z.y, z.x));
+  float angle = atan(z.y, z.x);
+  float adjusted = wrapAngleToRange(angle, center);
+  return vec2(log(magnitude), adjusted);
+}
+
+vec2 c_ln(vec2 z) {
+  return c_ln_branch(z, 0.0);
+}
+
+vec2 c_atan(vec2 z) {
+  vec2 iz = vec2(-z.y, z.x);
+  vec2 one = vec2(1.0, 0.0);
+  vec2 term1 = c_ln(one - iz);
+  vec2 term2 = c_ln(one + iz);
+  vec2 diff = term1 - term2;
+  return c_mul(vec2(0.0, 0.5), diff);
 }
 
 /*NODE_FUNCS*/

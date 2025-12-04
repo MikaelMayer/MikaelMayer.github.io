@@ -15,6 +15,8 @@ import {
   Exp,
   Sin,
   Cos,
+  Tan,
+  Atan,
   Ln,
   oo,
   FingerOffset,
@@ -120,6 +122,20 @@ test('elementary functions emit the dedicated helpers', () => {
   assert.match(fragment, /c_cos/);
   assert.match(fragment, /c_sin/);
   assert.match(fragment, /c_exp/);
+});
+
+test('tan and atan nodes emit their helpers', () => {
+  const ast = Tan(Atan(VarZ()));
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /c_tan/);
+  assert.match(fragment, /c_atan/);
+});
+
+test('ln nodes support branch shifts via second argument', () => {
+  const ast = Ln(VarZ(), VarX());
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /c_ln_branch/);
+  assert.match(fragment, /branchShift/);
 });
 
 test('Conjugate nodes flip the imaginary component', () => {
