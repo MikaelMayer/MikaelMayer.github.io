@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
-const SIMPLE_FORMULA = 'Add(Const(1.0, 0.0), Const(0.0, 1.0))';
+const SIMPLE_FORMULA = '(z - 1) * (z + 1)';
+const SEEDED_FORMULA = 'z + 2';
 const DYNAMIC_SET_FORMULA = 'set c = sin(z $ D1) in (1 - c + c * z) / (c + (1 - c) * z)';
 const FIXED_SET_FORMULA = 'set c = sin(z + F1) in (z - c) * (z + c)';
 
@@ -11,21 +12,21 @@ test('reflex4you updates formula query param after successful apply', async ({ p
   await expect(textarea).toBeVisible();
 
   await textarea.fill(SIMPLE_FORMULA);
-  await page.getByRole('button', { name: 'Apply' }).click();
-
-  const url = new URL(page.url());
-  const formulaInQuery = url.searchParams.get('formula');
-  expect(formulaInQuery).toBe(SIMPLE_FORMULA);
-
   await expect(page.locator('#error')).toBeHidden();
+  await expect.poll(async () => {
+    const href = await page.evaluate(() => window.location.href);
+    const url = new URL(href);
+    return url.searchParams.get('formula');
+  }).toBe(SIMPLE_FORMULA);
+
+  await expect(textarea).toHaveValue(SIMPLE_FORMULA);
 });
 
 test('reflex4you loads formulas from query string on startup', async ({ page }) => {
-  const seededFormula = 'Const(2.0, -1.5)';
-  await page.goto(`/index.html?formula=${encodeURIComponent(seededFormula)}`);
+  await page.goto(`/index.html?formula=${encodeURIComponent(SEEDED_FORMULA)}`);
 
   const textarea = page.locator('#formula');
-  await expect(textarea).toHaveValue(seededFormula);
+  await expect(textarea).toHaveValue(SEEDED_FORMULA);
 
   await expect(page.locator('#error')).toBeHidden();
 });
