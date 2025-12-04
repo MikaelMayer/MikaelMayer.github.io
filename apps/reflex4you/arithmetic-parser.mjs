@@ -226,6 +226,7 @@ const primitiveParser = Choice([
 
 let expressionParser;
 const expressionRef = lazy(() => expressionParser, { ctor: 'ExpressionRef' });
+const setBindingRef = lazy(() => setBindingParser, { ctor: 'SetBindingRef' });
 
 const groupedParser = Sequence([
   wsLiteral('(', { ctor: 'GroupOpen' }),
@@ -436,6 +437,7 @@ const primaryParser = Choice([
   explicitComposeParser,
   elementaryFunctionParser,
   ifParser,
+  setBindingRef,
   groupedParser,
   literalParser,
   primitiveParser,
