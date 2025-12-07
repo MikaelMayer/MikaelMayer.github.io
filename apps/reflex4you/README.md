@@ -10,7 +10,7 @@ Reflex4You is an interactive complex-function explorer. Type a formula, drag the
 2. **Enter a formula.** Try:
 
    ```
-   sin(z^2 + D2) $ (z - D1)
+   sin(z^2 + D2) $ z - D1
    ```
 
    Handles `D1` and `D2` appear. Drag them to adjust the parameters; their coordinates (and the formula) are stored directly in the URL, so sharing the link reproduces the exact view for anyone else.
@@ -69,7 +69,7 @@ Examples:
 
 ```text
 f $ ((z - W2) / (W1 - W2))    # pan/zoom/rotate via W gestures
-sin(z - D1)                   # manual handle for offsetting input
+sin $ z - D1                  # manual handle for offsetting input
 set c = abs(z) in c / (1 + c) # temporary value
 if(real < 0, conj(z), z)      # axis-aware interaction
 ```
