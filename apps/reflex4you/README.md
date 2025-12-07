@@ -68,8 +68,8 @@ The input accepts succinct expressions with complex arithmetic, composition, and
 Examples:
 
 ```text
-(z - W1) / W2                 # pan/zoom via gestures
-sin(z $ D1)                   # manual handle for offsetting input
+f $ ((z - W2) / (W1 - W2))    # pan/zoom/rotate via W gestures
+sin(z - D1)                   # manual handle for offsetting input
 set c = abs(z) in c / (1 + c) # temporary value
 if(real < 0, conj(z), z)      # axis-aware interaction
 ```
