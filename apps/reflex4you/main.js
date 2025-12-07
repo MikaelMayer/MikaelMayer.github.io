@@ -2,6 +2,7 @@ import {
   ReflexCore,
   createDefaultFormulaAST,
 } from './core-engine.mjs';
+import { visitAst } from './ast-utils.mjs';
 import { parseFormulaInput } from './arithmetic-parser.mjs';
 
 const canvas = document.getElementById('glcanvas');
@@ -13,12 +14,13 @@ const rootElement = typeof document !== 'undefined' ? document.documentElement :
 
 const FIXED_FINGER_ORDER = ['F1', 'F2', 'F3'];
 const DYNAMIC_FINGER_ORDER = ['D1', 'D2', 'D3'];
-const ALL_FINGER_LABELS = [...FIXED_FINGER_ORDER, ...DYNAMIC_FINGER_ORDER];
+const W_FINGER_ORDER = ['W1', 'W2'];
+const ALL_FINGER_LABELS = [...FIXED_FINGER_ORDER, ...DYNAMIC_FINGER_ORDER, ...W_FINGER_ORDER];
 
 const FINGER_METADATA = ALL_FINGER_LABELS.reduce((acc, label) => {
   acc[label] = {
     label,
-    type: label.startsWith('F') ? 'fixed' : 'dynamic',
+    type: label.startsWith('F') ? 'fixed' : label.startsWith('D') ? 'dynamic' : 'w',
   };
   return acc;
 }, {});
@@ -33,7 +35,19 @@ ALL_FINGER_LABELS.forEach((label) => {
   latestOffsets[label] = { x: 0, y: 0 };
 });
 
-let activeFingerState = { mode: 'none', slots: [] };
+let activeFingerState = createEmptyFingerState();
+
+function createEmptyFingerState() {
+  return {
+    mode: 'none',
+    fixedSlots: [],
+    dynamicSlots: [],
+    wSlots: [],
+    axisConstraints: new Map(),
+    allSlots: [],
+    activeLabelSet: new Set(),
+  };
+}
 
 function updateViewportInsets() {
   if (typeof window === 'undefined' || !rootElement) {
@@ -76,11 +90,11 @@ function refreshFingerIndicator(label) {
   }
   const latest = latestOffsets[label];
   indicator.textContent = formatComplexForDisplay(label, latest.x, latest.y);
-  const isActive = activeFingerState.slots.includes(label);
+  const isActive = activeFingerState.activeLabelSet.has(label);
   indicator.style.display = isActive ? '' : 'none';
 }
 
-const DEFAULT_FORMULA_TEXT = '(z - F1) * (z + F1)';
+const DEFAULT_FORMULA_TEXT = 'z';
 
 const defaultParseResult = parseFormulaInput(DEFAULT_FORMULA_TEXT);
 const fallbackDefaultAST = defaultParseResult.ok ? defaultParseResult.value : createDefaultFormulaAST();
@@ -185,6 +199,11 @@ function parseComplexString(raw) {
     }
   }
 
+  const realValue = Number(normalized);
+  if (Number.isFinite(realValue)) {
+    return { x: realValue, y: 0 };
+  }
+
   return null;
 }
 
@@ -263,7 +282,7 @@ function handleFingerValueChange(label, offset) {
   latestOffsets[label] = { x: offset.x, y: offset.y };
   refreshFingerIndicator(label);
   updateFingerDotPosition(label);
-  if (activeFingerState.slots.includes(label)) {
+  if (activeFingerState.activeLabelSet.has(label)) {
     const serialized = formatComplexForQuery(offset.x, offset.y);
     if (serialized !== fingerLastSerialized[label]) {
       fingerLastSerialized[label] = serialized;
@@ -298,98 +317,84 @@ function showParseError(source, failure) {
   showError(formatCaretIndicator(source, failure));
 }
 
-function detectFingerUsage(ast) {
+function analyzeFingerUsage(ast) {
   const usage = {
     fixed: new Set(),
     dynamic: new Set(),
+    w: new Set(),
   };
+  const axisBuckets = new Map();
   if (!ast) {
-    return usage;
+    return { usage, axisConstraints: new Map() };
   }
-  const stack = [ast];
-  while (stack.length) {
-    const node = stack.pop();
-    if (!node) {
-      continue;
+  visitAst(ast, (node, meta) => {
+    if (node.kind !== 'FingerOffset') {
+      return;
     }
-    if (node.kind === 'FingerOffset') {
-      const slot = node.slot;
-      if (FINGER_METADATA[slot]) {
-        const bucket = FINGER_METADATA[slot].type === 'fixed' ? usage.fixed : usage.dynamic;
-        bucket.add(slot);
-      }
-      continue;
+    const slot = node.slot;
+    const family = slot.startsWith('F') ? 'fixed' : slot.startsWith('D') ? 'dynamic' : 'w';
+    usage[family].add(slot);
+    const axisKind = resolveAxisContext(meta.parent, node);
+    const bucket = axisBuckets.get(slot) || new Set();
+    bucket.add(axisKind);
+    axisBuckets.set(slot, bucket);
+  });
+  const axisConstraints = new Map();
+  axisBuckets.forEach((bucket, slot) => {
+    if (bucket.size === 1 && bucket.has('x')) {
+      axisConstraints.set(slot, 'x');
+    } else if (bucket.size === 1 && bucket.has('y')) {
+      axisConstraints.set(slot, 'y');
     }
-    switch (node.kind) {
-      case 'Pow':
-        stack.push(node.base);
-        break;
-      case 'Exp':
-      case 'Sin':
-      case 'Cos':
-      case 'Tan':
-      case 'Atan':
-      case 'Abs':
-        stack.push(node.value);
-        break;
-      case 'Ln':
-        stack.push(node.value);
-        if (node.branch) {
-          stack.push(node.branch);
-        }
-        break;
-      case 'Sub':
-      case 'Mul':
-      case 'Op':
-      case 'Add':
-      case 'Div':
-      case 'LessThan':
-      case 'GreaterThan':
-      case 'LessThanOrEqual':
-      case 'GreaterThanOrEqual':
-      case 'Equal':
-      case 'LogicalAnd':
-      case 'LogicalOr':
-        stack.push(node.left, node.right);
-        break;
-      case 'Compose':
-        stack.push(node.f, node.g);
-        break;
-      case 'SetBinding':
-      case 'LetBinding':
-        stack.push(node.value, node.body);
-        break;
-      case 'If':
-        stack.push(node.condition, node.thenBranch, node.elseBranch);
-        break;
-      default:
-        break;
-    }
-  }
-  return usage;
+  });
+  return { usage, axisConstraints };
 }
 
-function deriveFingerState(usage) {
-  const fixedSlots = FIXED_FINGER_ORDER.filter((label) => usage.fixed.has(label));
-  const dynamicSlots = DYNAMIC_FINGER_ORDER.filter((label) => usage.dynamic.has(label));
+function resolveAxisContext(parent, node) {
+  if (
+    parent &&
+    parent.kind === 'Compose' &&
+    parent.g === node &&
+    parent.f &&
+    (parent.f.kind === 'VarX' || parent.f.kind === 'VarY')
+  ) {
+    return parent.f.kind === 'VarX' ? 'x' : 'y';
+  }
+  return 'other';
+}
+
+function deriveFingerState(analysis) {
+  const fixedSlots = FIXED_FINGER_ORDER.filter((label) => analysis.usage.fixed.has(label));
+  const dynamicSlots = DYNAMIC_FINGER_ORDER.filter((label) => analysis.usage.dynamic.has(label));
+  const wSlots = W_FINGER_ORDER.filter((label) => analysis.usage.w.has(label));
   if (fixedSlots.length && dynamicSlots.length) {
     return {
       mode: 'invalid',
-      slots: [],
+      fixedSlots: [],
+      dynamicSlots: [],
+      wSlots: [],
+      axisConstraints: new Map(),
       error: 'Formulas cannot mix F fingers (F1..F3) with D fingers (D1..D3).',
     };
   }
-  if (fixedSlots.length) {
-    return { mode: 'fixed', slots: fixedSlots };
-  }
-  if (dynamicSlots.length) {
-    return { mode: 'dynamic', slots: dynamicSlots };
-  }
-  return { mode: 'none', slots: [] };
+  const mode = fixedSlots.length ? 'fixed' : dynamicSlots.length ? 'dynamic' : 'none';
+  const axisConstraints = new Map();
+  [...fixedSlots, ...dynamicSlots, ...wSlots].forEach((label) => {
+    if (analysis.axisConstraints.has(label)) {
+      axisConstraints.set(label, analysis.axisConstraints.get(label));
+    }
+  });
+  return {
+    mode,
+    fixedSlots,
+    dynamicSlots,
+    wSlots,
+    axisConstraints,
+  };
 }
 
 function syncFingerUI() {
-  const activeLabels = activeFingerState.slots;
+  const activeLabels = activeFingerState.allSlots;
   if (fingerIndicatorStack) {
     fingerIndicatorStack.style.display = activeLabels.length ? 'flex' : 'none';
   }
@@ -418,15 +423,34 @@ function syncFingerUI() {
 }
 
 function applyFingerState(state) {
-  activeFingerState = state;
-  reflexCore?.setActiveFingerMode(state);
+  const axisConstraints = state.axisConstraints instanceof Map ? state.axisConstraints : new Map();
+  const allSlots = [
+    ...(state.fixedSlots || []),
+    ...(state.dynamicSlots || []),
+    ...(state.wSlots || []),
+  ];
+  activeFingerState = {
+    mode: state.mode,
+    fixedSlots: state.fixedSlots || [],
+    dynamicSlots: state.dynamicSlots || [],
+    wSlots: state.wSlots || [],
+    axisConstraints,
+    allSlots,
+    activeLabelSet: new Set(allSlots),
+  };
+  reflexCore?.setActiveFingerConfig({
+    fixedSlots: activeFingerState.fixedSlots,
+    dynamicSlots: activeFingerState.dynamicSlots,
+    wSlots: activeFingerState.wSlots,
+    axisConstraints: activeFingerState.axisConstraints,
+  });
   syncFingerUI();
-  state.slots.forEach((label) => {
+  activeFingerState.allSlots.forEach((label) => {
     refreshFingerIndicator(label);
     updateFingerDotPosition(label);
   });
   ALL_FINGER_LABELS.forEach((label) => {
-    if (!state.slots.includes(label)) {
+    if (!activeFingerState.activeLabelSet.has(label)) {
       clearFingerQueryParam(label);
       const dot = fingerDots.get(label);
       if (dot) {
@@ -434,7 +458,7 @@ function applyFingerState(state) {
       }
     }
   });
-  state.slots.forEach((label) => {
+  activeFingerState.allSlots.forEach((label) => {
     const latest = latestOffsets[label];
     const serialized = formatComplexForQuery(latest.x, latest.y);
     if (serialized !== fingerLastSerialized[label]) {
@@ -446,7 +470,7 @@ function applyFingerState(state) {
 
 function updateFingerDotPosition(label) {
   const dot = fingerDots.get(label);
-  if (!dot || !reflexCore || !activeFingerState.slots.includes(label)) {
+  if (!dot || !reflexCore || !activeFingerState.activeLabelSet.has(label)) {
     if (dot) {
       dot.classList.remove('visible');
     }
@@ -491,7 +515,7 @@ if (initialParse.ok) {
   showParseError(initialFormulaSource, initialParse);
 }
 
-const initialUsage = detectFingerUsage(initialAST);
+const initialUsage = analyzeFingerUsage(initialAST);
 const initialFingerState = deriveFingerState(initialUsage);
 if (initialFingerState.mode === 'invalid') {
   showError(initialFingerState.error);
@@ -521,7 +545,7 @@ ALL_FINGER_LABELS.forEach((label) => {
 if (initialFingerState.mode !== 'invalid') {
   applyFingerState(initialFingerState);
 } else {
-  applyFingerState({ mode: 'none', slots: [] });
+  applyFingerState(createEmptyFingerState());
 }
 
 formulaTextarea.addEventListener('focus', () => {
@@ -542,7 +566,7 @@ function applyFormulaFromTextarea({ updateQuery = true } = {}) {
     showParseError(source, result);
     return;
   }
-  const usage = detectFingerUsage(result.value);
+  const usage = analyzeFingerUsage(result.value);
   const nextState = deriveFingerState(usage);
   if (nextState.mode === 'invalid') {
     showError(nextState.error);
@@ -565,5 +589,5 @@ canvas.addEventListener('pointermove', (e) => reflexCore.handlePointerMove(e));
 });
 
 window.addEventListener('resize', () => {
-  activeFingerState.slots.forEach((label) => updateFingerDotPosition(label));
+  activeFingerState.allSlots.forEach((label) => updateFingerDotPosition(label));
 });

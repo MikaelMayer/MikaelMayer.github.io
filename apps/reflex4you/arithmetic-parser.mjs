@@ -39,6 +39,7 @@ import {
   Atan,
   Ln,
   Abs,
+  Floor,
   Conjugate,
   oo,
   If,
@@ -65,6 +66,13 @@ function withSpan(node, span) {
   return { ...node, span, input: span.input };
 }
 
+function withSyntax(node, syntaxLabel) {
+  if (node && typeof node === 'object' && syntaxLabel) {
+    node.syntaxLabel = syntaxLabel;
+  }
+  return node;
+}
+
 const BUILTIN_FUNCTION_DEFINITIONS = [
   { name: 'exp', factory: Exp },
   { name: 'sin', factory: Sin },
@@ -74,6 +82,7 @@ const BUILTIN_FUNCTION_DEFINITIONS = [
   { name: 'ln', factory: (value) => Ln(value, null) },
   { name: 'abs', factory: Abs },
   { name: 'conj', factory: Conjugate },
+  { name: 'floor', factory: Floor },
 ];
 
 function createBuiltinFunctionLiteral(name, factory, span) {
@@ -145,7 +154,7 @@ const numberToken = wsRegex(NUMBER_REGEX, {
   transform: (match) => Number(match[0]),
 });
 
-const imagUnit = wsLiteral('i', { ctor: 'ImagUnit', caseSensitive: false });
+const imagUnit = keywordLiteral('i', { ctor: 'ImagUnit', caseSensitive: false });
 const tightImagUnit = Literal('i', { ctor: 'ImagUnitTight', caseSensitive: false });
 
 const signParser = Choice([
@@ -173,10 +182,12 @@ const literalParser = Choice([
   jLiteral,
 ], { ctor: 'Literal' });
 
-const FINGER_TOKENS = ['F1', 'F2', 'F3', 'D1', 'D2', 'D3'];
+const FINGER_TOKENS = ['F1', 'F2', 'F3', 'D1', 'D2', 'D3', 'W1', 'W2'];
 
 const fingerLiteralParsers = FINGER_TOKENS.map((label) =>
-  keywordLiteral(label, { ctor: `Finger(${label})` }).Map((_, result) => withSpan(FingerOffset(label), result.span)),
+  keywordLiteral(label, { ctor: `Finger(${label})` }).Map((_, result) =>
+    withSyntax(withSpan(FingerOffset(label), result.span), label),
+  ),
 );
 
 const RESERVED_BINDING_NAMES = new Set([
@@ -190,12 +201,15 @@ const RESERVED_BINDING_NAMES = new Set([
   'atan',
   'ln',
   'abs',
+  'floor',
   'conj',
   'oo',
   'comp',
   'o',
   'x',
   'y',
+  'real',
+  'imag',
   'z',
   'j',
   ITERATION_VARIABLE_NAME,
@@ -250,8 +264,10 @@ const bindingIdentifierParser = createParser('BindingIdentifier', (input) => {
 });
 
 const primitiveParser = Choice([
-  keywordLiteral('x', { ctor: 'VarX' }).Map((_, result) => withSpan(VarX(), result.span)),
-  keywordLiteral('y', { ctor: 'VarY' }).Map((_, result) => withSpan(VarY(), result.span)),
+  keywordLiteral('x', { ctor: 'VarX' }).Map((_, result) => withSyntax(withSpan(VarX(), result.span), 'x')),
+  keywordLiteral('y', { ctor: 'VarY' }).Map((_, result) => withSyntax(withSpan(VarY(), result.span), 'y')),
+  keywordLiteral('real', { ctor: 'VarReal' }).Map((_, result) => withSyntax(withSpan(VarX(), result.span), 'real')),
+  keywordLiteral('imag', { ctor: 'VarImag' }).Map((_, result) => withSyntax(withSpan(VarY(), result.span), 'imag')),
   keywordLiteral('z', { ctor: 'VarZ' }).Map((_, result) => withSpan(VarZ(), result.span)),
   ...fingerLiteralParsers,
   iterationVariableLiteral,
@@ -462,6 +478,7 @@ const elementaryFunctionParser = Choice([
   createUnaryFunctionParser('atan', Atan),
   lnParser,
   createUnaryFunctionParser('abs', Abs),
+  createUnaryFunctionParser('floor', Floor),
   createUnaryFunctionParser('conj', Conjugate),
 ], { ctor: 'ElementaryFunction' });
 

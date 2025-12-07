@@ -87,7 +87,7 @@ export function attachReflexToElement(element, options = {}) {
   element.appendChild(canvas);
 
   const reflexCore = new ReflexCore(canvas, ast);
-  reflexCore.setActiveFingerMode({ mode: 'none', slots: [] });
+  reflexCore.setActiveFingerConfig();
 
   let resizeObserver = null;
   if (observeResize && typeof ResizeObserver !== 'undefined') {

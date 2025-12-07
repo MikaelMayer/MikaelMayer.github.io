@@ -100,6 +100,16 @@ test('parses additional finger primitives', () => {
   assert.equal(add.right.slot, 'D3');
 });
 
+test('parses W finger primitives', () => {
+  const result = parseFormulaInput('W1 + W2');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Add');
+  assert.equal(result.value.left.kind, 'FingerOffset');
+  assert.equal(result.value.left.slot, 'W1');
+  assert.equal(result.value.right.kind, 'FingerOffset');
+  assert.equal(result.value.right.slot, 'W2');
+});
+
 test('parses function composition forms', () => {
   const result = parseFormulaInput('o(z, F1) $ (z + 1)');
   assert.equal(result.ok, true);
@@ -172,12 +182,36 @@ test('parses abs() calls as unary functions', () => {
   assert.equal(result.value.value.kind, 'Var');
 });
 
+test('parses floor() calls as unary functions', () => {
+  const result = parseFormulaInput('floor(z)');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Floor');
+  assert.equal(result.value.value.kind, 'Var');
+});
+
 test('allows built-in functions to be referenced as values', () => {
   const result = parseFormulaInput('abs $ z');
   assert.equal(result.ok, true);
   assert.equal(result.value.kind, 'Compose');
   assert.equal(result.value.f.kind, 'Abs');
   assert.equal(result.value.g.kind, 'Var');
+});
+
+test('tracks syntax labels for axis primitives', () => {
+  const realResult = parseFormulaInput('real');
+  assert.equal(realResult.ok, true);
+  assert.equal(realResult.value.kind, 'VarX');
+  assert.equal(realResult.value.syntaxLabel, 'real');
+
+  const xResult = parseFormulaInput('x');
+  assert.equal(xResult.ok, true);
+  assert.equal(xResult.value.kind, 'VarX');
+  assert.equal(xResult.value.syntaxLabel, 'x');
+
+  const imagResult = parseFormulaInput('imag');
+  assert.equal(imagResult.ok, true);
+  assert.equal(imagResult.value.kind, 'VarY');
+  assert.equal(imagResult.value.syntaxLabel, 'imag');
 });
 
 test('explicit composition accepts built-in literals', () => {

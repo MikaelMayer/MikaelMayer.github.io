@@ -25,7 +25,12 @@ export function Pow(base, exponent) {
 
 const FIXED_FINGER_LABELS = Object.freeze(["F1", "F2", "F3"]);
 const DYNAMIC_FINGER_LABELS = Object.freeze(["D1", "D2", "D3"]);
-const ALL_FINGER_LABELS = Object.freeze([...FIXED_FINGER_LABELS, ...DYNAMIC_FINGER_LABELS]);
+const W_FINGER_LABELS = Object.freeze(["W1", "W2"]);
+const ALL_FINGER_LABELS = Object.freeze([
+  ...FIXED_FINGER_LABELS,
+  ...DYNAMIC_FINGER_LABELS,
+  ...W_FINGER_LABELS,
+]);
 
 function validateFingerLabel(slot) {
   if (!ALL_FINGER_LABELS.includes(slot)) {
@@ -133,6 +138,10 @@ export function Abs(value) {
   return { kind: "Abs", value };
 }
 
+export function Floor(value) {
+  return { kind: "Floor", value };
+}
+
 export function Conjugate(value) {
   return { kind: "Conjugate", value };
 }
@@ -161,11 +170,23 @@ function fingerIndexFromLabel(label) {
   return Number(label.slice(1)) - 1;
 }
 
-function isFixedFinger(label) {
-  return label[0] === "F";
+function fingerFamilyFromLabel(label) {
+  if (!label) {
+    return null;
+  }
+  switch (label[0]) {
+    case "F":
+      return "fixed";
+    case "D":
+      return "dynamic";
+    case "W":
+      return "w";
+    default:
+      return null;
+  }
 }
 
-export const defaultFormulaSource = 'Mul(Sub(VarZ(), Offset()), Op(VarZ(), Offset(), "add"))';
+export const defaultFormulaSource = 'VarZ()';
 
 const formulaGlobals = Object.freeze({
   VarX,
@@ -197,6 +218,7 @@ const formulaGlobals = Object.freeze({
   Atan,
   Ln,
   Abs,
+  Floor,
   Conjugate,
   oo,
 });
@@ -238,6 +260,7 @@ function assignNodeIds(ast) {
     case "Tan":
     case "Atan":
     case "Abs":
+    case "Floor":
     case "Conjugate":
       assignNodeIds(ast.value);
       return;
@@ -293,6 +316,7 @@ function collectNodesPostOrder(ast, out) {
     case "Tan":
     case "Atan":
     case "Abs":
+    case "Floor":
     case "Conjugate":
       collectNodesPostOrder(ast.value, out);
       break;
@@ -402,10 +426,14 @@ vec2 ${name}(vec2 z) {
   if (ast.kind === "FingerOffset") {
     const slot = ast.slot;
     const index = Number(slot.slice(1)) - 1;
-    const uniform =
-      slot[0] === "F"
-        ? `u_fixedOffsets[${index}]`
-        : `u_dynamicOffsets[${index}]`;
+    let uniform;
+    if (slot[0] === "F") {
+      uniform = `u_fixedOffsets[${index}]`;
+    } else if (slot[0] === "D") {
+      uniform = `u_dynamicOffsets[${index}]`;
+    } else {
+      uniform = `u_wOffsets[${index}]`;
+    }
     return `
 vec2 ${name}(vec2 z) {
     return ${uniform};
@@ -682,6 +710,15 @@ vec2 ${name}(vec2 z) {
 }`.trim();
   }
 
+  if (ast.kind === "Floor") {
+    const valueName = functionName(ast.value);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 v = ${valueName}(z);
+    return floor(v);
+}`.trim();
+  }
+
   if (ast.kind === "If") {
     const condName = functionName(ast.condition);
     const thenName = functionName(ast.thenBranch);
@@ -773,6 +810,7 @@ uniform vec2 u_max;
 uniform vec2 u_resolution;
 uniform vec2 u_fixedOffsets[3];
 uniform vec2 u_dynamicOffsets[3];
+uniform vec2 u_wOffsets[2];
 
 out vec4 outColor;
 
@@ -975,6 +1013,7 @@ export class ReflexCore {
     this.uResolutionLoc = null;
     this.uFixedOffsetsLoc = null;
     this.uDynamicOffsetsLoc = null;
+    this.uWOffsetsLoc = null;
 
     this.baseHalfSpan = 4.0;
     this.viewXSpan = 8.0;
@@ -996,12 +1035,19 @@ export class ReflexCore {
 
     this.fixedOffsetsBuffer = new Float32Array(FIXED_FINGER_LABELS.length * 2);
     this.dynamicOffsetsBuffer = new Float32Array(DYNAMIC_FINGER_LABELS.length * 2);
+    this.wOffsetsBuffer = new Float32Array(W_FINGER_LABELS.length * 2);
     this.fixedOffsetsDirty = true;
     this.dynamicOffsetsDirty = true;
+    this.wOffsetsDirty = true;
 
-    this.pointerAssignments = new Map();
-    this.activeFingerMode = 'none';
-    this.activeFingerSlots = [];
+    this.pointerStates = new Map();
+    this.pointerSequence = 0;
+    this.activeFixedSlots = [];
+    this.activeDynamicSlots = [];
+    this.activeWSlots = [];
+    this.activeFingerFamily = 'none';
+    this.fingerAxisConstraints = new Map();
+    this.wGestureState = null;
 
     this.formulaAST = initialAST;
 
@@ -1023,36 +1069,41 @@ export class ReflexCore {
     return this.formulaAST;
   }
 
-  setActiveFingerMode({ mode = 'none', slots = [] } = {}) {
-    const normalizedMode = mode === 'fixed' || mode === 'dynamic' ? mode : 'none';
-    const ordering =
-      normalizedMode === 'fixed'
-        ? FIXED_FINGER_LABELS
-        : normalizedMode === 'dynamic'
-          ? DYNAMIC_FINGER_LABELS
-          : [];
-    const normalizedSlots =
-      normalizedMode === 'none'
-        ? []
-        : ordering.filter((label) => slots.includes(label));
-
-    this.activeFingerMode = normalizedMode;
-    this.activeFingerSlots = normalizedSlots;
+  setActiveFingerConfig({
+    fixedSlots = [],
+    dynamicSlots = [],
+    wSlots = [],
+    axisConstraints = new Map(),
+  } = {}) {
+    this.activeFixedSlots = Array.isArray(fixedSlots) ? [...fixedSlots] : [];
+    this.activeDynamicSlots = Array.isArray(dynamicSlots) ? [...dynamicSlots] : [];
+    this.activeWSlots = Array.isArray(wSlots) ? [...wSlots] : [];
+    if (this.activeFixedSlots.length && this.activeDynamicSlots.length) {
+      // Should never happen, but guard to keep internal state consistent.
+      this.activeDynamicSlots = [];
+    }
+    this.activeFingerFamily = this.activeFixedSlots.length
+      ? 'fixed'
+      : this.activeDynamicSlots.length
+        ? 'dynamic'
+        : 'none';
+    this.fingerAxisConstraints = axisConstraints instanceof Map ? new Map(axisConstraints) : new Map();
     this.releaseAllPointerAssignments();
   }
 
   releaseAllPointerAssignments() {
-    if (!this.pointerAssignments.size) {
+    if (!this.pointerStates.size) {
       return;
     }
-    for (const state of this.pointerAssignments.values()) {
+    for (const state of this.pointerStates.values()) {
       try {
         this.canvas.releasePointerCapture(state.pointerId);
       } catch (_) {
         // ignore
       }
     }
-    this.pointerAssignments.clear();
+    this.pointerStates.clear();
+    this.wGestureState = null;
   }
 
   getFingerValue(label) {
@@ -1072,14 +1123,19 @@ export class ReflexCore {
     }
     this.fingerValues.set(slot, { x, y });
     const index = fingerIndexFromLabel(slot);
-    if (isFixedFinger(slot)) {
+    const family = fingerFamilyFromLabel(slot);
+    if (family === "fixed") {
       this.fixedOffsetsBuffer[index * 2] = x;
       this.fixedOffsetsBuffer[index * 2 + 1] = y;
       this.fixedOffsetsDirty = true;
-    } else {
+    } else if (family === "dynamic") {
       this.dynamicOffsetsBuffer[index * 2] = x;
       this.dynamicOffsetsBuffer[index * 2 + 1] = y;
       this.dynamicOffsetsDirty = true;
+    } else if (family === "w") {
+      this.wOffsetsBuffer[index * 2] = x;
+      this.wOffsetsBuffer[index * 2 + 1] = y;
+      this.wOffsetsDirty = true;
     }
     this.notifyFingerChange(slot);
     if (triggerRender) {
@@ -1187,8 +1243,10 @@ export class ReflexCore {
     this.uResolutionLoc = this.gl.getUniformLocation(this.program, 'u_resolution');
     this.uFixedOffsetsLoc = this.gl.getUniformLocation(this.program, 'u_fixedOffsets[0]');
     this.uDynamicOffsetsLoc = this.gl.getUniformLocation(this.program, 'u_dynamicOffsets[0]');
+    this.uWOffsetsLoc = this.gl.getUniformLocation(this.program, 'u_wOffsets[0]');
     this.fixedOffsetsDirty = true;
     this.dynamicOffsetsDirty = true;
+    this.wOffsetsDirty = true;
   }
 
   resizeCanvasToDisplaySize() {
@@ -1236,6 +1294,10 @@ export class ReflexCore {
       this.gl.uniform2fv(this.uDynamicOffsetsLoc, this.dynamicOffsetsBuffer);
       this.dynamicOffsetsDirty = false;
     }
+    if (this.uWOffsetsLoc && this.wOffsetsDirty) {
+      this.gl.uniform2fv(this.uWOffsetsLoc, this.wOffsetsBuffer);
+      this.wOffsetsDirty = false;
+    }
   }
 
   render() {
@@ -1252,98 +1314,305 @@ export class ReflexCore {
   }
 
   handlePointerDown(e) {
-    if (this.activeFingerMode === 'none' || !this.activeFingerSlots.length) {
+    if (
+      this.activeFingerFamily === 'none' &&
+      !this.activeWSlots.length
+    ) {
       return;
     }
-    const slot = this.pickPointerTarget(e);
-    if (!slot) {
-      return;
-    }
+    const state = {
+      pointerId: e.pointerId,
+      sequence: this.pointerSequence++,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      lastClientX: e.clientX,
+      lastClientY: e.clientY,
+      role: null,
+      slot: null,
+      axis: null,
+      originX: 0,
+      originY: 0,
+    };
+    this.pointerStates.set(e.pointerId, state);
     try {
       this.canvas.setPointerCapture(e.pointerId);
     } catch (_) {
       // ignore
     }
-    const origin = this.getFingerValue(slot);
-    this.pointerAssignments.set(e.pointerId, {
-      pointerId: e.pointerId,
-      slot,
-      startClientX: e.clientX,
-      startClientY: e.clientY,
-      originX: origin.x,
-      originY: origin.y,
-    });
+    this.recomputePointerRoles();
   }
 
   handlePointerMove(e) {
-    const state = this.pointerAssignments.get(e.pointerId);
+    const state = this.pointerStates.get(e.pointerId);
     if (!state) {
       return;
     }
-    const delta = this.pointerDeltaToComplex(e.clientX - state.startClientX, e.clientY - state.startClientY);
+    state.lastClientX = e.clientX;
+    state.lastClientY = e.clientY;
+    if (state.role === 'finger') {
+      this.updatePointerControlledFinger(state);
+    } else if (state.role === 'w') {
+      this.updateWFromGesture();
+    }
+  }
+
+  handlePointerEnd(e) {
+    const state = this.pointerStates.get(e.pointerId);
+    if (!state) {
+      return;
+    }
+    this.pointerStates.delete(e.pointerId);
+    try {
+      this.canvas.releasePointerCapture(e.pointerId);
+    } catch (_) {
+      // ignore
+    }
+    this.recomputePointerRoles();
+  }
+
+  updatePointerControlledFinger(state) {
+    const delta = this.pointerDeltaToComplex(
+      state.lastClientX - state.startClientX,
+      state.lastClientY - state.startClientY,
+    );
     if (!delta) {
       return;
+    }
+    if (state.axis === 'x') {
+      delta.im = 0;
+    } else if (state.axis === 'y') {
+      delta.re = 0;
     }
     const nextRe = state.originX + delta.re;
     const nextIm = state.originY + delta.im;
     this.setFingerValue(state.slot, nextRe, nextIm);
   }
 
-  handlePointerEnd(e) {
-    const state = this.pointerAssignments.get(e.pointerId);
-    if (!state) {
+  recomputePointerRoles() {
+    const pointerList = Array.from(this.pointerStates.values()).sort(
+      (a, b) => a.sequence - b.sequence,
+    );
+    const hasParamSlots = this.activeFingerFamily !== 'none';
+    const hasW = this.activeWSlots.length > 0;
+    const assignedPointerIds = new Set();
+
+    // Reset roles before reassigning.
+    pointerList.forEach((state) => {
+      if (state.role === 'w') {
+        this.wGestureState = null;
+      }
+      state.role = null;
+      state.slot = null;
+      state.axis = null;
+    });
+
+    // Assign W fingers according to priority rules.
+    const wAssignments = [];
+    if (hasW && pointerList.length) {
+      const availableCount = Math.min(this.activeWSlots.length, pointerList.length);
+      if (!hasParamSlots) {
+        for (let i = 0; i < availableCount; i += 1) {
+          wAssignments.push(pointerList[i]);
+        }
+      } else if (pointerList.length >= 2) {
+        const count = Math.min(2, availableCount);
+        for (let i = 0; i < count; i += 1) {
+          wAssignments.push(pointerList[i]);
+        }
+      }
+    }
+    wAssignments.forEach((state) => {
+      assignedPointerIds.add(state.pointerId);
+      this.assignPointerToW(state);
+    });
+
+    const remainingStates = pointerList.filter((state) => !assignedPointerIds.has(state.pointerId));
+
+    if (this.activeFingerFamily === 'fixed') {
+      let stateIndex = 0;
+      this.activeFixedSlots.forEach((slot) => {
+        if (stateIndex >= remainingStates.length) {
+          return;
+        }
+        const state = remainingStates[stateIndex];
+        this.assignPointerToSlot(state, slot);
+        stateIndex += 1;
+      });
+    } else if (this.activeFingerFamily === 'dynamic') {
+      const availableSlots = this.activeDynamicSlots.slice();
+      remainingStates.forEach((state) => {
+        if (!availableSlots.length) {
+          return;
+        }
+        const pointerPoint = this.clientPointToComplex(state.lastClientX, state.lastClientY);
+        if (!pointerPoint) {
+          const slot = availableSlots.shift();
+          this.assignPointerToSlot(state, slot);
+          return;
+        }
+        let bestSlot = availableSlots[0];
+        let bestDistance = Infinity;
+        availableSlots.forEach((slot) => {
+          const value = this.getFingerValue(slot);
+          const dx = value.x - pointerPoint.x;
+          const dy = value.y - pointerPoint.y;
+          const dist = dx * dx + dy * dy;
+          if (dist < bestDistance) {
+            bestDistance = dist;
+            bestSlot = slot;
+          }
+        });
+        const slotIndex = availableSlots.indexOf(bestSlot);
+        if (slotIndex !== -1) {
+          availableSlots.splice(slotIndex, 1);
+        }
+        this.assignPointerToSlot(state, bestSlot);
+      });
+    }
+
+    const currentWStates = pointerList.filter((state) => state.role === 'w');
+    this.updateWGestureAnchors(currentWStates);
+  }
+
+  assignPointerToSlot(state, slot) {
+    if (!slot) {
       return;
     }
-    this.pointerAssignments.delete(e.pointerId);
-    try {
-      this.canvas.releasePointerCapture(e.pointerId);
-    } catch (_) {
-      // ignore
-    }
+    state.role = 'finger';
+    state.slot = slot;
+    state.axis = this.fingerAxisConstraints.get(slot) || null;
+    state.startClientX = state.lastClientX;
+    state.startClientY = state.lastClientY;
+    const origin = this.getFingerValue(slot);
+    state.originX = origin.x;
+    state.originY = origin.y;
   }
 
-  pickPointerTarget(event) {
-    if (this.activeFingerMode === 'fixed') {
-      for (const slot of this.activeFingerSlots) {
-        if (!this.isSlotAssigned(slot)) {
-          return slot;
-        }
-      }
-      return null;
+  assignPointerToW(state) {
+    state.role = 'w';
+    state.slot = null;
+    state.axis = null;
+  }
+
+  updateWGestureAnchors(wStates) {
+    if (!wStates.length) {
+      this.wGestureState = null;
+      return;
     }
-    if (this.activeFingerMode === 'dynamic') {
-      const available = this.activeFingerSlots.filter((slot) => !this.isSlotAssigned(slot));
-      if (!available.length) {
-        return null;
-      }
-      const pointerPoint = this.clientPointToComplex(event.clientX, event.clientY);
-      if (!pointerPoint) {
-        return available[0];
-      }
-      let bestSlot = available[0];
-      let bestDistance = Infinity;
-      available.forEach((slot) => {
-        const value = this.getFingerValue(slot);
-        const dx = value.x - pointerPoint.x;
-        const dy = value.y - pointerPoint.y;
-        const dist = dx * dx + dy * dy;
-        if (dist < bestDistance) {
-          bestDistance = dist;
-          bestSlot = slot;
+    const pointerIds = new Set(wStates.map((state) => state.pointerId));
+    const existingIds = this.wGestureState ? this.wGestureState.pointerIds : null;
+    if (existingIds && pointerIds.size === existingIds.size) {
+      let identical = true;
+      pointerIds.forEach((id) => {
+        if (!existingIds.has(id)) {
+          identical = false;
         }
       });
-      return bestSlot;
-    }
-    return null;
-  }
-
-  isSlotAssigned(label) {
-    for (const state of this.pointerAssignments.values()) {
-      if (state.slot === label) {
-        return true;
+      if (identical) {
+        return;
       }
     }
-    return false;
+    const pointerData = new Map();
+    wStates.forEach((state) => {
+      pointerData.set(state.pointerId, {
+        startClientX: state.lastClientX,
+        startClientY: state.lastClientY,
+        startWorldPoint: this.clientPointToComplex(state.lastClientX, state.lastClientY),
+      });
+    });
+    const initialValues = new Map();
+    this.activeWSlots.forEach((slot) => {
+      initialValues.set(slot, this.getFingerValue(slot));
+    });
+    this.wGestureState = {
+      pointerIds,
+      pointerData,
+      initialValues,
+    };
+  }
+
+  updateWFromGesture() {
+    if (!this.wGestureState) {
+      return;
+    }
+    const wStates = Array.from(this.pointerStates.values()).filter((state) => state.role === 'w');
+    if (!wStates.length) {
+      return;
+    }
+    if (wStates.length === 1) {
+      const pointerState = wStates[0];
+      const anchor = this.wGestureState.pointerData.get(pointerState.pointerId);
+      if (!anchor || !anchor.startWorldPoint) {
+        return;
+      }
+      const current = this.clientPointToComplex(pointerState.lastClientX, pointerState.lastClientY);
+      if (!current) {
+        return;
+      }
+      const delta = complexSub(current, anchor.startWorldPoint);
+      this.applyWTranslation(delta);
+      return;
+    }
+    const [first, second] = wStates
+      .slice()
+      .sort((a, b) => a.sequence - b.sequence);
+    const firstAnchor = this.wGestureState.pointerData.get(first.pointerId);
+    const secondAnchor = this.wGestureState.pointerData.get(second.pointerId);
+    if (
+      !firstAnchor ||
+      !secondAnchor ||
+      !firstAnchor.startWorldPoint ||
+      !secondAnchor.startWorldPoint
+    ) {
+      return;
+    }
+    const currentFirst = this.clientPointToComplex(first.lastClientX, first.lastClientY);
+    const currentSecond = this.clientPointToComplex(second.lastClientX, second.lastClientY);
+    if (!currentFirst || !currentSecond) {
+      return;
+    }
+    const initialSpan = complexSub(firstAnchor.startWorldPoint, secondAnchor.startWorldPoint);
+    const currentSpan = complexSub(currentFirst, currentSecond);
+    const scale = complexDiv(currentSpan, initialSpan);
+    if (!scale) {
+      const delta = complexSub(currentFirst, firstAnchor.startWorldPoint);
+      this.applyWTranslation(delta);
+      return;
+    }
+    const scaledOrigin = complexMul(scale, firstAnchor.startWorldPoint);
+    const translation = complexSub(currentFirst, scaledOrigin);
+    this.applyWTransform(scale, translation);
+  }
+
+  applyWTranslation(delta) {
+    if (!delta) return;
+    let changed = false;
+    this.activeWSlots.forEach((slot) => {
+      const initial = this.wGestureState?.initialValues.get(slot) || { x: 0, y: 0 };
+      const next = complexAdd(initial, delta);
+      this.setFingerValue(slot, next.x, next.y, { triggerRender: false });
+      changed = true;
+    });
+    if (changed) {
+      this.render();
+    }
+  }
+
+  applyWTransform(scale, translation) {
+    if (!scale || !translation) {
+      return;
+    }
+    let changed = false;
+    this.activeWSlots.forEach((slot) => {
+      const initial = this.wGestureState?.initialValues.get(slot) || { x: 0, y: 0 };
+      const scaled = complexMul(scale, initial);
+      const next = complexAdd(scaled, translation);
+      this.setFingerValue(slot, next.x, next.y, { triggerRender: false });
+      changed = true;
+    });
+    if (changed) {
+      this.render();
+    }
   }
 
   clientPointToComplex(clientX, clientY) {
@@ -1398,4 +1667,30 @@ export class ReflexCore {
     }
     return { u, v };
   }
+}
+
+function complexAdd(a, b) {
+  return { x: a.x + b.x, y: a.y + b.y };
+}
+
+function complexSub(a, b) {
+  return { x: a.x - b.x, y: a.y - b.y };
+}
+
+function complexMul(a, b) {
+  return {
+    x: a.x * b.x - a.y * b.y,
+    y: a.x * b.y + a.y * b.x,
+  };
+}
+
+function complexDiv(a, b) {
+  const denom = b.x * b.x + b.y * b.y;
+  if (denom < 1e-12) {
+    return null;
+  }
+  return {
+    x: (a.x * b.x + a.y * b.y) / denom,
+    y: (a.y * b.x - a.x * b.y) / denom,
+  };
 }
