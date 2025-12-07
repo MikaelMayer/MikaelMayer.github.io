@@ -33,7 +33,7 @@ Rules of thumb:
 
 - A formula can use either the `F` family or the `D` family, plus the `W` pair. If both `F` and `D` appear, the UI refuses to activate the handles to avoid ambiguity.
 - If a handle only appears inside an `x`/`real` projection, dragging is locked to the real axis (and similarly for `y`/`imag`). Use both axes anywhere in the formula to regain free movement.
-- URLs remember the current formula and every active finger value, so you can bookmark exact views.
+- URLs remember the current formula and each handle’s last position, so you can bookmark exact views.
 
 ## Writing Formulas
 
