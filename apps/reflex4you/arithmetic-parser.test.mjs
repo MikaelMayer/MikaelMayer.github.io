@@ -138,6 +138,55 @@ test('$$ requires positive integer counts', () => {
   assert.match(result.message, /positive integer/i);
 });
 
+test('$$ accepts parenthesized expressions with constant propagation', () => {
+  const result = parseFormulaInput('z $$ (2 + 3)');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Compose');
+  const stack = [result.value];
+  let varCount = 0;
+  while (stack.length) {
+    const node = stack.pop();
+    if (!node || typeof node !== 'object') {
+      continue;
+    }
+    if (node.kind === 'Compose') {
+      stack.push(node.f, node.g);
+    } else if (node.kind === 'Var') {
+      varCount += 1;
+    }
+  }
+  assert.equal(varCount, 5);
+});
+
+test('$$ can derive counts from finger values', () => {
+  const result = parseFormulaInput('sin $$ (10 * D1.x).floor', {
+    fingerValues: {
+      D1: { x: 0.5, y: 0 },
+    },
+  });
+  assert.equal(result.ok, true);
+  const stack = [result.value];
+  let sinCount = 0;
+  while (stack.length) {
+    const node = stack.pop();
+    if (!node || typeof node !== 'object') {
+      continue;
+    }
+    if (node.kind === 'Compose') {
+      stack.push(node.f, node.g);
+    } else if (node.kind === 'Sin') {
+      sinCount += 1;
+    }
+  }
+  assert.equal(sinCount, 5);
+});
+
+test('$$ count expressions must be constant', () => {
+  const result = parseFormulaInput('z $$ x');
+  assert.equal(result.ok, false);
+  assert.match(result.message, /constant/i);
+});
+
 test('parses less-than comparisons using real parts', () => {
   const result = parseFormulaInput('(z $ F1) < 0');
   assert.equal(result.ok, true);
@@ -189,6 +238,13 @@ test('parses floor() calls as unary functions', () => {
   assert.equal(result.value.value.kind, 'Var');
 });
 
+test('parses abs2() calls as unary functions', () => {
+  const result = parseFormulaInput('abs2(z)');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Abs2');
+  assert.equal(result.value.value.kind, 'Var');
+});
+
 test('allows built-in functions to be referenced as values', () => {
   const result = parseFormulaInput('abs $ z');
   assert.equal(result.ok, true);
@@ -226,6 +282,27 @@ test('built-in literals work with repeat composition suffix', () => {
   const result = parseFormulaInput('abs $$ 2');
   assert.equal(result.ok, true);
   assert.equal(result.value.kind, 'Compose');
+});
+
+test('dot composition syntax treats a.b as (b $ a)', () => {
+  const result = parseFormulaInput('D1.x');
+  assert.equal(result.ok, true);
+  const node = result.value;
+  assert.equal(node.kind, 'Compose');
+  assert.equal(node.g.kind, 'FingerOffset');
+  assert.equal(node.g.slot, 'D1');
+  assert.equal(node.f.kind, 'VarX');
+});
+
+test('dot composition chains associate left-to-right', () => {
+  const result = parseFormulaInput('D1.x.abs');
+  assert.equal(result.ok, true);
+  const node = result.value;
+  assert.equal(node.kind, 'Compose');
+  assert.equal(node.f.kind, 'Abs');
+  assert.equal(node.g.kind, 'Compose');
+  assert.equal(node.g.f.kind, 'VarX');
+  assert.equal(node.g.g.kind, 'FingerOffset');
 });
 
 test('parses if expressions with embedded comparisons', () => {
