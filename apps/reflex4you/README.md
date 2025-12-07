@@ -26,7 +26,7 @@ Formulas can reference special complex constants that you edit directly on the c
 | Label family | Meaning | How to move |
 | --- | --- | --- |
 | `F1`, `F2`, `F3` | Fixed handles | Fingers are assigned in order (first touch → `F1`, etc.). |
-| `D1`, `D2`, `D3` | Dynamic handles | Touch the handle closest to the complex point you want to move. Only one set of `D` handles can be active per formula. |
+| `D1`, `D2`, `D3` | Dynamic handles | Touch the handle closest to the complex point you want to move. A formula can use either the `F` family or the `D` family (never both at once). |
 | `W1`, `W2` | Workspace frame | Gestures update both values together. One finger pans; two fingers capture the full similarity transform (pan, zoom, rotate) so you can navigate like Google Maps. |
 
 Rules of thumb:
