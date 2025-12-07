@@ -199,6 +199,11 @@ function parseComplexString(raw) {
     }
   }
 
+  const realValue = Number(normalized);
+  if (Number.isFinite(realValue)) {
+    return { x: realValue, y: 0 };
+  }
+
   return null;
 }
 
