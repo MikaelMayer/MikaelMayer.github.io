@@ -219,14 +219,12 @@ test('set bindings produce scoped nodes with shared slots', () => {
 });
 
 test('user-defined functions support call syntax f(z)', () => {
-  const result = parseFormulaInput('set f = z + 1 in f(z)');
+  const result = parseFormulaInput('let f = z + 1 in f(z)');
   assert.equal(result.ok, true);
   const ast = result.value;
-  assert.equal(ast.kind, 'SetBinding');
-  const body = ast.body;
-  assert.equal(body.kind, 'Compose');
-  assert.equal(body.f.kind, 'SetRef');
-  assert.equal(body.g.kind, 'Var');
+  assert.equal(ast.kind, 'Compose');
+  assert.equal(ast.f.kind, 'Add');
+  assert.equal(ast.g.kind, 'Var');
 });
 
 test('set bindings associate weaker than $$ and $', () => {
