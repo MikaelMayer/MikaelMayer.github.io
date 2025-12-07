@@ -77,7 +77,7 @@ if(real < 0, conj(z), z)      # axis-aware interaction
 Tips:
 
 - Use `W1`/`W2` whenever you want freeform navigation without moving your handles onto the area of interest.
-- To reset a handle, click its value chip and type `0`, `0+0i`, or any complex literal. (The formula itself is preserved across reloads because it lives in the URL.)
+- To reset a handle, click its value chip and type `0` (or any new complex literal). The formula itself is preserved across reloads because it lives in the URL.
 
 ## Forking / Developing Locally
 
