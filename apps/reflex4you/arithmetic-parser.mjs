@@ -39,6 +39,7 @@ import {
   Atan,
   Ln,
   Abs,
+  Abs2,
   Floor,
   Conjugate,
   oo,
@@ -81,6 +82,7 @@ const BUILTIN_FUNCTION_DEFINITIONS = [
   { name: 'atan', factory: Atan },
   { name: 'ln', factory: (value) => Ln(value, null) },
   { name: 'abs', factory: Abs },
+  { name: 'abs2', factory: Abs2 },
   { name: 'conj', factory: Conjugate },
   { name: 'floor', factory: Floor },
 ];
@@ -184,6 +186,17 @@ const literalParser = Choice([
 
 const FINGER_TOKENS = ['F1', 'F2', 'F3', 'D1', 'D2', 'D3', 'W1', 'W2'];
 
+const DEFAULT_FINGER_VALUE_MAP = {
+  F1: { re: 0, im: 0 },
+  F2: { re: 0, im: 0 },
+  F3: { re: 0, im: 0 },
+  D1: { re: 0, im: 0 },
+  D2: { re: 0, im: 0 },
+  D3: { re: 0, im: 0 },
+  W1: { re: -1, im: 0 },
+  W2: { re: 1, im: 0 },
+};
+
 const fingerLiteralParsers = FINGER_TOKENS.map((label) =>
   keywordLiteral(label, { ctor: `Finger(${label})` }).Map((_, result) =>
     withSyntax(withSpan(FingerOffset(label), result.span), label),
@@ -201,6 +214,7 @@ const RESERVED_BINDING_NAMES = new Set([
   'atan',
   'ln',
   'abs',
+  'abs2',
   'floor',
   'conj',
   'oo',
@@ -478,6 +492,7 @@ const elementaryFunctionParser = Choice([
   createUnaryFunctionParser('atan', Atan),
   lnParser,
   createUnaryFunctionParser('abs', Abs),
+  createUnaryFunctionParser('abs2', Abs2),
   createUnaryFunctionParser('floor', Floor),
   createUnaryFunctionParser('conj', Conjugate),
 ], { ctor: 'ElementaryFunction' });
@@ -552,6 +567,52 @@ const callExpressionParser = createParser('CallExpression', (input) => {
   });
 });
 
+const dotSuffixParser = createParser('DotSuffix', (input) => {
+  const dot = wsLiteral('.', { ctor: 'DotOp' }).runNormalized(input);
+  if (!dot.ok) {
+    return dot;
+  }
+  const rhs = callExpressionParser.runNormalized(dot.next);
+  if (!rhs.ok) {
+    return rhs;
+  }
+  const span = spanBetween(input, rhs.next);
+  return new ParseSuccess({
+    ctor: 'DotSuffix',
+    value: rhs.value,
+    span,
+    next: rhs.next,
+  });
+});
+
+const dotExpressionParser = createParser('DotExpression', (input) => {
+  const head = callExpressionParser.runNormalized(input);
+  if (!head.ok) {
+    return head;
+  }
+  let node = head.value;
+  let cursor = head.next;
+  while (true) {
+    const suffix = dotSuffixParser.runNormalized(cursor);
+    if (!suffix.ok) {
+      if (suffix.severity === ParseSeverity.error) {
+        return suffix;
+      }
+      break;
+    }
+    const span = spanBetween(input, suffix.next);
+    node = withSpan(Compose(suffix.value, node), span);
+    cursor = suffix.next;
+  }
+  const span = spanBetween(input, cursor);
+  return new ParseSuccess({
+    ctor: 'DotExpression',
+    value: node,
+    span,
+    next: cursor,
+  });
+});
+
 const unaryNegative = Sequence([
   wsLiteral('-', { ctor: 'UnaryMinusSymbol' }),
   unaryRef,
@@ -572,7 +633,7 @@ const unaryPositive = Sequence([
 }).Map((expr, result) => withSpan(expr, result.span));
 
 unaryParser = Choice([
-  callExpressionParser,
+  dotExpressionParser,
   unaryNegative,
   unaryPositive,
 ], { ctor: 'Unary' });
@@ -639,6 +700,15 @@ function spanBetween(startInput, endInput) {
   return startInput.createSpan(0, startInput.length - endInput.length);
 }
 
+function createRepeatComposePlaceholder(base, countExpression, countSpan) {
+  return {
+    kind: 'RepeatComposePlaceholder',
+    base,
+    countExpression,
+    countSpan,
+  };
+}
+
 function buildCompAST({ body, placeholder, seed, iterations, span }) {
   let current = cloneAst(seed);
   for (let i = 0; i < iterations; i += 1) {
@@ -678,6 +748,7 @@ function substitutePlaceholder(node, placeholder, replacement) {
     case 'Tan':
     case 'Atan':
     case 'Abs':
+    case 'Abs2':
     case 'Conjugate':
       return { ...node, value: substitutePlaceholder(node.value, placeholder, replacement) };
     case 'Ln': {
@@ -709,6 +780,12 @@ function substitutePlaceholder(node, placeholder, replacement) {
         ...node,
         f: substitutePlaceholder(node.f, placeholder, replacement),
         g: substitutePlaceholder(node.g, placeholder, replacement),
+      };
+    case 'RepeatComposePlaceholder':
+      return {
+        ...node,
+        base: substitutePlaceholder(node.base, placeholder, replacement),
+        countExpression: substitutePlaceholder(node.countExpression, placeholder, replacement),
       };
     case 'If':
       return {
@@ -756,6 +833,7 @@ function cloneAst(node) {
     case 'Tan':
     case 'Atan':
     case 'Abs':
+    case 'Abs2':
     case 'Conjugate':
       return { ...node, value: cloneAst(node.value) };
     case 'Ln':
@@ -789,6 +867,12 @@ function cloneAst(node) {
         condition: cloneAst(node.condition),
         thenBranch: cloneAst(node.thenBranch),
         elseBranch: cloneAst(node.elseBranch),
+      };
+    case 'RepeatComposePlaceholder':
+      return {
+        ...node,
+        base: cloneAst(node.base),
+        countExpression: cloneAst(node.countExpression),
       };
     default:
       throw new Error(`Unknown AST kind in cloneAst: ${node.kind}`);
@@ -827,6 +911,7 @@ function substituteIdentifierWithClone(node, targetName, replacement) {
     case 'Tan':
     case 'Atan':
     case 'Abs':
+    case 'Abs2':
     case 'Conjugate':
       return { ...node, value: substituteIdentifierWithClone(node.value, targetName, replacement) };
     case 'Ln': {
@@ -878,6 +963,12 @@ function substituteIdentifierWithClone(node, targetName, replacement) {
         body: nextBody,
       };
     }
+    case 'RepeatComposePlaceholder':
+      return {
+        ...node,
+        base: substituteIdentifierWithClone(node.base, targetName, replacement),
+        countExpression: substituteIdentifierWithClone(node.countExpression, targetName, replacement),
+      };
     default:
       return cloneAst(node);
   }
@@ -907,6 +998,7 @@ function findFirstPlaceholderNode(ast) {
       case 'Atan':
       case 'Ln':
       case 'Abs':
+      case 'Abs2':
       case 'Conjugate':
         stack.push(node.value);
         if (node.kind === 'Ln' && node.branch) {
@@ -932,6 +1024,12 @@ function findFirstPlaceholderNode(ast) {
         break;
       case 'Compose':
         stack.push(node.f, node.g);
+        break;
+      case 'RepeatComposePlaceholder':
+        stack.push(node.base);
+        if (node.countExpression) {
+          stack.push(node.countExpression);
+        }
         break;
       case 'SetBinding':
         stack.push(node.value, node.body);
@@ -967,6 +1065,7 @@ function findFirstLetBinding(ast) {
       case 'Atan':
       case 'Ln':
       case 'Abs':
+      case 'Abs2':
       case 'Conjugate':
         stack.push(node.value);
         if (node.kind === 'Ln' && node.branch) {
@@ -995,6 +1094,12 @@ function findFirstLetBinding(ast) {
         break;
       case 'SetBinding':
         stack.push(node.value, node.body);
+        break;
+      case 'RepeatComposePlaceholder':
+        stack.push(node.base);
+        if (node.countExpression) {
+          stack.push(node.countExpression);
+        }
         break;
       default:
         break;
@@ -1089,6 +1194,7 @@ function resolveSetReferences(ast, input) {
     case 'Tan':
     case 'Atan':
     case 'Abs':
+    case 'Abs2':
     case 'Conjugate':
       return visit(node.value);
     case 'Ln': {
@@ -1126,6 +1232,16 @@ function resolveSetReferences(ast, input) {
         }
         return visit(node.g);
       }
+      case 'RepeatComposePlaceholder': {
+        const baseErr = visit(node.base);
+        if (baseErr) {
+          return baseErr;
+        }
+        if (node.countExpression) {
+          return visit(node.countExpression);
+        }
+        return null;
+      }
       case 'If': {
         const condErr = visit(node.condition);
         if (condErr) {
@@ -1151,6 +1267,622 @@ function findBindingForName(env, name) {
     }
   }
   return null;
+}
+
+function normalizeParseOptions(options = {}) {
+  return {
+    fingerValues: normalizeFingerValuesSource(options.fingerValues),
+  };
+}
+
+function normalizeFingerValuesSource(source) {
+  const map = createDefaultFingerValueMap();
+  if (!source) {
+    return map;
+  }
+  if (source instanceof Map) {
+    source.forEach((value, key) => {
+      assignFingerValue(map, key, value);
+    });
+    return map;
+  }
+  if (typeof source === 'object') {
+    Object.keys(source).forEach((key) => {
+      assignFingerValue(map, key, source[key]);
+    });
+  }
+  return map;
+}
+
+function createDefaultFingerValueMap() {
+  const map = new Map();
+  FINGER_TOKENS.forEach((label) => {
+    const defaults = DEFAULT_FINGER_VALUE_MAP[label] || { re: 0, im: 0 };
+    map.set(label, { re: defaults.re, im: defaults.im });
+  });
+  return map;
+}
+
+function assignFingerValue(map, label, value) {
+  if (!FINGER_TOKENS.includes(label)) {
+    return;
+  }
+  const normalized = normalizeComplexInput(value);
+  if (normalized) {
+    map.set(label, normalized);
+  }
+}
+
+function normalizeComplexInput(value) {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const rawRe = value.re ?? value.x;
+  const rawIm = value.im ?? value.y;
+  const re = Number(rawRe);
+  const im = Number(rawIm);
+  if (!Number.isFinite(re) || !Number.isFinite(im)) {
+    return null;
+  }
+  return { re, im };
+}
+
+const REPEAT_COUNT_TOLERANCE = 1e-9;
+
+function resolveRepeatPlaceholders(ast, parseOptions, input) {
+  const context = {
+    fingerValues: parseOptions.fingerValues,
+    bindingStack: [],
+  };
+  function visit(node, parent, key) {
+    if (!node || typeof node !== 'object') {
+      return null;
+    }
+    switch (node.kind) {
+      case 'RepeatComposePlaceholder': {
+        const baseErr = visit(node.base, node, 'base');
+        if (baseErr) {
+          return baseErr;
+        }
+        const countExprErr = node.countExpression
+          ? visit(node.countExpression, node, 'countExpression')
+          : null;
+        if (countExprErr) {
+          return countExprErr;
+        }
+        const span =
+          (node.countExpression && node.countExpression.span) ||
+          node.countSpan ||
+          node.span ||
+          (parent?.span ?? input.createSpan(0, 0));
+        const count = evaluateRepeatCountExpression(node.countExpression, span, context, input);
+        if (count instanceof ParseFailure) {
+          return count;
+        }
+        const expanded = oo(node.base, count);
+        if (node.span) {
+          expanded.span = node.span;
+          expanded.input = node.input;
+        }
+        if (parent && key) {
+          parent[key] = expanded;
+          return visit(expanded, parent, key);
+        }
+        ast = expanded;
+        return visit(ast, null, null);
+      }
+      case 'SetBinding': {
+        const valueErr = visit(node.value, node, 'value');
+        if (valueErr) {
+          return valueErr;
+        }
+        const constantValue = evaluateConstantNode(node.value, context);
+        context.bindingStack.push({ binding: node, value: constantValue });
+        const bodyErr = visit(node.body, node, 'body');
+        context.bindingStack.pop();
+        return bodyErr;
+      }
+      case 'SetRef':
+      case 'Const':
+      case 'Var':
+      case 'VarX':
+      case 'VarY':
+      case 'FingerOffset':
+      case 'PlaceholderVar':
+        return null;
+      case 'Pow':
+        return visit(node.base, node, 'base');
+      case 'Exp':
+      case 'Sin':
+      case 'Cos':
+      case 'Tan':
+      case 'Atan':
+      case 'Abs':
+      case 'Abs2':
+      case 'Floor':
+      case 'Conjugate':
+        return visit(node.value, node, 'value');
+      case 'Ln': {
+        const valueErr = visit(node.value, node, 'value');
+        if (valueErr) {
+          return valueErr;
+        }
+        if (node.branch) {
+          return visit(node.branch, node, 'branch');
+        }
+        return null;
+      }
+      case 'Sub':
+      case 'Mul':
+      case 'Op':
+      case 'Add':
+      case 'Div':
+      case 'LessThan':
+      case 'GreaterThan':
+      case 'LessThanOrEqual':
+      case 'GreaterThanOrEqual':
+      case 'Equal':
+      case 'LogicalAnd':
+      case 'LogicalOr': {
+        const leftErr = visit(node.left, node, 'left');
+        if (leftErr) {
+          return leftErr;
+        }
+        return visit(node.right, node, 'right');
+      }
+      case 'Compose': {
+        const fErr = visit(node.f, node, 'f');
+        if (fErr) {
+          return fErr;
+        }
+        return visit(node.g, node, 'g');
+      }
+      case 'If': {
+        const condErr = visit(node.condition, node, 'condition');
+        if (condErr) {
+          return condErr;
+        }
+        const thenErr = visit(node.thenBranch, node, 'thenBranch');
+        if (thenErr) {
+          return thenErr;
+        }
+        return visit(node.elseBranch, node, 'elseBranch');
+      }
+      default:
+        return null;
+    }
+  }
+  const error = visit(ast, null, null);
+  if (error instanceof ParseFailure) {
+    return error;
+  }
+  return ast;
+}
+
+function evaluateRepeatCountExpression(node, span, context) {
+  const value = evaluateConstantNode(node, context);
+  if (!value) {
+    return new ParseFailure({
+      ctor: 'RepeatCount',
+      message: 'Repeat count must be a constant expression',
+      severity: ParseSeverity.error,
+      expected: 'constant positive integer',
+      span,
+      input: span.input,
+    });
+  }
+  if (Math.abs(value.im) > REPEAT_COUNT_TOLERANCE) {
+    return new ParseFailure({
+      ctor: 'RepeatCount',
+      message: 'Repeat count must be a real value',
+      severity: ParseSeverity.error,
+      expected: 'real constant',
+      span,
+      input: span.input,
+    });
+  }
+  if (!Number.isFinite(value.re)) {
+    return new ParseFailure({
+      ctor: 'RepeatCount',
+      message: 'Repeat count must be finite',
+      severity: ParseSeverity.error,
+      expected: 'finite constant',
+      span,
+      input: span.input,
+    });
+  }
+  const rounded = Math.round(value.re);
+  if (Math.abs(value.re - rounded) > REPEAT_COUNT_TOLERANCE) {
+    return new ParseFailure({
+      ctor: 'RepeatCount',
+      message: 'Repeat count must be an integer',
+      severity: ParseSeverity.error,
+      expected: 'integer constant',
+      span,
+      input: span.input,
+    });
+  }
+  if (rounded < 1) {
+    return new ParseFailure({
+      ctor: 'RepeatCount',
+      message: 'Repeat count must be a positive integer',
+      severity: ParseSeverity.error,
+      expected: 'positive integer',
+      span,
+      input: span.input,
+    });
+  }
+  return rounded;
+}
+
+function evaluateConstantNode(node, context, scope = {}, localBindings = []) {
+  if (!node || typeof node !== 'object') {
+    return null;
+  }
+  switch (node.kind) {
+    case 'Const':
+      return { re: node.re, im: node.im };
+    case 'FingerOffset':
+      return getFingerValueFromContext(node.slot, context.fingerValues);
+    case 'Var':
+      return scope.z ? { re: scope.z.re, im: scope.z.im } : null;
+    case 'VarX':
+      return scope.z ? { re: scope.z.re, im: 0 } : null;
+    case 'VarY':
+      return scope.z ? { re: scope.z.im, im: 0 } : null;
+    case 'Add': {
+      const left = evaluateConstantNode(node.left, context, scope, localBindings);
+      if (!left) {
+        return null;
+      }
+      const right = evaluateConstantNode(node.right, context, scope, localBindings);
+      if (!right) {
+        return null;
+      }
+      return complexAdd(left, right);
+    }
+    case 'Sub': {
+      const left = evaluateConstantNode(node.left, context, scope, localBindings);
+      if (!left) {
+        return null;
+      }
+      const right = evaluateConstantNode(node.right, context, scope, localBindings);
+      if (!right) {
+        return null;
+      }
+      return complexSub(left, right);
+    }
+    case 'Mul': {
+      const left = evaluateConstantNode(node.left, context, scope, localBindings);
+      if (!left) {
+        return null;
+      }
+      const right = evaluateConstantNode(node.right, context, scope, localBindings);
+      if (!right) {
+        return null;
+      }
+      return complexMul(left, right);
+    }
+    case 'Div': {
+      const left = evaluateConstantNode(node.left, context, scope, localBindings);
+      if (!left) {
+        return null;
+      }
+      const right = evaluateConstantNode(node.right, context, scope, localBindings);
+      if (!right) {
+        return null;
+      }
+      return complexDiv(left, right);
+    }
+    case 'Pow': {
+      const base = evaluateConstantNode(node.base, context, scope, localBindings);
+      if (!base) {
+        return null;
+      }
+      return complexPowInt(base, node.exponent);
+    }
+    case 'Exp': {
+      const value = evaluateConstantNode(node.value, context, scope, localBindings);
+      return value ? complexExp(value) : null;
+    }
+    case 'Sin': {
+      const value = evaluateConstantNode(node.value, context, scope, localBindings);
+      return value ? complexSin(value) : null;
+    }
+    case 'Cos': {
+      const value = evaluateConstantNode(node.value, context, scope, localBindings);
+      return value ? complexCos(value) : null;
+    }
+    case 'Tan': {
+      const value = evaluateConstantNode(node.value, context, scope, localBindings);
+      return value ? complexTan(value) : null;
+    }
+    case 'Atan': {
+      const value = evaluateConstantNode(node.value, context, scope, localBindings);
+      return value ? complexAtan(value) : null;
+    }
+    case 'Ln': {
+      const value = evaluateConstantNode(node.value, context, scope, localBindings);
+      if (!value) {
+        return null;
+      }
+      let center = 0;
+      if (node.branch) {
+        const branchValue = evaluateConstantNode(node.branch, context, scope, localBindings);
+        if (!branchValue) {
+          return null;
+        }
+        center = branchValue.re;
+      }
+      return complexLn(value, center);
+    }
+    case 'Abs': {
+      const value = evaluateConstantNode(node.value, context, scope, localBindings);
+      if (!value) {
+        return null;
+      }
+      return { re: complexAbs(value), im: 0 };
+    }
+    case 'Abs2': {
+      const value = evaluateConstantNode(node.value, context, scope, localBindings);
+      if (!value) {
+        return null;
+      }
+      return { re: complexAbs2(value), im: 0 };
+    }
+    case 'Floor': {
+      const value = evaluateConstantNode(node.value, context, scope, localBindings);
+      return value ? complexFloor(value) : null;
+    }
+    case 'Conjugate': {
+      const value = evaluateConstantNode(node.value, context, scope, localBindings);
+      return value ? complexConjugate(value) : null;
+    }
+    case 'Compose': {
+      const inner = evaluateConstantNode(node.g, context, scope, localBindings);
+      if (!inner) {
+        return null;
+      }
+      return evaluateConstantNode(node.f, context, { z: inner }, localBindings);
+    }
+    case 'LessThan':
+    case 'GreaterThan':
+    case 'LessThanOrEqual':
+    case 'GreaterThanOrEqual':
+    case 'Equal': {
+      const left = evaluateConstantNode(node.left, context, scope, localBindings);
+      if (!left) {
+        return null;
+      }
+      const right = evaluateConstantNode(node.right, context, scope, localBindings);
+      if (!right) {
+        return null;
+      }
+      return { re: evaluateComparison(node.kind, left, right), im: 0 };
+    }
+    case 'LogicalAnd':
+    case 'LogicalOr': {
+      const left = evaluateConstantNode(node.left, context, scope, localBindings);
+      if (!left) {
+        return null;
+      }
+      const right = evaluateConstantNode(node.right, context, scope, localBindings);
+      if (!right) {
+        return null;
+      }
+      const leftTruthy = isTruthyComplex(left);
+      const rightTruthy = isTruthyComplex(right);
+      const result =
+        node.kind === 'LogicalAnd'
+          ? leftTruthy && rightTruthy
+          : leftTruthy || rightTruthy;
+      return { re: result ? 1 : 0, im: 0 };
+    }
+    case 'If': {
+      const condition = evaluateConstantNode(node.condition, context, scope, localBindings);
+      if (!condition) {
+        return null;
+      }
+      const branch = isTruthyComplex(condition) ? node.thenBranch : node.elseBranch;
+      return evaluateConstantNode(branch, context, scope, localBindings);
+    }
+    case 'SetBinding': {
+      const value = evaluateConstantNode(node.value, context, scope, localBindings);
+      if (!value) {
+        return null;
+      }
+      localBindings.push({ binding: node, value });
+      const result = evaluateConstantNode(node.body, context, scope, localBindings);
+      localBindings.pop();
+      return result;
+    }
+    case 'SetRef': {
+      for (let i = localBindings.length - 1; i >= 0; i -= 1) {
+        if (localBindings[i].binding === node.binding) {
+          return localBindings[i].value;
+        }
+      }
+      if (context.bindingStack) {
+        for (let i = context.bindingStack.length - 1; i >= 0; i -= 1) {
+          const entry = context.bindingStack[i];
+          if (entry.binding === node.binding) {
+            return entry.value || null;
+          }
+        }
+      }
+      return null;
+    }
+    default:
+      return null;
+  }
+}
+
+function isTruthyComplex(value) {
+  return Math.abs(value.re) > REPEAT_COUNT_TOLERANCE || Math.abs(value.im) > REPEAT_COUNT_TOLERANCE;
+}
+
+function evaluateComparison(kind, left, right) {
+  switch (kind) {
+    case 'LessThan':
+      return left.re < right.re ? 1 : 0;
+    case 'GreaterThan':
+      return left.re > right.re ? 1 : 0;
+    case 'LessThanOrEqual':
+      return left.re <= right.re ? 1 : 0;
+    case 'GreaterThanOrEqual':
+      return left.re >= right.re ? 1 : 0;
+    case 'Equal':
+      return left.re === right.re ? 1 : 0;
+    default:
+      return 0;
+  }
+}
+
+function getFingerValueFromContext(label, fingerValues) {
+  const value = fingerValues?.get(label);
+  if (!value) {
+    return null;
+  }
+  return { re: value.re, im: value.im };
+}
+
+function complexAdd(a, b) {
+  return { re: a.re + b.re, im: a.im + b.im };
+}
+
+function complexSub(a, b) {
+  return { re: a.re - b.re, im: a.im - b.im };
+}
+
+function complexMul(a, b) {
+  return {
+    re: a.re * b.re - a.im * b.im,
+    im: a.re * b.im + a.im * b.re,
+  };
+}
+
+function complexDiv(a, b) {
+  const denom = b.re * b.re + b.im * b.im;
+  if (denom < 1e-12) {
+    return null;
+  }
+  return {
+    re: (a.re * b.re + a.im * b.im) / denom,
+    im: (a.im * b.re - a.re * b.im) / denom,
+  };
+}
+
+function complexPowInt(base, exponent) {
+  if (!Number.isInteger(exponent)) {
+    return null;
+  }
+  if (exponent === 0) {
+    return { re: 1, im: 0 };
+  }
+  let result = { re: 1, im: 0 };
+  let power = exponent;
+  let current = { re: base.re, im: base.im };
+  if (power < 0) {
+    const inv = complexDiv({ re: 1, im: 0 }, current);
+    if (!inv) {
+      return null;
+    }
+    current = inv;
+    power = -power;
+  }
+  while (power > 0) {
+    if (power % 2 === 1) {
+      result = complexMul(result, current);
+    }
+    power = Math.floor(power / 2);
+    if (power > 0) {
+      current = complexMul(current, current);
+    }
+  }
+  return result;
+}
+
+function complexAbs2(value) {
+  return value.re * value.re + value.im * value.im;
+}
+
+function complexAbs(value) {
+  return Math.hypot(value.re, value.im);
+}
+
+function complexFloor(value) {
+  return { re: Math.floor(value.re), im: Math.floor(value.im) };
+}
+
+function complexConjugate(value) {
+  return { re: value.re, im: -value.im };
+}
+
+function complexExp(value) {
+  const expReal = Math.exp(value.re);
+  return {
+    re: expReal * Math.cos(value.im),
+    im: expReal * Math.sin(value.im),
+  };
+}
+
+function complexSin(value) {
+  const sinX = Math.sin(value.re);
+  const cosX = Math.cos(value.re);
+  const sinhY = Math.sinh(value.im);
+  const coshY = Math.cosh(value.im);
+  return {
+    re: sinX * coshY,
+    im: cosX * sinhY,
+  };
+}
+
+function complexCos(value) {
+  const sinX = Math.sin(value.re);
+  const cosX = Math.cos(value.re);
+  const sinhY = Math.sinh(value.im);
+  const coshY = Math.cosh(value.im);
+  return {
+    re: cosX * coshY,
+    im: -sinX * sinhY,
+  };
+}
+
+function complexTan(value) {
+  const sin = complexSin(value);
+  const cos = complexCos(value);
+  return complexDiv(sin, cos);
+}
+
+function complexLn(value, branchCenter = 0) {
+  const magnitude = complexAbs(value);
+  if (magnitude < 1e-12) {
+    return null;
+  }
+  const angle = Math.atan2(value.im, value.re);
+  const adjusted = wrapAngleToRange(angle, branchCenter);
+  return {
+    re: Math.log(magnitude),
+    im: adjusted,
+  };
+}
+
+function complexAtan(value) {
+  const iz = { re: -value.im, im: value.re };
+  const one = { re: 1, im: 0 };
+  const term1 = complexLn(complexSub(one, iz));
+  const term2 = complexLn(complexAdd(one, iz));
+  if (!term1 || !term2) {
+    return null;
+  }
+  const diff = complexSub(term1, term2);
+  return complexMul({ re: 0, im: 0.5 }, diff);
+}
+
+function wrapAngleToRange(angle, center) {
+  const shifted = angle - center;
+  const normalized = shifted - Math.PI * 2 * Math.floor((shifted + Math.PI) / (Math.PI * 2));
+  return normalized + center;
 }
 
 function validateRepeatCount(value, span) {
@@ -1228,17 +1960,13 @@ const repeatSuffixParser = createParser('RepeatSuffix', (input) => {
   if (!opResult.ok) {
     return opResult;
   }
-  const countResult = numberToken.runNormalized(opResult.next);
+  const countResult = unaryParser.runNormalized(opResult.next);
   if (!countResult.ok) {
     return countResult;
   }
-  const validatedCount = validateRepeatCount(countResult.value, countResult.span);
-  if (validatedCount instanceof ParseFailure) {
-    return validatedCount;
-  }
   return new ParseSuccess({
     ctor: 'RepeatSuffix',
-    value: { count: validatedCount },
+    value: { expression: countResult.value, span: countResult.span },
     span: spanBetween(input, countResult.next),
     next: countResult.next,
   });
@@ -1260,7 +1988,10 @@ const repeatComposeParser = createParser('RepeatCompose', (input) => {
       break;
     }
     const span = spanBetween(input, suffix.next);
-    node = withSpan(oo(node, suffix.value.count), span);
+    node = withSpan(
+      createRepeatComposePlaceholder(node, suffix.value.expression, suffix.value.span || suffix.span),
+      span,
+    );
     cursor = suffix.next;
   }
   const span = spanBetween(input, cursor);
@@ -1441,7 +2172,8 @@ expressionParser = createParser('Expression', (input) => {
   return logicalOrParser.runNormalized(input);
 });
 
-export function parseFormulaInput(input) {
+export function parseFormulaInput(input, options = {}) {
+  const parseOptions = normalizeParseOptions(options);
   const normalized = ParserInput.from(input ?? '');
   if (normalized.toString().trim().length === 0) {
     return new ParseFailure({
@@ -1476,7 +2208,11 @@ export function parseFormulaInput(input) {
   if (resolveError instanceof ParseFailure) {
     return resolveError;
   }
-  parsed.value = letReduced;
+  const repeatResolved = resolveRepeatPlaceholders(letReduced, parseOptions, normalized);
+  if (repeatResolved instanceof ParseFailure) {
+    return repeatResolved;
+  }
+  parsed.value = repeatResolved;
   const placeholderNode = findFirstPlaceholderNode(parsed.value);
   if (placeholderNode) {
     const span = placeholderNode.span ?? normalized.createSpan(0, 0);
@@ -1492,8 +2228,8 @@ export function parseFormulaInput(input) {
   return parsed;
 }
 
-export function parseFormulaToAST(source) {
-  const result = parseFormulaInput(source);
+export function parseFormulaToAST(source, options) {
+  const result = parseFormulaInput(source, options);
   if (!result.ok) {
     const err = new SyntaxError(result.message || 'Failed to parse formula');
     err.parseFailure = result;

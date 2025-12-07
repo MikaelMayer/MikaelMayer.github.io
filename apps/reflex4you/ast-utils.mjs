@@ -29,6 +29,7 @@ function getChildEntries(node) {
     case 'Tan':
     case 'Atan':
     case 'Abs':
+    case 'Abs2':
     case 'Floor':
     case 'Conjugate':
       return [['value', node.value]];
@@ -70,6 +71,11 @@ function getChildEntries(node) {
       return [
         ['value', node.value],
         ['body', node.body],
+      ];
+    case 'RepeatComposePlaceholder':
+      return [
+        ['base', node.base],
+        ['countExpression', node.countExpression],
       ];
     case 'LetBinding':
       return [

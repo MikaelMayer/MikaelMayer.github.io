@@ -138,6 +138,10 @@ export function Abs(value) {
   return { kind: "Abs", value };
 }
 
+export function Abs2(value) {
+  return { kind: "Abs2", value };
+}
+
 export function Floor(value) {
   return { kind: "Floor", value };
 }
@@ -218,6 +222,7 @@ const formulaGlobals = Object.freeze({
   Atan,
   Ln,
   Abs,
+  Abs2,
   Floor,
   Conjugate,
   oo,
@@ -260,6 +265,7 @@ function assignNodeIds(ast) {
     case "Tan":
     case "Atan":
     case "Abs":
+    case "Abs2":
     case "Floor":
     case "Conjugate":
       assignNodeIds(ast.value);
@@ -316,6 +322,7 @@ function collectNodesPostOrder(ast, out) {
     case "Tan":
     case "Atan":
     case "Abs":
+    case "Abs2":
     case "Floor":
     case "Conjugate":
       collectNodesPostOrder(ast.value, out);
@@ -710,6 +717,16 @@ vec2 ${name}(vec2 z) {
 }`.trim();
   }
 
+  if (ast.kind === "Abs2") {
+    const valueName = functionName(ast.value);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 v = ${valueName}(z);
+    float magnitudeSquared = dot(v, v);
+    return vec2(magnitudeSquared, 0.0);
+}`.trim();
+  }
+
   if (ast.kind === "Floor") {
     const valueName = functionName(ast.value);
     return `
@@ -1039,6 +1056,9 @@ export class ReflexCore {
     this.fixedOffsetsDirty = true;
     this.dynamicOffsetsDirty = true;
     this.wOffsetsDirty = true;
+
+    this.setFingerValue('W1', -1, 0, { triggerRender: false });
+    this.setFingerValue('W2', 1, 0, { triggerRender: false });
 
     this.pointerStates = new Map();
     this.pointerSequence = 0;

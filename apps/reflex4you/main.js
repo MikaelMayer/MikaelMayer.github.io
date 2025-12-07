@@ -32,8 +32,18 @@ const latestOffsets = {};
 
 ALL_FINGER_LABELS.forEach((label) => {
   fingerLastSerialized[label] = null;
-  latestOffsets[label] = { x: 0, y: 0 };
+  if (label === 'W1') {
+    latestOffsets[label] = { x: -1, y: 0 };
+  } else if (label === 'W2') {
+    latestOffsets[label] = { x: 1, y: 0 };
+  } else {
+    latestOffsets[label] = { x: 0, y: 0 };
+  }
 });
+
+function getParserOptionsFromFingers() {
+  return { fingerValues: latestOffsets };
+}
 
 let activeFingerState = createEmptyFingerState();
 
@@ -96,7 +106,7 @@ function refreshFingerIndicator(label) {
 
 const DEFAULT_FORMULA_TEXT = 'z';
 
-const defaultParseResult = parseFormulaInput(DEFAULT_FORMULA_TEXT);
+const defaultParseResult = parseFormulaInput(DEFAULT_FORMULA_TEXT, getParserOptionsFromFingers());
 const fallbackDefaultAST = defaultParseResult.ok ? defaultParseResult.value : createDefaultFormulaAST();
 
 function readFormulaFromQuery() {
@@ -503,7 +513,7 @@ if (!initialFormulaSource || !initialFormulaSource.trim()) {
   initialFormulaSource = DEFAULT_FORMULA_TEXT;
 }
 
-const initialParse = parseFormulaInput(initialFormulaSource);
+const initialParse = parseFormulaInput(initialFormulaSource, getParserOptionsFromFingers());
 let initialAST;
 
 if (initialParse.ok) {
@@ -561,7 +571,7 @@ function applyFormulaFromTextarea({ updateQuery = true } = {}) {
     showError('Formula cannot be empty.');
     return;
   }
-  const result = parseFormulaInput(source);
+  const result = parseFormulaInput(source, getParserOptionsFromFingers());
   if (!result.ok) {
     showParseError(source, result);
     return;

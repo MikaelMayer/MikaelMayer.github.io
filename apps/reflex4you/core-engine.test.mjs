@@ -29,6 +29,7 @@ import {
   LogicalOr,
   If,
   Abs,
+  Abs2,
   Floor,
   Conjugate,
   buildFragmentSourceFromAST,
@@ -205,6 +206,13 @@ test('Abs nodes emit magnitude as real output', () => {
   const fragment = buildFragmentSourceFromAST(ast);
   assert.match(fragment, /float magnitude = length/);
   assert.match(fragment, /vec2\(magnitude, 0\.0\)/);
+});
+
+test('Abs2 nodes emit squared magnitude as real output', () => {
+  const ast = Abs2(Const(3, 4));
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /float magnitudeSquared = dot/);
+  assert.match(fragment, /vec2\(magnitudeSquared, 0\.0\)/);
 });
 
 test('Floor nodes emit component-wise floor', () => {
