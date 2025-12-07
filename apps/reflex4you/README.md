@@ -26,12 +26,12 @@ Reflex4You is an interactive complex-function explorer. Type a formula, drag the
 4. **Dive into advanced physics-style demos.** Handles plus gesture control make it easy to model optical experiments. For instance, the following formula mimics both the Michelson interferometer and Young’s double-slit patterns:
 
    ```text
-   let sqrt = exp(0.5*ln(z)) in
+   let sqrt = exp $ 0.5*ln in
    set d1 = 2*D1 in
    set scale = 5 in
    set r = sqrt $ abs((x$d1) + (y$d1))^2 + x^2 + y^2 $ scale*(z - D3) in
    set r2 = sqrt $ abs((x$d1) - (y$d1))^2 + x^2 + y^2 $ scale*(z + D3) in
-   abs(z) $
+   abs $
    10*z $ 1/(r^2)*exp(4*abs(D2*2)*i*r) + 1/(r2^2)*exp(4*abs(D2*2)*i*r2)
    ```
 
