@@ -23,6 +23,20 @@ Reflex4You is an interactive complex-function explorer. Type a formula, drag the
 
    Here `W1`/`W2` follow your fingers: a single finger pans both values, while a two-finger gesture solves the similarity transform (pan, zoom, rotate) and applies it to the pair. `f $ g` means “compose with” (`f(g(z))`), and `f $$ n` repeats `f` exactly `n` times. Parentheses are optional, and the complete formula syntax is summarized below under **Formula Language**.
 
+4. **Dive into advanced physics-style demos.** Handles plus gesture control make it easy to model optical experiments. For instance, the following formula mimics both the Michelson interferometer and Young’s double-slit patterns:
+
+   ```text
+   let sqrt = exp(0.5*ln(z)) in
+   set d1 = 2*D1 in
+   set scale = 5 in
+   set r = sqrt $ abs((x$d1) + (y$d1))^2 + x^2 + y^2 $ scale*(z - D3) in
+   set r2 = sqrt $ abs((x$d1) - (y$d1))^2 + x^2 + y^2 $ scale*(z + D3) in
+   abs(z) $
+   10*z $ 1/(r^2)*exp(4*abs(D2*2)*i*r) + 1/(r2^2)*exp(4*abs(D2*2)*i*r2)
+   ```
+
+   Drag `D1` to change the arm angle, `D2` to tweak the wavelength, and `D3` to offset the detectors; the visual interference pattern updates instantly and the full configuration is still shareable via the URL.
+
 ## Interaction Constants
 
 Formulas can reference special complex constants that you edit directly on the canvas:
