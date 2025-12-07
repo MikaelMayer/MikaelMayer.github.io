@@ -65,6 +65,40 @@ function withSpan(node, span) {
   return { ...node, span, input: span.input };
 }
 
+const BUILTIN_FUNCTION_DEFINITIONS = [
+  { name: 'exp', factory: Exp },
+  { name: 'sin', factory: Sin },
+  { name: 'cos', factory: Cos },
+  { name: 'tan', factory: Tan },
+  { name: 'atan', factory: Atan },
+  { name: 'ln', factory: (value) => Ln(value, null) },
+  { name: 'abs', factory: Abs },
+  { name: 'conj', factory: Conjugate },
+];
+
+function createBuiltinFunctionLiteral(name, factory, span) {
+  const identityVar = withSpan(VarZ(), span);
+  const node = withSpan(factory(identityVar), span);
+  node.__functionLiteral = {
+    kind: 'builtin',
+    name,
+    apply: (arg) => factory(arg),
+  };
+  return node;
+}
+
+function isBuiltinFunctionLiteral(node) {
+  return Boolean(node && node.__functionLiteral && node.__functionLiteral.kind === 'builtin');
+}
+
+function applyFunctionLiteral(node, argument) {
+  if (!isBuiltinFunctionLiteral(node)) {
+    return null;
+  }
+  const applied = node.__functionLiteral.apply(argument);
+  return applied;
+}
+
 function wsLiteral(text, options = {}) {
   const wsCtor = options.wsCtor ?? `WS:${text}`;
   return WS({ ctor: wsCtor })._i(Literal(text, options), { ctor: `wsLiteral(${text})` });
@@ -431,11 +465,21 @@ const elementaryFunctionParser = Choice([
   createUnaryFunctionParser('conj', Conjugate),
 ], { ctor: 'ElementaryFunction' });
 
+const builtinFunctionLiteralParser = Choice(
+  BUILTIN_FUNCTION_DEFINITIONS.map(({ name, factory }) =>
+    keywordLiteral(name, { ctor: `${name}FunctionLiteral` }).Map((_, result) =>
+      createBuiltinFunctionLiteral(name, factory, result.span),
+    ),
+  ),
+  { ctor: 'BuiltinFunctionLiteral' },
+);
+
 const primaryParser = Choice([
   explicitRepeatComposeParser,
   compParser,
   explicitComposeParser,
   elementaryFunctionParser,
+  builtinFunctionLiteralParser,
   ifParser,
   setBindingRef,
   groupedParser,
@@ -445,6 +489,51 @@ const primaryParser = Choice([
 
 let unaryParser;
 const unaryRef = lazy(() => unaryParser, { ctor: 'UnaryRef' });
+
+const functionCallSuffixParser = Sequence(
+  [
+    wsLiteral('(', { ctor: 'CallOpen' }),
+    expressionRef,
+    wsLiteral(')', { ctor: 'CallClose' }),
+  ],
+  {
+    ctor: 'FunctionCallSuffix',
+    projector: (values) => values[1],
+  },
+);
+
+const callExpressionParser = createParser('CallExpression', (input) => {
+  const head = primaryParser.runNormalized(input);
+  if (!head.ok) {
+    return head;
+  }
+  let node = head.value;
+  let cursor = head.next;
+  while (true) {
+    const suffix = functionCallSuffixParser.runNormalized(cursor);
+    if (!suffix.ok) {
+      if (suffix.severity === ParseSeverity.error) {
+        return suffix;
+      }
+      break;
+    }
+    const span = spanBetween(input, suffix.next);
+    const applied = applyFunctionLiteral(node, suffix.value);
+    if (applied) {
+      node = withSpan(applied, span);
+    } else {
+      node = withSpan(Compose(node, suffix.value), span);
+    }
+    cursor = suffix.next;
+  }
+  const span = spanBetween(input, cursor);
+  return new ParseSuccess({
+    ctor: 'CallExpression',
+    value: node,
+    span,
+    next: cursor,
+  });
+});
 
 const unaryNegative = Sequence([
   wsLiteral('-', { ctor: 'UnaryMinusSymbol' }),
@@ -466,7 +555,7 @@ const unaryPositive = Sequence([
 }).Map((expr, result) => withSpan(expr, result.span));
 
 unaryParser = Choice([
-  primaryParser,
+  callExpressionParser,
   unaryNegative,
   unaryPositive,
 ], { ctor: 'Unary' });

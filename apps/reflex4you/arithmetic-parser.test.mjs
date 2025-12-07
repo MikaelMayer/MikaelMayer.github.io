@@ -172,6 +172,28 @@ test('parses abs() calls as unary functions', () => {
   assert.equal(result.value.value.kind, 'Var');
 });
 
+test('allows built-in functions to be referenced as values', () => {
+  const result = parseFormulaInput('abs $ z');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Compose');
+  assert.equal(result.value.f.kind, 'Abs');
+  assert.equal(result.value.g.kind, 'Var');
+});
+
+test('explicit composition accepts built-in literals', () => {
+  const result = parseFormulaInput('o(abs, z)');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Compose');
+  assert.equal(result.value.f.kind, 'Abs');
+  assert.equal(result.value.g.kind, 'Var');
+});
+
+test('built-in literals work with repeat composition suffix', () => {
+  const result = parseFormulaInput('abs $$ 2');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Compose');
+});
+
 test('parses if expressions with embedded comparisons', () => {
   const result = parseFormulaInput('if(x < y, x + 1, y + 2)');
   assert.equal(result.ok, true);
@@ -194,6 +216,17 @@ test('set bindings produce scoped nodes with shared slots', () => {
   assert.equal(ast.body.right.kind, 'SetRef');
   assert.strictEqual(ast.body.left.binding, ast);
   assert.strictEqual(ast.body.right.binding, ast);
+});
+
+test('user-defined functions support call syntax f(z)', () => {
+  const result = parseFormulaInput('set f = z + 1 in f(z)');
+  assert.equal(result.ok, true);
+  const ast = result.value;
+  assert.equal(ast.kind, 'SetBinding');
+  const body = ast.body;
+  assert.equal(body.kind, 'Compose');
+  assert.equal(body.f.kind, 'SetRef');
+  assert.equal(body.g.kind, 'Var');
 });
 
 test('set bindings associate weaker than $$ and $', () => {
