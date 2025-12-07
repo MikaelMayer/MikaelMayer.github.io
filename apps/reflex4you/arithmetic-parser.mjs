@@ -193,8 +193,8 @@ const DEFAULT_FINGER_VALUE_MAP = {
   D1: { re: 0, im: 0 },
   D2: { re: 0, im: 0 },
   D3: { re: 0, im: 0 },
-  W1: { re: -1, im: 0 },
-  W2: { re: 1, im: 0 },
+  W1: { re: 1, im: 0 },
+  W2: { re: 0, im: 0 },
 };
 
 const fingerLiteralParsers = FINGER_TOKENS.map((label) =>

@@ -33,9 +33,9 @@ const latestOffsets = {};
 ALL_FINGER_LABELS.forEach((label) => {
   fingerLastSerialized[label] = null;
   if (label === 'W1') {
-    latestOffsets[label] = { x: -1, y: 0 };
-  } else if (label === 'W2') {
     latestOffsets[label] = { x: 1, y: 0 };
+  } else if (label === 'W2') {
+    latestOffsets[label] = { x: 0, y: 0 };
   } else {
     latestOffsets[label] = { x: 0, y: 0 };
   }
