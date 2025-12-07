@@ -1,23 +1,27 @@
 # Reflex4You
 
-Reflex4You is an interactive complex-function explorer. Type a formula, drag the on-screen handles, or pinch to zoom, and the fractal view updates in real time. This document focuses on using the app; implementation details live in the source.
+Reflex4You is an interactive complex-function explorer. Type a formula, drag the on-screen handles, or pinch to zoom, and the fractal view updates in real time.
 
 ## Quick Start
 
-```bash
-cd apps/reflex4you
-npm install
+1. **Open the live app:** https://mikaelmayer.github.io/apps/reflex4you  
+   The viewer presents the complex function `z → z` across the rectangular domain `[-4 - 4i, 4 + 4i]`, clamped to your screen. Because every formula describes a function of `z`, the shorthand `z` means “map `z` to itself.”
 
-# Run the viewer (any static server works)
-npx http-server .
-# ...then open http://localhost:8080/apps/reflex4you in your browser
-```
+2. **Enter a formula.** Try:
 
-Playwright/node tests are optional but available:
+   ```
+   sin(z^2 + D2) $ (z - D1)
+   ```
 
-```bash
-npm run test:node
-```
+   Handles `D1` and `D2` appear. Drag them to adjust the parameters; their coordinates (and the formula) are stored directly in the URL, so sharing the link reproduces the exact view for anyone else.
+
+3. **Explore with gestures.** To inspect something Mandelbrot-like without moving handles onto the feature, use the workspace frame:
+
+   ```
+   set c = (z - W1) / (W2 - W1) in (z^2 + c $$ 20) $ 0
+   ```
+
+   Here `W1`/`W2` follow your fingers: a single finger pans both values, while a two-finger gesture solves the similarity transform (pan, zoom, rotate) and applies it to the pair. `f $ g` means “compose with” (`f(g(z))`), and `f $$ n` repeats `f` exactly `n` times. Parentheses are optional, and the complete formula syntax is summarized below under **Formula Language**.
 
 ## Interaction Constants
 
@@ -35,7 +39,7 @@ Rules of thumb:
 - If a handle only appears inside an `x`/`real` projection, dragging is locked to the real axis (and similarly for `y`/`imag`). Use both axes anywhere in the formula to regain free movement.
 - URLs remember the current formula and each handle’s last position, so you can bookmark exact views.
 
-## Writing Formulas
+## Formula Language
 
 The input accepts succinct expressions with complex arithmetic, composition, and built-in helpers:
 
@@ -61,3 +65,19 @@ Tips:
 - Use `W1`/`W2` whenever you want freeform navigation without moving your handles onto the area of interest.
 - Mix `W` with `D` or `F` for advanced effects: e.g., `f((z - W1 - D1)/W2)` pans/zooms globally while still letting you drag `D1` as a parameter inside the function.
 - To reset pointers, clear the formula or press reload; the query string always reflects the latest state.
+
+## Forking / Developing Locally
+
+```bash
+cd apps/reflex4you
+npm install
+
+# Run the viewer (any static server works)
+npx http-server .
+# ...then open http://localhost:8080/apps/reflex4you in your browser
+
+# Optional: run parser/engine unit tests
+npm run test:node
+```
+
+Implementation details (parsers, traversal helpers, WebGL shaders, etc.) live in the source tree under `apps/reflex4you`. Use the commands above if you plan to fork or extend the project locally.***
