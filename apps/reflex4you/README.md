@@ -77,8 +77,7 @@ if(real < 0, conj(z), z)      # axis-aware interaction
 Tips:
 
 - Use `W1`/`W2` whenever you want freeform navigation without moving your handles onto the area of interest.
-- Mix `W` with `D` or `F` for advanced effects: e.g., `f((z - W1 - D1)/W2)` pans/zooms globally while still letting you drag `D1` as a parameter inside the function.
-- To reset pointers, clear the formula or press reload; the query string always reflects the latest state.
+- To reset a handle, click its value chip and type `0`, `0+0i`, or any complex literal. (The formula itself is preserved across reloads because it lives in the URL.)
 
 ## Forking / Developing Locally
 
