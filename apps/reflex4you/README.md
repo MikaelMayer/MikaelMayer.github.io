@@ -39,7 +39,7 @@ Reflex4You is an interactive complex-function explorer. Type a formula, drag the
 
 ## Interaction Constants
 
-Formulas can reference special complex constants that you edit directly on the canvas:
+Formulas can reference special complex constants that you edit directly on the canvas—either drag their on-screen handle or click the value chip to type an exact complex number:
 
 | Label family | Meaning | How to move |
 | --- | --- | --- |
