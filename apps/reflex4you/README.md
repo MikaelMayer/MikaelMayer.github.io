@@ -48,12 +48,30 @@ Because the accumulator is reused, this avoids repeated array spreading when par
 ## Arithmetic grammar highlights
 `arithmetic-parser.mjs` focuses on the formula language described in the roadmap:
 - Numeric literals (real, imaginary, shorthand `i`/`-i`).
-- Built-in symbols `x`, `y`, `z`, `F1` (renaming what the renderer previously called `Offset`).
+- Axis projection symbols `x`, `y`, `real`, and `imag`. `real`/`imag` are synonyms for `x`/`y`, but we now track the original token in `syntaxLabel` metadata so UI layers can mirror the source spelling.
+- Built-in symbols `z`, `F1`, `F2`, `F3`, `D1`, `D2`, `D3`, plus the new navigation pair `W1`, `W2`.
 - Unary minus/plus, binary `+ - * /`, grouping parentheses.
 - Composition notations `o(A, B)` and `A $ B`.
+- Elementary functions `exp`, `sin`, `cos`, `tan`, `atan`, `ln`, `abs`, `conj`, and the newly added `floor`. Every unary helper shares the same AST shape, so extending the language just requires registering a new factory and GLSL emitter.
 - Span annotations on every AST node (used for error messages and future tooling).
+- Optional metadata (`syntaxLabel`) on primitives so downstream tools can recover whether a node came from `x` vs `real`, etc.
 
 Helpers like `wsLiteral('foo')` reuse the `_i` shortcut so whitespace logic stays centralized.
+
+### Interaction constants
+Reflex exposes three finger families, all accessible from formulas via `FingerOffset('label')` or the shorthand tokens (`F1`, `D2`, etc.):
+
+- **Fixed fingers (`F1`‑`F3`)** – ordered handles that capture touches in declaration order.
+- **Dynamic fingers (`D1`‑`D3`)** – proximity-based handles; whichever touch starts closest to a handle's complex value takes control.
+- **Workspace fingers (`W1`, `W2`)** – gesture-driven constants. With one finger (when no `D`/`F` handles are present) both `W` values translate together. With two fingers, we solve the complex similarity defined by the gesture (pan/zoom/rotate) and apply it to `W1` and `W2`, enabling map-like navigation entirely through formulas such as `f((z - W1)/W2)`.
+
+Formulas can freely mix `W` with either `F` or `D`, but `F` and `D` remain mutually exclusive to keep the interaction model deterministic. The UI analyzes each AST to decide which labels are active and whether a given slot should be clamped to a single axis. If every occurrence of `D1` sits inside an `x$D1` (or `real $ D1`) projection, pointer deltas are restricted to the real axis; mixing both axes (or any other expression) immediately lifts the constraint.
+
+### Formula & interaction documentation
+- **Parser keywords:** numerical literals (real/imag shorthand), projection keywords (`x`, `y`, `real`, `imag`), finger tokens (`F1`‑`F3`, `D1`‑`D3`, `W1`, `W2`), and elementary functions (`exp`, `sin`, `cos`, `tan`, `atan`, `ln`, `abs`, `floor`, `conj`).
+- **Metadata:** every AST node carries `span` information, and primitives also carry `syntaxLabel` so UI layers can echo the author's original spelling.
+- **Gestures:** single-touch pans manipulate either `F`/`D` handles (when referenced) or the `W` frame. Two-touch gestures always reserve the first two touches for `W` when the formula references those slots, ensuring consistent pinch-to-zoom even while other parameters are exposed via `F`/`D`.
+- **Axis locking:** handled automatically by scanning the AST with `visitAst`. Slots are only considered axis-constrained when *all* of their usages are projections to the same axis, regardless of repetition count.
 
 ## Testing
 From `apps/reflex4you/` run:

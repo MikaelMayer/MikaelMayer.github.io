@@ -29,6 +29,7 @@ import {
   LogicalOr,
   If,
   Abs,
+  Floor,
   Conjugate,
   buildFragmentSourceFromAST,
 } from './core-engine.mjs';
@@ -91,6 +92,13 @@ test('dynamic fingers read from the dynamic offset array', () => {
   const fragment = buildFragmentSourceFromAST(ast);
   assert.match(fragment, /uniform vec2 u_dynamicOffsets\[3\]/);
   assert.match(fragment, /return u_dynamicOffsets\[0\];/);
+});
+
+test('W fingers read from the W offset array', () => {
+  const ast = FingerOffset('W2');
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /uniform vec2 u_wOffsets\[2\]/);
+  assert.match(fragment, /return u_wOffsets\[1\];/);
 });
 
 test('VarX and VarY nodes project components', () => {
@@ -198,4 +206,10 @@ test('Abs nodes emit magnitude as real output', () => {
   const fragment = buildFragmentSourceFromAST(ast);
   assert.match(fragment, /float magnitude = length/);
   assert.match(fragment, /vec2\(magnitude, 0\.0\)/);
+});
+
+test('Floor nodes emit component-wise floor', () => {
+  const ast = Floor(VarZ());
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /return floor\(v\);/);
 });

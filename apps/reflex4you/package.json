@@ -4,7 +4,7 @@
   "description": "Local tooling for the Reflex4You app",
   "scripts": {
     "test": "playwright test",
-    "test:node": "node --test core-engine.test.mjs parser-primitives.test.mjs arithmetic-parser.test.mjs"
+    "test:node": "node --test core-engine.test.mjs parser-primitives.test.mjs arithmetic-parser.test.mjs ast-utils.test.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.48.2",
