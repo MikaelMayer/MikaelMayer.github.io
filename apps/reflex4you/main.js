@@ -94,7 +94,7 @@ function refreshFingerIndicator(label) {
   indicator.style.display = isActive ? '' : 'none';
 }
 
-const DEFAULT_FORMULA_TEXT = '(z - F1) * (z + F1)';
+const DEFAULT_FORMULA_TEXT = 'z';
 
 const defaultParseResult = parseFormulaInput(DEFAULT_FORMULA_TEXT);
 const fallbackDefaultAST = defaultParseResult.ok ? defaultParseResult.value : createDefaultFormulaAST();

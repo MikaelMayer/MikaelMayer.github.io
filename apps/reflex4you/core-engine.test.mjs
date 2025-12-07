@@ -40,11 +40,10 @@ function approxEqual(a, b) {
   return Math.abs(a - b) < EPSILON;
 }
 
-test('default formula parses into a multiplication AST', () => {
+test('default formula is the identity function z -> z', () => {
   const ast = evaluateFormulaSource(defaultFormulaSource);
-  assert.equal(ast.kind, 'Mul');
-  assert.equal(ast.left.kind, 'Sub');
-  assert.equal(ast.right.kind, 'Op');
+  assert.equal(ast.kind, 'Var');
+  assert.equal(ast.name, 'z');
 });
 
 test('Compose nodes wrap inner functions correctly', () => {

@@ -186,7 +186,7 @@ function fingerFamilyFromLabel(label) {
   }
 }
 
-export const defaultFormulaSource = 'Mul(Sub(VarZ(), Offset()), Op(VarZ(), Offset(), "add"))';
+export const defaultFormulaSource = 'VarZ()';
 
 const formulaGlobals = Object.freeze({
   VarX,
