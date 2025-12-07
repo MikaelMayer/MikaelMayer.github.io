@@ -32,7 +32,7 @@ Reflex4You is an interactive complex-function explorer. Type a formula, drag the
    set r = sqrt $ abs((x$d1) + (y$d1))^2 + x^2 + y^2 $ scale*(z - D3) in
    set r2 = sqrt $ abs((x$d1) - (y$d1))^2 + x^2 + y^2 $ scale*(z + D3) in
    abs $
-   10*z $ 1/(r^2)*exp(4*abs(D2*2)*i*r) + 1/(r2^2)*exp(4*abs(D2*2)*i*r2)
+   10*z $ 1/(r^2)*exp(8*abs(x$D2)*i*r) + 1/(r2^2)*exp(8*abs(x$D2)*i*r2)
    ```
 
    Drag `D1` to change the arm angle, `D2` to tweak the wavelength, and `D3` to offset the detectors; the visual interference pattern updates instantly and the full configuration is still shareable via the URL.
