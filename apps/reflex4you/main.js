@@ -10,12 +10,30 @@ const formulaTextarea = document.getElementById('formula');
 const errorDiv = document.getElementById('error');
 const fingerIndicatorStack = document.getElementById('finger-indicator-stack');
 const fingerOverlay = document.getElementById('finger-overlay');
+const menuButton = document.getElementById('menu-button');
+const menuDropdown = document.getElementById('menu-dropdown');
 const rootElement = typeof document !== 'undefined' ? document.documentElement : null;
 
 const FIXED_FINGER_ORDER = ['F1', 'F2', 'F3'];
 const DYNAMIC_FINGER_ORDER = ['D1', 'D2', 'D3'];
 const W_FINGER_ORDER = ['W1', 'W2'];
 const ALL_FINGER_LABELS = [...FIXED_FINGER_ORDER, ...DYNAMIC_FINGER_ORDER, ...W_FINGER_ORDER];
+const DEFAULT_FINGER_OFFSETS = Object.freeze(
+  ALL_FINGER_LABELS.reduce((acc, label) => {
+    const value = label === 'W1' ? { x: 1, y: 0 } : { x: 0, y: 0 };
+    acc[label] = Object.freeze(value);
+    return acc;
+  }, {}),
+);
+
+function cloneFingerOffsets(source) {
+  const clone = {};
+  ALL_FINGER_LABELS.forEach((label) => {
+    const baseline = source[label] || { x: 0, y: 0 };
+    clone[label] = { x: baseline.x, y: baseline.y };
+  });
+  return clone;
+}
 
 const FINGER_METADATA = ALL_FINGER_LABELS.reduce((acc, label) => {
   acc[label] = {
@@ -28,17 +46,10 @@ const FINGER_METADATA = ALL_FINGER_LABELS.reduce((acc, label) => {
 const fingerIndicators = new Map();
 const fingerDots = new Map();
 const fingerLastSerialized = {};
-const latestOffsets = {};
+const latestOffsets = cloneFingerOffsets(DEFAULT_FINGER_OFFSETS);
 
 ALL_FINGER_LABELS.forEach((label) => {
   fingerLastSerialized[label] = null;
-  if (label === 'W1') {
-    latestOffsets[label] = { x: 1, y: 0 };
-  } else if (label === 'W2') {
-    latestOffsets[label] = { x: 0, y: 0 };
-  } else {
-    latestOffsets[label] = { x: 0, y: 0 };
-  }
 });
 
 function getParserOptionsFromFingers() {
@@ -134,20 +145,20 @@ function updateFormulaQueryParam(source) {
   window.history.replaceState({}, '', newUrl);
 }
 
-function roundToTwoDecimals(value) {
+function roundToThreeDecimals(value) {
   if (!Number.isFinite(value)) {
     return NaN;
   }
-  const rounded = Math.round(value * 100) / 100;
+  const rounded = Math.round(value * 1000) / 1000;
   return Object.is(rounded, -0) ? 0 : rounded;
 }
 
 function formatNumberForDisplay(value) {
-  const rounded = roundToTwoDecimals(value);
+  const rounded = roundToThreeDecimals(value);
   if (!Number.isFinite(rounded)) {
     return '?';
   }
-  return rounded.toFixed(2).replace(/\.?0+$/, '');
+  return rounded.toFixed(3).replace(/\.?0+$/, '');
 }
 
 function formatComplexForDisplay(label, re, im) {
@@ -601,3 +612,146 @@ canvas.addEventListener('pointermove', (e) => reflexCore.handlePointerMove(e));
 window.addEventListener('resize', () => {
   activeFingerState.allSlots.forEach((label) => updateFingerDotPosition(label));
 });
+
+setupMenuInteractions();
+
+function setupMenuInteractions() {
+  if (!menuButton || !menuDropdown) {
+    return;
+  }
+  setMenuOpen(false);
+  menuButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const nextState = !isMenuOpen();
+    setMenuOpen(nextState);
+    if (nextState) {
+      focusFirstMenuItem();
+    }
+  });
+  document.addEventListener('pointerdown', (event) => {
+    if (!menuDropdown.contains(event.target) && !menuButton.contains(event.target)) {
+      setMenuOpen(false);
+    }
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && isMenuOpen()) {
+      setMenuOpen(false);
+      menuButton.focus();
+    }
+  });
+  menuDropdown.addEventListener('click', (event) => {
+    const actionButton = event.target.closest('[data-menu-action]');
+    if (!actionButton) {
+      return;
+    }
+    handleMenuAction(actionButton.dataset.menuAction);
+    setMenuOpen(false);
+  });
+}
+
+function focusFirstMenuItem() {
+  const firstItem = menuDropdown?.querySelector('[data-menu-action]');
+  if (firstItem) {
+    firstItem.focus({ preventScroll: true });
+  }
+}
+
+function setMenuOpen(isOpen) {
+  if (!menuButton || !menuDropdown) {
+    return;
+  }
+  menuButton.setAttribute('aria-expanded', String(isOpen));
+  menuDropdown.classList.toggle('menu-dropdown--open', isOpen);
+  menuDropdown.setAttribute('aria-hidden', String(!isOpen));
+}
+
+function isMenuOpen() {
+  return Boolean(menuDropdown?.classList.contains('menu-dropdown--open'));
+}
+
+function handleMenuAction(action) {
+  switch (action) {
+    case 'reset':
+      confirmAndReset();
+      break;
+    case 'save-image':
+      saveCanvasImage();
+      break;
+    default:
+      break;
+  }
+}
+
+function confirmAndReset() {
+  if (
+    !window.confirm(
+      'Reset the current formula and finger positions? This cannot be undone.',
+    )
+  ) {
+    return;
+  }
+  resetApplicationState();
+}
+
+function resetApplicationState() {
+  formulaTextarea.value = DEFAULT_FORMULA_TEXT;
+  applyFormulaFromTextarea({ updateQuery: false });
+  updateFormulaQueryParam(null);
+  resetFingerValuesToDefaults();
+  clearError();
+}
+
+function resetFingerValuesToDefaults() {
+  if (!reflexCore) {
+    return;
+  }
+  ALL_FINGER_LABELS.forEach((label) => {
+    const defaults = DEFAULT_FINGER_OFFSETS[label];
+    reflexCore.setFingerValue(label, defaults.x, defaults.y);
+  });
+}
+
+function saveCanvasImage() {
+  if (!canvas) {
+    return;
+  }
+  const filename = `reflex4you-${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
+  const handleBlob = (blob) => {
+    if (!blob) {
+      saveCanvasImageFallback(filename);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(blob);
+    triggerImageDownload(objectUrl, filename, true);
+  };
+  if (canvas.toBlob) {
+    canvas.toBlob(handleBlob, 'image/png');
+  } else {
+    saveCanvasImageFallback(filename);
+  }
+}
+
+function saveCanvasImageFallback(filename) {
+  if (!canvas) {
+    return;
+  }
+  try {
+    const dataUrl = canvas.toDataURL('image/png');
+    triggerImageDownload(dataUrl, filename, false);
+  } catch (err) {
+    alert(`Unable to save image: ${err.message}`);
+  }
+}
+
+function triggerImageDownload(url, filename, shouldRevoke) {
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  if (shouldRevoke) {
+    URL.revokeObjectURL(url);
+  }
+}
