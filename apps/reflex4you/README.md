@@ -97,7 +97,7 @@ Implementation details (parsers, traversal helpers, WebGL shaders, etc.) live in
 
 ## Running the Playwright UI tests
 
-Several UI regressions (like the burger menu) are covered by Playwright specs. Getting them to run locally mostly comes down to installing the managed browsers once:
+The Playwright specs cover the interactive UI pieces (menu, finger indicators, etc.). Getting them to run locally mostly comes down to installing the managed browsers once:
 
 1. Install dependencies (only once per clone):
 
