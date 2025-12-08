@@ -14,6 +14,8 @@ const menuButton = document.getElementById('menu-button');
 const menuDropdown = document.getElementById('menu-dropdown');
 const rootElement = typeof document !== 'undefined' ? document.documentElement : null;
 
+let fatalErrorActive = false;
+
 const FIXED_FINGER_ORDER = ['F1', 'F2', 'F3'];
 const DYNAMIC_FINGER_ORDER = ['D1', 'D2', 'D3'];
 const W_FINGER_ORDER = ['W1', 'W2'];
@@ -272,6 +274,10 @@ function promptFingerValue(label) {
     alert(`Could not parse ${label}. Use "a+bi" or "real,imag".`);
     return;
   }
+  if (!reflexCore) {
+    alert('Unable to edit finger values because the renderer is unavailable.');
+    return;
+  }
   reflexCore.setFingerValue(label, parsed.x, parsed.y);
 }
 
@@ -313,13 +319,46 @@ function handleFingerValueChange(label, offset) {
 }
 
 function showError(msg) {
+  if (fatalErrorActive) {
+    return;
+  }
+  errorDiv.removeAttribute('data-error-severity');
+  errorDiv.textContent = msg;
+  errorDiv.style.display = 'block';
+}
+
+function showFatalError(msg) {
+  fatalErrorActive = true;
+  errorDiv.setAttribute('data-error-severity', 'fatal');
   errorDiv.textContent = msg;
   errorDiv.style.display = 'block';
 }
 
 function clearError() {
+  if (fatalErrorActive) {
+    return;
+  }
+  errorDiv.removeAttribute('data-error-severity');
   errorDiv.style.display = 'none';
   errorDiv.textContent = '';
+}
+
+function handleRendererInitializationFailure(error) {
+  const reason =
+    error && typeof error.message === 'string' && error.message.length
+      ? error.message
+      : 'Unknown error';
+  const guidance = [
+    'Reflex4You could not initialize the WebGL2 renderer.',
+    'Rendering and gesture controls are disabled.',
+    `Details: ${reason}`,
+    'Try enabling WebGL2 or switch to a browser/device that supports it.',
+  ].join('\n');
+  if (canvas) {
+    canvas.classList.add('glcanvas--unavailable');
+    canvas.setAttribute('aria-disabled', 'true');
+  }
+  showFatalError(guidance);
 }
 
 function formatCaretIndicator(source, failure) {
@@ -544,24 +583,26 @@ if (initialFingerState.mode === 'invalid') {
 
 formulaTextarea.value = initialFormulaSource;
 
-let reflexCore;
+let reflexCore = null;
 try {
   reflexCore = new ReflexCore(canvas, initialAST);
 } catch (err) {
-  alert(err.message);
-  throw err;
+  console.error('Failed to initialize Reflex4You renderer', err);
+  handleRendererInitializationFailure(err);
 }
 
-ALL_FINGER_LABELS.forEach((label) => {
-  reflexCore.onFingerChange(label, (offset) => handleFingerValueChange(label, offset));
-});
+if (reflexCore) {
+  ALL_FINGER_LABELS.forEach((label) => {
+    reflexCore.onFingerChange(label, (offset) => handleFingerValueChange(label, offset));
+  });
 
-ALL_FINGER_LABELS.forEach((label) => {
-  const parsed = readFingerFromQuery(label);
-  if (parsed) {
-    reflexCore.setFingerValue(label, parsed.x, parsed.y);
-  }
-});
+  ALL_FINGER_LABELS.forEach((label) => {
+    const parsed = readFingerFromQuery(label);
+    if (parsed) {
+      reflexCore.setFingerValue(label, parsed.x, parsed.y);
+    }
+  });
+}
 
 if (initialFingerState.mode !== 'invalid') {
   applyFingerState(initialFingerState);
@@ -594,7 +635,7 @@ function applyFormulaFromTextarea({ updateQuery = true } = {}) {
     return;
   }
   clearError();
-  reflexCore.setFormulaAST(result.value);
+  reflexCore?.setFormulaAST(result.value);
   applyFingerState(nextState);
   if (updateQuery) {
     updateFormulaQueryParam(source);
@@ -603,11 +644,15 @@ function applyFormulaFromTextarea({ updateQuery = true } = {}) {
 
 formulaTextarea.addEventListener('input', () => applyFormulaFromTextarea());
 
-canvas.addEventListener('pointerdown', (e) => reflexCore.handlePointerDown(e));
-canvas.addEventListener('pointermove', (e) => reflexCore.handlePointerMove(e));
-['pointerup', 'pointercancel', 'pointerleave'].forEach((type) => {
-  canvas.addEventListener(type, (e) => reflexCore.handlePointerEnd(e));
-});
+if (reflexCore) {
+  canvas.addEventListener('pointerdown', (e) => reflexCore.handlePointerDown(e));
+  canvas.addEventListener('pointermove', (e) => reflexCore.handlePointerMove(e));
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach((type) => {
+    canvas.addEventListener(type, (e) => reflexCore.handlePointerEnd(e));
+  });
+} else if (canvas) {
+  canvas.style.pointerEvents = 'none';
+}
 
 window.addEventListener('resize', () => {
   activeFingerState.allSlots.forEach((label) => updateFingerDotPosition(label));
