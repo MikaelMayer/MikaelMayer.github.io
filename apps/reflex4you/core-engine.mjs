@@ -228,7 +228,7 @@ const formulaGlobals = Object.freeze({
   oo,
 });
 
-const FINGER_SWITCH_DISTANCE_THRESHOLD = 0.02;
+const FINGER_SWITCH_PIXEL_THRESHOLD = 6;
 
 export function evaluateFormulaSource(source, extraGlobals = {}) {
   const scope = Object.assign({}, formulaGlobals, extraGlobals);
@@ -1070,6 +1070,7 @@ export class ReflexCore {
     this.activeFingerFamily = 'none';
     this.fingerAxisConstraints = new Map();
     this.wGestureState = null;
+    this.wGestureLatched = false;
 
     this.formulaAST = initialAST;
 
@@ -1126,6 +1127,7 @@ export class ReflexCore {
     }
     this.pointerStates.clear();
     this.wGestureState = null;
+    this.wGestureLatched = false;
   }
 
   getFingerValue(label) {
@@ -1357,6 +1359,7 @@ export class ReflexCore {
       fingerInitialValue: null,
       fingerLastValue: null,
       fingerHasSignificantMovement: false,
+      maxScreenDistance: 0,
       prevRole: null,
       prevSlot: null,
     };
@@ -1398,13 +1401,14 @@ export class ReflexCore {
   }
 
   updatePointerControlledFinger(state) {
-    const delta = this.pointerDeltaToComplex(
-      state.lastClientX - state.startClientX,
-      state.lastClientY - state.startClientY,
-    );
+    const deltaX = state.lastClientX - state.startClientX;
+    const deltaY = state.lastClientY - state.startClientY;
+    const delta = this.pointerDeltaToComplex(deltaX, deltaY);
     if (!delta) {
       return;
     }
+    const screenDistance = Math.hypot(deltaX, deltaY);
+    state.maxScreenDistance = Math.max(state.maxScreenDistance || 0, screenDistance);
     if (state.axis === 'x') {
       delta.im = 0;
     } else if (state.axis === 'y') {
@@ -1414,11 +1418,9 @@ export class ReflexCore {
     const nextIm = state.originY + delta.im;
     this.setFingerValue(state.slot, nextRe, nextIm);
     state.fingerLastValue = { x: nextRe, y: nextIm };
-    if (!state.fingerHasSignificantMovement && state.fingerInitialValue) {
-      state.fingerHasSignificantMovement = hasFingerMovedBeyondThreshold(
-        state.fingerInitialValue,
-        state.fingerLastValue,
-      );
+    if (!state.fingerHasSignificantMovement) {
+      state.fingerHasSignificantMovement =
+        screenDistance >= FINGER_SWITCH_PIXEL_THRESHOLD;
     }
   }
 
@@ -1428,6 +1430,9 @@ export class ReflexCore {
     );
     const hasParamSlots = this.activeFingerFamily !== 'none';
     const hasW = this.activeWSlots.length > 0;
+    if (!hasW || !pointerList.length) {
+      this.wGestureLatched = false;
+    }
     const assignedPointerIds = new Set();
 
     // Reset roles before reassigning.
@@ -1446,14 +1451,16 @@ export class ReflexCore {
     const wAssignments = [];
     if (hasW && pointerList.length) {
       const availableCount = Math.min(this.activeWSlots.length, pointerList.length);
-      if (!hasParamSlots) {
-        for (let i = 0; i < availableCount; i += 1) {
+      const minPointersToStart = hasParamSlots ? 2 : 1;
+      const canStartNewGesture = pointerList.length >= minPointersToStart;
+      const shouldAssignW = this.wGestureLatched || canStartNewGesture;
+      if (shouldAssignW && availableCount > 0) {
+        const desiredCount = hasParamSlots ? Math.min(2, availableCount) : availableCount;
+        for (let i = 0; i < desiredCount; i += 1) {
           wAssignments.push(pointerList[i]);
         }
-      } else if (pointerList.length >= 2) {
-        const count = Math.min(2, availableCount);
-        for (let i = 0; i < count; i += 1) {
-          wAssignments.push(pointerList[i]);
+        if (!this.wGestureLatched && canStartNewGesture) {
+          this.wGestureLatched = true;
         }
       }
     }
@@ -1519,6 +1526,7 @@ export class ReflexCore {
     state.axis = this.fingerAxisConstraints.get(slot) || null;
     state.startClientX = state.lastClientX;
     state.startClientY = state.lastClientY;
+    state.maxScreenDistance = 0;
     const origin = this.getFingerValue(slot);
     state.originX = origin.x;
     state.originY = origin.y;
@@ -1551,6 +1559,7 @@ export class ReflexCore {
   updateWGestureAnchors(wStates) {
     if (!wStates.length) {
       this.wGestureState = null;
+      this.wGestureLatched = false;
       return;
     }
     const pointerIds = new Set(wStates.map((state) => state.pointerId));
@@ -1749,11 +1758,3 @@ function complexDiv(a, b) {
   };
 }
 
-function hasFingerMovedBeyondThreshold(initial, current) {
-  if (!initial || !current) {
-    return false;
-  }
-  const dx = initial.x - current.x;
-  const dy = initial.y - current.y;
-  return Math.hypot(dx, dy) >= FINGER_SWITCH_DISTANCE_THRESHOLD;
-}
