@@ -34,6 +34,12 @@
       touch-action: none; /* 1-finger pan on mobile */
     }
 
+    #glcanvas.glcanvas--unavailable {
+      filter: grayscale(1);
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
     /* Error overlay positioned beneath finger indicators */
     #error {
       position: fixed;

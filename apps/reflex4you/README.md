@@ -94,3 +94,30 @@ npm run test:node
 ```
 
 Implementation details (parsers, traversal helpers, WebGL shaders, etc.) live in the source tree under `apps/reflex4you`. Use the commands above if you plan to fork or extend the project locally.***
+
+## Running the Playwright UI tests
+
+The Playwright specs cover the interactive UI pieces (menu, finger indicators, etc.). Getting them to run locally mostly comes down to installing the managed browsers once:
+
+1. Install dependencies (only once per clone):
+
+   ```bash
+   cd apps/reflex4you
+   npm install
+   ```
+
+2. Install the browsers Playwright expects. Chromium is mandatory; Firefox is enabled in `playwright.config.js`, so grab both:
+
+   ```bash
+   npx playwright install chromium firefox
+   # Optional but helpful on bare Linux images:
+   # npx playwright install-deps   # may require sudo
+   ```
+
+3. Run the suite (this command automatically starts `http-server` on port 5173 before executing the tests):
+
+   ```bash
+   npx playwright test
+   ```
+
+Use `npx playwright test --project=chromium` if you only want to debug Chromium, but please run the full matrix before sharing your changes so we keep Firefox coverage healthy.***

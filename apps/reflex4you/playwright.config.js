@@ -18,7 +18,8 @@ module.exports = defineConfig({
     }
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } }
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'firefox', use: { ...devices['Desktop Firefox'] } }
   ],
   webServer: {
     command: 'npx http-server -p 5173 -c-1 .',

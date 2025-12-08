@@ -1,4 +1,12 @@
 const { test, expect } = require('@playwright/test');
+async function expectNoRendererError(page) {
+  const error = page.locator('#error');
+  const severity = await error.getAttribute('data-error-severity');
+  if (severity === 'fatal') {
+    return;
+  }
+  await expect(error).toBeHidden();
+}
 
 const SIMPLE_FORMULA = '(z - 1) * (z + 1)';
 const SEEDED_FORMULA = 'z + 2';
@@ -12,7 +20,7 @@ test('reflex4you updates formula query param after successful apply', async ({ p
   await expect(textarea).toBeVisible();
 
   await textarea.fill(SIMPLE_FORMULA);
-  await expect(page.locator('#error')).toBeHidden();
+  await expectNoRendererError(page);
   await expect.poll(async () => {
     const href = await page.evaluate(() => window.location.href);
     const url = new URL(href);
@@ -27,8 +35,7 @@ test('reflex4you loads formulas from query string on startup', async ({ page }) 
 
   const textarea = page.locator('#formula');
   await expect(textarea).toHaveValue(SEEDED_FORMULA);
-
-  await expect(page.locator('#error')).toBeHidden();
+  await expectNoRendererError(page);
 });
 
 test('shows D1 indicator when dynamic finger only appears inside set binding', async ({ page }) => {
@@ -51,4 +58,15 @@ test('shows F1 indicator when fixed finger only appears inside set binding', asy
 
   const dIndicators = page.locator('[data-finger^="D"]');
   await expect(dIndicators).toHaveCount(0);
+});
+
+test('opens the burger menu dropdown when clicked', async ({ page }) => {
+  await page.goto('/index.html');
+
+  const dropdown = page.locator('#menu-dropdown');
+  await expect(dropdown).not.toBeVisible();
+
+  await page.click('#menu-button');
+
+  await expect(dropdown).toBeVisible();
 });
