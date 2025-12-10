@@ -950,22 +950,6 @@ vec2 c_sqrt(vec2 z) {
   return vec2(realPart, imagPart);
 }
 
-vec2 c_asin(vec2 z) {
-  vec2 iz = vec2(-z.y, z.x);
-  vec2 one = vec2(1.0, 0.0);
-  vec2 zSquared = c_mul(z, z);
-  vec2 underSqrt = one - zSquared;
-  vec2 sqrtTerm = c_sqrt(underSqrt);
-  vec2 inside = iz + sqrtTerm;
-  vec2 lnInside = c_ln(inside);
-  return vec2(lnInside.y, -lnInside.x);
-}
-
-vec2 c_acos(vec2 z) {
-  vec2 asinValue = c_asin(z);
-  return vec2(0.5 * PI - asinValue.x, -asinValue.y);
-}
-
 float wrapAngleToRange(float angle, float center) {
   float shifted = angle - center;
   float normalized = shifted - TAU * floor((shifted + PI) / TAU);
@@ -984,6 +968,22 @@ vec2 c_ln_branch(vec2 z, float center) {
 
 vec2 c_ln(vec2 z) {
   return c_ln_branch(z, 0.0);
+}
+
+vec2 c_asin(vec2 z) {
+  vec2 iz = vec2(-z.y, z.x);
+  vec2 one = vec2(1.0, 0.0);
+  vec2 zSquared = c_mul(z, z);
+  vec2 underSqrt = one - zSquared;
+  vec2 sqrtTerm = c_sqrt(underSqrt);
+  vec2 inside = iz + sqrtTerm;
+  vec2 lnInside = c_ln(inside);
+  return vec2(lnInside.y, -lnInside.x);
+}
+
+vec2 c_acos(vec2 z) {
+  vec2 asinValue = c_asin(z);
+  return vec2(0.5 * PI - asinValue.x, -asinValue.y);
 }
 
 vec2 c_atan(vec2 z) {
