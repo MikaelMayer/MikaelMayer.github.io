@@ -688,7 +688,7 @@ const powerParser = createParser('Power', (input) => {
 });
 
 function createPowerApplication(baseNode, exponentNode, span) {
-  const literal = extractLiteralIntegerExponent(exponentNode);
+  const literal = extractSmallIntegerExponent(exponentNode);
   if (literal !== null) {
     return withSpan(Pow(baseNode, literal), span);
   }
@@ -703,15 +703,15 @@ function createPowerApplication(baseNode, exponentNode, span) {
   return expNode;
 }
 
-function extractLiteralIntegerExponent(node) {
-  const value = extractRealConstantValue(node);
+function extractSmallIntegerExponent(node, contextOverride = null) {
+  const value = evaluateNodeToRealScalar(node, contextOverride ?? currentConstantEvaluationContext);
   if (value === null) {
     return null;
   }
   if (!Number.isFinite(value)) {
     return null;
   }
-  if (value !== Math.floor(value)) {
+  if (!Number.isInteger(value)) {
     return null;
   }
   if (Math.abs(value) > MAX_DIRECT_POWER_EXPONENT) {
@@ -720,7 +720,7 @@ function extractLiteralIntegerExponent(node) {
   return value;
 }
 
-function extractRealConstantValue(node) {
+function evaluateNodeToRealScalar(node, context) {
   if (!node || typeof node !== 'object') {
     return null;
   }
@@ -730,14 +730,11 @@ function extractRealConstantValue(node) {
     }
     return node.re;
   }
-  if (!currentConstantEvaluationContext) {
+  if (!context) {
     return null;
   }
-  const evaluated = evaluateConstantNode(node, currentConstantEvaluationContext);
-  if (!evaluated) {
-    return null;
-  }
-  if (evaluated.im !== 0) {
+  const evaluated = evaluateConstantNode(node, context);
+  if (!evaluated || evaluated.im !== 0) {
     return null;
   }
   return evaluated.re;
@@ -1570,8 +1567,7 @@ function maybeReducePowerExpression(node, parent, key, context) {
     return null;
   }
   const metadata = node.__powerExpression;
-  const value = evaluateConstantNode(metadata.exponent, context);
-  const integerExponent = extractIntegerFromConstantValue(value);
+  const integerExponent = extractSmallIntegerExponent(metadata.exponent, context);
   delete node.__powerExpression;
   if (integerExponent === null) {
     return null;
@@ -1582,25 +1578,6 @@ function maybeReducePowerExpression(node, parent, key, context) {
     replacement.input = node.input;
   }
   return replacement;
-}
-
-function extractIntegerFromConstantValue(value) {
-  if (!value) {
-    return null;
-  }
-  if (value.im !== 0) {
-    return null;
-  }
-  if (!Number.isFinite(value.re)) {
-    return null;
-  }
-  if (value.re !== Math.floor(value.re)) {
-    return null;
-  }
-  if (Math.abs(value.re) > MAX_DIRECT_POWER_EXPONENT) {
-    return null;
-  }
-  return value.re;
 }
 
 function evaluateRepeatCountExpression(node, span, context) {
