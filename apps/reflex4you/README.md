@@ -37,6 +37,12 @@ Reflex4You is an interactive complex-function explorer. Type a formula, drag the
 
    Drag `D1` to change the arm angle, `D2` to tweak the wavelength, and `D3` to offset the detectors; the visual interference pattern updates instantly and the full configuration is still shareable via the URL.
 
+## Install as a PWA
+
+- On Chrome/Edge/Android, open https://mikaelmayer.github.io/apps/reflex4you, open the browser menu, and choose **Install app** (or **Add to Home screen** on iOS Safari).  
+- The shipped `manifest.json` and service worker let the viewer cache `index.html`, all ES modules, and the WebGL assets so you can explore saved formulas even when you're offline.
+- Updates ship automatically: when a new version is published, the service worker pulls fresh files after the next load and activates on the following visit.
+
 ## Interaction Constants
 
 Formulas can reference special complex constants that you edit directly on the canvas—either drag their on-screen handle or click the value chip to type an exact complex number:

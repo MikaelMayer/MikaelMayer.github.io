@@ -1016,3 +1016,13 @@ function triggerImageDownload(url, filename, shouldRevoke) {
     URL.revokeObjectURL(url);
   }
 }
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('./service-worker.js')
+      .catch((error) => {
+        console.warn('Reflex4You service worker registration failed.', error);
+      });
+  });
+}
