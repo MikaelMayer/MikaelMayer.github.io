@@ -49,10 +49,51 @@ test('parses negative exponents', () => {
   assert.equal(result.value.exponent, -2);
 });
 
-test('rejects non-integer exponents', () => {
+test('non-integer exponents lower to exp form', () => {
   const result = parseFormulaInput('z ^ 1.5');
-  assert.equal(result.ok, false);
-  assert.match(result.message, /exponent must be an integer/i);
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Exp');
+  assert.equal(result.value.value.kind, 'Mul');
+  assert.equal(result.value.value.left.kind, 'Const');
+});
+
+test('power expressions simplify to Pow when exponent is an integer expression', () => {
+  const result = parseFormulaInput('z ^ (1 + 1)');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Pow');
+  assert.equal(result.value.exponent, 2);
+});
+
+test('set-bound integer exponent resolves to Pow', () => {
+  const result = parseFormulaInput('set n = 3 in z ^ n');
+  assert.equal(result.ok, true);
+  const binding = result.value;
+  assert.equal(binding.kind, 'SetBinding');
+  assert.equal(binding.body.kind, 'Pow');
+  assert.equal(binding.body.exponent, 3);
+});
+
+test('symbolic non-integer exponents remain in exp form', () => {
+  const result = parseFormulaInput('z ^ x');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Exp');
+});
+
+test('power exponents beyond threshold fall back to exp form', () => {
+  const result = parseFormulaInput('z ^ 11');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Exp');
+});
+
+test('power exponents from finger-based constants collapse to Pow', () => {
+  const result = parseFormulaInput('z ^ (F1.x + 1)', {
+    fingerValues: {
+      F1: { x: 2, y: 0 },
+    },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Pow');
+  assert.equal(result.value.exponent, 3);
 });
 
 test('parses exp/sin/cos/ln calls', () => {
@@ -67,6 +108,28 @@ test('parses tan and atan calls', () => {
   assert.equal(result.ok, true);
   assert.equal(result.value.kind, 'Tan');
   assert.equal(result.value.value.kind, 'Atan');
+});
+
+test('parses arc trig aliases', () => {
+  const asinResult = parseFormulaInput('asin(z)');
+  assert.equal(asinResult.ok, true);
+  assert.equal(asinResult.value.kind, 'Asin');
+
+  const arcsinResult = parseFormulaInput('arcsin(z)');
+  assert.equal(arcsinResult.ok, true);
+  assert.equal(arcsinResult.value.kind, 'Asin');
+
+  const acosResult = parseFormulaInput('acos(z)');
+  assert.equal(acosResult.ok, true);
+  assert.equal(acosResult.value.kind, 'Acos');
+
+  const arccosResult = parseFormulaInput('arccos(z)');
+  assert.equal(arccosResult.ok, true);
+  assert.equal(arccosResult.value.kind, 'Acos');
+
+  const arctanResult = parseFormulaInput('arctan(z)');
+  assert.equal(arctanResult.ok, true);
+  assert.equal(arctanResult.value.kind, 'Atan');
 });
 
 test('parses ln calls with optional branch shift', () => {

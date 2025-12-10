@@ -130,6 +130,14 @@ export function Atan(value) {
   return { kind: "Atan", value };
 }
 
+export function Asin(value) {
+  return { kind: "Asin", value };
+}
+
+export function Acos(value) {
+  return { kind: "Acos", value };
+}
+
 export function Ln(value, branch = null) {
   return { kind: "Ln", value, branch };
 }
@@ -220,6 +228,8 @@ const formulaGlobals = Object.freeze({
   Cos,
   Tan,
   Atan,
+  Asin,
+  Acos,
   Ln,
   Abs,
   Abs2,
@@ -266,6 +276,8 @@ function assignNodeIds(ast) {
     case "Cos":
     case "Tan":
     case "Atan":
+    case "Asin":
+    case "Acos":
     case "Abs":
     case "Abs2":
     case "Floor":
@@ -323,6 +335,8 @@ function collectNodesPostOrder(ast, out) {
     case "Cos":
     case "Tan":
     case "Atan":
+    case "Asin":
+    case "Acos":
     case "Abs":
     case "Abs2":
     case "Floor":
@@ -709,6 +723,24 @@ vec2 ${name}(vec2 z) {
 }`.trim();
   }
 
+  if (ast.kind === "Asin") {
+    const valueName = functionName(ast.value);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 v = ${valueName}(z);
+    return c_asin(v);
+}`.trim();
+  }
+
+  if (ast.kind === "Acos") {
+    const valueName = functionName(ast.value);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 v = ${valueName}(z);
+    return c_acos(v);
+}`.trim();
+  }
+
   if (ast.kind === "Abs") {
     const valueName = functionName(ast.value);
     return `
@@ -905,6 +937,35 @@ vec2 c_tan(vec2 z) {
   return c_div(s, c);
 }
 
+vec2 c_sqrt(vec2 z) {
+  float magnitude = length(z);
+  if (magnitude == 0.0) {
+    return vec2(0.0, 0.0);
+  }
+  float realPart = sqrt(0.5 * (magnitude + z.x));
+  float imagPart = sqrt(max(0.0, 0.5 * (magnitude - z.x)));
+  if (z.y < 0.0) {
+    imagPart = -imagPart;
+  }
+  return vec2(realPart, imagPart);
+}
+
+vec2 c_asin(vec2 z) {
+  vec2 iz = vec2(-z.y, z.x);
+  vec2 one = vec2(1.0, 0.0);
+  vec2 zSquared = c_mul(z, z);
+  vec2 underSqrt = one - zSquared;
+  vec2 sqrtTerm = c_sqrt(underSqrt);
+  vec2 inside = iz + sqrtTerm;
+  vec2 lnInside = c_ln(inside);
+  return vec2(lnInside.y, -lnInside.x);
+}
+
+vec2 c_acos(vec2 z) {
+  vec2 asinValue = c_asin(z);
+  return vec2(0.5 * PI - asinValue.x, -asinValue.y);
+}
+
 float wrapAngleToRange(float angle, float center) {
   float shifted = angle - center;
   float normalized = shifted - TAU * floor((shifted + PI) / TAU);
@@ -1020,7 +1081,7 @@ export function buildFragmentSourceFromAST(ast) {
 export class ReflexCore {
   constructor(canvas, initialAST = createDefaultFormulaAST()) {
     this.canvas = canvas;
-    this.gl = canvas.getContext('webgl2');
+    this.gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true }) || canvas.getContext('webgl2');
     if (!this.gl) {
       throw new Error('WebGL2 not supported in this browser');
     }
