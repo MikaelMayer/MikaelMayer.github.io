@@ -950,6 +950,9 @@ vec2 c_sqrt(vec2 z) {
   return vec2(realPart, imagPart);
 }
 
+vec2 c_ln_branch(vec2 z, float center);
+vec2 c_ln(vec2 z);
+
 vec2 c_asin(vec2 z) {
   vec2 iz = vec2(-z.y, z.x);
   vec2 one = vec2(1.0, 0.0);
