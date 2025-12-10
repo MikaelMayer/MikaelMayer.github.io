@@ -79,6 +79,23 @@ test('symbolic non-integer exponents remain in exp form', () => {
   assert.equal(result.value.kind, 'Exp');
 });
 
+test('power exponents beyond threshold fall back to exp form', () => {
+  const result = parseFormulaInput('z ^ 11');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Exp');
+});
+
+test('power exponents from finger-based constants collapse to Pow', () => {
+  const result = parseFormulaInput('z ^ (F1.x + 1)', {
+    fingerValues: {
+      F1: { x: 2, y: 0 },
+    },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Pow');
+  assert.equal(result.value.exponent, 3);
+});
+
 test('parses exp/sin/cos/ln calls', () => {
   const result = parseFormulaInput('exp(sin(cos(ln(z))))');
   assert.equal(result.ok, true);

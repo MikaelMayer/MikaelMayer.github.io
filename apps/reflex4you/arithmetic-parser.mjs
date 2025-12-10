@@ -51,6 +51,9 @@ import {
   SetRef,
 } from './core-engine.mjs';
 
+const MAX_DIRECT_POWER_EXPONENT = 10;
+let currentConstantEvaluationContext = null;
+
 const IDENTIFIER_CHAR = /[A-Za-z0-9_]/;
 const NUMBER_REGEX = /[+-]?(?:\d+\.\d+|\d+|\.\d+)(?:[eE][+-]?\d+)?/y;
 const SQRT3_OVER_2 = Math.sqrt(3) / 2;
@@ -701,17 +704,43 @@ function createPowerApplication(baseNode, exponentNode, span) {
 }
 
 function extractLiteralIntegerExponent(node) {
-  if (!node || typeof node !== 'object' || node.kind !== 'Const') {
+  const value = extractRealConstantValue(node);
+  if (value === null) {
     return null;
   }
-  if (!Number.isFinite(node.re) || Math.abs(node.im) > REPEAT_COUNT_TOLERANCE) {
+  if (!Number.isFinite(value)) {
     return null;
   }
-  const rounded = Math.round(node.re);
-  if (Math.abs(node.re - rounded) > REPEAT_COUNT_TOLERANCE) {
+  if (value !== Math.floor(value)) {
     return null;
   }
-  return rounded;
+  if (Math.abs(value) > MAX_DIRECT_POWER_EXPONENT) {
+    return null;
+  }
+  return value;
+}
+
+function extractRealConstantValue(node) {
+  if (!node || typeof node !== 'object') {
+    return null;
+  }
+  if (node.kind === 'Const') {
+    if (node.im !== 0) {
+      return null;
+    }
+    return node.re;
+  }
+  if (!currentConstantEvaluationContext) {
+    return null;
+  }
+  const evaluated = evaluateConstantNode(node, currentConstantEvaluationContext);
+  if (!evaluated) {
+    return null;
+  }
+  if (evaluated.im !== 0) {
+    return null;
+  }
+  return evaluated.re;
 }
 
 function leftAssociative(termParser, operatorParser, ctor) {
@@ -1559,17 +1588,19 @@ function extractIntegerFromConstantValue(value) {
   if (!value) {
     return null;
   }
-  if (Math.abs(value.im) > REPEAT_COUNT_TOLERANCE) {
+  if (value.im !== 0) {
     return null;
   }
   if (!Number.isFinite(value.re)) {
     return null;
   }
-  const rounded = Math.round(value.re);
-  if (Math.abs(value.re - rounded) > REPEAT_COUNT_TOLERANCE) {
+  if (value.re !== Math.floor(value.re)) {
     return null;
   }
-  return rounded;
+  if (Math.abs(value.re) > MAX_DIRECT_POWER_EXPONENT) {
+    return null;
+  }
+  return value.re;
 }
 
 function evaluateRepeatCountExpression(node, span, context) {
@@ -2340,7 +2371,16 @@ export function parseFormulaInput(input, options = {}) {
       input: normalized,
     });
   }
-  const parsed = expressionParser.runNormalized(normalized);
+  currentConstantEvaluationContext = {
+    fingerValues: parseOptions.fingerValues,
+    bindingStack: [],
+  };
+  let parsed;
+  try {
+    parsed = expressionParser.runNormalized(normalized);
+  } finally {
+    currentConstantEvaluationContext = null;
+  }
   if (!parsed.ok) {
     return parsed;
   }
