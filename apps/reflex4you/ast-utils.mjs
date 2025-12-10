@@ -28,6 +28,8 @@ function getChildEntries(node) {
     case 'Cos':
     case 'Tan':
     case 'Atan':
+    case 'Asin':
+    case 'Acos':
     case 'Abs':
     case 'Abs2':
     case 'Floor':

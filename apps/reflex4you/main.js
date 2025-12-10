@@ -918,7 +918,10 @@ function handleMenuAction(action) {
       confirmAndReset();
       break;
     case 'save-image':
-      saveCanvasImage();
+      saveCanvasImage().catch((error) => {
+        console.error('Failed to save canvas image.', error);
+        alert('Unable to save image. Check console for details.');
+      });
       break;
     default:
       break;
@@ -956,24 +959,38 @@ function resetFingerValuesToDefaults() {
   });
 }
 
-function saveCanvasImage() {
+async function saveCanvasImage() {
   if (!canvas) {
     return;
   }
+  await ensureCanvasSnapshotReady();
   const filename = `reflex4you-${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
-  const handleBlob = (blob) => {
-    if (!blob) {
-      saveCanvasImageFallback(filename);
+  if (canvas.toBlob) {
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    if (blob && blob.size > 0) {
+      const objectUrl = URL.createObjectURL(blob);
+      triggerImageDownload(objectUrl, filename, true);
       return;
     }
-    const objectUrl = URL.createObjectURL(blob);
-    triggerImageDownload(objectUrl, filename, true);
-  };
-  if (canvas.toBlob) {
-    canvas.toBlob(handleBlob, 'image/png');
-  } else {
-    saveCanvasImageFallback(filename);
   }
+  saveCanvasImageFallback(filename);
+}
+
+async function ensureCanvasSnapshotReady() {
+  if (reflexCore) {
+    reflexCore.render();
+    if (reflexCore.gl && typeof reflexCore.gl.finish === 'function') {
+      reflexCore.gl.finish();
+    }
+  }
+  await waitForNextFrame();
+}
+
+function waitForNextFrame() {
+  if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => window.requestAnimationFrame(resolve));
 }
 
 function saveCanvasImageFallback(filename) {

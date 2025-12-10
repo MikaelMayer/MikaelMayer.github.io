@@ -37,6 +37,8 @@ import {
   Cos,
   Tan,
   Atan,
+  Asin,
+  Acos,
   Ln,
   Abs,
   Abs2,
@@ -80,6 +82,11 @@ const BUILTIN_FUNCTION_DEFINITIONS = [
   { name: 'cos', factory: Cos },
   { name: 'tan', factory: Tan },
   { name: 'atan', factory: Atan },
+  { name: 'arctan', factory: Atan },
+  { name: 'asin', factory: Asin },
+  { name: 'arcsin', factory: Asin },
+  { name: 'acos', factory: Acos },
+  { name: 'arccos', factory: Acos },
   { name: 'ln', factory: (value) => Ln(value, null) },
   { name: 'abs', factory: Abs },
   { name: 'abs2', factory: Abs2 },
@@ -212,6 +219,11 @@ const RESERVED_BINDING_NAMES = new Set([
   'cos',
   'tan',
   'atan',
+  'asin',
+  'acos',
+  'arcsin',
+  'arccos',
+  'arctan',
   'ln',
   'abs',
   'abs2',
@@ -442,6 +454,10 @@ function createUnaryFunctionParser(name, factory) {
   }).Map((expr, result) => withSpan(factory(expr), result.span));
 }
 
+function createUnaryFunctionParsers(names, factory) {
+  return names.map((name) => createUnaryFunctionParser(name, factory));
+}
+
 const lnParser = createParser('LnCall', (input) => {
   const keyword = keywordLiteral('ln', { ctor: 'lnKeyword' }).runNormalized(input);
   if (!keyword.ok) {
@@ -485,16 +501,18 @@ const lnParser = createParser('LnCall', (input) => {
 });
 
 const elementaryFunctionParser = Choice([
-  createUnaryFunctionParser('exp', Exp),
-  createUnaryFunctionParser('sin', Sin),
-  createUnaryFunctionParser('cos', Cos),
-  createUnaryFunctionParser('tan', Tan),
-  createUnaryFunctionParser('atan', Atan),
+  ...createUnaryFunctionParsers(['exp'], Exp),
+  ...createUnaryFunctionParsers(['sin'], Sin),
+  ...createUnaryFunctionParsers(['cos'], Cos),
+  ...createUnaryFunctionParsers(['tan'], Tan),
+  ...createUnaryFunctionParsers(['atan', 'arctan'], Atan),
+  ...createUnaryFunctionParsers(['asin', 'arcsin'], Asin),
+  ...createUnaryFunctionParsers(['acos', 'arccos'], Acos),
   lnParser,
-  createUnaryFunctionParser('abs', Abs),
-  createUnaryFunctionParser('abs2', Abs2),
-  createUnaryFunctionParser('floor', Floor),
-  createUnaryFunctionParser('conj', Conjugate),
+  ...createUnaryFunctionParsers(['abs'], Abs),
+  ...createUnaryFunctionParsers(['abs2'], Abs2),
+  ...createUnaryFunctionParsers(['floor'], Floor),
+  ...createUnaryFunctionParsers(['conj'], Conjugate),
 ], { ctor: 'ElementaryFunction' });
 
 const builtinFunctionLiteralParser = Choice(
@@ -654,7 +672,7 @@ const powerParser = createParser('Power', (input) => {
       break;
     }
     const span = spanBetween(input, suffix.next);
-    node = withSpan(Pow(node, suffix.value), span);
+    node = createPowerApplication(node, suffix.value, span);
     cursor = suffix.next;
   }
   const span = spanBetween(input, cursor);
@@ -665,6 +683,36 @@ const powerParser = createParser('Power', (input) => {
     next: cursor,
   });
 });
+
+function createPowerApplication(baseNode, exponentNode, span) {
+  const literal = extractLiteralIntegerExponent(exponentNode);
+  if (literal !== null) {
+    return withSpan(Pow(baseNode, literal), span);
+  }
+  const lnSpan = baseNode?.span || span;
+  const lnNode = withSpan(Ln(baseNode, null), lnSpan);
+  const mulNode = withSpan(Mul(exponentNode, lnNode), span);
+  const expNode = withSpan(Exp(mulNode), span);
+  expNode.__powerExpression = {
+    base: baseNode,
+    exponent: exponentNode,
+  };
+  return expNode;
+}
+
+function extractLiteralIntegerExponent(node) {
+  if (!node || typeof node !== 'object' || node.kind !== 'Const') {
+    return null;
+  }
+  if (!Number.isFinite(node.re) || Math.abs(node.im) > REPEAT_COUNT_TOLERANCE) {
+    return null;
+  }
+  const rounded = Math.round(node.re);
+  if (Math.abs(node.re - rounded) > REPEAT_COUNT_TOLERANCE) {
+    return null;
+  }
+  return rounded;
+}
 
 function leftAssociative(termParser, operatorParser, ctor) {
   const maybeOperator = operatorParser.Optional(null, { ctor: `${ctor}:maybeOp` });
@@ -747,6 +795,8 @@ function substitutePlaceholder(node, placeholder, replacement) {
     case 'Cos':
     case 'Tan':
     case 'Atan':
+    case 'Asin':
+    case 'Acos':
     case 'Abs':
     case 'Abs2':
     case 'Conjugate':
@@ -832,6 +882,8 @@ function cloneAst(node) {
     case 'Cos':
     case 'Tan':
     case 'Atan':
+    case 'Asin':
+    case 'Acos':
     case 'Abs':
     case 'Abs2':
     case 'Conjugate':
@@ -910,6 +962,8 @@ function substituteIdentifierWithClone(node, targetName, replacement) {
     case 'Cos':
     case 'Tan':
     case 'Atan':
+    case 'Asin':
+    case 'Acos':
     case 'Abs':
     case 'Abs2':
     case 'Conjugate':
@@ -996,6 +1050,8 @@ function findFirstPlaceholderNode(ast) {
       case 'Cos':
       case 'Tan':
       case 'Atan':
+      case 'Asin':
+      case 'Acos':
       case 'Ln':
       case 'Abs':
       case 'Abs2':
@@ -1063,6 +1119,8 @@ function findFirstLetBinding(ast) {
       case 'Cos':
       case 'Tan':
       case 'Atan':
+      case 'Asin':
+      case 'Acos':
       case 'Ln':
       case 'Abs':
       case 'Abs2':
@@ -1193,6 +1251,8 @@ function resolveSetReferences(ast, input) {
     case 'Cos':
     case 'Tan':
     case 'Atan':
+    case 'Asin':
+    case 'Acos':
     case 'Abs':
     case 'Abs2':
     case 'Conjugate':
@@ -1392,11 +1452,28 @@ function resolveRepeatPlaceholders(ast, parseOptions, input) {
         return null;
       case 'Pow':
         return visit(node.base, node, 'base');
-      case 'Exp':
+      case 'Exp': {
+        const valueErr = visit(node.value, node, 'value');
+        if (valueErr) {
+          return valueErr;
+        }
+        const replacement = maybeReducePowerExpression(node, parent, key, context);
+        if (!replacement) {
+          return null;
+        }
+        if (parent && key) {
+          parent[key] = replacement;
+          return visit(replacement, parent, key);
+        }
+        ast = replacement;
+        return visit(ast, null, null);
+      }
       case 'Sin':
       case 'Cos':
       case 'Tan':
       case 'Atan':
+      case 'Asin':
+      case 'Acos':
       case 'Abs':
       case 'Abs2':
       case 'Floor':
@@ -1457,6 +1534,42 @@ function resolveRepeatPlaceholders(ast, parseOptions, input) {
     return error;
   }
   return ast;
+}
+
+function maybeReducePowerExpression(node, parent, key, context) {
+  if (!node || typeof node !== 'object' || !node.__powerExpression) {
+    return null;
+  }
+  const metadata = node.__powerExpression;
+  const value = evaluateConstantNode(metadata.exponent, context);
+  const integerExponent = extractIntegerFromConstantValue(value);
+  delete node.__powerExpression;
+  if (integerExponent === null) {
+    return null;
+  }
+  const replacement = Pow(metadata.base, integerExponent);
+  if (node.span) {
+    replacement.span = node.span;
+    replacement.input = node.input;
+  }
+  return replacement;
+}
+
+function extractIntegerFromConstantValue(value) {
+  if (!value) {
+    return null;
+  }
+  if (Math.abs(value.im) > REPEAT_COUNT_TOLERANCE) {
+    return null;
+  }
+  if (!Number.isFinite(value.re)) {
+    return null;
+  }
+  const rounded = Math.round(value.re);
+  if (Math.abs(value.re - rounded) > REPEAT_COUNT_TOLERANCE) {
+    return null;
+  }
+  return rounded;
 }
 
 function evaluateRepeatCountExpression(node, span, context) {
@@ -1600,6 +1713,14 @@ function evaluateConstantNode(node, context, scope = {}, localBindings = []) {
     case 'Atan': {
       const value = evaluateConstantNode(node.value, context, scope, localBindings);
       return value ? complexAtan(value) : null;
+    }
+    case 'Asin': {
+      const value = evaluateConstantNode(node.value, context, scope, localBindings);
+      return value ? complexAsin(value) : null;
+    }
+    case 'Acos': {
+      const value = evaluateConstantNode(node.value, context, scope, localBindings);
+      return value ? complexAcos(value) : null;
     }
     case 'Ln': {
       const value = evaluateConstantNode(node.value, context, scope, localBindings);
@@ -1854,6 +1975,51 @@ function complexTan(value) {
   return complexDiv(sin, cos);
 }
 
+function complexSqrt(value) {
+  if (!value) {
+    return null;
+  }
+  const magnitude = complexAbs(value);
+  if (!Number.isFinite(magnitude)) {
+    return null;
+  }
+  if (magnitude === 0) {
+    return { re: 0, im: 0 };
+  }
+  const realPart = Math.sqrt(0.5 * (magnitude + value.re));
+  const imagPartMagnitude = Math.sqrt(Math.max(0, 0.5 * (magnitude - value.re)));
+  const imagPart = value.im >= 0 ? imagPartMagnitude : -imagPartMagnitude;
+  return { re: realPart, im: imagPart };
+}
+
+function complexAsin(value) {
+  if (!value) {
+    return null;
+  }
+  const iz = { re: -value.im, im: value.re };
+  const one = { re: 1, im: 0 };
+  const zSquared = complexMul(value, value);
+  const underSqrt = complexSub(one, zSquared);
+  const sqrtTerm = complexSqrt(underSqrt);
+  if (!sqrtTerm) {
+    return null;
+  }
+  const inside = complexAdd(iz, sqrtTerm);
+  const lnValue = complexLn(inside);
+  if (!lnValue) {
+    return null;
+  }
+  return { re: lnValue.im, im: -lnValue.re };
+}
+
+function complexAcos(value) {
+  const asinValue = complexAsin(value);
+  if (!asinValue) {
+    return null;
+  }
+  return { re: Math.PI / 2 - asinValue.re, im: -asinValue.im };
+}
+
 function complexLn(value, branchCenter = 0) {
   const magnitude = complexAbs(value);
   if (magnitude < 1e-12) {
@@ -1918,19 +2084,9 @@ const powerSuffixParser = createParser('PowerSuffix', (input) => {
   if (!caret.ok) {
     return caret;
   }
-  const exponentResult = numberToken.runNormalized(caret.next);
+  const exponentResult = unaryParser.runNormalized(caret.next);
   if (!exponentResult.ok) {
     return exponentResult;
-  }
-  if (!Number.isInteger(exponentResult.value)) {
-    return new ParseFailure({
-      ctor: 'PowerSuffix',
-      message: 'Exponent must be an integer',
-      severity: ParseSeverity.error,
-      expected: 'integer exponent',
-      span: exponentResult.span,
-      input: exponentResult.span.input,
-    });
   }
   const span = spanBetween(input, exponentResult.next);
   return new ParseSuccess({

@@ -17,6 +17,8 @@ import {
   Cos,
   Tan,
   Atan,
+  Asin,
+  Acos,
   Ln,
   oo,
   FingerOffset,
@@ -137,6 +139,13 @@ test('tan and atan nodes emit their helpers', () => {
   const fragment = buildFragmentSourceFromAST(ast);
   assert.match(fragment, /c_tan/);
   assert.match(fragment, /c_atan/);
+});
+
+test('asin and acos nodes emit their helpers', () => {
+  const ast = Asin(Acos(VarZ()));
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /c_asin/);
+  assert.match(fragment, /c_acos/);
 });
 
 test('ln nodes support branch shifts via second argument', () => {
