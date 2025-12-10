@@ -21,6 +21,8 @@ const FORMULA_PARAM = 'formula';
 const FORMULA_B64_PARAM = 'formulab64';
 const sharedTextEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
 const sharedTextDecoder = typeof TextDecoder !== 'undefined' ? new TextDecoder() : null;
+const supportsCompressionStream = typeof CompressionStream === 'function';
+const supportsDecompressionStream = typeof DecompressionStream === 'function';
 
 const FIXED_FINGER_ORDER = ['F1', 'F2', 'F3'];
 const DYNAMIC_FINGER_ORDER = ['D1', 'D2', 'D3'];
@@ -127,6 +129,38 @@ const DEFAULT_FORMULA_TEXT = 'z';
 
 const defaultParseResult = parseFormulaInput(DEFAULT_FORMULA_TEXT, getParserOptionsFromFingers());
 const fallbackDefaultAST = defaultParseResult.ok ? defaultParseResult.value : createDefaultFormulaAST();
+let reflexCore = null;
+
+async function transformWithStream(bytes, StreamConstructor) {
+  if (typeof Blob === 'undefined') {
+    throw new Error('Blob API unavailable');
+  }
+  const stream = new Blob([bytes]).stream().pipeThrough(new StreamConstructor('gzip'));
+  const buffer = await new Response(stream).arrayBuffer();
+  return new Uint8Array(buffer);
+}
+
+async function compressBytes(bytes) {
+  if (supportsCompressionStream) {
+    try {
+      return await transformWithStream(bytes, CompressionStream);
+    } catch (error) {
+      console.warn('CompressionStream failed; falling back to pako.', error);
+    }
+  }
+  return gzip(bytes);
+}
+
+async function decompressBytes(bytes) {
+  if (supportsDecompressionStream) {
+    try {
+      return await transformWithStream(bytes, DecompressionStream);
+    } catch (error) {
+      console.warn('DecompressionStream failed; falling back to pako.', error);
+    }
+  }
+  return ungzip(bytes);
+}
 
 function encodeUtf8(value) {
   if (sharedTextEncoder) {
@@ -183,16 +217,16 @@ function base64UrlDecodeToBytes(encoded) {
   return bytes;
 }
 
-function encodeFormulaToCompressedParam(source) {
+async function encodeFormulaToCompressedParam(source) {
   const utf8 = encodeUtf8(source);
-  const compressed = gzip(utf8);
+  const compressed = await compressBytes(utf8);
   return base64UrlEncodeBytes(compressed);
 }
 
-function decodeFormulaFromCompressedParam(encoded) {
+async function decodeFormulaFromCompressedParam(encoded) {
   try {
     const compressed = base64UrlDecodeToBytes(encoded);
-    const decompressed = ungzip(compressed);
+    const decompressed = await decompressBytes(compressed);
     const decoded = decodeUtf8(decompressed);
     return { ok: true, value: decoded };
   } catch (error) {
@@ -200,14 +234,14 @@ function decodeFormulaFromCompressedParam(encoded) {
   }
 }
 
-function writeFormulaToSearchParams(params, source) {
+async function writeFormulaToSearchParams(params, source) {
   params.delete(FORMULA_PARAM);
   params.delete(FORMULA_B64_PARAM);
   if (!source || !source.trim()) {
     return;
   }
   try {
-    const encoded = encodeFormulaToCompressedParam(source);
+    const encoded = await encodeFormulaToCompressedParam(source);
     params.set(FORMULA_B64_PARAM, encoded);
   } catch (error) {
     console.warn('Failed to encode formula into formulab64 parameter. Falling back to raw text.', error);
@@ -221,17 +255,17 @@ function replaceUrlSearch(params) {
   window.history.replaceState({}, '', newUrl);
 }
 
-function upgradeLegacyFormulaParam(source) {
+async function upgradeLegacyFormulaParam(source) {
   const params = new URLSearchParams(window.location.search);
-  writeFormulaToSearchParams(params, source);
+  await writeFormulaToSearchParams(params, source);
   replaceUrlSearch(params);
 }
 
-function readFormulaFromQuery() {
+async function readFormulaFromQuery() {
   const params = new URLSearchParams(window.location.search);
   const encoded = params.get(FORMULA_B64_PARAM);
   if (encoded) {
-    const decoded = decodeFormulaFromCompressedParam(encoded);
+    const decoded = await decodeFormulaFromCompressedParam(encoded);
     if (decoded.ok) {
       return decoded.value;
     }
@@ -250,13 +284,13 @@ function readFormulaFromQuery() {
   } catch (_) {
     // Already decoded, ignore.
   }
-  upgradeLegacyFormulaParam(decoded);
+  await upgradeLegacyFormulaParam(decoded);
   return decoded;
 }
 
-function updateFormulaQueryParam(source) {
+async function updateFormulaQueryParam(source) {
   const params = new URLSearchParams(window.location.search);
-  writeFormulaToSearchParams(params, source);
+  await writeFormulaToSearchParams(params, source);
   replaceUrlSearch(params);
 }
 
@@ -671,57 +705,77 @@ function updateFingerDotPosition(label) {
   dot.classList.add('visible');
 }
 
-let initialFormulaSource = readFormulaFromQuery();
-if (!initialFormulaSource || !initialFormulaSource.trim()) {
-  initialFormulaSource = DEFAULT_FORMULA_TEXT;
+async function bootstrapReflexApplication() {
+  let initialFormulaSource = await readFormulaFromQuery();
+  if (!initialFormulaSource || !initialFormulaSource.trim()) {
+    initialFormulaSource = DEFAULT_FORMULA_TEXT;
+  }
+
+  const initialParse = parseFormulaInput(initialFormulaSource, getParserOptionsFromFingers());
+  let initialAST;
+
+  if (initialParse.ok) {
+    initialAST = initialParse.value;
+    clearError();
+  } else {
+    console.warn('Failed to parse initial formula, rendering fallback AST.', initialParse);
+    initialAST = fallbackDefaultAST;
+    showParseError(initialFormulaSource, initialParse);
+  }
+
+  const initialUsage = analyzeFingerUsage(initialAST);
+  const initialFingerState = deriveFingerState(initialUsage);
+  if (initialFingerState.mode === 'invalid') {
+    showError(initialFingerState.error);
+  }
+
+  formulaTextarea.value = initialFormulaSource;
+
+  try {
+    reflexCore = new ReflexCore(canvas, initialAST);
+  } catch (err) {
+    console.error('Failed to initialize Reflex4You renderer', err);
+    handleRendererInitializationFailure(err);
+  }
+
+  if (reflexCore) {
+    ALL_FINGER_LABELS.forEach((label) => {
+      reflexCore.onFingerChange(label, (offset) => handleFingerValueChange(label, offset));
+    });
+
+    ALL_FINGER_LABELS.forEach((label) => {
+      const parsed = readFingerFromQuery(label);
+      if (parsed) {
+        reflexCore.setFingerValue(label, parsed.x, parsed.y);
+      }
+    });
+  }
+
+  if (initialFingerState.mode !== 'invalid') {
+    applyFingerState(initialFingerState);
+  } else {
+    applyFingerState(createEmptyFingerState());
+  }
+
+  if (reflexCore) {
+    canvas.addEventListener('pointerdown', (e) => reflexCore.handlePointerDown(e));
+    canvas.addEventListener('pointermove', (e) => reflexCore.handlePointerMove(e));
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach((type) => {
+      canvas.addEventListener(type, (e) => reflexCore.handlePointerEnd(e));
+    });
+  } else if (canvas) {
+    canvas.style.pointerEvents = 'none';
+  }
 }
 
-const initialParse = parseFormulaInput(initialFormulaSource, getParserOptionsFromFingers());
-let initialAST;
-
-if (initialParse.ok) {
-  initialAST = initialParse.value;
-  clearError();
-} else {
-  console.warn('Failed to parse initial formula, rendering fallback AST.', initialParse);
-  initialAST = fallbackDefaultAST;
-  showParseError(initialFormulaSource, initialParse);
+const bootstrapPromise = bootstrapReflexApplication();
+if (typeof window !== 'undefined') {
+  window.__reflexReady = bootstrapPromise;
 }
-
-const initialUsage = analyzeFingerUsage(initialAST);
-const initialFingerState = deriveFingerState(initialUsage);
-if (initialFingerState.mode === 'invalid') {
-  showError(initialFingerState.error);
-}
-
-formulaTextarea.value = initialFormulaSource;
-
-let reflexCore = null;
-try {
-  reflexCore = new ReflexCore(canvas, initialAST);
-} catch (err) {
-  console.error('Failed to initialize Reflex4You renderer', err);
-  handleRendererInitializationFailure(err);
-}
-
-if (reflexCore) {
-  ALL_FINGER_LABELS.forEach((label) => {
-    reflexCore.onFingerChange(label, (offset) => handleFingerValueChange(label, offset));
-  });
-
-  ALL_FINGER_LABELS.forEach((label) => {
-    const parsed = readFingerFromQuery(label);
-    if (parsed) {
-      reflexCore.setFingerValue(label, parsed.x, parsed.y);
-    }
-  });
-}
-
-if (initialFingerState.mode !== 'invalid') {
-  applyFingerState(initialFingerState);
-} else {
-  applyFingerState(createEmptyFingerState());
-}
+bootstrapPromise.catch((error) => {
+  console.error('Failed to bootstrap Reflex4You.', error);
+  showFatalError('Unable to initialize Reflex4You.');
+});
 
 formulaTextarea.addEventListener('focus', () => {
   formulaTextarea.classList.add('expanded');
@@ -751,21 +805,13 @@ function applyFormulaFromTextarea({ updateQuery = true } = {}) {
   reflexCore?.setFormulaAST(result.value);
   applyFingerState(nextState);
   if (updateQuery) {
-    updateFormulaQueryParam(source);
+    updateFormulaQueryParam(source).catch((error) =>
+      console.warn('Failed to persist formula parameter.', error),
+    );
   }
 }
 
 formulaTextarea.addEventListener('input', () => applyFormulaFromTextarea());
-
-if (reflexCore) {
-  canvas.addEventListener('pointerdown', (e) => reflexCore.handlePointerDown(e));
-  canvas.addEventListener('pointermove', (e) => reflexCore.handlePointerMove(e));
-  ['pointerup', 'pointercancel', 'pointerleave'].forEach((type) => {
-    canvas.addEventListener(type, (e) => reflexCore.handlePointerEnd(e));
-  });
-} else if (canvas) {
-  canvas.style.pointerEvents = 'none';
-}
 
 window.addEventListener('resize', () => {
   activeFingerState.allSlots.forEach((label) => updateFingerDotPosition(label));
@@ -855,7 +901,9 @@ function confirmAndReset() {
 function resetApplicationState() {
   formulaTextarea.value = DEFAULT_FORMULA_TEXT;
   applyFormulaFromTextarea({ updateQuery: false });
-  updateFormulaQueryParam(null);
+  updateFormulaQueryParam(null).catch((error) =>
+    console.warn('Failed to clear formula parameter.', error),
+  );
   resetFingerValuesToDefaults();
   clearError();
 }

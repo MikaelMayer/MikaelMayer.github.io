@@ -26,6 +26,11 @@ function decodeFormulab64(value) {
   return zlib.gunzipSync(compressed).toString('utf8');
 }
 
+async function waitForReflexReady(page) {
+  await page.waitForFunction(() => typeof window.__reflexReady !== 'undefined');
+  await page.evaluate(() => window.__reflexReady);
+}
+
 async function expectNoRendererError(page) {
   const error = page.locator('#error');
   const severity = await error.getAttribute('data-error-severity');
@@ -42,6 +47,7 @@ const FIXED_SET_FORMULA = 'set c = sin(z + F1) in (z - c) * (z + c)';
 
 test('reflex4you updates formula query param after successful apply', async ({ page }) => {
   await page.goto('/index.html');
+  await waitForReflexReady(page);
 
   const textarea = page.locator('#formula');
   await expect(textarea).toBeVisible();
@@ -71,6 +77,7 @@ test('reflex4you updates formula query param after successful apply', async ({ p
 test('reflex4you loads formulas from query string on startup', async ({ page }) => {
   const encoded = encodeFormulaToFormulab64(SEEDED_FORMULA);
   await page.goto(`/index.html?formulab64=${encodeURIComponent(encoded)}`);
+  await waitForReflexReady(page);
 
   const textarea = page.locator('#formula');
   await expect(textarea).toHaveValue(SEEDED_FORMULA);
@@ -79,6 +86,7 @@ test('reflex4you loads formulas from query string on startup', async ({ page }) 
 
 test('reflex4you upgrades legacy formula query param to formulab64', async ({ page }) => {
   await page.goto(`/index.html?formula=${encodeURIComponent(SEEDED_FORMULA)}`);
+  await waitForReflexReady(page);
 
   const textarea = page.locator('#formula');
   await expect(textarea).toHaveValue(SEEDED_FORMULA);
@@ -104,6 +112,7 @@ test('reflex4you upgrades legacy formula query param to formulab64', async ({ pa
 test('shows D1 indicator when dynamic finger only appears inside set binding', async ({ page }) => {
   const encoded = encodeFormulaToFormulab64(DYNAMIC_SET_FORMULA);
   await page.goto(`/index.html?formulab64=${encodeURIComponent(encoded)}`);
+  await waitForReflexReady(page);
 
   const d1Indicator = page.locator('[data-finger="D1"]');
   await expect(d1Indicator).toBeVisible();
@@ -116,6 +125,7 @@ test('shows D1 indicator when dynamic finger only appears inside set binding', a
 test('shows F1 indicator when fixed finger only appears inside set binding', async ({ page }) => {
   const encoded = encodeFormulaToFormulab64(FIXED_SET_FORMULA);
   await page.goto(`/index.html?formulab64=${encodeURIComponent(encoded)}`);
+  await waitForReflexReady(page);
 
   const f1Indicator = page.locator('[data-finger="F1"]');
   await expect(f1Indicator).toBeVisible();
@@ -127,6 +137,7 @@ test('shows F1 indicator when fixed finger only appears inside set binding', asy
 
 test('opens the burger menu dropdown when clicked', async ({ page }) => {
   await page.goto('/index.html');
+  await waitForReflexReady(page);
 
   const dropdown = page.locator('#menu-dropdown');
   await expect(dropdown).not.toBeVisible();
