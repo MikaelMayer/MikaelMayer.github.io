@@ -4,6 +4,7 @@ import {
 } from './core-engine.mjs';
 import { visitAst } from './ast-utils.mjs';
 import { parseFormulaInput } from './arithmetic-parser.mjs';
+import { gzip, ungzip } from './node_modules/pako/dist/pako.esm.mjs';
 
 const canvas = document.getElementById('glcanvas');
 const formulaTextarea = document.getElementById('formula');
@@ -15,6 +16,11 @@ const menuDropdown = document.getElementById('menu-dropdown');
 const rootElement = typeof document !== 'undefined' ? document.documentElement : null;
 
 let fatalErrorActive = false;
+
+const FORMULA_PARAM = 'formula';
+const FORMULA_B64_PARAM = 'formulab64';
+const sharedTextEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
+const sharedTextDecoder = typeof TextDecoder !== 'undefined' ? new TextDecoder() : null;
 
 const FIXED_FINGER_ORDER = ['F1', 'F2', 'F3'];
 const DYNAMIC_FINGER_ORDER = ['D1', 'D2', 'D3'];
@@ -122,29 +128,136 @@ const DEFAULT_FORMULA_TEXT = 'z';
 const defaultParseResult = parseFormulaInput(DEFAULT_FORMULA_TEXT, getParserOptionsFromFingers());
 const fallbackDefaultAST = defaultParseResult.ok ? defaultParseResult.value : createDefaultFormulaAST();
 
+function encodeUtf8(value) {
+  if (sharedTextEncoder) {
+    return sharedTextEncoder.encode(value);
+  }
+  const percentEncoded = encodeURIComponent(value);
+  const bytes = [];
+  for (let i = 0; i < percentEncoded.length; ) {
+    const char = percentEncoded[i];
+    if (char === '%') {
+      const hex = percentEncoded.slice(i + 1, i + 3);
+      bytes.push(parseInt(hex, 16));
+      i += 3;
+    } else {
+      bytes.push(char.charCodeAt(0));
+      i += 1;
+    }
+  }
+  return Uint8Array.from(bytes);
+}
+
+function decodeUtf8(bytes) {
+  if (sharedTextDecoder) {
+    return sharedTextDecoder.decode(bytes);
+  }
+  let percentEncoded = '';
+  for (let i = 0; i < bytes.length; i++) {
+    percentEncoded += `%${bytes[i].toString(16).padStart(2, '0')}`;
+  }
+  try {
+    return decodeURIComponent(percentEncoded);
+  } catch (_) {
+    return percentEncoded;
+  }
+}
+
+function base64UrlEncodeBytes(bytes) {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64UrlDecodeToBytes(encoded) {
+  const normalized = encoded.replace(/-/g, '+').replace(/_/g, '/');
+  const paddingNeeded = (4 - (normalized.length % 4)) % 4;
+  const padded = normalized + '='.repeat(paddingNeeded);
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function encodeFormulaToCompressedParam(source) {
+  const utf8 = encodeUtf8(source);
+  const compressed = gzip(utf8);
+  return base64UrlEncodeBytes(compressed);
+}
+
+function decodeFormulaFromCompressedParam(encoded) {
+  try {
+    const compressed = base64UrlDecodeToBytes(encoded);
+    const decompressed = ungzip(compressed);
+    const decoded = decodeUtf8(decompressed);
+    return { ok: true, value: decoded };
+  } catch (error) {
+    return { ok: false, error };
+  }
+}
+
+function writeFormulaToSearchParams(params, source) {
+  params.delete(FORMULA_PARAM);
+  params.delete(FORMULA_B64_PARAM);
+  if (!source || !source.trim()) {
+    return;
+  }
+  try {
+    const encoded = encodeFormulaToCompressedParam(source);
+    params.set(FORMULA_B64_PARAM, encoded);
+  } catch (error) {
+    console.warn('Failed to encode formula into formulab64 parameter. Falling back to raw text.', error);
+    params.set(FORMULA_PARAM, source);
+  }
+}
+
+function replaceUrlSearch(params) {
+  const newQuery = params.toString();
+  const newUrl = `${window.location.pathname}${newQuery ? `?${newQuery}` : ''}`;
+  window.history.replaceState({}, '', newUrl);
+}
+
+function upgradeLegacyFormulaParam(source) {
+  const params = new URLSearchParams(window.location.search);
+  writeFormulaToSearchParams(params, source);
+  replaceUrlSearch(params);
+}
+
 function readFormulaFromQuery() {
   const params = new URLSearchParams(window.location.search);
-  const raw = params.get('formula');
+  const encoded = params.get(FORMULA_B64_PARAM);
+  if (encoded) {
+    const decoded = decodeFormulaFromCompressedParam(encoded);
+    if (decoded.ok) {
+      return decoded.value;
+    }
+    console.warn('Failed to decode formulab64 parameter, falling back to default formula.', decoded.error);
+    showError('We could not decode the formula embedded in this link. Resetting to the default formula.');
+    params.delete(FORMULA_B64_PARAM);
+    replaceUrlSearch(params);
+  }
+  const raw = params.get(FORMULA_PARAM);
   if (!raw) {
     return null;
   }
+  let decoded = raw;
   try {
-    return decodeURIComponent(raw);
+    decoded = decodeURIComponent(raw);
   } catch (_) {
-    return raw;
+    // Already decoded, ignore.
   }
+  upgradeLegacyFormulaParam(decoded);
+  return decoded;
 }
 
 function updateFormulaQueryParam(source) {
   const params = new URLSearchParams(window.location.search);
-  if (source) {
-    params.set('formula', source);
-  } else {
-    params.delete('formula');
-  }
-  const newQuery = params.toString();
-  const newUrl = `${window.location.pathname}${newQuery ? `?${newQuery}` : ''}`;
-  window.history.replaceState({}, '', newUrl);
+  writeFormulaToSearchParams(params, source);
+  replaceUrlSearch(params);
 }
 
 function roundToThreeDecimals(value) {

@@ -1,4 +1,31 @@
 const { test, expect } = require('@playwright/test');
+const zlib = require('zlib');
+
+function bufferToBase64Url(buffer) {
+  return buffer
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+function base64UrlToBuffer(value) {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padding = (4 - (normalized.length % 4)) % 4;
+  const padded = normalized + '='.repeat(padding);
+  return Buffer.from(padded, 'base64');
+}
+
+function encodeFormulaToFormulab64(formula) {
+  const compressed = zlib.gzipSync(Buffer.from(formula, 'utf8'));
+  return bufferToBase64Url(compressed);
+}
+
+function decodeFormulab64(value) {
+  const compressed = base64UrlToBuffer(value);
+  return zlib.gunzipSync(compressed).toString('utf8');
+}
+
 async function expectNoRendererError(page) {
   const error = page.locator('#error');
   const severity = await error.getAttribute('data-error-severity');
@@ -24,22 +51,59 @@ test('reflex4you updates formula query param after successful apply', async ({ p
   await expect.poll(async () => {
     const href = await page.evaluate(() => window.location.href);
     const url = new URL(href);
-    return url.searchParams.get('formula');
-  }).toBe(SIMPLE_FORMULA);
+    return url.searchParams.get('formulab64');
+  }).not.toBeNull();
+
+  const params = await page.evaluate(() => {
+    const url = new URL(window.location.href);
+    return {
+      base64: url.searchParams.get('formulab64'),
+      legacy: url.searchParams.get('formula'),
+    };
+  });
+  expect(params.legacy).toBeNull();
+  expect(params.base64).not.toBeNull();
+  expect(decodeFormulab64(params.base64)).toBe(SIMPLE_FORMULA);
 
   await expect(textarea).toHaveValue(SIMPLE_FORMULA);
 });
 
 test('reflex4you loads formulas from query string on startup', async ({ page }) => {
-  await page.goto(`/index.html?formula=${encodeURIComponent(SEEDED_FORMULA)}`);
+  const encoded = encodeFormulaToFormulab64(SEEDED_FORMULA);
+  await page.goto(`/index.html?formulab64=${encodeURIComponent(encoded)}`);
 
   const textarea = page.locator('#formula');
   await expect(textarea).toHaveValue(SEEDED_FORMULA);
   await expectNoRendererError(page);
 });
 
+test('reflex4you upgrades legacy formula query param to formulab64', async ({ page }) => {
+  await page.goto(`/index.html?formula=${encodeURIComponent(SEEDED_FORMULA)}`);
+
+  const textarea = page.locator('#formula');
+  await expect(textarea).toHaveValue(SEEDED_FORMULA);
+
+  await expect.poll(async () => {
+    const href = await page.evaluate(() => window.location.href);
+    const url = new URL(href);
+    return url.searchParams.get('formulab64');
+  }).not.toBeNull();
+
+  const params = await page.evaluate(() => {
+    const url = new URL(window.location.href);
+    return {
+      base64: url.searchParams.get('formulab64'),
+      legacy: url.searchParams.get('formula'),
+    };
+  });
+
+  expect(params.legacy).toBeNull();
+  expect(decodeFormulab64(params.base64)).toBe(SEEDED_FORMULA);
+});
+
 test('shows D1 indicator when dynamic finger only appears inside set binding', async ({ page }) => {
-  await page.goto(`/index.html?formula=${encodeURIComponent(DYNAMIC_SET_FORMULA)}`);
+  const encoded = encodeFormulaToFormulab64(DYNAMIC_SET_FORMULA);
+  await page.goto(`/index.html?formulab64=${encodeURIComponent(encoded)}`);
 
   const d1Indicator = page.locator('[data-finger="D1"]');
   await expect(d1Indicator).toBeVisible();
@@ -50,7 +114,8 @@ test('shows D1 indicator when dynamic finger only appears inside set binding', a
 });
 
 test('shows F1 indicator when fixed finger only appears inside set binding', async ({ page }) => {
-  await page.goto(`/index.html?formula=${encodeURIComponent(FIXED_SET_FORMULA)}`);
+  const encoded = encodeFormulaToFormulab64(FIXED_SET_FORMULA);
+  await page.goto(`/index.html?formulab64=${encodeURIComponent(encoded)}`);
 
   const f1Indicator = page.locator('[data-finger="F1"]');
   await expect(f1Indicator).toBeVisible();
