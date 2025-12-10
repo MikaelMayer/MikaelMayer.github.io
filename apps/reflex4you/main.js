@@ -4,7 +4,7 @@ import {
 } from './core-engine.mjs';
 import { visitAst } from './ast-utils.mjs';
 import { parseFormulaInput } from './arithmetic-parser.mjs';
-import { gzip, ungzip } from './node_modules/pako/dist/pako.esm.mjs';
+import { gzip, ungzip } from './vendor/pako.esm.mjs';
 
 const canvas = document.getElementById('glcanvas');
 const formulaTextarea = document.getElementById('formula');

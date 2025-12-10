@@ -9,8 +9,5 @@
   "devDependencies": {
     "@playwright/test": "^1.48.2",
     "http-server": "^14.1.1"
-  },
-  "dependencies": {
-    "pako": "^2.1.0"
   }
 }
