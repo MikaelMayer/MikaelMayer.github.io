@@ -4,7 +4,6 @@ import {
 } from './core-engine.mjs';
 import { visitAst } from './ast-utils.mjs';
 import { parseFormulaInput } from './arithmetic-parser.mjs';
-import { gzip, ungzip } from './vendor/pako.esm.mjs';
 
 const canvas = document.getElementById('glcanvas');
 const formulaTextarea = document.getElementById('formula');
@@ -21,8 +20,25 @@ const FORMULA_PARAM = 'formula';
 const FORMULA_B64_PARAM = 'formulab64';
 const sharedTextEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
 const sharedTextDecoder = typeof TextDecoder !== 'undefined' ? new TextDecoder() : null;
-const supportsCompressionStream = typeof CompressionStream === 'function';
-const supportsDecompressionStream = typeof DecompressionStream === 'function';
+const hasSecureContext = typeof window !== 'undefined' && Boolean(window.isSecureContext);
+const compressionStreamsAvailable =
+  typeof CompressionStream === 'function' && typeof DecompressionStream === 'function' && hasSecureContext;
+let supportsCompressionStream = compressionStreamsAvailable;
+let supportsDecompressionStream = compressionStreamsAvailable;
+
+function disableCompressionStreams() {
+  if (supportsCompressionStream || supportsDecompressionStream) {
+    supportsCompressionStream = false;
+    supportsDecompressionStream = false;
+    if (typeof window !== 'undefined') {
+      window.__reflexCompressionEnabled = false;
+    }
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.__reflexCompressionEnabled = supportsCompressionStream && supportsDecompressionStream;
+}
 
 const FIXED_FINGER_ORDER = ['F1', 'F2', 'F3'];
 const DYNAMIC_FINGER_ORDER = ['D1', 'D2', 'D3'];
@@ -132,8 +148,8 @@ const fallbackDefaultAST = defaultParseResult.ok ? defaultParseResult.value : cr
 let reflexCore = null;
 
 async function transformWithStream(bytes, StreamConstructor) {
-  if (typeof Blob === 'undefined') {
-    throw new Error('Blob API unavailable');
+  if (typeof Blob === 'undefined' || typeof ReadableStream === 'undefined') {
+    throw new Error('Streaming compression not supported');
   }
   const stream = new Blob([bytes]).stream().pipeThrough(new StreamConstructor('gzip'));
   const buffer = await new Response(stream).arrayBuffer();
@@ -141,25 +157,29 @@ async function transformWithStream(bytes, StreamConstructor) {
 }
 
 async function compressBytes(bytes) {
-  if (supportsCompressionStream) {
-    try {
-      return await transformWithStream(bytes, CompressionStream);
-    } catch (error) {
-      console.warn('CompressionStream failed; falling back to pako.', error);
-    }
+  if (!supportsCompressionStream) {
+    throw new Error('CompressionStream API not supported');
   }
-  return gzip(bytes);
+  return transformWithStream(bytes, CompressionStream);
 }
 
 async function decompressBytes(bytes) {
-  if (supportsDecompressionStream) {
-    try {
-      return await transformWithStream(bytes, DecompressionStream);
-    } catch (error) {
-      console.warn('DecompressionStream failed; falling back to pako.', error);
-    }
+  if (!supportsDecompressionStream) {
+    throw new Error('DecompressionStream API not supported');
   }
-  return ungzip(bytes);
+  return transformWithStream(bytes, DecompressionStream);
+}
+
+async function verifyCompressionSupport() {
+  if (!supportsCompressionStream) {
+    return;
+  }
+  try {
+    await compressBytes(encodeUtf8('probe'));
+  } catch (error) {
+    console.warn('CompressionStream is unavailable in this context; falling back to legacy query parameters.', error);
+    disableCompressionStreams();
+  }
 }
 
 function encodeUtf8(value) {
@@ -219,17 +239,30 @@ function base64UrlDecodeToBytes(encoded) {
 
 async function encodeFormulaToCompressedParam(source) {
   const utf8 = encodeUtf8(source);
-  const compressed = await compressBytes(utf8);
-  return base64UrlEncodeBytes(compressed);
+  if (!supportsCompressionStream) {
+    return null;
+  }
+  try {
+    const compressed = await compressBytes(utf8);
+    return base64UrlEncodeBytes(compressed);
+  } catch (error) {
+    console.warn('CompressionStream failed; falling back to legacy formula parameter.', error);
+    disableCompressionStreams();
+    return null;
+  }
 }
 
 async function decodeFormulaFromCompressedParam(encoded) {
+  if (!supportsDecompressionStream) {
+    return { ok: false, error: new Error('CompressionStream API unavailable') };
+  }
   try {
     const compressed = base64UrlDecodeToBytes(encoded);
     const decompressed = await decompressBytes(compressed);
     const decoded = decodeUtf8(decompressed);
     return { ok: true, value: decoded };
   } catch (error) {
+    disableCompressionStreams();
     return { ok: false, error };
   }
 }
@@ -242,7 +275,11 @@ async function writeFormulaToSearchParams(params, source) {
   }
   try {
     const encoded = await encodeFormulaToCompressedParam(source);
-    params.set(FORMULA_B64_PARAM, encoded);
+    if (encoded) {
+      params.set(FORMULA_B64_PARAM, encoded);
+    } else {
+      params.set(FORMULA_PARAM, source);
+    }
   } catch (error) {
     console.warn('Failed to encode formula into formulab64 parameter. Falling back to raw text.', error);
     params.set(FORMULA_PARAM, source);
@@ -706,6 +743,7 @@ function updateFingerDotPosition(label) {
 }
 
 async function bootstrapReflexApplication() {
+  await verifyCompressionSupport();
   let initialFormulaSource = await readFormulaFromQuery();
   if (!initialFormulaSource || !initialFormulaSource.trim()) {
     initialFormulaSource = DEFAULT_FORMULA_TEXT;
