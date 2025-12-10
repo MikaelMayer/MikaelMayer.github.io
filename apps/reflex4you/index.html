@@ -196,6 +196,7 @@
       display: inline-flex;
       flex-direction: column;
       align-items: flex-end;
+  gap: 6px;
       pointer-events: auto;
     }
 
@@ -259,6 +260,19 @@
       visibility: visible;
     }
 
+  #app-version-pill {
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(158, 240, 255, 0.8);
+      background: linear-gradient(120deg, rgba(11,17,34,0.85), rgba(16,57,89,0.9));
+      color: #9ef0ff;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+      text-transform: uppercase;
+  }
+
     .menu-dropdown__item {
       background: transparent;
       border: 0;
@@ -320,6 +334,7 @@
       Save image
     </button>
   </div>
+  <div id="app-version-pill" aria-live="polite" aria-label="Reflex4You version">v1</div>
 </div>
 
 <div id="error"></div>

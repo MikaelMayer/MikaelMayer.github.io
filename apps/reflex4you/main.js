@@ -12,9 +12,17 @@ const fingerIndicatorStack = document.getElementById('finger-indicator-stack');
 const fingerOverlay = document.getElementById('finger-overlay');
 const menuButton = document.getElementById('menu-button');
 const menuDropdown = document.getElementById('menu-dropdown');
+const versionPill = document.getElementById('app-version-pill');
 const rootElement = typeof document !== 'undefined' ? document.documentElement : null;
 
 let fatalErrorActive = false;
+
+const APP_VERSION = 2;
+
+if (versionPill) {
+  versionPill.textContent = `v${APP_VERSION}`;
+  versionPill.setAttribute('data-version', String(APP_VERSION));
+}
 
 const FORMULA_PARAM = 'formula';
 const FORMULA_B64_PARAM = 'formulab64';
