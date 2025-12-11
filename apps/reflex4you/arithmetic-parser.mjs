@@ -774,6 +774,35 @@ function spanBetween(startInput, endInput) {
   return startInput.createSpan(0, startInput.length - endInput.length);
 }
 
+function failureAdvancedPastInput(failure, originInput) {
+  if (!failure || failure.ok) {
+    return false;
+  }
+  const originStart = originInput?.start ?? 0;
+  return failureContainsStartPastOrigin(failure, originStart);
+}
+
+function failureContainsStartPastOrigin(node, originStart) {
+  if (!node) {
+    return false;
+  }
+  if (node.span && typeof node.span.start === 'number' && node.span.start > originStart) {
+    const spanInput = node.span.input;
+    const source = spanInput?.buffer;
+    if (source) {
+      const deltaSlice = source.slice(originStart, node.span.start);
+      if (deltaSlice.trim().length === 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+  if (!node.children || node.children.length === 0) {
+    return false;
+  }
+  return node.children.some((child) => failureContainsStartPastOrigin(child, originStart));
+}
+
 function createRepeatComposePlaceholder(base, countExpression, countSpan) {
   return {
     kind: 'RepeatComposePlaceholder',
@@ -2323,14 +2352,14 @@ expressionParser = createParser('Expression', (input) => {
   if (letResult.ok) {
     return letResult;
   }
-  if (letResult.severity === ParseSeverity.error) {
+  if (letResult.severity === ParseSeverity.error || failureAdvancedPastInput(letResult, input)) {
     return letResult;
   }
   const setResult = setBindingParser.runNormalized(input);
   if (setResult.ok) {
     return setResult;
   }
-  if (setResult.severity === ParseSeverity.error) {
+  if (setResult.severity === ParseSeverity.error || failureAdvancedPastInput(setResult, input)) {
     return setResult;
   }
   return logicalOrParser.runNormalized(input);
