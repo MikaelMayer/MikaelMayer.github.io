@@ -401,6 +401,13 @@ test('user-defined functions support call syntax f(z)', () => {
   assert.equal(ast.g.kind, 'Var');
 });
 
+test('missing "in" after let binding does not backtrack', () => {
+  const result = parseFormulaInput('let foo = z + 1 foo(z)');
+  assert.equal(result.ok, false);
+  assert.equal(result.ctor, 'SetInKeyword');
+  assert.equal(result.expected, 'in');
+});
+
 test('set bindings associate weaker than $$ and $', () => {
   const result = parseFormulaInput('set f = z $$ 2 in f $ f');
   assert.equal(result.ok, true);
