@@ -142,6 +142,37 @@ test('parses ln calls with optional branch shift', () => {
   assert.equal(node.branch.left.kind, 'VarX');
 });
 
+test('parses sqrt calls via ln desugaring', () => {
+  const result = parseFormulaInput('sqrt(z)');
+  assert.equal(result.ok, true);
+  const expNode = result.value;
+  assert.equal(expNode.kind, 'Exp');
+  assert.equal(expNode.value.kind, 'Mul');
+  assert.equal(expNode.value.left.kind, 'Const');
+  assert.equal(expNode.value.left.re, 0.5);
+  assert.equal(expNode.value.right.kind, 'Ln');
+});
+
+test('sqrt forwards optional branch arguments into ln', () => {
+  const result = parseFormulaInput('sqrt(z, x + 1)');
+  assert.equal(result.ok, true);
+  const lnNode = result.value.value.right;
+  assert.equal(lnNode.kind, 'Ln');
+  assert.equal(lnNode.branch.kind, 'Add');
+});
+
+test('heav desugars to a conditional step function', () => {
+  const result = parseFormulaInput('heav(z)');
+  assert.equal(result.ok, true);
+  const node = result.value;
+  assert.equal(node.kind, 'If');
+  assert.equal(node.condition.kind, 'GreaterThan');
+  assert.equal(node.thenBranch.kind, 'Const');
+  assert.equal(node.thenBranch.re, 1);
+  assert.equal(node.elseBranch.kind, 'Const');
+  assert.equal(node.elseBranch.re, 0);
+});
+
 test('parses F2 primitive', () => {
   const result = parseFormulaInput('F2 + 1');
   assert.equal(result.ok, true);
@@ -203,6 +234,26 @@ test('$$ requires positive integer counts', () => {
 
 test('$$ accepts parenthesized expressions with constant propagation', () => {
   const result = parseFormulaInput('z $$ (2 + 3)');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Compose');
+  const stack = [result.value];
+  let varCount = 0;
+  while (stack.length) {
+    const node = stack.pop();
+    if (!node || typeof node !== 'object') {
+      continue;
+    }
+    if (node.kind === 'Compose') {
+      stack.push(node.f, node.g);
+    } else if (node.kind === 'Var') {
+      varCount += 1;
+    }
+  }
+  assert.equal(varCount, 5);
+});
+
+test('$$ accepts bare additive expressions on the right-hand side', () => {
+  const result = parseFormulaInput('z $$ 2 + 3');
   assert.equal(result.ok, true);
   assert.equal(result.value.kind, 'Compose');
   const stack = [result.value];
