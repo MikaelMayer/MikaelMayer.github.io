@@ -812,6 +812,21 @@ function createRepeatComposePlaceholder(base, countExpression, countSpan) {
   };
 }
 
+function createComposeMultipleNode({ base, countExpression, countSpan, span, resolvedCount }) {
+  const node = {
+    kind: 'ComposeMultiple',
+    base,
+    countExpression: countExpression || null,
+    countSpan: countSpan || null,
+    resolvedCount,
+  };
+  if (span) {
+    node.span = span;
+    node.input = span.input;
+  }
+  return node;
+}
+
 function buildCompAST({ body, placeholder, seed, iterations, span }) {
   let current = cloneAst(seed);
   for (let i = 0; i < iterations; i += 1) {
@@ -885,6 +900,14 @@ function substitutePlaceholder(node, placeholder, replacement) {
         ...node,
         f: substitutePlaceholder(node.f, placeholder, replacement),
         g: substitutePlaceholder(node.g, placeholder, replacement),
+      };
+    case 'ComposeMultiple':
+      return {
+        ...node,
+        base: substitutePlaceholder(node.base, placeholder, replacement),
+        countExpression: node.countExpression
+          ? substitutePlaceholder(node.countExpression, placeholder, replacement)
+          : null,
       };
     case 'RepeatComposePlaceholder':
       return {
@@ -968,6 +991,12 @@ function cloneAst(node) {
       };
     case 'Compose':
       return { ...node, f: cloneAst(node.f), g: cloneAst(node.g) };
+    case 'ComposeMultiple':
+      return {
+        ...node,
+        base: cloneAst(node.base),
+        countExpression: node.countExpression ? cloneAst(node.countExpression) : null,
+      };
     case 'If':
       return {
         ...node,
@@ -1053,6 +1082,14 @@ function substituteIdentifierWithClone(node, targetName, replacement) {
         f: substituteIdentifierWithClone(node.f, targetName, replacement),
         g: substituteIdentifierWithClone(node.g, targetName, replacement),
       };
+    case 'ComposeMultiple':
+      return {
+        ...node,
+        base: substituteIdentifierWithClone(node.base, targetName, replacement),
+        countExpression: node.countExpression
+          ? substituteIdentifierWithClone(node.countExpression, targetName, replacement)
+          : null,
+      };
     case 'If':
       return {
         ...node,
@@ -1136,6 +1173,12 @@ function findFirstPlaceholderNode(ast) {
       case 'Compose':
         stack.push(node.f, node.g);
         break;
+      case 'ComposeMultiple':
+        stack.push(node.base);
+        if (node.countExpression) {
+          stack.push(node.countExpression);
+        }
+        break;
       case 'RepeatComposePlaceholder':
         stack.push(node.base);
         if (node.countExpression) {
@@ -1204,6 +1247,12 @@ function findFirstLetBinding(ast) {
         break;
       case 'Compose':
         stack.push(node.f, node.g);
+        break;
+      case 'ComposeMultiple':
+        stack.push(node.base);
+        if (node.countExpression) {
+          stack.push(node.countExpression);
+        }
         break;
       case 'SetBinding':
         stack.push(node.value, node.body);
@@ -1347,6 +1396,16 @@ function resolveSetReferences(ast, input) {
         }
         return visit(node.g);
       }
+      case 'ComposeMultiple': {
+        const baseErr = visit(node.base);
+        if (baseErr) {
+          return baseErr;
+        }
+        if (node.countExpression) {
+          return visit(node.countExpression);
+        }
+        return null;
+      }
       case 'RepeatComposePlaceholder': {
         const baseErr = visit(node.base);
         if (baseErr) {
@@ -1474,17 +1533,19 @@ function resolveRepeatPlaceholders(ast, parseOptions, input) {
         if (count instanceof ParseFailure) {
           return count;
         }
-        const expanded = oo(node.base, count);
-        if (node.span) {
-          expanded.span = node.span;
-          expanded.input = node.input;
-        }
+        const composeMultiple = createComposeMultipleNode({
+          base: node.base,
+          countExpression: node.countExpression,
+          countSpan: span,
+          span: node.span,
+          resolvedCount: count,
+        });
         if (parent && key) {
-          parent[key] = expanded;
-          return visit(expanded, parent, key);
+          parent[key] = composeMultiple;
+          return null;
         }
-        ast = expanded;
-        return visit(ast, null, null);
+        ast = composeMultiple;
+        return null;
       }
       case 'SetBinding': {
         const valueErr = visit(node.value, node, 'value');
@@ -1616,7 +1677,7 @@ function evaluateRepeatCountExpression(node, span, context) {
       ctor: 'RepeatCount',
       message: 'Repeat count must be a constant expression',
       severity: ParseSeverity.error,
-      expected: 'constant positive integer',
+      expected: 'constant non-negative integer',
       span,
       input: span.input,
     });
@@ -1652,12 +1713,12 @@ function evaluateRepeatCountExpression(node, span, context) {
       input: span.input,
     });
   }
-  if (rounded < 1) {
+  if (rounded < 0) {
     return new ParseFailure({
       ctor: 'RepeatCount',
-      message: 'Repeat count must be a positive integer',
+      message: 'Repeat count must be a non-negative integer',
       severity: ParseSeverity.error,
-      expected: 'positive integer',
+      expected: 'non-negative integer',
       span,
       input: span.input,
     });
@@ -1802,6 +1863,24 @@ function evaluateConstantNode(node, context, scope = {}, localBindings = []) {
         return null;
       }
       return evaluateConstantNode(node.f, context, { z: inner }, localBindings);
+    }
+    case 'ComposeMultiple': {
+      const count = typeof node.resolvedCount === 'number' ? node.resolvedCount : null;
+      if (count === null) {
+        return null;
+      }
+      if (count === 0) {
+        return scope.z ? { re: scope.z.re, im: scope.z.im } : null;
+      }
+      if (count === 1) {
+        return evaluateConstantNode(node.base, context, scope, localBindings);
+      }
+      const repeated = oo(node.base, count);
+      if (node.span && repeated && typeof repeated === 'object') {
+        repeated.span = node.span;
+        repeated.input = node.input;
+      }
+      return evaluateConstantNode(repeated, context, scope, localBindings);
     }
     case 'LessThan':
     case 'GreaterThan':

@@ -63,6 +63,11 @@ function getChildEntries(node) {
         ['f', node.f],
         ['g', node.g],
       ];
+    case 'ComposeMultiple':
+      return [
+        ['base', node.base],
+        ['countExpression', node.countExpression],
+      ];
     case 'If':
       return [
         ['condition', node.condition],
