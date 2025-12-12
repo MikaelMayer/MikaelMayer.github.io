@@ -86,8 +86,7 @@ Reflex4You links can optionally include **time-based animations** for finger con
 - **Per-constant animation parameter**: append `A` to any finger constant name to animate it.
   - Example: `D1A=1+2i..-1-3i`
   - The `..` separates the interval start and end.
-  - You can include multiple intervals by separating them with `;` (or by repeating the parameter).
-    - Example: `D1A=0+0i..1+0i;1+0i..1+1i`
+  - Only **one interval per constant** is supported (keep it simple; sequences can be modeled inside the formula if needed).
 
 - **Timing (`t`)**: all animated constants run **simultaneously**, using the same duration.
   - Default: `t=5s`

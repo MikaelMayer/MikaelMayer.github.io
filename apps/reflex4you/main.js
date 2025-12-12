@@ -91,7 +91,6 @@ let activeFingerState = createEmptyFingerState();
 let suppressFingerQueryUpdates = false;
 
 const ANIMATION_SUFFIX = 'A';
-const ANIMATION_INTERVAL_SEPARATOR_REGEX = /[;|]/g;
 
 let viewerModeActive = false;
 let viewerModeRevealed = false;
@@ -486,6 +485,9 @@ function parseComplexInterval(raw) {
     return null;
   }
   const normalized = String(raw).trim().replace(/\s+/g, '');
+  if (!normalized || normalized.includes(';') || normalized.includes('|')) {
+    return null;
+  }
   const parts = normalized.split('..');
   if (parts.length !== 2) {
     return null;
@@ -498,44 +500,25 @@ function parseComplexInterval(raw) {
   return { start, end };
 }
 
-function readAnimationIntervalsFromQuery(label) {
+function readAnimationIntervalFromQuery(label) {
   const params = new URLSearchParams(window.location.search);
   const key = `${label}${ANIMATION_SUFFIX}`;
-  const rawValues = params.getAll(key);
-  const segments = [];
-  rawValues.forEach((value) => {
-    const chunks = String(value)
-      .split(ANIMATION_INTERVAL_SEPARATOR_REGEX)
-      .map((chunk) => chunk.trim())
-      .filter(Boolean);
-    chunks.forEach((chunk) => {
-      const interval = parseComplexInterval(chunk);
-      if (interval) {
-        segments.push(interval);
-      }
-    });
-  });
-  return segments;
+  const raw = params.get(key);
+  return parseComplexInterval(raw);
 }
 
-function serializeAnimationIntervals(intervals) {
-  if (!Array.isArray(intervals) || !intervals.length) {
+function serializeAnimationInterval(interval) {
+  if (!interval) {
     return null;
   }
-  const parts = [];
-  for (const interval of intervals) {
-    const start = interval?.start;
-    const end = interval?.end;
-    const startText = start ? formatComplexForQuery(start.x, start.y) : null;
-    const endText = end ? formatComplexForQuery(end.x, end.y) : null;
-    if (startText && endText) {
-      parts.push(`${startText}..${endText}`);
-    }
-  }
-  if (!parts.length) {
+  const start = interval?.start;
+  const end = interval?.end;
+  const startText = start ? formatComplexForQuery(start.x, start.y) : null;
+  const endText = end ? formatComplexForQuery(end.x, end.y) : null;
+  if (!startText || !endText) {
     return null;
   }
-  return parts.join(';');
+  return `${startText}..${endText}`;
 }
 
 function updateSearchParam(key, valueOrNull) {
@@ -1175,9 +1158,9 @@ function handleMenuAction(action) {
 function buildAnimationTracksFromQuery() {
   const tracks = new Map();
   for (const label of ALL_FINGER_LABELS) {
-    const segments = readAnimationIntervalsFromQuery(label);
-    if (segments.length) {
-      tracks.set(label, segments);
+    const interval = readAnimationIntervalFromQuery(label);
+    if (interval) {
+      tracks.set(label, interval);
     }
   }
   return tracks;
@@ -1189,10 +1172,9 @@ function applyAnimationStartValues(tracks) {
   }
   suppressFingerQueryUpdates = true;
   try {
-    for (const [label, segments] of tracks.entries()) {
-      const first = segments?.[0];
-      if (first?.start) {
-        reflexCore.setFingerValue(label, first.start.x, first.start.y, { triggerRender: false });
+    for (const [label, interval] of tracks.entries()) {
+      if (interval?.start) {
+        reflexCore.setFingerValue(label, interval.start.x, interval.start.y, { triggerRender: false });
       }
     }
   } finally {
@@ -1232,12 +1214,11 @@ function createAnimationController(core, tracks, secondsPerSegment) {
     perTrack: new Map(),
   };
 
-  for (const [label, segments] of state.tracks.entries()) {
+  for (const [label, interval] of state.tracks.entries()) {
     state.perTrack.set(label, {
       label,
-      segments,
-      segmentIndex: 0,
-      direction: 1, // 1 forward, -1 backward
+      interval,
+      direction: 1, // 1 forward, -1 backward (ping-pong)
       segmentStartMs: 0,
       initialized: false,
     });
@@ -1249,14 +1230,14 @@ function createAnimationController(core, tracks, secondsPerSegment) {
       track.segmentStartMs = nowMs;
       track.initialized = true;
     }
-    if (!track.segments.length) {
+    const interval = track.interval;
+    if (!interval) {
       return null;
     }
     let guard = 0;
     while (guard++ < 10) {
-      const seg = track.segments[track.segmentIndex];
-      const start = track.direction === 1 ? seg.start : seg.end;
-      const end = track.direction === 1 ? seg.end : seg.start;
+      const start = track.direction === 1 ? interval.start : interval.end;
+      const end = track.direction === 1 ? interval.end : interval.start;
       const elapsed = nowMs - track.segmentStartMs;
       const p = durationMs > 0 ? elapsed / durationMs : 1;
       if (p < 1) {
@@ -1266,21 +1247,13 @@ function createAnimationController(core, tracks, secondsPerSegment) {
       // Snap to end and advance segment.
       track.segmentStartMs += durationMs;
       const atEndValue = end;
-
-      const nextIndex = track.segmentIndex + track.direction;
-      if (nextIndex >= 0 && nextIndex < track.segments.length) {
-        track.segmentIndex = nextIndex;
-        return { value: atEndValue, done: false };
-      }
-
       // Flip direction at ends (ping-pong).
       track.direction *= -1;
       return { value: atEndValue, done: false };
     }
 
     // Fallback if time jumps wildly.
-    const seg = track.segments[Math.max(0, Math.min(track.segments.length - 1, track.segmentIndex))];
-    return { value: seg.end, done: false };
+    return { value: interval.end, done: false };
   }
 
   function frame(nowMs) {
@@ -1362,10 +1335,11 @@ function setAnimationEndFromCurrent() {
       continue;
     }
     const end = reflexCore.getFingerValue(label);
-    const existing = readAnimationIntervalsFromQuery(label);
-    existing.push({ start: { x: start.x, y: start.y }, end: { x: end.x, y: end.y } });
-    const serialized = serializeAnimationIntervals(existing);
     const key = `${label}${ANIMATION_SUFFIX}`;
+    const serialized = serializeAnimationInterval({
+      start: { x: start.x, y: start.y },
+      end: { x: end.x, y: end.y },
+    });
     if (serialized) {
       params.set(key, serialized);
       affected.push(label);
@@ -1383,7 +1357,7 @@ function setAnimationEndFromCurrent() {
       startAnimations(tracks);
     }
   }
-  alert(affected.length ? `Animation interval appended for: ${affected.join(', ')}` : 'No active handles to animate.');
+  alert(affected.length ? `Animation interval set for: ${affected.join(', ')}` : 'No active handles to animate.');
 }
 
 function promptAndSetAnimationTime() {
