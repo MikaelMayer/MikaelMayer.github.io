@@ -276,6 +276,17 @@
         font-size: 18px;
       }
     }
+
+    /* Viewer mode: hide UI chrome until first interaction. */
+    html.viewer-mode #menu-container,
+    html.viewer-mode #formula-panel,
+    html.viewer-mode #finger-indicator-stack,
+    html.viewer-mode #finger-overlay,
+    html.viewer-mode #error {
+      display: none !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
   </style>
 </head>
 <body>
@@ -305,6 +316,30 @@
       role="menuitem"
     >
       Reset
+    </button>
+    <button
+      type="button"
+      class="menu-dropdown__item"
+      data-menu-action="set-animation-start"
+      role="menuitem"
+    >
+      Set animation start
+    </button>
+    <button
+      type="button"
+      class="menu-dropdown__item"
+      data-menu-action="set-animation-end"
+      role="menuitem"
+    >
+      Set animation end
+    </button>
+    <button
+      type="button"
+      class="menu-dropdown__item"
+      data-menu-action="set-animation-time"
+      role="menuitem"
+    >
+      Set animation time
     </button>
     <button
       type="button"

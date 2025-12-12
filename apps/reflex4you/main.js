@@ -18,6 +18,8 @@ let fatalErrorActive = false;
 
 const FORMULA_PARAM = 'formula';
 const FORMULA_B64_PARAM = 'formulab64';
+const EDIT_PARAM = 'edit';
+const ANIMATION_TIME_PARAM = 't';
 const sharedTextEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
 const sharedTextDecoder = typeof TextDecoder !== 'undefined' ? new TextDecoder() : null;
 const hasSecureContext = typeof window !== 'undefined' && Boolean(window.isSecureContext);
@@ -25,6 +27,8 @@ const compressionStreamsAvailable =
   typeof CompressionStream === 'function' && typeof DecompressionStream === 'function' && hasSecureContext;
 let supportsCompressionStream = compressionStreamsAvailable;
 let supportsDecompressionStream = compressionStreamsAvailable;
+
+const DEFAULT_ANIMATION_SECONDS = 5;
 
 function disableCompressionStreams() {
   if (supportsCompressionStream || supportsDecompressionStream) {
@@ -83,6 +87,18 @@ function getParserOptionsFromFingers() {
 }
 
 let activeFingerState = createEmptyFingerState();
+
+let suppressFingerQueryUpdates = false;
+
+const ANIMATION_SUFFIX = 'A';
+const ANIMATION_INTERVAL_SEPARATOR_REGEX = /[;|]/g;
+
+let viewerModeActive = false;
+let viewerModeRevealed = false;
+
+let animationSeconds = DEFAULT_ANIMATION_SECONDS;
+let animationController = null;
+let animationDraftStart = null;
 
 function createEmptyFingerState() {
   return {
@@ -440,6 +456,130 @@ function parseComplexString(raw) {
   return null;
 }
 
+function parseSecondsFromQuery(raw) {
+  if (raw == null) {
+    return null;
+  }
+  const trimmed = String(raw).trim().toLowerCase();
+  if (!trimmed) {
+    return null;
+  }
+  const numeric = trimmed.endsWith('s') ? trimmed.slice(0, -1) : trimmed;
+  const seconds = Number(numeric);
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return null;
+  }
+  return seconds;
+}
+
+function formatSecondsForQuery(seconds) {
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return null;
+  }
+  const normalized = Math.round(seconds * 1000) / 1000;
+  return `${normalized}s`;
+}
+
+function parseComplexInterval(raw) {
+  if (!raw) {
+    return null;
+  }
+  const normalized = String(raw).trim().replace(/\s+/g, '');
+  const parts = normalized.split('..');
+  if (parts.length !== 2) {
+    return null;
+  }
+  const start = parseComplexString(parts[0]);
+  const end = parseComplexString(parts[1]);
+  if (!start || !end) {
+    return null;
+  }
+  return { start, end };
+}
+
+function readAnimationIntervalsFromQuery(label) {
+  const params = new URLSearchParams(window.location.search);
+  const key = `${label}${ANIMATION_SUFFIX}`;
+  const rawValues = params.getAll(key);
+  const segments = [];
+  rawValues.forEach((value) => {
+    const chunks = String(value)
+      .split(ANIMATION_INTERVAL_SEPARATOR_REGEX)
+      .map((chunk) => chunk.trim())
+      .filter(Boolean);
+    chunks.forEach((chunk) => {
+      const interval = parseComplexInterval(chunk);
+      if (interval) {
+        segments.push(interval);
+      }
+    });
+  });
+  return segments;
+}
+
+function serializeAnimationIntervals(intervals) {
+  if (!Array.isArray(intervals) || !intervals.length) {
+    return null;
+  }
+  const parts = [];
+  for (const interval of intervals) {
+    const start = interval?.start;
+    const end = interval?.end;
+    const startText = start ? formatComplexForQuery(start.x, start.y) : null;
+    const endText = end ? formatComplexForQuery(end.x, end.y) : null;
+    if (startText && endText) {
+      parts.push(`${startText}..${endText}`);
+    }
+  }
+  if (!parts.length) {
+    return null;
+  }
+  return parts.join(';');
+}
+
+function updateSearchParam(key, valueOrNull) {
+  const params = new URLSearchParams(window.location.search);
+  if (valueOrNull == null || valueOrNull === '') {
+    params.delete(key);
+  } else {
+    params.set(key, String(valueOrNull));
+  }
+  replaceUrlSearch(params);
+}
+
+function hasFormulaQueryParam() {
+  const params = new URLSearchParams(window.location.search);
+  return params.has(FORMULA_PARAM) || params.has(FORMULA_B64_PARAM);
+}
+
+function isEditModeEnabled() {
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get(EDIT_PARAM);
+  if (!raw) {
+    return false;
+  }
+  const normalized = String(raw).trim().toLowerCase();
+  return normalized === 'true' || normalized === '1' || normalized === 'yes';
+}
+
+function setViewerModeActive(active) {
+  viewerModeActive = Boolean(active);
+  if (!rootElement) {
+    return;
+  }
+  rootElement.classList.toggle('viewer-mode', viewerModeActive && !viewerModeRevealed);
+}
+
+function revealViewerModeUIOnce() {
+  if (!viewerModeActive || viewerModeRevealed) {
+    return;
+  }
+  viewerModeRevealed = true;
+  if (rootElement) {
+    rootElement.classList.remove('viewer-mode');
+  }
+}
+
 function ensureFingerIndicator(label) {
   if (fingerIndicators.has(label)) {
     return fingerIndicators.get(label);
@@ -519,7 +659,7 @@ function handleFingerValueChange(label, offset) {
   latestOffsets[label] = { x: offset.x, y: offset.y };
   refreshFingerIndicator(label);
   updateFingerDotPosition(label);
-  if (activeFingerState.activeLabelSet.has(label)) {
+  if (!suppressFingerQueryUpdates && activeFingerState.activeLabelSet.has(label)) {
     const serialized = formatComplexForQuery(offset.x, offset.y);
     if (serialized !== fingerLastSerialized[label]) {
       fingerLastSerialized[label] = serialized;
@@ -531,6 +671,7 @@ function handleFingerValueChange(label, offset) {
   // counts), a finger move must re-run the parse/desugar pipeline so the shader
   // reflects the updated constant-folded structure.
   if (
+    !suppressFingerQueryUpdates &&
     activeFingerState.activeLabelSet.has(label) &&
     formulaNeedsFingerDrivenReparse(formulaTextarea?.value || '')
   ) {
@@ -780,6 +921,21 @@ function updateFingerDotPosition(label) {
 
 async function bootstrapReflexApplication() {
   await verifyCompressionSupport();
+
+  const editEnabled = isEditModeEnabled();
+  const shouldStartInViewerMode = hasFormulaQueryParam() && !editEnabled;
+  setViewerModeActive(shouldStartInViewerMode);
+
+  // Any interaction reveals the UI when in viewer mode.
+  if (typeof window !== 'undefined') {
+    const reveal = () => revealViewerModeUIOnce();
+    window.addEventListener('pointerdown', reveal, { once: true, capture: true });
+    window.addEventListener('keydown', reveal, { once: true, capture: true });
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  animationSeconds = parseSecondsFromQuery(params.get(ANIMATION_TIME_PARAM)) ?? DEFAULT_ANIMATION_SECONDS;
+
   let initialFormulaSource = await readFormulaFromQuery();
   if (!initialFormulaSource || !initialFormulaSource.trim()) {
     initialFormulaSource = DEFAULT_FORMULA_TEXT;
@@ -842,6 +998,27 @@ async function bootstrapReflexApplication() {
     });
   } else if (canvas) {
     canvas.style.pointerEvents = 'none';
+  }
+
+  // Load any animation intervals from the URL and start animating (unless edit mode).
+  if (reflexCore) {
+    const tracks = buildAnimationTracksFromQuery();
+    if (tracks.size) {
+      applyAnimationStartValues(tracks);
+      if (!editEnabled) {
+        startAnimations(tracks);
+      }
+    }
+    // Tap anywhere while animations are playing pauses them.
+    document.addEventListener(
+      'pointerdown',
+      () => {
+        if (animationController?.isPlaying()) {
+          animationController.pause();
+        }
+      },
+      { capture: true },
+    );
   }
 }
 
@@ -962,6 +1139,15 @@ function handleMenuAction(action) {
     case 'reset':
       confirmAndReset();
       break;
+    case 'set-animation-start':
+      setAnimationStartFromCurrent();
+      break;
+    case 'set-animation-end':
+      setAnimationEndFromCurrent();
+      break;
+    case 'set-animation-time':
+      promptAndSetAnimationTime();
+      break;
     case 'save-image':
       saveCanvasImage().catch((error) => {
         console.error('Failed to save canvas image.', error);
@@ -970,6 +1156,239 @@ function handleMenuAction(action) {
       break;
     default:
       break;
+  }
+}
+
+function buildAnimationTracksFromQuery() {
+  const tracks = new Map();
+  for (const label of ALL_FINGER_LABELS) {
+    const segments = readAnimationIntervalsFromQuery(label);
+    if (segments.length) {
+      tracks.set(label, segments);
+    }
+  }
+  return tracks;
+}
+
+function applyAnimationStartValues(tracks) {
+  if (!reflexCore) {
+    return;
+  }
+  suppressFingerQueryUpdates = true;
+  try {
+    for (const [label, segments] of tracks.entries()) {
+      const first = segments?.[0];
+      if (first?.start) {
+        reflexCore.setFingerValue(label, first.start.x, first.start.y, { triggerRender: false });
+      }
+    }
+  } finally {
+    suppressFingerQueryUpdates = false;
+  }
+  reflexCore.render();
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function lerpComplex(a, b, t) {
+  return { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t) };
+}
+
+function startAnimations(tracks) {
+  if (!reflexCore) {
+    return;
+  }
+  if (animationController) {
+    animationController.stop();
+  }
+  animationController = createAnimationController(reflexCore, tracks, animationSeconds);
+  animationController.start();
+}
+
+function createAnimationController(core, tracks, secondsPerSegment) {
+  const state = {
+    core,
+    tracks: new Map(tracks),
+    secondsPerSegment: Math.max(0.001, Number(secondsPerSegment) || DEFAULT_ANIMATION_SECONDS),
+    rafId: null,
+    playing: false,
+    paused: false,
+    lastNowMs: 0,
+    perTrack: new Map(),
+  };
+
+  for (const [label, segments] of state.tracks.entries()) {
+    state.perTrack.set(label, {
+      label,
+      segments,
+      segmentIndex: 0,
+      direction: 1, // 1 forward, -1 backward
+      segmentStartMs: 0,
+      initialized: false,
+    });
+  }
+
+  function stepTrack(track, nowMs) {
+    const durationMs = state.secondsPerSegment * 1000;
+    if (!track.initialized) {
+      track.segmentStartMs = nowMs;
+      track.initialized = true;
+    }
+    if (!track.segments.length) {
+      return null;
+    }
+    let guard = 0;
+    while (guard++ < 10) {
+      const seg = track.segments[track.segmentIndex];
+      const start = track.direction === 1 ? seg.start : seg.end;
+      const end = track.direction === 1 ? seg.end : seg.start;
+      const elapsed = nowMs - track.segmentStartMs;
+      const p = durationMs > 0 ? elapsed / durationMs : 1;
+      if (p < 1) {
+        return { value: lerpComplex(start, end, Math.max(0, Math.min(1, p))), done: false };
+      }
+
+      // Snap to end and advance segment.
+      track.segmentStartMs += durationMs;
+      const atEndValue = end;
+
+      const nextIndex = track.segmentIndex + track.direction;
+      if (nextIndex >= 0 && nextIndex < track.segments.length) {
+        track.segmentIndex = nextIndex;
+        return { value: atEndValue, done: false };
+      }
+
+      // Flip direction at ends (ping-pong).
+      track.direction *= -1;
+      return { value: atEndValue, done: false };
+    }
+
+    // Fallback if time jumps wildly.
+    const seg = track.segments[Math.max(0, Math.min(track.segments.length - 1, track.segmentIndex))];
+    return { value: seg.end, done: false };
+  }
+
+  function frame(nowMs) {
+    if (!state.playing || state.paused) {
+      return;
+    }
+    state.lastNowMs = nowMs;
+    suppressFingerQueryUpdates = true;
+    try {
+      for (const track of state.perTrack.values()) {
+        const step = stepTrack(track, nowMs);
+        if (!step?.value) {
+          continue;
+        }
+        state.core.setFingerValue(track.label, step.value.x, step.value.y, { triggerRender: false });
+      }
+      state.core.render();
+    } finally {
+      suppressFingerQueryUpdates = false;
+    }
+    state.rafId = window.requestAnimationFrame(frame);
+  }
+
+  return {
+    start() {
+      if (state.playing) {
+        return;
+      }
+      state.playing = true;
+      state.paused = false;
+      state.rafId = window.requestAnimationFrame(frame);
+    },
+    pause() {
+      state.paused = true;
+      if (state.rafId != null) {
+        window.cancelAnimationFrame(state.rafId);
+        state.rafId = null;
+      }
+    },
+    stop() {
+      state.playing = false;
+      state.paused = false;
+      if (state.rafId != null) {
+        window.cancelAnimationFrame(state.rafId);
+        state.rafId = null;
+      }
+    },
+    isPlaying() {
+      return state.playing && !state.paused;
+    },
+  };
+}
+
+function setAnimationStartFromCurrent() {
+  if (!reflexCore) {
+    return;
+  }
+  const snapshot = {};
+  for (const label of activeFingerState.allSlots) {
+    snapshot[label] = reflexCore.getFingerValue(label);
+  }
+  animationDraftStart = snapshot;
+  alert('Animation start recorded for active handles.');
+}
+
+function setAnimationEndFromCurrent() {
+  if (!reflexCore) {
+    return;
+  }
+  if (!animationDraftStart) {
+    alert('Set animation start first.');
+    return;
+  }
+  const params = new URLSearchParams(window.location.search);
+  const affected = [];
+  for (const label of activeFingerState.allSlots) {
+    const start = animationDraftStart[label];
+    if (!start) {
+      continue;
+    }
+    const end = reflexCore.getFingerValue(label);
+    const existing = readAnimationIntervalsFromQuery(label);
+    existing.push({ start: { x: start.x, y: start.y }, end: { x: end.x, y: end.y } });
+    const serialized = serializeAnimationIntervals(existing);
+    const key = `${label}${ANIMATION_SUFFIX}`;
+    if (serialized) {
+      params.set(key, serialized);
+      affected.push(label);
+    } else {
+      params.delete(key);
+    }
+  }
+  replaceUrlSearch(params);
+  animationDraftStart = null;
+
+  const tracks = buildAnimationTracksFromQuery();
+  if (tracks.size) {
+    applyAnimationStartValues(tracks);
+    if (!isEditModeEnabled()) {
+      startAnimations(tracks);
+    }
+  }
+  alert(affected.length ? `Animation interval appended for: ${affected.join(', ')}` : 'No active handles to animate.');
+}
+
+function promptAndSetAnimationTime() {
+  const current = formatSecondsForQuery(animationSeconds) || `${DEFAULT_ANIMATION_SECONDS}s`;
+  const raw = window.prompt('Set animation time (seconds, suffix "s" optional):', current);
+  if (raw === null) {
+    return;
+  }
+  const parsed = parseSecondsFromQuery(raw);
+  if (!parsed) {
+    alert('Could not parse animation time. Example: "5s" or "10".');
+    return;
+  }
+  animationSeconds = parsed;
+  updateSearchParam(ANIMATION_TIME_PARAM, formatSecondsForQuery(parsed));
+  const tracks = buildAnimationTracksFromQuery();
+  if (tracks.size && !isEditModeEnabled()) {
+    startAnimations(tracks);
   }
 }
 
