@@ -1,0 +1,33 @@
+name: Deploy production (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy main to gh-pages root
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # This repo is a static site (HTML/JS/CSS). If you later add a build step,
+      # insert it here and set `folder:` below to your build output directory.
+
+      - name: Deploy to gh-pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: .
+          enable_jekyll: false
+          clean: true
+          single-commit: true

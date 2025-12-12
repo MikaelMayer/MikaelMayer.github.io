@@ -1,0 +1,60 @@
+name: PR Preview (GitHub Pages)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: pr-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  deploy_preview:
+    name: Deploy PR preview to gh-pages subfolder
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      # Static site: deploy repo contents as-is.
+      # If you later add a build step, build here and deploy the build output folder.
+
+      - name: Deploy preview to gh-pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: .
+          target-folder: pr-preview/pr-${{ github.event.pull_request.number }}
+          clean: true
+          single-commit: false
+
+      - name: Comment preview URL on PR
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ✅ **PR Preview deployed**
+
+            - **Preview URL**: https://${{ github.repository_owner }}.github.io/pr-preview/pr-${{ github.event.pull_request.number }}/
+            - **Commit**: ${{ github.event.pull_request.head.sha }}
+
+  no_preview_for_forks:
+    name: Inform forks that previews are disabled
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.head.repo.full_name != github.repository
+    steps:
+      - name: Comment why preview is skipped
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ⚠️ **PR Preview not deployed**
+
+            This PR comes from a fork, so GitHub restricts `GITHUB_TOKEN` permissions and the workflow cannot publish to `gh-pages`.
