@@ -94,7 +94,7 @@ Reflex4You links can optionally include **time-based animations** for finger con
 
 - **Pause / edit handoff**: tapping/clicking anywhere while the animation is playing **stops animations and enters edit mode** for the rest of the session (no returning to animation mode until a refresh).
 
-- **Looping**: animations “ping-pong” (forward then backward) and repeat indefinitely.
+- **Looping**: animations repeat **forward only** (start → end, then jump back to start and repeat). Back-and-forth motion can be modeled inside the formula if needed.
 
 ### Editing an animation interval
 
