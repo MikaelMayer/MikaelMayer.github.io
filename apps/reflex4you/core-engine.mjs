@@ -1408,6 +1408,7 @@ export class ReflexCore {
 
   rebuildProgram() {
     const fragmentSource = buildFragmentSourceFromAST(this.formulaAST);
+    this.lastFragmentSource = fragmentSource;
     const newProgram = this.createProgram(vertexSource, fragmentSource);
     this.program = newProgram;
     this.gl.useProgram(this.program);
