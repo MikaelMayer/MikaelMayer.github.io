@@ -146,6 +146,32 @@ const DEFAULT_FORMULA_TEXT = 'z';
 const defaultParseResult = parseFormulaInput(DEFAULT_FORMULA_TEXT, getParserOptionsFromFingers());
 const fallbackDefaultAST = defaultParseResult.ok ? defaultParseResult.value : createDefaultFormulaAST();
 let reflexCore = null;
+let scheduledFingerDrivenReparse = false;
+
+function formulaNeedsFingerDrivenReparse(source) {
+  if (!source || typeof source !== 'string') {
+    return false;
+  }
+  // These operators trigger parse-time desugaring / constant-folding that may
+  // depend on finger values (e.g. repeat counts and small integer exponents).
+  return source.includes('$$') || source.includes('^');
+}
+
+function scheduleFingerDrivenReparse() {
+  if (scheduledFingerDrivenReparse) {
+    return;
+  }
+  if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+    // Fall back to immediate reparse if rAF is unavailable.
+    applyFormulaFromTextarea({ updateQuery: false });
+    return;
+  }
+  scheduledFingerDrivenReparse = true;
+  window.requestAnimationFrame(() => {
+    scheduledFingerDrivenReparse = false;
+    applyFormulaFromTextarea({ updateQuery: false });
+  });
+}
 
 async function transformWithStream(bytes, StreamConstructor) {
   if (typeof Blob === 'undefined' || typeof ReadableStream === 'undefined') {
@@ -500,6 +526,16 @@ function handleFingerValueChange(label, offset) {
       updateFingerQueryParam(label, offset.x, offset.y);
     }
   }
+
+  // If the current formula performs finger-dependent desugaring (e.g. `$$` repeat
+  // counts), a finger move must re-run the parse/desugar pipeline so the shader
+  // reflects the updated constant-folded structure.
+  if (
+    activeFingerState.activeLabelSet.has(label) &&
+    formulaNeedsFingerDrivenReparse(formulaTextarea?.value || '')
+  ) {
+    scheduleFingerDrivenReparse();
+  }
 }
 
 function showError(msg) {
@@ -777,6 +813,9 @@ async function bootstrapReflexApplication() {
   }
 
   if (reflexCore) {
+    if (typeof window !== 'undefined') {
+      window.__reflexCore = reflexCore;
+    }
     ALL_FINGER_LABELS.forEach((label) => {
       reflexCore.onFingerChange(label, (offset) => handleFingerValueChange(label, offset));
     });

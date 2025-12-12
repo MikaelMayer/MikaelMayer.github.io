@@ -181,3 +181,27 @@ test('opens the burger menu dropdown when clicked', async ({ page }) => {
 
   await expect(dropdown).toBeVisible();
 });
+
+test('re-runs parse/desugar pipeline when D1 changes for $$ repeat counts', async ({ page }) => {
+  await page.goto('/index.html');
+  await waitForReflexReady(page);
+
+  const hasRenderer = await page.evaluate(() => Boolean(window.__reflexCore));
+  test.skip(!hasRenderer, 'Renderer unavailable (no WebGL2 in this browser environment)');
+
+  const textarea = page.locator('#formula');
+  await expect(textarea).toBeVisible();
+
+  await textarea.fill('sin $$ D1.x.abs.floor');
+  await expectNoRendererError(page);
+
+  // Force D1.x to change the repeat count: floor(abs(x)) = 1 -> 2.
+  await page.evaluate(() => window.__reflexCore.setFingerValue('D1', 1.2, 0));
+  const shaderAtOne = await page.evaluate(() => window.__reflexCore.lastFragmentSource);
+  expect(typeof shaderAtOne).toBe('string');
+
+  await page.evaluate(() => window.__reflexCore.setFingerValue('D1', 2.2, 0));
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__reflexCore.lastFragmentSource);
+  }).not.toBe(shaderAtOne);
+});
