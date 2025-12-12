@@ -141,8 +141,8 @@ test('reflex4you upgrades legacy formula query param to formulab64', async ({ pa
 test('shows D1 indicator when dynamic finger only appears inside set binding', async ({ page }) => {
   const supportsCompression = await detectCompressionCapability(page);
   const targetUrl = supportsCompression
-    ? `/index.html?formulab64=${encodeURIComponent(encodeFormulaToFormulab64(DYNAMIC_SET_FORMULA))}`
-    : `/index.html?formula=${encodeURIComponent(DYNAMIC_SET_FORMULA)}`;
+    ? `/index.html?formulab64=${encodeURIComponent(encodeFormulaToFormulab64(DYNAMIC_SET_FORMULA))}&edit=true`
+    : `/index.html?formula=${encodeURIComponent(DYNAMIC_SET_FORMULA)}&edit=true`;
   await page.goto(targetUrl);
   await waitForReflexReady(page);
 
@@ -157,8 +157,8 @@ test('shows D1 indicator when dynamic finger only appears inside set binding', a
 test('shows F1 indicator when fixed finger only appears inside set binding', async ({ page }) => {
   const supportsCompression = await detectCompressionCapability(page);
   const targetUrl = supportsCompression
-    ? `/index.html?formulab64=${encodeURIComponent(encodeFormulaToFormulab64(FIXED_SET_FORMULA))}`
-    : `/index.html?formula=${encodeURIComponent(FIXED_SET_FORMULA)}`;
+    ? `/index.html?formulab64=${encodeURIComponent(encodeFormulaToFormulab64(FIXED_SET_FORMULA))}&edit=true`
+    : `/index.html?formula=${encodeURIComponent(FIXED_SET_FORMULA)}&edit=true`;
   await page.goto(targetUrl);
   await waitForReflexReady(page);
 

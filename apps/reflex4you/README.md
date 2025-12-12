@@ -79,6 +79,45 @@ Tips:
 - Use `W1`/`W2` whenever you want freeform navigation without moving your handles onto the area of interest.
 - To reset a handle, click its value chip and type `0` (or any new complex literal). The formula itself is preserved across reloads because it lives in the URL.
 
+## Sharing on-demand videos (URL animations)
+
+Reflex4You links can optionally include **time-based animations** for finger constants. This is intended for sharing “on-demand videos”: open the link and the parameters animate automatically.
+
+- **Per-constant animation parameter**: append `A` to any finger constant name to animate it.
+  - Example: `D1A=1+2i..-1-3i`
+  - The `..` separates the interval start and end.
+  - You can include multiple intervals by separating them with `;` (or by repeating the parameter).
+    - Example: `D1A=0+0i..1+0i;1+0i..1+1i`
+
+- **Timing (`t`)**: all animated constants run **simultaneously**, using the same duration.
+  - Default: `t=5s`
+  - Override: `t=10s` (the trailing `s` is optional; only seconds are supported for now).
+
+- **Pause**: tapping/clicking anywhere while the animation is playing **pauses** the animation and leaves the current values as-is.
+
+- **Looping**: animations “ping-pong” (forward then backward) and repeat indefinitely.
+
+### Editing an animation interval
+
+Use the menu:
+
+1. **Set animation start**: records the current values for all active handles.
+2. Move the handles to the desired end state.
+3. **Set animation end**: appends an interval for each active handle into the URL.
+4. **Set animation time**: sets `t=` in the URL.
+
+### Viewer mode vs edit mode (`edit=true`)
+
+When opening a link that contains a formula (`?formula=...` or `?formulab64=...`), Reflex4You starts in a **viewer mode**:
+
+- The menu, formula editor overlay, finger constant value chips, and finger dots are hidden **until you interact** with the page (tap/click/press a key).
+
+If you want the full UI to be visible immediately, add:
+
+- `edit=true`
+
+When `edit=true` is present, **URL animations do not play** (so you can adjust and re-share links without the view moving under you).
+
 ## Forking / Developing Locally
 
 ```bash
