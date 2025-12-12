@@ -99,6 +99,7 @@ let viewerModeRevealed = false;
 let animationSeconds = DEFAULT_ANIMATION_SECONDS;
 let animationController = null;
 let animationDraftStart = null;
+let sessionEditMode = false;
 
 function createEmptyFingerState() {
   return {
@@ -562,6 +563,18 @@ function isEditModeEnabled() {
   return normalized === 'true' || normalized === '1' || normalized === 'yes';
 }
 
+function isEditModeActive() {
+  return sessionEditMode || isEditModeEnabled();
+}
+
+function enterEditModeForSession() {
+  sessionEditMode = true;
+  revealViewerModeUIOnce();
+  if (animationController) {
+    animationController.stop();
+  }
+}
+
 function setViewerModeActive(active) {
   viewerModeActive = Boolean(active);
   if (!rootElement) {
@@ -922,7 +935,7 @@ function updateFingerDotPosition(label) {
 async function bootstrapReflexApplication() {
   await verifyCompressionSupport();
 
-  const editEnabled = isEditModeEnabled();
+  const editEnabled = isEditModeActive();
   const shouldStartInViewerMode = hasFormulaQueryParam() && !editEnabled;
   setViewerModeActive(shouldStartInViewerMode);
 
@@ -1009,12 +1022,12 @@ async function bootstrapReflexApplication() {
         startAnimations(tracks);
       }
     }
-    // Tap anywhere while animations are playing pauses them.
+    // Tap anywhere while animations are playing switches into edit mode for this session.
     document.addEventListener(
       'pointerdown',
       () => {
         if (animationController?.isPlaying()) {
-          animationController.pause();
+          enterEditModeForSession();
         }
       },
       { capture: true },
@@ -1366,7 +1379,7 @@ function setAnimationEndFromCurrent() {
   const tracks = buildAnimationTracksFromQuery();
   if (tracks.size) {
     applyAnimationStartValues(tracks);
-    if (!isEditModeEnabled()) {
+    if (!isEditModeActive()) {
       startAnimations(tracks);
     }
   }
@@ -1387,7 +1400,7 @@ function promptAndSetAnimationTime() {
   animationSeconds = parsed;
   updateSearchParam(ANIMATION_TIME_PARAM, formatSecondsForQuery(parsed));
   const tracks = buildAnimationTracksFromQuery();
-  if (tracks.size && !isEditModeEnabled()) {
+  if (tracks.size && !isEditModeActive()) {
     startAnimations(tracks);
   }
 }
