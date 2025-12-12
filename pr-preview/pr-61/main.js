@@ -373,6 +373,17 @@ async function updateFormulaQueryParam(source) {
   replaceUrlSearch(params);
 }
 
+function updateFormulaQueryParamImmediately(source) {
+  const params = new URLSearchParams(window.location.search);
+  params.delete(FORMULA_B64_PARAM);
+  if (!source || !source.trim()) {
+    params.delete(FORMULA_PARAM);
+  } else {
+    params.set(FORMULA_PARAM, source);
+  }
+  replaceUrlSearch(params);
+}
+
 function roundToThreeDecimals(value) {
   if (!Number.isFinite(value)) {
     return NaN;
@@ -1061,6 +1072,9 @@ function applyFormulaFromTextarea({ updateQuery = true, preserveFingerState = fa
     applyFingerState(nextState);
   }
   if (updateQuery) {
+    // Update immediately (tests + deterministic sharing), then try to upgrade
+    // to the compressed param asynchronously when supported.
+    updateFormulaQueryParamImmediately(source);
     updateFormulaQueryParam(source).catch((error) =>
       console.warn('Failed to persist formula parameter.', error),
     );
@@ -1218,8 +1232,7 @@ function createAnimationController(core, tracks, secondsPerSegment) {
     state.perTrack.set(label, {
       label,
       interval,
-      direction: 1, // 1 forward, -1 backward (ping-pong)
-      segmentStartMs: 0,
+      baseStartMs: 0,
       initialized: false,
     });
   }
@@ -1227,33 +1240,19 @@ function createAnimationController(core, tracks, secondsPerSegment) {
   function stepTrack(track, nowMs) {
     const durationMs = state.secondsPerSegment * 1000;
     if (!track.initialized) {
-      track.segmentStartMs = nowMs;
+      track.baseStartMs = nowMs;
       track.initialized = true;
     }
     const interval = track.interval;
     if (!interval) {
       return null;
     }
-    let guard = 0;
-    while (guard++ < 10) {
-      const start = track.direction === 1 ? interval.start : interval.end;
-      const end = track.direction === 1 ? interval.end : interval.start;
-      const elapsed = nowMs - track.segmentStartMs;
-      const p = durationMs > 0 ? elapsed / durationMs : 1;
-      if (p < 1) {
-        return { value: lerpComplex(start, end, Math.max(0, Math.min(1, p))), done: false };
-      }
-
-      // Snap to end and advance segment.
-      track.segmentStartMs += durationMs;
-      const atEndValue = end;
-      // Flip direction at ends (ping-pong).
-      track.direction *= -1;
-      return { value: atEndValue, done: false };
-    }
-
-    // Fallback if time jumps wildly.
-    return { value: interval.end, done: false };
+    const start = interval.start;
+    const end = interval.end;
+    const elapsed = nowMs - track.baseStartMs;
+    const t = durationMs > 0 ? elapsed / durationMs : 0;
+    const frac = t - Math.floor(t);
+    return { value: lerpComplex(start, end, Math.max(0, Math.min(1, frac))), done: false };
   }
 
   function frame(nowMs) {
