@@ -163,13 +163,13 @@ function scheduleFingerDrivenReparse() {
   }
   if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
     // Fall back to immediate reparse if rAF is unavailable.
-    applyFormulaFromTextarea({ updateQuery: false });
+    applyFormulaFromTextarea({ updateQuery: false, preserveFingerState: true });
     return;
   }
   scheduledFingerDrivenReparse = true;
   window.requestAnimationFrame(() => {
     scheduledFingerDrivenReparse = false;
-    applyFormulaFromTextarea({ updateQuery: false });
+    applyFormulaFromTextarea({ updateQuery: false, preserveFingerState: true });
   });
 }
 
@@ -861,7 +861,7 @@ formulaTextarea.addEventListener('blur', () => {
   formulaTextarea.classList.remove('expanded');
 });
 
-function applyFormulaFromTextarea({ updateQuery = true } = {}) {
+function applyFormulaFromTextarea({ updateQuery = true, preserveFingerState = false } = {}) {
   const source = formulaTextarea.value;
   if (!source.trim()) {
     showError('Formula cannot be empty.');
@@ -880,7 +880,13 @@ function applyFormulaFromTextarea({ updateQuery = true } = {}) {
   }
   clearError();
   reflexCore?.setFormulaAST(result.value);
-  applyFingerState(nextState);
+  // Finger-driven reparses happen while a pointer is down (e.g. `$$` repeat counts
+  // derived from D1). Re-applying the finger state would call into ReflexCore's
+  // `setActiveFingerConfig`, which intentionally releases pointer capture and
+  // clears active pointer assignments — interrupting the drag mid-gesture.
+  if (!preserveFingerState) {
+    applyFingerState(nextState);
+  }
   if (updateQuery) {
     updateFormulaQueryParam(source).catch((error) =>
       console.warn('Failed to persist formula parameter.', error),

@@ -205,3 +205,46 @@ test('re-runs parse/desugar pipeline when D1 changes for $$ repeat counts', asyn
     return await page.evaluate(() => window.__reflexCore.lastFragmentSource);
   }).not.toBe(shaderAtOne);
 });
+
+test('dragging D1 stays continuous when formula uses $$', async ({ page }) => {
+  await page.goto('/index.html');
+  await waitForReflexReady(page);
+
+  const hasRenderer = await page.evaluate(() => Boolean(window.__reflexCore));
+  test.skip(!hasRenderer, 'Renderer unavailable (no WebGL2 in this browser environment)');
+
+  const textarea = page.locator('#formula');
+  await expect(textarea).toBeVisible();
+  await textarea.fill('sin $$ D1.x.abs.floor');
+  await expectNoRendererError(page);
+  // `fill()` focuses the textarea, which expands the overlay and can cover the
+  // canvas. Blur it so pointer events reach the canvas (mirrors normal usage).
+  await textarea.blur();
+
+  const canvas = page.locator('#glcanvas');
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+
+  const cx = box.x + box.width / 2;
+  // Aim away from the bottom formula overlay.
+  const cy = box.y + box.height * 0.25;
+
+  const readD1 = async () =>
+    await page.evaluate(() => window.__reflexCore.getFingerValue('D1'));
+
+  const start = await readD1();
+
+  // Hold mouse down and move twice. If pointer capture is released mid-drag,
+  // only the first move updates D1 and the second move has no effect.
+  await page.mouse.move(cx, cy);
+  await page.mouse.down();
+
+  await page.mouse.move(cx + 20, cy);
+  await expect.poll(readD1).not.toEqual(start);
+
+  const afterFirst = await readD1();
+  await page.mouse.move(cx + 60, cy);
+  await expect.poll(readD1).not.toEqual(afterFirst);
+
+  await page.mouse.up();
+});
