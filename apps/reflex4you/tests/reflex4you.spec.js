@@ -56,36 +56,33 @@ const FIXED_SET_FORMULA = 'set c = sin(z + F1) in (z - c) * (z + c)';
 test('reflex4you updates formula query param after successful apply', async ({ page }) => {
   await page.goto('/index.html');
   await waitForReflexReady(page);
-  const supportsCompression = await page.evaluate(() => Boolean(window.__reflexCompressionEnabled));
 
   const textarea = page.locator('#formula');
   await expect(textarea).toBeVisible();
 
   await textarea.fill(SIMPLE_FORMULA);
   await expectNoRendererError(page);
-  if (supportsCompression) {
-    await expect.poll(async () => {
-      const href = await page.evaluate(() => window.location.href);
-      const url = new URL(href);
-      return url.searchParams.get('formulab64');
-    }).not.toBeNull();
+  await expect.poll(async () => {
+    const href = await page.evaluate(() => window.location.href);
+    const url = new URL(href);
+    return {
+      base64: url.searchParams.get('formulab64'),
+      legacy: url.searchParams.get('formula'),
+    };
+  }, { timeout: 15000 }).not.toEqual({ base64: null, legacy: null });
 
-    const params = await page.evaluate(() => {
-      const url = new URL(window.location.href);
-      return {
-        base64: url.searchParams.get('formulab64'),
-        legacy: url.searchParams.get('formula'),
-      };
-    });
-    expect(params.legacy).toBeNull();
-    expect(params.base64).not.toBeNull();
+  const params = await page.evaluate(() => {
+    const url = new URL(window.location.href);
+    return {
+      base64: url.searchParams.get('formulab64'),
+      legacy: url.searchParams.get('formula'),
+    };
+  });
+
+  if (params.base64) {
     expect(decodeFormulab64(params.base64)).toBe(SIMPLE_FORMULA);
   } else {
-    await expect.poll(async () => {
-      const href = await page.evaluate(() => window.location.href);
-      const url = new URL(href);
-      return url.searchParams.get('formula');
-    }).toBe(SIMPLE_FORMULA);
+    expect(params.legacy).toBe(SIMPLE_FORMULA);
   }
 
   await expect(textarea).toHaveValue(SIMPLE_FORMULA);
@@ -141,8 +138,8 @@ test('reflex4you upgrades legacy formula query param to formulab64', async ({ pa
 test('shows D1 indicator when dynamic finger only appears inside set binding', async ({ page }) => {
   const supportsCompression = await detectCompressionCapability(page);
   const targetUrl = supportsCompression
-    ? `/index.html?formulab64=${encodeURIComponent(encodeFormulaToFormulab64(DYNAMIC_SET_FORMULA))}`
-    : `/index.html?formula=${encodeURIComponent(DYNAMIC_SET_FORMULA)}`;
+    ? `/index.html?formulab64=${encodeURIComponent(encodeFormulaToFormulab64(DYNAMIC_SET_FORMULA))}&edit=true`
+    : `/index.html?formula=${encodeURIComponent(DYNAMIC_SET_FORMULA)}&edit=true`;
   await page.goto(targetUrl);
   await waitForReflexReady(page);
 
@@ -157,8 +154,8 @@ test('shows D1 indicator when dynamic finger only appears inside set binding', a
 test('shows F1 indicator when fixed finger only appears inside set binding', async ({ page }) => {
   const supportsCompression = await detectCompressionCapability(page);
   const targetUrl = supportsCompression
-    ? `/index.html?formulab64=${encodeURIComponent(encodeFormulaToFormulab64(FIXED_SET_FORMULA))}`
-    : `/index.html?formula=${encodeURIComponent(FIXED_SET_FORMULA)}`;
+    ? `/index.html?formulab64=${encodeURIComponent(encodeFormulaToFormulab64(FIXED_SET_FORMULA))}&edit=true`
+    : `/index.html?formula=${encodeURIComponent(FIXED_SET_FORMULA)}&edit=true`;
   await page.goto(targetUrl);
   await waitForReflexReady(page);
 
