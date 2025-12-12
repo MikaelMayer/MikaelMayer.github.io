@@ -102,7 +102,7 @@ Use the menu:
 
 1. **Set animation start**: records the current values for all active handles.
 2. Move the handles to the desired end state.
-3. **Set animation end**: appends an interval for each active handle into the URL.
+3. **Set animation end**: writes a single `start..end` interval for each active handle into the URL.
 4. **Set animation time**: sets `t=` in the URL.
 
 ### Viewer mode vs edit mode (`edit=true`)
