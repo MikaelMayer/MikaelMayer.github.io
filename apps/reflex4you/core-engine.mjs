@@ -1321,18 +1321,15 @@ export class ReflexCore {
     this.viewYMax = 4.0;
 
     this.fingerValues = new Map();
-    ALL_FINGER_LABELS.forEach((label) => {
-      this.fingerValues.set(label, { x: 0.0, y: 0.0 });
-    });
-
     this.fingerListeners = new Map();
-    ALL_FINGER_LABELS.forEach((label) => {
-      this.fingerListeners.set(label, new Set());
-    });
 
-    this.fixedOffsetsBuffer = new Float32Array(FIXED_FINGER_LABELS.length * 2);
-    this.dynamicOffsetsBuffer = new Float32Array(DYNAMIC_FINGER_LABELS.length * 2);
-    this.wOffsetsBuffer = new Float32Array(W_FINGER_LABELS.length * 2);
+    this.fixedUniformCount = 1;
+    this.dynamicUniformCount = 1;
+    this.wUniformCount = 2;
+
+    this.fixedOffsetsBuffer = new Float32Array(this.fixedUniformCount * 2);
+    this.dynamicOffsetsBuffer = new Float32Array(this.dynamicUniformCount * 2);
+    this.wOffsetsBuffer = new Float32Array(this.wUniformCount * 2);
     this.fixedOffsetsDirty = true;
     this.dynamicOffsetsDirty = true;
     this.wOffsetsDirty = true;
@@ -1410,8 +1407,15 @@ export class ReflexCore {
 
   getFingerValue(label) {
     const slot = validateFingerLabel(label);
-    const value = this.fingerValues.get(slot) || { x: 0, y: 0 };
+    const value = this.fingerValues.get(slot) || this.defaultFingerValue(slot);
     return { x: value.x, y: value.y };
+  }
+
+  defaultFingerValue(label) {
+    if (label === 'W1') {
+      return { x: 1, y: 0 };
+    }
+    return { x: 0, y: 0 };
   }
 
   setFingerValue(label, x, y, { triggerRender = true } = {}) {
@@ -1427,21 +1431,52 @@ export class ReflexCore {
     const index = fingerIndexFromLabel(slot);
     const family = fingerFamilyFromLabel(slot);
     if (family === "fixed") {
-      this.fixedOffsetsBuffer[index * 2] = x;
-      this.fixedOffsetsBuffer[index * 2 + 1] = y;
-      this.fixedOffsetsDirty = true;
+      if (index >= 0) {
+        this.ensureOffsetsBufferCapacity('fixed', index + 1);
+        this.fixedOffsetsBuffer[index * 2] = x;
+        this.fixedOffsetsBuffer[index * 2 + 1] = y;
+        this.fixedOffsetsDirty = true;
+      }
     } else if (family === "dynamic") {
-      this.dynamicOffsetsBuffer[index * 2] = x;
-      this.dynamicOffsetsBuffer[index * 2 + 1] = y;
-      this.dynamicOffsetsDirty = true;
+      if (index >= 0) {
+        this.ensureOffsetsBufferCapacity('dynamic', index + 1);
+        this.dynamicOffsetsBuffer[index * 2] = x;
+        this.dynamicOffsetsBuffer[index * 2 + 1] = y;
+        this.dynamicOffsetsDirty = true;
+      }
     } else if (family === "w") {
-      this.wOffsetsBuffer[index * 2] = x;
-      this.wOffsetsBuffer[index * 2 + 1] = y;
-      this.wOffsetsDirty = true;
+      if (index >= 0) {
+        this.wOffsetsBuffer[index * 2] = x;
+        this.wOffsetsBuffer[index * 2 + 1] = y;
+        this.wOffsetsDirty = true;
+      }
     }
     this.notifyFingerChange(slot);
     if (triggerRender) {
       this.render();
+    }
+  }
+
+  ensureOffsetsBufferCapacity(family, neededCount) {
+    const count = Math.max(1, Number(neededCount) || 1);
+    if (family === 'fixed') {
+      const current = this.fixedOffsetsBuffer.length / 2;
+      if (count <= current) {
+        return;
+      }
+      const next = new Float32Array(count * 2);
+      next.set(this.fixedOffsetsBuffer);
+      this.fixedOffsetsBuffer = next;
+      return;
+    }
+    if (family === 'dynamic') {
+      const current = this.dynamicOffsetsBuffer.length / 2;
+      if (count <= current) {
+        return;
+      }
+      const next = new Float32Array(count * 2);
+      next.set(this.dynamicOffsetsBuffer);
+      this.dynamicOffsetsBuffer = next;
     }
   }
 
@@ -1450,7 +1485,11 @@ export class ReflexCore {
       return () => {};
     }
     const slot = validateFingerLabel(label);
-    const bucket = this.fingerListeners.get(slot);
+    let bucket = this.fingerListeners.get(slot);
+    if (!bucket) {
+      bucket = new Set();
+      this.fingerListeners.set(slot, bucket);
+    }
     bucket.add(listener);
     try {
       listener(this.getFingerValue(slot));
@@ -1530,6 +1569,19 @@ export class ReflexCore {
   }
 
   rebuildProgram() {
+    const uniformCounts = analyzeFingerUniformCounts(this.formulaAST);
+    this.fixedUniformCount = uniformCounts.fixedCount;
+    this.dynamicUniformCount = uniformCounts.dynamicCount;
+    this.wUniformCount = uniformCounts.wCount;
+    // Ensure CPU-side buffers exist for the uniforms declared in the shader.
+    this.ensureOffsetsBufferCapacity('fixed', this.fixedUniformCount);
+    this.ensureOffsetsBufferCapacity('dynamic', this.dynamicUniformCount);
+    if (!this.wOffsetsBuffer || this.wOffsetsBuffer.length !== this.wUniformCount * 2) {
+      this.wOffsetsBuffer = new Float32Array(this.wUniformCount * 2);
+    }
+    // Fill buffers from current fingerValues (defaults to 0, with W1 defaulting to 1+0i).
+    this.hydrateUniformBuffersFromFingerValues();
+
     const fragmentSource = buildFragmentSourceFromAST(this.formulaAST);
     this.lastFragmentSource = fragmentSource;
     const newProgram = this.createProgram(vertexSource, fragmentSource);
@@ -1550,6 +1602,30 @@ export class ReflexCore {
     this.fixedOffsetsDirty = true;
     this.dynamicOffsetsDirty = true;
     this.wOffsetsDirty = true;
+  }
+
+  hydrateUniformBuffersFromFingerValues() {
+    // Fixed offsets
+    for (let i = 0; i < this.fixedUniformCount; i += 1) {
+      const label = `F${i + 1}`;
+      const value = this.fingerValues.get(label) || this.defaultFingerValue(label);
+      this.fixedOffsetsBuffer[i * 2] = value.x;
+      this.fixedOffsetsBuffer[i * 2 + 1] = value.y;
+    }
+    // Dynamic offsets
+    for (let i = 0; i < this.dynamicUniformCount; i += 1) {
+      const label = `D${i + 1}`;
+      const value = this.fingerValues.get(label) || this.defaultFingerValue(label);
+      this.dynamicOffsetsBuffer[i * 2] = value.x;
+      this.dynamicOffsetsBuffer[i * 2 + 1] = value.y;
+    }
+    // Workspace offsets
+    for (let i = 0; i < this.wUniformCount; i += 1) {
+      const label = `W${i + 1}`;
+      const value = this.fingerValues.get(label) || this.defaultFingerValue(label);
+      this.wOffsetsBuffer[i * 2] = value.x;
+      this.wOffsetsBuffer[i * 2 + 1] = value.y;
+    }
   }
 
   resizeCanvasToDisplaySize() {
@@ -1590,15 +1666,24 @@ export class ReflexCore {
 
   uploadFingerUniforms() {
     if (this.uFixedOffsetsLoc && this.fixedOffsetsDirty) {
-      this.gl.uniform2fv(this.uFixedOffsetsLoc, this.fixedOffsetsBuffer);
+      this.gl.uniform2fv(
+        this.uFixedOffsetsLoc,
+        this.fixedOffsetsBuffer.subarray(0, this.fixedUniformCount * 2),
+      );
       this.fixedOffsetsDirty = false;
     }
     if (this.uDynamicOffsetsLoc && this.dynamicOffsetsDirty) {
-      this.gl.uniform2fv(this.uDynamicOffsetsLoc, this.dynamicOffsetsBuffer);
+      this.gl.uniform2fv(
+        this.uDynamicOffsetsLoc,
+        this.dynamicOffsetsBuffer.subarray(0, this.dynamicUniformCount * 2),
+      );
       this.dynamicOffsetsDirty = false;
     }
     if (this.uWOffsetsLoc && this.wOffsetsDirty) {
-      this.gl.uniform2fv(this.uWOffsetsLoc, this.wOffsetsBuffer);
+      this.gl.uniform2fv(
+        this.uWOffsetsLoc,
+        this.wOffsetsBuffer.subarray(0, this.wUniformCount * 2),
+      );
       this.wOffsetsDirty = false;
     }
   }
