@@ -50,6 +50,24 @@ test('parses negative exponents', () => {
   assert.equal(result.value.exponent, -2);
 });
 
+test('unary minus binds weaker than exponentiation', () => {
+  const result = parseFormulaInput('-z^4');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Sub');
+  assert.equal(result.value.left.kind, 'Const');
+  assert.equal(result.value.right.kind, 'Pow');
+  assert.equal(result.value.right.base.kind, 'Var');
+  assert.equal(result.value.right.exponent, 4);
+});
+
+test('parentheses can force (-z)^4', () => {
+  const result = parseFormulaInput('(-z)^4');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Pow');
+  assert.equal(result.value.exponent, 4);
+  assert.equal(result.value.base.kind, 'Sub');
+});
+
 test('non-integer exponents lower to exp form', () => {
   const result = parseFormulaInput('z ^ 1.5');
   assert.equal(result.ok, true);
@@ -195,6 +213,22 @@ test('parses additional finger primitives', () => {
   assert.equal(add.right.slot, 'D3');
 });
 
+test('parses non-consecutive finger primitives (any F*/D*)', () => {
+  const result = parseFormulaInput('F7 + D12');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Add');
+  assert.equal(result.value.left.kind, 'FingerOffset');
+  assert.equal(result.value.left.slot, 'F7');
+  assert.equal(result.value.right.kind, 'FingerOffset');
+  assert.equal(result.value.right.slot, 'D12');
+});
+
+test('rejects binding finger names with set', () => {
+  const result = parseFormulaInput('set F7 = 1 in F7');
+  assert.equal(result.ok, false);
+  assert.match(result.message, /reserved identifier/i);
+});
+
 test('parses W finger primitives', () => {
   const result = parseFormulaInput('W1 + W2');
   assert.equal(result.ok, true);
@@ -253,15 +287,17 @@ test('$$ accepts parenthesized expressions with constant propagation', () => {
 test('$$ accepts bare additive expressions on the right-hand side', () => {
   const result = parseFormulaInput('z $$ 2 + 3');
   assert.equal(result.ok, true);
+  // `$$` binds tighter than `+`, and the parser keeps a compact `ComposeMultiple`
+  // node (later materialized by the engine when building the shader).
   assert.equal(result.value.kind, 'ComposeMultiple');
   assert.equal(result.value.resolvedCount, 5);
   assert.equal(result.value.base.kind, 'Var');
 });
 
 test('$$ can derive counts from finger values', () => {
-  const result = parseFormulaInput('sin $$ (10 * D1.x).floor', {
+  const result = parseFormulaInput('sin $$ (10 * D12.x).floor', {
     fingerValues: {
-      D1: { x: 0.5, y: 0 },
+      D12: { x: 0.5, y: 0 },
     },
   });
   assert.equal(result.ok, true);
@@ -270,7 +306,7 @@ test('$$ can derive counts from finger values', () => {
   assert.equal(result.value.base.kind, 'Sin');
   let fingerSeen = false;
   visitAst(result.value.countExpression, (node) => {
-    if (node.kind === 'FingerOffset' && node.slot === 'D1') {
+    if (node.kind === 'FingerOffset' && node.slot === 'D12') {
       fingerSeen = true;
     }
   });
@@ -493,6 +529,14 @@ test('nested let bindings are rejected', () => {
   const result = parseFormulaInput('set a = let f = z in f in a');
   assert.equal(result.ok, false);
   assert.match(result.message, /top level/i);
+});
+
+test('top-level let can be followed by another let (sequential lets)', () => {
+  const source = `let zeroline = heav $ 0.05-z $ abs in
+let f = y - 3*sin(3*x) in
+zeroline $ f`;
+  const result = parseFormulaInput(source);
+  assert.equal(result.ok, true);
 });
 
 test('parseFormulaToAST throws on invalid formula', () => {

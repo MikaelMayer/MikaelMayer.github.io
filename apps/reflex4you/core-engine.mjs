@@ -23,17 +23,37 @@ export function Pow(base, exponent) {
   return { kind: "Pow", base, exponent };
 }
 
-const FIXED_FINGER_LABELS = Object.freeze(["F1", "F2", "F3"]);
-const DYNAMIC_FINGER_LABELS = Object.freeze(["D1", "D2", "D3"]);
 const W_FINGER_LABELS = Object.freeze(["W1", "W2"]);
-const ALL_FINGER_LABELS = Object.freeze([
-  ...FIXED_FINGER_LABELS,
-  ...DYNAMIC_FINGER_LABELS,
-  ...W_FINGER_LABELS,
-]);
+
+function parseFingerLabel(label) {
+  if (!label || typeof label !== "string") {
+    return null;
+  }
+  if (label === "W1") {
+    return { family: "w", index: 0 };
+  }
+  if (label === "W2") {
+    return { family: "w", index: 1 };
+  }
+  const match = /^([FD])([1-9]\d*)$/.exec(label);
+  if (!match) {
+    return null;
+  }
+  const prefix = match[1];
+  const rawIndex = Number(match[2]);
+  if (!Number.isInteger(rawIndex) || rawIndex < 1) {
+    return null;
+  }
+  const index = rawIndex - 1;
+  return {
+    family: prefix === "F" ? "fixed" : "dynamic",
+    index,
+  };
+}
 
 function validateFingerLabel(slot) {
-  if (!ALL_FINGER_LABELS.includes(slot)) {
+  const parsed = parseFingerLabel(slot);
+  if (!parsed) {
     throw new Error(`Unknown finger slot: ${slot}`);
   }
   return slot;
@@ -170,6 +190,93 @@ export function oo(f, n) {
   return node;
 }
 
+function analyzeFingerUniformCounts(ast) {
+  let maxFixed = -1;
+  let maxDynamic = -1;
+  function visit(node) {
+    if (!node || typeof node !== "object") {
+      return;
+    }
+    if (node.kind === "FingerOffset") {
+      const parsed = parseFingerLabel(node.slot);
+      if (parsed) {
+        if (parsed.family === "fixed") {
+          maxFixed = Math.max(maxFixed, parsed.index);
+        } else if (parsed.family === "dynamic") {
+          maxDynamic = Math.max(maxDynamic, parsed.index);
+        }
+      }
+      return;
+    }
+    switch (node.kind) {
+      case "Pow":
+        visit(node.base);
+        return;
+      case "Exp":
+      case "Sin":
+      case "Cos":
+      case "Tan":
+      case "Atan":
+      case "Asin":
+      case "Acos":
+      case "Abs":
+      case "Abs2":
+      case "Floor":
+      case "Conjugate":
+        visit(node.value);
+        return;
+      case "Ln":
+        visit(node.value);
+        if (node.branch) {
+          visit(node.branch);
+        }
+        return;
+      case "Sub":
+      case "Mul":
+      case "Op":
+      case "Add":
+      case "Div":
+      case "LessThan":
+      case "GreaterThan":
+      case "LessThanOrEqual":
+      case "GreaterThanOrEqual":
+      case "Equal":
+      case "LogicalAnd":
+      case "LogicalOr":
+        visit(node.left);
+        visit(node.right);
+        return;
+      case "If":
+        visit(node.condition);
+        visit(node.thenBranch);
+        visit(node.elseBranch);
+        return;
+      case "Compose":
+        visit(node.f);
+        visit(node.g);
+        return;
+      case "SetBinding":
+        visit(node.value);
+        visit(node.body);
+        return;
+      case "SetRef":
+      case "Var":
+      case "VarX":
+      case "VarY":
+      case "Const":
+        return;
+      default:
+        return;
+    }
+  }
+  visit(ast);
+  return {
+    fixedCount: Math.max(1, maxFixed + 1),
+    dynamicCount: Math.max(1, maxDynamic + 1),
+    wCount: 2,
+  };
+}
+
 function materializeComposeMultiples(ast) {
   let root = ast;
   function visit(node, parent, key) {
@@ -272,23 +379,13 @@ export function SetRef(name, binding = null) {
 }
 
 function fingerIndexFromLabel(label) {
-  return Number(label.slice(1)) - 1;
+  const parsed = parseFingerLabel(label);
+  return parsed ? parsed.index : -1;
 }
 
 function fingerFamilyFromLabel(label) {
-  if (!label) {
-    return null;
-  }
-  switch (label[0]) {
-    case "F":
-      return "fixed";
-    case "D":
-      return "dynamic";
-    case "W":
-      return "w";
-    default:
-      return null;
-  }
+  const parsed = parseFingerLabel(label);
+  return parsed ? parsed.family : null;
 }
 
 export const defaultFormulaSource = 'VarZ()';
@@ -541,7 +638,7 @@ vec2 ${name}(vec2 z) {
 
   if (ast.kind === "FingerOffset") {
     const slot = ast.slot;
-    const index = Number(slot.slice(1)) - 1;
+    const index = fingerIndexFromLabel(slot);
     let uniform;
     if (slot[0] === "F") {
       uniform = `u_fixedOffsets[${index}]`;
@@ -952,8 +1049,8 @@ precision highp float;
 uniform vec2 u_min;
 uniform vec2 u_max;
 uniform vec2 u_resolution;
-uniform vec2 u_fixedOffsets[3];
-uniform vec2 u_dynamicOffsets[3];
+uniform vec2 u_fixedOffsets[/*FIXED_OFFSETS_COUNT*/];
+uniform vec2 u_dynamicOffsets[/*DYNAMIC_OFFSETS_COUNT*/];
 uniform vec2 u_wOffsets[2];
 
 out vec4 outColor;
@@ -1107,23 +1204,50 @@ vec3 reflexColor(vec2 w) {
     return vec3(1.0);
   }
 
+  float rpm  = re + m;
+  float rpm2 = rpm * rpm;
+  float i2   = im * im;
+  float denRaw = rpm2 + i2;
+
+  // The only place the denominator can legitimately collapse toward 0 is on
+  // the negative real axis (re < 0, im ≈ 0) where rpm = re + |re| → 0 and i2 → 0.
+  // In some WebGL/PWA configurations (notably on mobile GPUs where precision is
+  // effectively lower), denRaw and/or COLOR_MIN_DEN can underflow to 0.0 and
+  // lead to NaNs. Detect that singular case by the denominator itself, rather
+  // than relying on exact im == 0.0 pixel alignment.
+  if (re < 0.0 && denRaw <= COLOR_MIN_DEN) {
+    float r = 0.0;
+    float g = 190.0;
+    float b = 190.0;
+
+    float luminosite = 240.0 * m / (m + 1.0);
+    luminosite = clamp(luminosite, 0.0, 240.0);
+
+    if (luminosite <= 120.0) {
+      float scale = luminosite / 120.0;
+      r *= scale;
+      g *= scale;
+      b *= scale;
+    } else {
+      float k1 = 2.0 - luminosite / 120.0;
+      float k2 = luminosite / 120.0 - 1.0;
+      r = r * k1 + 255.0 * k2;
+      g = g * k1 + 255.0 * k2;
+      b = b * k1 + 255.0 * k2;
+    }
+
+    return vec3(r / 255.0, g / 255.0, b / 255.0);
+  }
+
   float r = 0.0;
   float g = 0.0;
   float b = 0.0;
 
-  float rpm  = re + m;
-  float rpm2 = rpm * rpm;
-  float i2   = im * im;
-  float den  = max(rpm2 + i2, COLOR_MIN_DEN);
+  float den  = max(denRaw, COLOR_MIN_DEN);
 
-  if (im == 0.0 && re <= 0.0) {
-    g = 190.0;
-    b = 190.0;
-  } else {
-    r = 255.0 * (1.0 - i2 / den);
-    g = 255.0 * (0.25 + 0.5 * im * (SQ3 * rpm + im) / den);
-    b = 255.0 * (0.25 - 0.5 * im * (SQ3 * rpm - im) / den);
-  }
+  r = 255.0 * (1.0 - i2 / den);
+  g = 255.0 * (0.25 + 0.5 * im * (SQ3 * rpm + im) / den);
+  b = 255.0 * (0.25 - 0.5 * im * (SQ3 * rpm - im) / den);
 
   float luminosite = 240.0 * m / (m + 1.0);
   luminosite = clamp(luminosite, 0.0, 240.0);
@@ -1162,8 +1286,11 @@ void main() {
 
 export function buildFragmentSourceFromAST(ast) {
   const preparedAst = materializeComposeMultiples(ast);
+  const uniformCounts = analyzeFingerUniformCounts(preparedAst);
   const { funcs, topName } = buildNodeFunctionsAndTop(preparedAst);
   return fragmentTemplate
+    .replace("/*FIXED_OFFSETS_COUNT*/", String(uniformCounts.fixedCount))
+    .replace("/*DYNAMIC_OFFSETS_COUNT*/", String(uniformCounts.dynamicCount))
     .replace("/*NODE_FUNCS*/", funcs)
     .replace("/*TOP_FUNC*/", topName);
 }
@@ -1198,18 +1325,15 @@ export class ReflexCore {
     this.viewYMax = 4.0;
 
     this.fingerValues = new Map();
-    ALL_FINGER_LABELS.forEach((label) => {
-      this.fingerValues.set(label, { x: 0.0, y: 0.0 });
-    });
-
     this.fingerListeners = new Map();
-    ALL_FINGER_LABELS.forEach((label) => {
-      this.fingerListeners.set(label, new Set());
-    });
 
-    this.fixedOffsetsBuffer = new Float32Array(FIXED_FINGER_LABELS.length * 2);
-    this.dynamicOffsetsBuffer = new Float32Array(DYNAMIC_FINGER_LABELS.length * 2);
-    this.wOffsetsBuffer = new Float32Array(W_FINGER_LABELS.length * 2);
+    this.fixedUniformCount = 1;
+    this.dynamicUniformCount = 1;
+    this.wUniformCount = 2;
+
+    this.fixedOffsetsBuffer = new Float32Array(this.fixedUniformCount * 2);
+    this.dynamicOffsetsBuffer = new Float32Array(this.dynamicUniformCount * 2);
+    this.wOffsetsBuffer = new Float32Array(this.wUniformCount * 2);
     this.fixedOffsetsDirty = true;
     this.dynamicOffsetsDirty = true;
     this.wOffsetsDirty = true;
@@ -1287,8 +1411,15 @@ export class ReflexCore {
 
   getFingerValue(label) {
     const slot = validateFingerLabel(label);
-    const value = this.fingerValues.get(slot) || { x: 0, y: 0 };
+    const value = this.fingerValues.get(slot) || this.defaultFingerValue(slot);
     return { x: value.x, y: value.y };
+  }
+
+  defaultFingerValue(label) {
+    if (label === 'W1') {
+      return { x: 1, y: 0 };
+    }
+    return { x: 0, y: 0 };
   }
 
   setFingerValue(label, x, y, { triggerRender = true } = {}) {
@@ -1304,21 +1435,52 @@ export class ReflexCore {
     const index = fingerIndexFromLabel(slot);
     const family = fingerFamilyFromLabel(slot);
     if (family === "fixed") {
-      this.fixedOffsetsBuffer[index * 2] = x;
-      this.fixedOffsetsBuffer[index * 2 + 1] = y;
-      this.fixedOffsetsDirty = true;
+      if (index >= 0) {
+        this.ensureOffsetsBufferCapacity('fixed', index + 1);
+        this.fixedOffsetsBuffer[index * 2] = x;
+        this.fixedOffsetsBuffer[index * 2 + 1] = y;
+        this.fixedOffsetsDirty = true;
+      }
     } else if (family === "dynamic") {
-      this.dynamicOffsetsBuffer[index * 2] = x;
-      this.dynamicOffsetsBuffer[index * 2 + 1] = y;
-      this.dynamicOffsetsDirty = true;
+      if (index >= 0) {
+        this.ensureOffsetsBufferCapacity('dynamic', index + 1);
+        this.dynamicOffsetsBuffer[index * 2] = x;
+        this.dynamicOffsetsBuffer[index * 2 + 1] = y;
+        this.dynamicOffsetsDirty = true;
+      }
     } else if (family === "w") {
-      this.wOffsetsBuffer[index * 2] = x;
-      this.wOffsetsBuffer[index * 2 + 1] = y;
-      this.wOffsetsDirty = true;
+      if (index >= 0) {
+        this.wOffsetsBuffer[index * 2] = x;
+        this.wOffsetsBuffer[index * 2 + 1] = y;
+        this.wOffsetsDirty = true;
+      }
     }
     this.notifyFingerChange(slot);
     if (triggerRender) {
       this.render();
+    }
+  }
+
+  ensureOffsetsBufferCapacity(family, neededCount) {
+    const count = Math.max(1, Number(neededCount) || 1);
+    if (family === 'fixed') {
+      const current = this.fixedOffsetsBuffer.length / 2;
+      if (count <= current) {
+        return;
+      }
+      const next = new Float32Array(count * 2);
+      next.set(this.fixedOffsetsBuffer);
+      this.fixedOffsetsBuffer = next;
+      return;
+    }
+    if (family === 'dynamic') {
+      const current = this.dynamicOffsetsBuffer.length / 2;
+      if (count <= current) {
+        return;
+      }
+      const next = new Float32Array(count * 2);
+      next.set(this.dynamicOffsetsBuffer);
+      this.dynamicOffsetsBuffer = next;
     }
   }
 
@@ -1327,7 +1489,11 @@ export class ReflexCore {
       return () => {};
     }
     const slot = validateFingerLabel(label);
-    const bucket = this.fingerListeners.get(slot);
+    let bucket = this.fingerListeners.get(slot);
+    if (!bucket) {
+      bucket = new Set();
+      this.fingerListeners.set(slot, bucket);
+    }
     bucket.add(listener);
     try {
       listener(this.getFingerValue(slot));
@@ -1407,6 +1573,19 @@ export class ReflexCore {
   }
 
   rebuildProgram() {
+    const uniformCounts = analyzeFingerUniformCounts(this.formulaAST);
+    this.fixedUniformCount = uniformCounts.fixedCount;
+    this.dynamicUniformCount = uniformCounts.dynamicCount;
+    this.wUniformCount = uniformCounts.wCount;
+    // Ensure CPU-side buffers exist for the uniforms declared in the shader.
+    this.ensureOffsetsBufferCapacity('fixed', this.fixedUniformCount);
+    this.ensureOffsetsBufferCapacity('dynamic', this.dynamicUniformCount);
+    if (!this.wOffsetsBuffer || this.wOffsetsBuffer.length !== this.wUniformCount * 2) {
+      this.wOffsetsBuffer = new Float32Array(this.wUniformCount * 2);
+    }
+    // Fill buffers from current fingerValues (defaults to 0, with W1 defaulting to 1+0i).
+    this.hydrateUniformBuffersFromFingerValues();
+
     const fragmentSource = buildFragmentSourceFromAST(this.formulaAST);
     this.lastFragmentSource = fragmentSource;
     const newProgram = this.createProgram(vertexSource, fragmentSource);
@@ -1427,6 +1606,30 @@ export class ReflexCore {
     this.fixedOffsetsDirty = true;
     this.dynamicOffsetsDirty = true;
     this.wOffsetsDirty = true;
+  }
+
+  hydrateUniformBuffersFromFingerValues() {
+    // Fixed offsets
+    for (let i = 0; i < this.fixedUniformCount; i += 1) {
+      const label = `F${i + 1}`;
+      const value = this.fingerValues.get(label) || this.defaultFingerValue(label);
+      this.fixedOffsetsBuffer[i * 2] = value.x;
+      this.fixedOffsetsBuffer[i * 2 + 1] = value.y;
+    }
+    // Dynamic offsets
+    for (let i = 0; i < this.dynamicUniformCount; i += 1) {
+      const label = `D${i + 1}`;
+      const value = this.fingerValues.get(label) || this.defaultFingerValue(label);
+      this.dynamicOffsetsBuffer[i * 2] = value.x;
+      this.dynamicOffsetsBuffer[i * 2 + 1] = value.y;
+    }
+    // Workspace offsets
+    for (let i = 0; i < this.wUniformCount; i += 1) {
+      const label = `W${i + 1}`;
+      const value = this.fingerValues.get(label) || this.defaultFingerValue(label);
+      this.wOffsetsBuffer[i * 2] = value.x;
+      this.wOffsetsBuffer[i * 2 + 1] = value.y;
+    }
   }
 
   resizeCanvasToDisplaySize() {
@@ -1467,15 +1670,24 @@ export class ReflexCore {
 
   uploadFingerUniforms() {
     if (this.uFixedOffsetsLoc && this.fixedOffsetsDirty) {
-      this.gl.uniform2fv(this.uFixedOffsetsLoc, this.fixedOffsetsBuffer);
+      this.gl.uniform2fv(
+        this.uFixedOffsetsLoc,
+        this.fixedOffsetsBuffer.subarray(0, this.fixedUniformCount * 2),
+      );
       this.fixedOffsetsDirty = false;
     }
     if (this.uDynamicOffsetsLoc && this.dynamicOffsetsDirty) {
-      this.gl.uniform2fv(this.uDynamicOffsetsLoc, this.dynamicOffsetsBuffer);
+      this.gl.uniform2fv(
+        this.uDynamicOffsetsLoc,
+        this.dynamicOffsetsBuffer.subarray(0, this.dynamicUniformCount * 2),
+      );
       this.dynamicOffsetsDirty = false;
     }
     if (this.uWOffsetsLoc && this.wOffsetsDirty) {
-      this.gl.uniform2fv(this.uWOffsetsLoc, this.wOffsetsBuffer);
+      this.gl.uniform2fv(
+        this.uWOffsetsLoc,
+        this.wOffsetsBuffer.subarray(0, this.wUniformCount * 2),
+      );
       this.wOffsetsDirty = false;
     }
   }

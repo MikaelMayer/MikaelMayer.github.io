@@ -2,6 +2,27 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+  <script>
+    // Some static hosts serve this page at `/apps/reflex4you` (no trailing slash)
+    // without redirecting to `/apps/reflex4you/`. In that case, relative asset
+    // URLs like `./main.js` resolve to `/apps/main.js` and the app fails to load.
+    // Normalize to a trailing-slash URL before loading any modules.
+    (function () {
+      try {
+        const { pathname, search, hash } = window.location;
+        if (pathname && !pathname.endsWith('/') && !pathname.endsWith('.html')) {
+          window.location.replace(`${pathname}/${search || ''}${hash || ''}`);
+        }
+      } catch (_) {
+        // Ignore redirect failures (non-browser contexts).
+      }
+    })();
+  </script>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
   <title>Reflex GPU demo – full-screen + live formulas</title>
   <style>
     html, body {
@@ -191,6 +212,7 @@
       display: inline-flex;
       flex-direction: column;
       align-items: flex-end;
+  gap: 6px;
       pointer-events: auto;
     }
 
@@ -254,6 +276,19 @@
       visibility: visible;
     }
 
+  #app-version-pill {
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(158, 240, 255, 0.8);
+      background: linear-gradient(120deg, rgba(11,17,34,0.85), rgba(16,57,89,0.9));
+      color: #9ef0ff;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+      text-transform: uppercase;
+  }
+
     .menu-dropdown__item {
       background: transparent;
       border: 0;
@@ -312,6 +347,14 @@
     <button
       type="button"
       class="menu-dropdown__item"
+      data-menu-action="copy-share-link"
+      role="menuitem"
+    >
+      Copy share link
+    </button>
+    <button
+      type="button"
+      class="menu-dropdown__item"
       data-menu-action="reset"
       role="menuitem"
     >
@@ -358,6 +401,7 @@
       Formula view
     </button>
   </div>
+  <div id="app-version-pill" aria-live="polite" aria-label="Reflex4You version">v3</div>
 </div>
 
 <div id="error"></div>

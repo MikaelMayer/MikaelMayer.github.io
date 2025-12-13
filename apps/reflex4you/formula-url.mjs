@@ -1,8 +1,23 @@
 const FORMULA_PARAM = 'formula';
 const FORMULA_B64_PARAM = 'formulab64';
+const LAST_STATE_SEARCH_KEY = 'reflex4you:lastSearch';
 
 const sharedTextEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
 const sharedTextDecoder = typeof TextDecoder !== 'undefined' ? new TextDecoder() : null;
+
+function persistSearchToLocalStorage(search, env = {}) {
+  const storage =
+    env.localStorage ??
+    (typeof window !== 'undefined' ? window.localStorage : null);
+  if (!storage) {
+    return;
+  }
+  try {
+    storage.setItem(LAST_STATE_SEARCH_KEY, String(search || ''));
+  } catch (_) {
+    // Ignore storage failures (private mode, quota, etc.).
+  }
+}
 
 function getWindowSecureContextFlag() {
   if (typeof window === 'undefined') {
@@ -205,6 +220,7 @@ export function replaceUrlSearch(params, env = {}) {
   const newQuery = params.toString();
   const newUrl = `${location.pathname}${newQuery ? `?${newQuery}` : ''}`;
   history.replaceState({}, '', newUrl);
+  persistSearchToLocalStorage(newQuery ? `?${newQuery}` : '', env);
 }
 
 async function upgradeLegacyFormulaParam(source, env = {}) {
@@ -284,4 +300,4 @@ export function updateFormulaQueryParamImmediately(source, options = {}) {
   replaceUrlSearch(params, options);
 }
 
-export { FORMULA_PARAM, FORMULA_B64_PARAM };
+export { FORMULA_PARAM, FORMULA_B64_PARAM, LAST_STATE_SEARCH_KEY };

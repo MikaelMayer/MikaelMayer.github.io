@@ -240,23 +240,48 @@ const literalParser = Choice([
   jLiteral,
 ], { ctor: 'Literal' });
 
-const FINGER_TOKENS = ['F1', 'F2', 'F3', 'D1', 'D2', 'D3', 'W1', 'W2'];
+const FINGER_LABEL_REGEX = /(?:[FD][1-9]\d*|W[12])/y;
 
-const DEFAULT_FINGER_VALUE_MAP = {
-  F1: { re: 0, im: 0 },
-  F2: { re: 0, im: 0 },
-  F3: { re: 0, im: 0 },
-  D1: { re: 0, im: 0 },
-  D2: { re: 0, im: 0 },
-  D3: { re: 0, im: 0 },
-  W1: { re: 1, im: 0 },
-  W2: { re: 0, im: 0 },
-};
+function isFingerLabel(label) {
+  if (!label || typeof label !== 'string') {
+    return false;
+  }
+  if (label === 'W1' || label === 'W2') {
+    return true;
+  }
+  return /^[FD][1-9]\d*$/.test(label);
+}
 
-const fingerLiteralParsers = FINGER_TOKENS.map((label) =>
-  keywordLiteral(label, { ctor: `Finger(${label})` }).Map((_, result) =>
-    withSyntax(withSpan(FingerOffset(label), result.span), label),
-  ),
+const fingerToken = wsRegex(FINGER_LABEL_REGEX, {
+  ctor: 'FingerToken',
+  transform: (match) => match[0],
+});
+
+const fingerLiteralParser = createParser('FingerLiteral', (input) => {
+  const result = fingerToken.runNormalized(input);
+  if (!result.ok) {
+    return result;
+  }
+  const nextChar = result.next.peek();
+  if (nextChar && IDENTIFIER_CHAR.test(nextChar)) {
+    // e.g. "F1foo" should be parsed as an identifier, not a finger literal.
+    return new ParseFailure({
+      ctor: 'FingerLiteral',
+      message: 'Expected finger literal',
+      severity: ParseSeverity.recoverable,
+      expected: 'finger literal',
+      span: result.span,
+      input: result.span.input,
+    });
+  }
+  return new ParseSuccess({
+    ctor: 'FingerLiteral',
+    value: result.value,
+    span: result.span,
+    next: result.next,
+  });
+}).Map((label, result) =>
+  withSyntax(withSpan(FingerOffset(label), result.span), label),
 );
 
 const RESERVED_BINDING_NAMES = new Set([
@@ -290,7 +315,6 @@ const RESERVED_BINDING_NAMES = new Set([
   'z',
   'j',
   ITERATION_VARIABLE_NAME,
-  ...FINGER_TOKENS,
 ]);
 
 const iterationVariableLiteral = keywordLiteral(ITERATION_VARIABLE_NAME, { ctor: 'IterationVar' })
@@ -322,7 +346,7 @@ const bindingIdentifierParser = createParser('BindingIdentifier', (input) => {
   if (!identifier.ok) {
     return identifier;
   }
-  if (RESERVED_BINDING_NAMES.has(identifier.value)) {
+  if (RESERVED_BINDING_NAMES.has(identifier.value) || isFingerLabel(identifier.value)) {
     return new ParseFailure({
       ctor: 'BindingIdentifier',
       message: `"${identifier.value}" is a reserved identifier and cannot be bound with set`,
@@ -346,7 +370,7 @@ const primitiveParser = Choice([
   keywordLiteral('real', { ctor: 'VarReal' }).Map((_, result) => withSyntax(withSpan(VarX(), result.span), 'real')),
   keywordLiteral('imag', { ctor: 'VarImag' }).Map((_, result) => withSyntax(withSpan(VarY(), result.span), 'imag')),
   keywordLiteral('z', { ctor: 'VarZ' }).Map((_, result) => withSpan(VarZ(), result.span)),
-  ...fingerLiteralParsers,
+  fingerLiteralParser,
   iterationVariableLiteral,
   identifierReferenceParser,
 ], { ctor: 'Primitive' });
@@ -629,8 +653,8 @@ const primaryParser = Choice([
   primitiveParser,
 ], { ctor: 'Primary' });
 
-let unaryParser;
-const unaryRef = lazy(() => unaryParser, { ctor: 'UnaryRef' });
+let prefixParser;
+const prefixRef = lazy(() => prefixParser, { ctor: 'PrefixRef' });
 
 const functionCallSuffixParser = Sequence(
   [
@@ -723,33 +747,12 @@ const dotExpressionParser = createParser('DotExpression', (input) => {
   });
 });
 
-const unaryNegative = Sequence([
-  wsLiteral('-', { ctor: 'UnaryMinusSymbol' }),
-  unaryRef,
-], {
-  ctor: 'UnaryMinusSeq',
-  projector: (values) => values[1],
-}).Map((expr, result) => {
-  const zero = withSpan(Const(0, 0), result.span);
-  return withSpan(Sub(zero, expr), result.span);
-});
-
-const unaryPositive = Sequence([
-  wsLiteral('+', { ctor: 'UnaryPlusSymbol' }),
-  unaryRef,
-], {
-  ctor: 'UnaryPlusSeq',
-  projector: (values) => values[1],
-}).Map((expr, result) => withSpan(expr, result.span));
-
-unaryParser = Choice([
-  dotExpressionParser,
-  unaryNegative,
-  unaryPositive,
-], { ctor: 'Unary' });
+// Exponentiation binds tighter than unary +/-.
+// This ensures `-z^4` parses as `-(z^4)`, not `(-z)^4`.
+const postfixParser = dotExpressionParser;
 
 const powerParser = createParser('Power', (input) => {
-  const head = unaryParser.runNormalized(input);
+  const head = postfixParser.runNormalized(input);
   if (!head.ok) {
     return head;
   }
@@ -775,6 +778,31 @@ const powerParser = createParser('Power', (input) => {
     next: cursor,
   });
 });
+
+const unaryNegative = Sequence([
+  wsLiteral('-', { ctor: 'UnaryMinusSymbol' }),
+  prefixRef,
+], {
+  ctor: 'UnaryMinusSeq',
+  projector: (values) => values[1],
+}).Map((expr, result) => {
+  const zero = withSpan(Const(0, 0), result.span);
+  return withSpan(Sub(zero, expr), result.span);
+});
+
+const unaryPositive = Sequence([
+  wsLiteral('+', { ctor: 'UnaryPlusSymbol' }),
+  prefixRef,
+], {
+  ctor: 'UnaryPlusSeq',
+  projector: (values) => values[1],
+}).Map((expr, result) => withSpan(expr, result.span));
+
+prefixParser = Choice([
+  powerParser,
+  unaryNegative,
+  unaryPositive,
+], { ctor: 'Prefix' });
 
 function createPowerApplication(baseNode, exponentNode, span) {
   const literal = extractSmallIntegerExponent(exponentNode);
@@ -947,6 +975,12 @@ function substitutePlaceholder(node, placeholder, replacement) {
     case 'Identifier':
     case 'SetRef':
       return cloneAst(node);
+    case 'LetBinding':
+      return {
+        ...node,
+        value: substitutePlaceholder(node.value, placeholder, replacement),
+        body: substitutePlaceholder(node.body, placeholder, replacement),
+      };
     case 'Pow':
       return { ...node, base: substitutePlaceholder(node.base, placeholder, replacement) };
     case 'Exp':
@@ -1036,6 +1070,12 @@ function cloneAst(node) {
     case 'Identifier':
     case 'SetRef':
       return { ...node };
+    case 'LetBinding':
+      return {
+        ...node,
+        value: cloneAst(node.value),
+        body: cloneAst(node.body),
+      };
     case 'SetBinding':
       return {
         ...node,
@@ -1128,6 +1168,18 @@ function substituteIdentifierWithClone(node, targetName, replacement) {
     case 'PlaceholderVar':
     case 'SetRef':
       return cloneAst(node);
+    case 'LetBinding': {
+      const nextValue = substituteIdentifierWithClone(node.value, targetName, replacement);
+      const nextBody =
+        node.name === targetName
+          ? cloneAst(node.body)
+          : substituteIdentifierWithClone(node.body, targetName, replacement);
+      return {
+        ...node,
+        value: nextValue,
+        body: nextBody,
+      };
+    }
     case 'Pow':
       return { ...node, base: substituteIdentifierWithClone(node.base, targetName, replacement) };
     case 'Exp':
@@ -1539,7 +1591,7 @@ function normalizeParseOptions(options = {}) {
 }
 
 function normalizeFingerValuesSource(source) {
-  const map = createDefaultFingerValueMap();
+  const map = new Map();
   if (!source) {
     return map;
   }
@@ -1557,17 +1609,8 @@ function normalizeFingerValuesSource(source) {
   return map;
 }
 
-function createDefaultFingerValueMap() {
-  const map = new Map();
-  FINGER_TOKENS.forEach((label) => {
-    const defaults = DEFAULT_FINGER_VALUE_MAP[label] || { re: 0, im: 0 };
-    map.set(label, { re: defaults.re, im: defaults.im });
-  });
-  return map;
-}
-
 function assignFingerValue(map, label, value) {
-  if (!FINGER_TOKENS.includes(label)) {
+  if (!isFingerLabel(label)) {
     return;
   }
   const normalized = normalizeComplexInput(value);
@@ -2066,10 +2109,15 @@ function evaluateComparison(kind, left, right) {
 
 function getFingerValueFromContext(label, fingerValues) {
   const value = fingerValues?.get(label);
-  if (!value) {
-    return null;
+  if (value) {
+    return { re: value.re, im: value.im };
   }
-  return { re: value.re, im: value.im };
+  // Default missing finger values to 0 (with W1 defaulting to 1+0i),
+  // matching the previous fixed-token behavior.
+  if (label === 'W1') {
+    return { re: 1, im: 0 };
+  }
+  return { re: 0, im: 0 };
 }
 
 function complexAdd(a, b) {
@@ -2289,7 +2337,7 @@ const powerSuffixParser = createParser('PowerSuffix', (input) => {
   if (!caret.ok) {
     return caret;
   }
-  const exponentResult = unaryParser.runNormalized(caret.next);
+  const exponentResult = prefixParser.runNormalized(caret.next);
   if (!exponentResult.ok) {
     return exponentResult;
   }
@@ -2314,7 +2362,7 @@ const additiveOperators = Choice([
 
 const composeOperator = wsLiteral('$', { ctor: 'ComposeOp' }).Map(() => (left, right) => Compose(left, right));
 
-const multiplicativeParser = leftAssociative(powerParser, multiplicativeOperators, 'MulDiv');
+const multiplicativeParser = leftAssociative(prefixParser, multiplicativeOperators, 'MulDiv');
 const additiveParser = leftAssociative(multiplicativeParser, additiveOperators, 'AddSub');
 const repeatSuffixParser = createParser('RepeatSuffix', (input) => {
   const opResult = wsLiteral('$$', { ctor: 'RepeatOp' }).runNormalized(input);

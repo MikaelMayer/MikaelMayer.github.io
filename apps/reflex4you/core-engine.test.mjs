@@ -73,6 +73,8 @@ test('fragment generator embeds node functions and top entry', () => {
   assert.match(fragment, /vec2 node\d+\(vec2 z\)/);
   assert.match(fragment, /vec2 f\(vec2 z\)/);
   assert.match(fragment, /return node\d+\(z\);/);
+  // Guard against rare GPU/driver divide-by-zero on strictly negative reals.
+  assert.match(fragment, /if\s*\(re < 0\.0 && denRaw <= COLOR_MIN_DEN\)/);
 });
 
 test('Pow nodes emit exponentiation by squaring and allow negatives', () => {
@@ -85,15 +87,27 @@ test('Pow nodes emit exponentiation by squaring and allow negatives', () => {
 test('Offset2 nodes read from the fixed offset array', () => {
   const ast = Offset2();
   const fragment = buildFragmentSourceFromAST(ast);
-  assert.match(fragment, /uniform vec2 u_fixedOffsets\[3\]/);
+  assert.match(fragment, /uniform vec2 u_fixedOffsets\[2\]/);
   assert.match(fragment, /return u_fixedOffsets\[1\];/);
 });
 
 test('dynamic fingers read from the dynamic offset array', () => {
   const ast = FingerOffset('D1');
   const fragment = buildFragmentSourceFromAST(ast);
-  assert.match(fragment, /uniform vec2 u_dynamicOffsets\[3\]/);
+  assert.match(fragment, /uniform vec2 u_dynamicOffsets\[1\]/);
   assert.match(fragment, /return u_dynamicOffsets\[0\];/);
+});
+
+test('supports sparse high-index finger uniforms', () => {
+  const fixedAst = FingerOffset('F7');
+  const fixedFragment = buildFragmentSourceFromAST(fixedAst);
+  assert.match(fixedFragment, /uniform vec2 u_fixedOffsets\[7\]/);
+  assert.match(fixedFragment, /return u_fixedOffsets\[6\];/);
+
+  const dynamicAst = FingerOffset('D12');
+  const dynamicFragment = buildFragmentSourceFromAST(dynamicAst);
+  assert.match(dynamicFragment, /uniform vec2 u_dynamicOffsets\[12\]/);
+  assert.match(dynamicFragment, /return u_dynamicOffsets\[11\];/);
 });
 
 test('W fingers read from the W offset array', () => {

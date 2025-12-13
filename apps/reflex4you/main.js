@@ -8,8 +8,10 @@ import { formatCaretIndicator } from './parse-error-format.mjs';
 import {
   FORMULA_PARAM,
   FORMULA_B64_PARAM,
+  LAST_STATE_SEARCH_KEY,
   verifyCompressionSupport,
   readFormulaFromQuery,
+  writeFormulaToSearchParams,
   updateFormulaQueryParam,
   updateFormulaQueryParamImmediately,
   replaceUrlSearch,
@@ -22,52 +24,137 @@ const fingerIndicatorStack = document.getElementById('finger-indicator-stack');
 const fingerOverlay = document.getElementById('finger-overlay');
 const menuButton = document.getElementById('menu-button');
 const menuDropdown = document.getElementById('menu-dropdown');
+const versionPill = document.getElementById('app-version-pill');
 const rootElement = typeof document !== 'undefined' ? document.documentElement : null;
 
 let fatalErrorActive = false;
+
+const APP_VERSION = 4;
+
+if (versionPill) {
+  versionPill.textContent = `v${APP_VERSION}`;
+  versionPill.setAttribute('data-version', String(APP_VERSION));
+}
 
 const EDIT_PARAM = 'edit';
 const ANIMATION_TIME_PARAM = 't';
 
 const DEFAULT_ANIMATION_SECONDS = 5;
 
-const FIXED_FINGER_ORDER = ['F1', 'F2', 'F3'];
-const DYNAMIC_FINGER_ORDER = ['D1', 'D2', 'D3'];
 const W_FINGER_ORDER = ['W1', 'W2'];
-const ALL_FINGER_LABELS = [...FIXED_FINGER_ORDER, ...DYNAMIC_FINGER_ORDER, ...W_FINGER_ORDER];
-const DEFAULT_FINGER_OFFSETS = Object.freeze(
-  ALL_FINGER_LABELS.reduce((acc, label) => {
-    const value = label === 'W1' ? { x: 1, y: 0 } : { x: 0, y: 0 };
-    acc[label] = Object.freeze(value);
-    return acc;
-  }, {}),
-);
+const FINGER_LABEL_REGEX = /^(?:[FD][1-9]\d*|W[12])$/;
 
-function cloneFingerOffsets(source) {
-  const clone = {};
-  ALL_FINGER_LABELS.forEach((label) => {
-    const baseline = source[label] || { x: 0, y: 0 };
-    clone[label] = { x: baseline.x, y: baseline.y };
-  });
-  return clone;
+function isFingerLabel(label) {
+  return typeof label === 'string' && FINGER_LABEL_REGEX.test(label);
 }
 
-const FINGER_METADATA = ALL_FINGER_LABELS.reduce((acc, label) => {
-  acc[label] = {
+function fingerFamily(label) {
+  if (!label) return null;
+  if (label.startsWith('F')) return 'fixed';
+  if (label.startsWith('D')) return 'dynamic';
+  if (label.startsWith('W')) return 'w';
+  return null;
+}
+
+function fingerIndex(label) {
+  if (!label) return -1;
+  if (label === 'W1') return 0;
+  if (label === 'W2') return 1;
+  const match = /^([FD])([1-9]\d*)$/.exec(label);
+  if (!match) return -1;
+  return Number(match[2]) - 1;
+}
+
+function defaultFingerOffset(label) {
+  if (label === 'W1') {
+    return { x: 1, y: 0 };
+  }
+  return { x: 0, y: 0 };
+}
+
+function getFingerMeta(label) {
+  return {
     label,
-    type: label.startsWith('F') ? 'fixed' : label.startsWith('D') ? 'dynamic' : 'w',
+    type: fingerFamily(label) || 'fixed',
   };
-  return acc;
-}, {});
+}
+
+function sortFingerLabels(labels) {
+  return labels
+    .slice()
+    .filter((label) => isFingerLabel(label))
+    .sort((a, b) => {
+      const fa = fingerFamily(a);
+      const fb = fingerFamily(b);
+      if (fa !== fb) {
+        // Keep fixed/dynamic ahead of workspace.
+        if (fa === 'w') return 1;
+        if (fb === 'w') return -1;
+      }
+      return fingerIndex(a) - fingerIndex(b);
+    });
+}
 
 const fingerIndicators = new Map();
 const fingerDots = new Map();
 const fingerLastSerialized = {};
-const latestOffsets = cloneFingerOffsets(DEFAULT_FINGER_OFFSETS);
+const latestOffsets = {};
+const knownFingerLabels = new Set();
+const fingerUnsubscribers = new Map();
 
-ALL_FINGER_LABELS.forEach((label) => {
-  fingerLastSerialized[label] = null;
-});
+function ensureFingerState(label) {
+  if (!isFingerLabel(label)) {
+    return;
+  }
+  knownFingerLabels.add(label);
+  if (!latestOffsets[label]) {
+    latestOffsets[label] = defaultFingerOffset(label);
+  }
+  if (!(label in fingerLastSerialized)) {
+    fingerLastSerialized[label] = null;
+  }
+}
+
+// Always keep workspace fingers in a known state.
+W_FINGER_ORDER.forEach((label) => ensureFingerState(label));
+
+function ensureFingerSubscriptions(labels) {
+  if (!reflexCore) {
+    return;
+  }
+  (labels || []).forEach((label) => {
+    if (!isFingerLabel(label)) {
+      return;
+    }
+    ensureFingerState(label);
+    if (fingerUnsubscribers.has(label)) {
+      return;
+    }
+    const unsubscribe = reflexCore.onFingerChange(label, (offset) => handleFingerValueChange(label, offset));
+    fingerUnsubscribers.set(label, unsubscribe);
+  });
+}
+
+function applyFingerValuesFromQuery(labels) {
+  if (!reflexCore) {
+    return;
+  }
+  suppressFingerQueryUpdates = true;
+  try {
+    (labels || []).forEach((label) => {
+      if (!isFingerLabel(label)) {
+        return;
+      }
+      const parsed = readFingerFromQuery(label);
+      if (parsed) {
+        reflexCore.setFingerValue(label, parsed.x, parsed.y, { triggerRender: false });
+      }
+    });
+  } finally {
+    suppressFingerQueryUpdates = false;
+  }
+  reflexCore.render();
+}
 
 function getParserOptionsFromFingers() {
   return { fingerValues: latestOffsets };
@@ -134,6 +221,7 @@ function setupViewportInsetListeners() {
 setupViewportInsetListeners();
 
 function refreshFingerIndicator(label) {
+  ensureFingerState(label);
   const indicator = fingerIndicators.get(label);
   if (!indicator) {
     return;
@@ -383,7 +471,8 @@ function ensureFingerIndicator(label) {
   if (fingerIndicators.has(label)) {
     return fingerIndicators.get(label);
   }
-  const meta = FINGER_METADATA[label];
+  ensureFingerState(label);
+  const meta = getFingerMeta(label);
   const indicator = document.createElement('button');
   indicator.type = 'button';
   indicator.className = `finger-indicator finger-indicator--${meta.type}`;
@@ -401,7 +490,8 @@ function ensureFingerDot(label) {
   if (fingerDots.has(label)) {
     return fingerDots.get(label);
   }
-  const meta = FINGER_METADATA[label];
+  ensureFingerState(label);
+  const meta = getFingerMeta(label);
   const dot = document.createElement('div');
   dot.className = `finger-dot finger-dot--${meta.type}`;
   dot.dataset.fingerDot = label;
@@ -436,6 +526,51 @@ function readFingerFromQuery(label) {
   return parseComplexString(raw);
 }
 
+function persistLastSearchToLocalStorage(search) {
+  try {
+    window.localStorage?.setItem(LAST_STATE_SEARCH_KEY, String(search || ''));
+  } catch (_) {
+    // ignore storage failures
+  }
+}
+
+function clearPersistedLastSearch() {
+  try {
+    window.localStorage?.removeItem(LAST_STATE_SEARCH_KEY);
+  } catch (_) {
+    // ignore storage failures
+  }
+}
+
+function restorePersistedSearchIfNeeded() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  const params = new URLSearchParams(window.location.search);
+  // If opened via a share link (formula embedded), do not override it.
+  if (params.has(FORMULA_PARAM) || params.has(FORMULA_B64_PARAM)) {
+    return;
+  }
+  let saved = null;
+  try {
+    saved = window.localStorage?.getItem(LAST_STATE_SEARCH_KEY);
+  } catch (_) {
+    saved = null;
+  }
+  if (!saved || typeof saved !== 'string' || !saved.startsWith('?')) {
+    return;
+  }
+  const savedParams = new URLSearchParams(saved.slice(1));
+  if (!savedParams.has(FORMULA_PARAM) && !savedParams.has(FORMULA_B64_PARAM)) {
+    return;
+  }
+  const current = window.location.search || '';
+  if (current === saved) {
+    return;
+  }
+  window.history.replaceState({}, '', `${window.location.pathname}${saved}`);
+}
+
 function updateFingerQueryParam(label, re, im) {
   const serialized = formatComplexForQuery(re, im);
   const params = new URLSearchParams(window.location.search);
@@ -447,6 +582,7 @@ function updateFingerQueryParam(label, re, im) {
   const newQuery = params.toString();
   const newUrl = `${window.location.pathname}${newQuery ? `?${newQuery}` : ''}`;
   window.history.replaceState({}, '', newUrl);
+  persistLastSearchToLocalStorage(newQuery ? `?${newQuery}` : '');
 }
 
 function clearFingerQueryParam(label) {
@@ -455,6 +591,7 @@ function clearFingerQueryParam(label) {
 }
 
 function handleFingerValueChange(label, offset) {
+  ensureFingerState(label);
   latestOffsets[label] = { x: offset.x, y: offset.y };
   refreshFingerIndicator(label);
   updateFingerDotPosition(label);
@@ -572,8 +709,8 @@ function resolveAxisContext(parent, node) {
 }
 
 function deriveFingerState(analysis) {
-  const fixedSlots = FIXED_FINGER_ORDER.filter((label) => analysis.usage.fixed.has(label));
-  const dynamicSlots = DYNAMIC_FINGER_ORDER.filter((label) => analysis.usage.dynamic.has(label));
+  const fixedSlots = sortFingerLabels(Array.from(analysis.usage.fixed));
+  const dynamicSlots = sortFingerLabels(Array.from(analysis.usage.dynamic));
   const wSlots = W_FINGER_ORDER.filter((label) => analysis.usage.w.has(label));
   if (fixedSlots.length && dynamicSlots.length) {
     return {
@@ -582,7 +719,7 @@ function deriveFingerState(analysis) {
       dynamicSlots: [],
       wSlots: [],
       axisConstraints: new Map(),
-      error: 'Formulas cannot mix F fingers (F1..F3) with D fingers (D1..D3).',
+      error: 'Formulas cannot mix F* fingers with D* fingers.',
     };
   }
   const mode = fixedSlots.length ? 'fixed' : dynamicSlots.length ? 'dynamic' : 'none';
@@ -637,6 +774,7 @@ function applyFingerState(state) {
     ...(state.dynamicSlots || []),
     ...(state.wSlots || []),
   ];
+  allSlots.forEach((label) => ensureFingerState(label));
   activeFingerState = {
     mode: state.mode,
     fixedSlots: state.fixedSlots || [],
@@ -652,12 +790,13 @@ function applyFingerState(state) {
     wSlots: activeFingerState.wSlots,
     axisConstraints: activeFingerState.axisConstraints,
   });
+  ensureFingerSubscriptions(activeFingerState.allSlots);
   syncFingerUI();
   activeFingerState.allSlots.forEach((label) => {
     refreshFingerIndicator(label);
     updateFingerDotPosition(label);
   });
-  ALL_FINGER_LABELS.forEach((label) => {
+  Array.from(knownFingerLabels).forEach((label) => {
     if (!activeFingerState.activeLabelSet.has(label)) {
       clearFingerQueryParam(label);
       const dot = fingerDots.get(label);
@@ -677,6 +816,7 @@ function applyFingerState(state) {
 }
 
 function updateFingerDotPosition(label) {
+  ensureFingerState(label);
   const dot = fingerDots.get(label);
   if (!dot || !reflexCore || !activeFingerState.activeLabelSet.has(label)) {
     if (dot) {
@@ -707,6 +847,10 @@ function updateFingerDotPosition(label) {
 }
 
 async function bootstrapReflexApplication() {
+  // Installed PWAs often relaunch at `start_url` without the last query string.
+  // Restore the last known reflex state unless the user opened an explicit share link.
+  restorePersistedSearchIfNeeded();
+
   await verifyCompressionSupport();
 
   const editEnabled = isEditModeActive();
@@ -763,16 +907,16 @@ async function bootstrapReflexApplication() {
     if (typeof window !== 'undefined') {
       window.__reflexCore = reflexCore;
     }
-    ALL_FINGER_LABELS.forEach((label) => {
-      reflexCore.onFingerChange(label, (offset) => handleFingerValueChange(label, offset));
-    });
-
-    ALL_FINGER_LABELS.forEach((label) => {
-      const parsed = readFingerFromQuery(label);
-      if (parsed) {
-        reflexCore.setFingerValue(label, parsed.x, parsed.y);
-      }
-    });
+    // Subscribe only to the finger labels that are actually used.
+    const initialActiveLabels = initialFingerState.mode === 'invalid'
+      ? W_FINGER_ORDER
+      : [
+        ...(initialFingerState.fixedSlots || []),
+        ...(initialFingerState.dynamicSlots || []),
+        ...(initialFingerState.wSlots || []),
+      ];
+    ensureFingerSubscriptions(initialActiveLabels);
+    applyFingerValuesFromQuery(initialActiveLabels);
   }
 
   if (initialFingerState.mode !== 'invalid') {
@@ -930,6 +1074,11 @@ function isMenuOpen() {
 
 function handleMenuAction(action) {
   switch (action) {
+    case 'copy-share-link':
+      copyShareLinkToClipboard().catch((error) => {
+        console.warn('Failed to copy share link.', error);
+      });
+      break;
     case 'reset':
       confirmAndReset();
       break;
@@ -956,9 +1105,85 @@ function handleMenuAction(action) {
   }
 }
 
+async function buildShareUrl() {
+  const href = typeof window !== 'undefined' ? window.location.href : '';
+  const url = new URL(href);
+  url.hash = '';
+
+  const params = new URLSearchParams(url.search);
+  // Sharing should default to viewer mode; do not force edit UI for recipients.
+  params.delete(EDIT_PARAM);
+
+  // Re-encode the current formula so the share URL is canonical and can use
+  // `formulab64` when supported, even if the current URL hasn't upgraded yet.
+  await writeFormulaToSearchParams(params, formulaTextarea?.value || '');
+
+  url.search = params.toString();
+  return url.toString();
+}
+
+async function copyTextToClipboard(text) {
+  if (!text) {
+    throw new Error('Nothing to copy');
+  }
+  const clipboard = navigator?.clipboard;
+  if (clipboard && typeof clipboard.writeText === 'function') {
+    try {
+      await clipboard.writeText(text);
+      return;
+    } catch (error) {
+      // Fall through to the execCommand-based fallback (e.g. insecure contexts).
+      console.warn('navigator.clipboard.writeText failed; falling back.', error);
+    }
+  }
+
+  // Fallback for older browsers / insecure contexts.
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.top = '-1000px';
+  textarea.style.left = '-1000px';
+  document.body.appendChild(textarea);
+  textarea.select();
+  textarea.setSelectionRange(0, text.length);
+  const ok = typeof document.execCommand === 'function' ? document.execCommand('copy') : false;
+  document.body.removeChild(textarea);
+  if (!ok) {
+    throw new Error('Clipboard copy fallback failed');
+  }
+}
+
+function showTransientStatus(message, { timeoutMs = 1400 } = {}) {
+  if (!versionPill) {
+    return;
+  }
+  const baseline = `v${APP_VERSION}`;
+  versionPill.textContent = message;
+  window.setTimeout(() => {
+    if (versionPill.textContent === message) {
+      versionPill.textContent = baseline;
+    }
+  }, timeoutMs);
+}
+
+async function copyShareLinkToClipboard() {
+  const shareUrl = await buildShareUrl();
+  try {
+    await copyTextToClipboard(shareUrl);
+    showTransientStatus('Copied link');
+  } catch (error) {
+    console.warn('Clipboard write failed; falling back to prompt.', error);
+    window.prompt('Copy this Reflex4You link:', shareUrl);
+  }
+}
+
 function buildAnimationTracksFromQuery() {
   const tracks = new Map();
-  for (const label of ALL_FINGER_LABELS) {
+  const candidates = activeFingerState?.allSlots?.length
+    ? activeFingerState.allSlots
+    : Array.from(knownFingerLabels);
+  for (const label of candidates) {
     const interval = readAnimationIntervalFromQuery(label);
     if (interval) {
       tracks.set(label, interval);
@@ -1182,6 +1407,7 @@ function resetApplicationState() {
   updateFormulaQueryParam(null).catch((error) =>
     console.warn('Failed to clear formula parameter.', error),
   );
+  clearPersistedLastSearch();
   resetFingerValuesToDefaults();
   clearError();
 }
@@ -1190,8 +1416,8 @@ function resetFingerValuesToDefaults() {
   if (!reflexCore) {
     return;
   }
-  ALL_FINGER_LABELS.forEach((label) => {
-    const defaults = DEFAULT_FINGER_OFFSETS[label];
+  Array.from(knownFingerLabels).forEach((label) => {
+    const defaults = defaultFingerOffset(label);
     reflexCore.setFingerValue(label, defaults.x, defaults.y);
   });
 }
@@ -1252,4 +1478,14 @@ function triggerImageDownload(url, filename, shouldRevoke) {
   if (shouldRevoke) {
     URL.revokeObjectURL(url);
   }
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('./service-worker.js')
+      .catch((error) => {
+        console.warn('Reflex4You service worker registration failed.', error);
+      });
+  });
 }
