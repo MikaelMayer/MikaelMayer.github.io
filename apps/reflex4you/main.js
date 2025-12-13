@@ -1118,6 +1118,33 @@ async function buildShareUrl() {
   // `formulab64` when supported, even if the current URL hasn't upgraded yet.
   await writeFormulaToSearchParams(params, formulaTextarea?.value || '');
 
+  // Finger constants can change while URL updates are suppressed (e.g. during
+  // animations). Build the share URL from the latest in-memory finger values
+  // rather than relying on `window.location.search`.
+  const fingerLabels = activeFingerState?.allSlots?.length
+    ? activeFingerState.allSlots
+    : Array.from(knownFingerLabels);
+  if (activeFingerState?.activeLabelSet?.size) {
+    for (const label of knownFingerLabels) {
+      if (!activeFingerState.activeLabelSet.has(label)) {
+        params.delete(label);
+      }
+    }
+  }
+  for (const label of fingerLabels) {
+    if (!isFingerLabel(label)) {
+      continue;
+    }
+    ensureFingerState(label);
+    const latest = latestOffsets[label] ?? reflexCore?.getFingerValue(label) ?? defaultFingerOffset(label);
+    const serialized = formatComplexForQuery(latest.x, latest.y);
+    if (serialized) {
+      params.set(label, serialized);
+    } else {
+      params.delete(label);
+    }
+  }
+
   url.search = params.toString();
   return url.toString();
 }
