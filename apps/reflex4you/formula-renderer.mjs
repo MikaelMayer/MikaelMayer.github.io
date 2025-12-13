@@ -114,20 +114,8 @@ function wrapParens(content) {
   return joinInline([span('rf-paren', '('), content, span('rf-paren', ')')]);
 }
 
-function br(className = null) {
-  const el = document.createElement('br');
-  if (className) {
-    el.className = className;
-  }
-  return el;
-}
-
 function maybeWrap(node, rendered, parentPrec, side, opKind) {
   const childPrec = precedence(node);
-  if (node && typeof node === 'object' && node.kind === 'SetBinding') {
-    // Prefer "let-style" display without extra parentheses.
-    return rendered;
-  }
   if (childPrec < parentPrec) {
     return wrapParens(rendered);
   }
@@ -351,7 +339,7 @@ function renderNode(node, parentPrec = 0, options = {}) {
         renderNode(node.value, 0, options),
         ' ',
         kwIn,
-        br('rf-br'),
+        ' ',
         renderNode(node.body, 0, options),
       ]);
     }
