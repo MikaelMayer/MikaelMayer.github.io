@@ -179,6 +179,65 @@ test('opens the burger menu dropdown when clicked', async ({ page }) => {
   await expect(dropdown).toBeVisible();
 });
 
+test('menu can copy a share link for the current reflex', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async (text) => {
+          window.__copiedText = String(text);
+        },
+      },
+    });
+  });
+
+  await page.goto('/index.html');
+  await waitForReflexReady(page);
+
+  const textarea = page.locator('#formula');
+  await expect(textarea).toBeVisible();
+  await textarea.fill(SIMPLE_FORMULA);
+  await expectNoRendererError(page);
+
+  await page.click('#menu-button');
+  await page.click('[data-menu-action="copy-share-link"]');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__copiedText || null);
+  }).not.toBeNull();
+
+  const params = await page.evaluate(() => {
+    const url = new URL(window.__copiedText);
+    return {
+      base64: url.searchParams.get('formulab64'),
+      legacy: url.searchParams.get('formula'),
+      edit: url.searchParams.get('edit'),
+    };
+  });
+
+  expect(params.edit).toBeNull();
+  if (params.base64) {
+    expect(decodeFormulab64(params.base64)).toBe(SIMPLE_FORMULA);
+  } else {
+    expect(params.legacy).toBe(SIMPLE_FORMULA);
+  }
+});
+
+test('pwa relaunch restores last reflex when opened without query string', async ({ page }) => {
+  await page.goto('/index.html');
+  await waitForReflexReady(page);
+
+  const textarea = page.locator('#formula');
+  await expect(textarea).toBeVisible();
+  await textarea.fill(SIMPLE_FORMULA);
+  await expectNoRendererError(page);
+
+  // Simulate a PWA relaunch that goes to the bare start_url without query params.
+  await page.goto('/index.html');
+  await waitForReflexReady(page);
+  await expect(page.locator('#formula')).toHaveValue(SIMPLE_FORMULA);
+});
+
 test('re-runs parse/desugar pipeline when D1 changes for $$ repeat counts', async ({ page }) => {
   await page.goto('/index.html');
   await waitForReflexReady(page);
