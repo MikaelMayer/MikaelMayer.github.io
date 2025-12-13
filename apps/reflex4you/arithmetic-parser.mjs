@@ -79,6 +79,37 @@ function withSyntax(node, syntaxLabel) {
   return node;
 }
 
+function createConstNode(re, im, span) {
+  if (!span) {
+    return Const(re, im);
+  }
+  return withSpan(Const(re, im), span);
+}
+
+function createSqrtExpression(valueNode, branchNode = null, spanOverride = null) {
+  const primarySpan = spanOverride || valueNode?.span || branchNode?.span;
+  const lnSpan = valueNode?.span || primarySpan;
+  const lnNode = lnSpan ? withSpan(Ln(valueNode, branchNode), lnSpan) : Ln(valueNode, branchNode);
+  if (!primarySpan) {
+    return Exp(Mul(Const(0.5, 0), lnNode));
+  }
+  const halfConst = createConstNode(0.5, 0, primarySpan);
+  const mulNode = withSpan(Mul(halfConst, lnNode), primarySpan);
+  return withSpan(Exp(mulNode), primarySpan);
+}
+
+function createHeavExpression(valueNode, spanOverride = null) {
+  const primarySpan = spanOverride || valueNode?.span;
+  const zeroForComparison = createConstNode(0, 0, primarySpan);
+  const oneConst = createConstNode(1, 0, primarySpan);
+  const zeroConst = createConstNode(0, 0, primarySpan);
+  if (!primarySpan) {
+    return If(GreaterThan(valueNode, Const(0, 0)), Const(1, 0), Const(0, 0));
+  }
+  const comparison = withSpan(GreaterThan(valueNode, zeroForComparison), primarySpan);
+  return withSpan(If(comparison, oneConst, zeroConst), primarySpan);
+}
+
 const BUILTIN_FUNCTION_DEFINITIONS = [
   { name: 'exp', factory: Exp },
   { name: 'sin', factory: Sin },
@@ -91,10 +122,12 @@ const BUILTIN_FUNCTION_DEFINITIONS = [
   { name: 'acos', factory: Acos },
   { name: 'arccos', factory: Acos },
   { name: 'ln', factory: (value) => Ln(value, null) },
+  { name: 'sqrt', factory: (value) => createSqrtExpression(value, null) },
   { name: 'abs', factory: Abs },
   { name: 'abs2', factory: Abs2 },
   { name: 'conj', factory: Conjugate },
   { name: 'floor', factory: Floor },
+  { name: 'heav', factory: (value) => createHeavExpression(value) },
 ];
 
 function createBuiltinFunctionLiteral(name, factory, span) {
@@ -228,10 +261,12 @@ const RESERVED_BINDING_NAMES = new Set([
   'arccos',
   'arctan',
   'ln',
+  'sqrt',
   'abs',
   'abs2',
   'floor',
   'conj',
+  'heav',
   'oo',
   'comp',
   'o',
@@ -503,6 +538,45 @@ const lnParser = createParser('LnCall', (input) => {
   });
 });
 
+const sqrtParser = createParser('SqrtCall', (input) => {
+  const keyword = keywordLiteral('sqrt', { ctor: 'sqrtKeyword' }).runNormalized(input);
+  if (!keyword.ok) {
+    return keyword;
+  }
+  const open = wsLiteral('(', { ctor: 'sqrtOpen' }).runNormalized(keyword.next);
+  if (!open.ok) {
+    return open;
+  }
+  const valueResult = expressionRef.runNormalized(open.next);
+  if (!valueResult.ok) {
+    return valueResult;
+  }
+  let cursor = valueResult.next;
+  let branchNode = null;
+  const comma = wsLiteral(',', { ctor: 'sqrtComma' }).runNormalized(cursor);
+  if (comma.ok) {
+    const branchResult = expressionRef.runNormalized(comma.next);
+    if (!branchResult.ok) {
+      return branchResult;
+    }
+    branchNode = branchResult.value;
+    cursor = branchResult.next;
+  } else if (comma.severity === ParseSeverity.error) {
+    return comma;
+  }
+  const close = wsLiteral(')', { ctor: 'sqrtClose' }).runNormalized(cursor);
+  if (!close.ok) {
+    return close;
+  }
+  const span = spanBetween(input, close.next);
+  return new ParseSuccess({
+    ctor: 'SqrtCall',
+    value: createSqrtExpression(valueResult.value, branchNode, span),
+    span,
+    next: close.next,
+  });
+});
+
 const elementaryFunctionParser = Choice([
   ...createUnaryFunctionParsers(['exp'], Exp),
   ...createUnaryFunctionParsers(['sin'], Sin),
@@ -512,10 +586,12 @@ const elementaryFunctionParser = Choice([
   ...createUnaryFunctionParsers(['asin', 'arcsin'], Asin),
   ...createUnaryFunctionParsers(['acos', 'arccos'], Acos),
   lnParser,
+  sqrtParser,
   ...createUnaryFunctionParsers(['abs'], Abs),
   ...createUnaryFunctionParsers(['abs2'], Abs2),
   ...createUnaryFunctionParsers(['floor'], Floor),
   ...createUnaryFunctionParsers(['conj'], Conjugate),
+  ...createUnaryFunctionParsers(['heav'], (value) => createHeavExpression(value)),
 ], { ctor: 'ElementaryFunction' });
 
 const builtinFunctionLiteralParser = Choice(
@@ -2232,7 +2308,7 @@ const repeatSuffixParser = createParser('RepeatSuffix', (input) => {
   if (!opResult.ok) {
     return opResult;
   }
-  const countResult = unaryParser.runNormalized(opResult.next);
+  const countResult = additiveParser.runNormalized(opResult.next);
   if (!countResult.ok) {
     return countResult;
   }
