@@ -1107,6 +1107,34 @@ vec3 reflexColor(vec2 w) {
     return vec3(1.0);
   }
 
+  // Some GPUs/driver combos can underflow tiny denominators to 0.0 in the
+  // "negative real axis" case (im == 0 and re < 0), which can then trigger a
+  // division-by-zero path and produce NaNs in the final color. Short-circuit
+  // strictly negative reals so no denominator-based formula is evaluated.
+  if (im == 0.0 && re < 0.0) {
+    float r = 0.0;
+    float g = 190.0;
+    float b = 190.0;
+
+    float luminosite = 240.0 * m / (m + 1.0);
+    luminosite = clamp(luminosite, 0.0, 240.0);
+
+    if (luminosite <= 120.0) {
+      float scale = luminosite / 120.0;
+      r *= scale;
+      g *= scale;
+      b *= scale;
+    } else {
+      float k1 = 2.0 - luminosite / 120.0;
+      float k2 = luminosite / 120.0 - 1.0;
+      r = r * k1 + 255.0 * k2;
+      g = g * k1 + 255.0 * k2;
+      b = b * k1 + 255.0 * k2;
+    }
+
+    return vec3(r / 255.0, g / 255.0, b / 255.0);
+  }
+
   float r = 0.0;
   float g = 0.0;
   float b = 0.0;
@@ -1116,14 +1144,9 @@ vec3 reflexColor(vec2 w) {
   float i2   = im * im;
   float den  = max(rpm2 + i2, COLOR_MIN_DEN);
 
-  if (im == 0.0 && re <= 0.0) {
-    g = 190.0;
-    b = 190.0;
-  } else {
-    r = 255.0 * (1.0 - i2 / den);
-    g = 255.0 * (0.25 + 0.5 * im * (SQ3 * rpm + im) / den);
-    b = 255.0 * (0.25 - 0.5 * im * (SQ3 * rpm - im) / den);
-  }
+  r = 255.0 * (1.0 - i2 / den);
+  g = 255.0 * (0.25 + 0.5 * im * (SQ3 * rpm + im) / den);
+  b = 255.0 * (0.25 - 0.5 * im * (SQ3 * rpm - im) / den);
 
   float luminosite = 240.0 * m / (m + 1.0);
   luminosite = clamp(luminosite, 0.0, 240.0);

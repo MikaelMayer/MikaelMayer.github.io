@@ -73,6 +73,8 @@ test('fragment generator embeds node functions and top entry', () => {
   assert.match(fragment, /vec2 node\d+\(vec2 z\)/);
   assert.match(fragment, /vec2 f\(vec2 z\)/);
   assert.match(fragment, /return node\d+\(z\);/);
+  // Guard against rare GPU/driver divide-by-zero on strictly negative reals.
+  assert.match(fragment, /if\s*\(im == 0\.0 && re < 0\.0\)/);
 });
 
 test('Pow nodes emit exponentiation by squaring and allow negatives', () => {
