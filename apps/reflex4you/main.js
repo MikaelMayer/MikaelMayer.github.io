@@ -1,6 +1,7 @@
 import {
   ReflexCore,
   createDefaultFormulaAST,
+  FINGER_DECIMAL_PLACES,
 } from './core-engine.mjs';
 import { visitAst } from './ast-utils.mjs';
 import { parseFormulaInput } from './arithmetic-parser.mjs';
@@ -140,18 +141,33 @@ function applyFingerValuesFromQuery(labels) {
     return;
   }
   suppressFingerQueryUpdates = true;
+  const params = new URLSearchParams(window.location.search);
+  let normalizedQuery = false;
   try {
     (labels || []).forEach((label) => {
       if (!isFingerLabel(label)) {
         return;
       }
-      const parsed = readFingerFromQuery(label);
+      const raw = params.get(label);
+      const parsed = parseComplexString(raw);
       if (parsed) {
         reflexCore.setFingerValue(label, parsed.x, parsed.y, { triggerRender: false });
+        // Normalize URL values to the same quantized representation used internally,
+        // so reloads remain deterministic and GPU uniforms match the URL display.
+        const stored = reflexCore.getFingerValue(label);
+        const normalized = formatComplexForQuery(stored.x, stored.y);
+        if (normalized && normalized !== raw) {
+          params.set(label, normalized);
+          fingerLastSerialized[label] = normalized;
+          normalizedQuery = true;
+        }
       }
     });
   } finally {
     suppressFingerQueryUpdates = false;
+  }
+  if (normalizedQuery) {
+    replaceUrlSearch(params);
   }
   reflexCore.render();
 }
@@ -264,20 +280,22 @@ function scheduleFingerDrivenReparse() {
   });
 }
 
-function roundToThreeDecimals(value) {
+const FINGER_DECIMAL_FACTOR = 10 ** FINGER_DECIMAL_PLACES;
+
+function roundToFingerPrecision(value) {
   if (!Number.isFinite(value)) {
     return NaN;
   }
-  const rounded = Math.round(value * 1000) / 1000;
+  const rounded = Math.round(value * FINGER_DECIMAL_FACTOR) / FINGER_DECIMAL_FACTOR;
   return Object.is(rounded, -0) ? 0 : rounded;
 }
 
 function formatNumberForDisplay(value) {
-  const rounded = roundToThreeDecimals(value);
+  const rounded = roundToFingerPrecision(value);
   if (!Number.isFinite(rounded)) {
     return '?';
   }
-  return rounded.toFixed(3).replace(/\.?0+$/, '');
+  return rounded.toFixed(FINGER_DECIMAL_PLACES).replace(/\.?0+$/, '');
 }
 
 function formatComplexForDisplay(label, re, im) {
