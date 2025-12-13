@@ -2486,14 +2486,14 @@ const additiveOperators = Choice([
 
 const composeOperator = wsLiteral('$', { ctor: 'ComposeOp' }).Map(() => (left, right) => Compose(left, right));
 
-const multiplicativeParser = leftAssociative(powerParser, multiplicativeOperators, 'MulDiv');
-const additiveParser = leftAssociative(multiplicativeParser, additiveOperators, 'AddSub');
+// `$$` binds tighter than `*` and `+`, but looser than power `^`.
+// The RHS is parsed as a unary/dot expression, so `D1.x.abs.floor` is atomic.
 const repeatSuffixParser = createParser('RepeatSuffix', (input) => {
   const opResult = wsLiteral('$$', { ctor: 'RepeatOp' }).runNormalized(input);
   if (!opResult.ok) {
     return opResult;
   }
-  const countResult = additiveParser.runNormalized(opResult.next);
+  const countResult = unaryParser.runNormalized(opResult.next);
   if (!countResult.ok) {
     return countResult;
   }
@@ -2505,8 +2505,8 @@ const repeatSuffixParser = createParser('RepeatSuffix', (input) => {
   });
 });
 
-const repeatComposeParser = createParser('RepeatCompose', (input) => {
-  const head = additiveParser.runNormalized(input);
+const repeatableParser = createParser('Repeatable', (input) => {
+  const head = powerParser.runNormalized(input);
   if (!head.ok) {
     return head;
   }
@@ -2529,14 +2529,17 @@ const repeatComposeParser = createParser('RepeatCompose', (input) => {
   }
   const span = spanBetween(input, cursor);
   return new ParseSuccess({
-    ctor: 'RepeatCompose',
+    ctor: 'Repeatable',
     value: node,
     span,
     next: cursor,
   });
 });
 
-const compositionChainParser = leftAssociative(repeatComposeParser, composeOperator, 'Composition');
+const multiplicativeParser = leftAssociative(repeatableParser, multiplicativeOperators, 'MulDiv');
+const additiveParser = leftAssociative(multiplicativeParser, additiveOperators, 'AddSub');
+
+const compositionChainParser = leftAssociative(additiveParser, composeOperator, 'Composition');
 
 const comparisonOperatorParser = Choice([
   wsLiteral('<=', { ctor: 'LessThanOrEqualOp' }).Map(
