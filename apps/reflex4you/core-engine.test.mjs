@@ -98,6 +98,18 @@ test('dynamic fingers read from the dynamic offset array', () => {
   assert.match(fragment, /return u_dynamicOffsets\[0\];/);
 });
 
+test('supports sparse high-index finger uniforms', () => {
+  const fixedAst = FingerOffset('F7');
+  const fixedFragment = buildFragmentSourceFromAST(fixedAst);
+  assert.match(fixedFragment, /uniform vec2 u_fixedOffsets\[7\]/);
+  assert.match(fixedFragment, /return u_fixedOffsets\[6\];/);
+
+  const dynamicAst = FingerOffset('D12');
+  const dynamicFragment = buildFragmentSourceFromAST(dynamicAst);
+  assert.match(dynamicFragment, /uniform vec2 u_dynamicOffsets\[12\]/);
+  assert.match(dynamicFragment, /return u_dynamicOffsets\[11\];/);
+});
+
 test('W fingers read from the W offset array', () => {
   const ast = FingerOffset('W2');
   const fragment = buildFragmentSourceFromAST(ast);

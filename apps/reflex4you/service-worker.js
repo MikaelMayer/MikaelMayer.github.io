@@ -1,5 +1,5 @@
 // apps/reflex4you/service-worker.js
-const CACHE_NAME = 'reflex4you-cache-v3';
+const CACHE_NAME = 'reflex4you-cache-v4';
 
 const ASSETS_TO_CACHE = [
   './',
