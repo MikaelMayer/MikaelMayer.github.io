@@ -253,21 +253,9 @@ test('$$ accepts parenthesized expressions with constant propagation', () => {
 test('$$ accepts bare additive expressions on the right-hand side', () => {
   const result = parseFormulaInput('z $$ 2 + 3');
   assert.equal(result.ok, true);
-  assert.equal(result.value.kind, 'Compose');
-  const stack = [result.value];
-  let varCount = 0;
-  while (stack.length) {
-    const node = stack.pop();
-    if (!node || typeof node !== 'object') {
-      continue;
-    }
-    if (node.kind === 'Compose') {
-      stack.push(node.f, node.g);
-    } else if (node.kind === 'Var') {
-      varCount += 1;
-    }
-  }
-  assert.equal(varCount, 5);
+  assert.equal(result.value.kind, 'ComposeMultiple');
+  assert.equal(result.value.resolvedCount, 5);
+  assert.equal(result.value.base.kind, 'Var');
 });
 
 test('$$ can derive counts from finger values', () => {
