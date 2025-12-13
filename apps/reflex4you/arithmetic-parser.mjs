@@ -934,6 +934,12 @@ function substitutePlaceholder(node, placeholder, replacement) {
     case 'Identifier':
     case 'SetRef':
       return cloneAst(node);
+    case 'LetBinding':
+      return {
+        ...node,
+        value: substitutePlaceholder(node.value, placeholder, replacement),
+        body: substitutePlaceholder(node.body, placeholder, replacement),
+      };
     case 'Pow':
       return { ...node, base: substitutePlaceholder(node.base, placeholder, replacement) };
     case 'Exp':
@@ -1023,6 +1029,12 @@ function cloneAst(node) {
     case 'Identifier':
     case 'SetRef':
       return { ...node };
+    case 'LetBinding':
+      return {
+        ...node,
+        value: cloneAst(node.value),
+        body: cloneAst(node.body),
+      };
     case 'SetBinding':
       return {
         ...node,
@@ -1115,6 +1127,18 @@ function substituteIdentifierWithClone(node, targetName, replacement) {
     case 'PlaceholderVar':
     case 'SetRef':
       return cloneAst(node);
+    case 'LetBinding': {
+      const nextValue = substituteIdentifierWithClone(node.value, targetName, replacement);
+      const nextBody =
+        node.name === targetName
+          ? cloneAst(node.body)
+          : substituteIdentifierWithClone(node.body, targetName, replacement);
+      return {
+        ...node,
+        value: nextValue,
+        body: nextBody,
+      };
+    }
     case 'Pow':
       return { ...node, base: substituteIdentifierWithClone(node.base, targetName, replacement) };
     case 'Exp':

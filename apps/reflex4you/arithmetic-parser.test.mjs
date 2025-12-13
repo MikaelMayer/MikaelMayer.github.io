@@ -497,6 +497,14 @@ test('nested let bindings are rejected', () => {
   assert.match(result.message, /top level/i);
 });
 
+test('top-level let can be followed by another let (sequential lets)', () => {
+  const source = `let zeroline = heav $ 0.05-z $ abs in
+let f = y - 3*sin(3*x) in
+zeroline $ f`;
+  const result = parseFormulaInput(source);
+  assert.equal(result.ok, true);
+});
+
 test('parseFormulaToAST throws on invalid formula', () => {
   assert.throws(() => parseFormulaToAST('('), {
     name: 'SyntaxError',
