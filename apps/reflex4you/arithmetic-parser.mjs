@@ -1652,25 +1652,11 @@ function validateRepeatCountExpressionAst(node, span, input) {
       }
     }
 
-    // Parentheses rule: anything non-atomic must be parenthesized.
-    if (!parenthesized) {
-      if (
-        current.kind === 'Add' ||
-        current.kind === 'Sub' ||
-        current.kind === 'Mul' ||
-        current.kind === 'Div' ||
-        current.kind === 'Pow'
-      ) {
-        return new ParseFailure({
-          ctor: 'RepeatCount',
-          message: 'Repeat count must be atomic; wrap arithmetic in parentheses (e.g. $$ (2 + 3))',
-          severity: ParseSeverity.error,
-          expected: 'atomic repeat count',
-          span,
-          input: span.input || input,
-        });
-      }
-    }
+    // Note: The repeat-count grammar itself is enforced at parse time by parsing
+    // the RHS of `$$` as a unary/dot expression. That naturally makes it
+    // "atomic" unless explicitly parenthesized (e.g. `(2 + 3)`), while still
+    // allowing expressions like `(10 * D1.x).floor` where arithmetic lives
+    // under parentheses and a dot-chain wraps it.
 
     // Disallow bindings / identifiers / conditionals inside the count.
     if (
