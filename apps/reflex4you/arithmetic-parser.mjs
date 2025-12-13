@@ -90,12 +90,20 @@ function createSqrtExpression(valueNode, branchNode = null, spanOverride = null)
   const primarySpan = spanOverride || valueNode?.span || branchNode?.span;
   const lnSpan = valueNode?.span || primarySpan;
   const lnNode = lnSpan ? withSpan(Ln(valueNode, branchNode), lnSpan) : Ln(valueNode, branchNode);
+  const syntheticCall = {
+    name: 'sqrt',
+    args: branchNode ? [valueNode, branchNode] : [valueNode],
+  };
   if (!primarySpan) {
-    return Exp(Mul(Const(0.5, 0), lnNode));
+    const node = Exp(Mul(Const(0.5, 0), lnNode));
+    node.__syntheticCall = syntheticCall;
+    return node;
   }
   const halfConst = createConstNode(0.5, 0, primarySpan);
   const mulNode = withSpan(Mul(halfConst, lnNode), primarySpan);
-  return withSpan(Exp(mulNode), primarySpan);
+  const node = withSpan(Exp(mulNode), primarySpan);
+  node.__syntheticCall = syntheticCall;
+  return node;
 }
 
 function createHeavExpression(valueNode, spanOverride = null) {
@@ -103,11 +111,16 @@ function createHeavExpression(valueNode, spanOverride = null) {
   const zeroForComparison = createConstNode(0, 0, primarySpan);
   const oneConst = createConstNode(1, 0, primarySpan);
   const zeroConst = createConstNode(0, 0, primarySpan);
+  const syntheticCall = { name: 'heav', args: [valueNode] };
   if (!primarySpan) {
-    return If(GreaterThan(valueNode, Const(0, 0)), Const(1, 0), Const(0, 0));
+    const node = If(GreaterThan(valueNode, Const(0, 0)), Const(1, 0), Const(0, 0));
+    node.__syntheticCall = syntheticCall;
+    return node;
   }
   const comparison = withSpan(GreaterThan(valueNode, zeroForComparison), primarySpan);
-  return withSpan(If(comparison, oneConst, zeroConst), primarySpan);
+  const node = withSpan(If(comparison, oneConst, zeroConst), primarySpan);
+  node.__syntheticCall = syntheticCall;
+  return node;
 }
 
 const BUILTIN_FUNCTION_DEFINITIONS = [

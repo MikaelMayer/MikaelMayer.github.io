@@ -131,6 +131,49 @@ function renderFunctionCall(name, arg, options) {
   return joinInline([nameEl, span('rf-paren', '('), argEl, span('rf-paren', ')')]);
 }
 
+function renderFunctionCallWithArgs(name, args, options) {
+  const nameEl = span('rf-fn', name);
+  const renderedArgs = (args || []).map((arg) => renderNode(arg, 0, options));
+  const parts = [nameEl, span('rf-paren', '(')];
+  renderedArgs.forEach((argEl, idx) => {
+    if (idx > 0) {
+      parts.push(span('rf-op', ', '));
+    }
+    parts.push(argEl);
+  });
+  parts.push(span('rf-paren', ')'));
+  return joinInline(parts);
+}
+
+function renderSqrtCall(args, options) {
+  const valueNode = args?.[0];
+  const branchNode = args?.[1] ?? null;
+  const valueRendered = valueNode ? renderNode(valueNode, 0, options) : span('rf-atom', '?');
+  const radicand = valueNode && needsParens(valueNode) ? wrapParens(valueRendered) : valueRendered;
+
+  const sqrtEl = document.createElement('span');
+  sqrtEl.className = 'rf-sqrt';
+
+  const symbol = document.createElement('span');
+  symbol.className = 'rf-sqrt-symbol';
+  symbol.textContent = '√';
+
+  if (branchNode) {
+    const idx = document.createElement('span');
+    idx.className = 'rf-sqrt-index';
+    idx.appendChild(renderNode(branchNode, 0, options));
+    symbol.appendChild(idx);
+  }
+
+  const rad = document.createElement('span');
+  rad.className = 'rf-sqrt-radicand';
+  rad.appendChild(radicand);
+
+  sqrtEl.appendChild(symbol);
+  sqrtEl.appendChild(rad);
+  return sqrtEl;
+}
+
 function fingerLabelToPretty(slot) {
   const family = slot?.[0] ?? '';
   const idx = slot?.slice(1) ?? '';
@@ -141,6 +184,14 @@ function fingerLabelToPretty(slot) {
 function renderNode(node, parentPrec = 0, options = {}) {
   if (!node || typeof node !== 'object') {
     return span('rf-atom', '?');
+  }
+
+  if (node.__syntheticCall && typeof node.__syntheticCall.name === 'string') {
+    const call = node.__syntheticCall;
+    if (call.name === 'sqrt') {
+      return renderSqrtCall(call.args, options);
+    }
+    return renderFunctionCallWithArgs(call.name, call.args, options);
   }
 
   switch (node.kind) {

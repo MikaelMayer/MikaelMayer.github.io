@@ -53,6 +53,20 @@ const SEEDED_FORMULA = 'z + 2';
 const DYNAMIC_SET_FORMULA = 'set c = sin(z $ D1) in (1 - c + c * z) / (c + (1 - c) * z)';
 const FIXED_SET_FORMULA = 'set c = sin(z + F1) in (z - c) * (z + c)';
 
+test('formula page renders sqrt(...) as sqrt (not exp/ln desugaring)', async ({ page }) => {
+  await page.goto(`/formula.html?formula=${encodeURIComponent('sqrt(z)')}`);
+  const render = page.locator('#formula-render');
+  await expect(render).toBeVisible();
+  await expect(render).toContainText('√');
+});
+
+test('formula page renders heav(...) as a function name', async ({ page }) => {
+  await page.goto(`/formula.html?formula=${encodeURIComponent('heav(z)')}`);
+  const render = page.locator('#formula-render');
+  await expect(render).toBeVisible();
+  await expect(render).toContainText('heav');
+});
+
 test('reflex4you updates formula query param after successful apply', async ({ page }) => {
   await page.goto('/index.html');
   await waitForReflexReady(page);
