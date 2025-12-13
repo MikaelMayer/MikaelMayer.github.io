@@ -57,7 +57,7 @@ test('formula page renders sqrt(...) as sqrt (not exp/ln desugaring)', async ({ 
   await page.goto(`/formula.html?formula=${encodeURIComponent('sqrt(z)')}`);
   const render = page.locator('#formula-render');
   await expect(render).toBeVisible();
-  await expect(render).toContainText('sqrt');
+  await expect(render).toContainText('√');
 });
 
 test('formula page renders heav(...) as a function name', async ({ page }) => {
