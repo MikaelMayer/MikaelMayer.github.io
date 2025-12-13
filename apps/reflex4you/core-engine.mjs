@@ -433,7 +433,7 @@ const FINGER_SWITCH_PIXEL_THRESHOLD = 6;
 // Finger values are serialized into the URL (and displayed) at a fixed decimal
 // precision. Keep the internal state quantized to the same representation so
 // that reloads are deterministic and GPU uniforms always match the URL display.
-const FINGER_DECIMAL_PLACES = 4;
+export const FINGER_DECIMAL_PLACES = 4;
 const FINGER_DECIMAL_FACTOR = 10 ** FINGER_DECIMAL_PLACES;
 
 function roundFingerComponent(value) {

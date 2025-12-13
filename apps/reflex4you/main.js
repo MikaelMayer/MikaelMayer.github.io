@@ -1,6 +1,7 @@
 import {
   ReflexCore,
   createDefaultFormulaAST,
+  FINGER_DECIMAL_PLACES,
 } from './core-engine.mjs';
 import { visitAst } from './ast-utils.mjs';
 import { parseFormulaInput } from './arithmetic-parser.mjs';
@@ -279,7 +280,6 @@ function scheduleFingerDrivenReparse() {
   });
 }
 
-const FINGER_DECIMAL_PLACES = 4;
 const FINGER_DECIMAL_FACTOR = 10 ** FINGER_DECIMAL_PLACES;
 
 function roundToFingerPrecision(value) {
