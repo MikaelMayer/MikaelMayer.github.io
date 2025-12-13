@@ -1579,173 +1579,6 @@ function normalizeComplexInput(value) {
 
 const REPEAT_COUNT_TOLERANCE = 1e-9;
 
-function spanLooksParenthesized(span) {
-  if (!span || typeof span.text !== 'function') {
-    return false;
-  }
-  const raw = span.text();
-  if (typeof raw !== 'string') {
-    return false;
-  }
-  const trimmed = raw.trim();
-  return trimmed.startsWith('(') && trimmed.endsWith(')');
-}
-
-function validateRepeatCountExpressionAst(node, span, input) {
-  if (!node || typeof node !== 'object') {
-    return new ParseFailure({
-      ctor: 'RepeatCount',
-      message: 'Repeat count must be an expression',
-      severity: ParseSeverity.error,
-      expected: 'repeat count expression',
-      span,
-      input: span.input || input,
-    });
-  }
-
-  const parenthesized = spanLooksParenthesized(span);
-
-  const stack = [node];
-  while (stack.length) {
-    const current = stack.pop();
-    if (!current || typeof current !== 'object') {
-      continue;
-    }
-
-    // Disallow any composition constructs inside the repeat count.
-    if (current.kind === 'ComposeMultiple' || current.kind === 'RepeatComposePlaceholder') {
-      return new ParseFailure({
-        ctor: 'RepeatCount',
-        message: 'Repeat count cannot itself contain $$ composition',
-        severity: ParseSeverity.error,
-        expected: 'non-repeating count expression',
-        span,
-        input: span.input || input,
-      });
-    }
-
-    if (current.kind === 'Compose') {
-      // Compose nodes also arise from dot syntax. Reject only if the source span
-      // indicates the `$` operator or explicit o(...) / oo(...).
-      const text = current.span?.text?.();
-      if (typeof text === 'string') {
-        if (text.includes('$')) {
-          return new ParseFailure({
-            ctor: 'RepeatCount',
-            message: 'Repeat count cannot contain the $ composition operator',
-            severity: ParseSeverity.error,
-            expected: 'arithmetic count expression',
-            span,
-            input: span.input || input,
-          });
-        }
-        if (/\boo\s*\(|\bo\s*\(/.test(text)) {
-          return new ParseFailure({
-            ctor: 'RepeatCount',
-            message: 'Repeat count cannot contain explicit composition (o/oo)',
-            severity: ParseSeverity.error,
-            expected: 'arithmetic count expression',
-            span,
-            input: span.input || input,
-          });
-        }
-      }
-    }
-
-    // Note: The repeat-count grammar itself is enforced at parse time by parsing
-    // the RHS of `$$` as a unary/dot expression. That naturally makes it
-    // "atomic" unless explicitly parenthesized (e.g. `(2 + 3)`), while still
-    // allowing expressions like `(10 * D1.x).floor` where arithmetic lives
-    // under parentheses and a dot-chain wraps it.
-
-    // Disallow bindings / identifiers / conditionals inside the count.
-    if (
-      current.kind === 'SetBinding' ||
-      current.kind === 'LetBinding' ||
-      current.kind === 'Identifier' ||
-      current.kind === 'SetRef' ||
-      current.kind === 'If' ||
-      current.kind === 'LessThan' ||
-      current.kind === 'GreaterThan' ||
-      current.kind === 'LessThanOrEqual' ||
-      current.kind === 'GreaterThanOrEqual' ||
-      current.kind === 'Equal' ||
-      current.kind === 'LogicalAnd' ||
-      current.kind === 'LogicalOr' ||
-      current.kind === 'PlaceholderVar'
-    ) {
-      return new ParseFailure({
-        ctor: 'RepeatCount',
-        message: 'Repeat count must be a constant arithmetic expression',
-        severity: ParseSeverity.error,
-        expected: 'constant arithmetic expression',
-        span,
-        input: span.input || input,
-      });
-    }
-
-    // Traverse children.
-    switch (current.kind) {
-      case 'Const':
-      case 'Var':
-      case 'VarX':
-      case 'VarY':
-      case 'FingerOffset':
-        break;
-      case 'Pow':
-        stack.push(current.base);
-        break;
-      case 'Exp':
-      case 'Sin':
-      case 'Cos':
-      case 'Tan':
-      case 'Atan':
-      case 'Asin':
-      case 'Acos':
-      case 'Abs':
-      case 'Abs2':
-      case 'Floor':
-      case 'Conjugate':
-        stack.push(current.value);
-        break;
-      case 'Ln':
-        stack.push(current.value);
-        if (current.branch) {
-          stack.push(current.branch);
-        }
-        break;
-      case 'Add':
-      case 'Sub':
-      case 'Mul':
-      case 'Div':
-      case 'LessThan':
-      case 'GreaterThan':
-      case 'LessThanOrEqual':
-      case 'GreaterThanOrEqual':
-      case 'Equal':
-      case 'LogicalAnd':
-      case 'LogicalOr':
-        stack.push(current.left, current.right);
-        break;
-      case 'Compose':
-        stack.push(current.f, current.g);
-        break;
-      default:
-        // Unknown kinds are rejected to keep the repeat-count grammar strict.
-        return new ParseFailure({
-          ctor: 'RepeatCount',
-          message: `Repeat count contains unsupported expression kind "${current.kind}"`,
-          severity: ParseSeverity.error,
-          expected: 'supported arithmetic count expression',
-          span,
-          input: span.input || input,
-        });
-    }
-  }
-
-  return null;
-}
-
 function resolveRepeatPlaceholders(ast, parseOptions, input) {
   const context = {
     fingerValues: parseOptions.fingerValues,
@@ -1772,10 +1605,6 @@ function resolveRepeatPlaceholders(ast, parseOptions, input) {
           node.countSpan ||
           node.span ||
           (parent?.span ?? input.createSpan(0, 0));
-        const structuralError = validateRepeatCountExpressionAst(node.countExpression, span, input);
-        if (structuralError instanceof ParseFailure) {
-          return structuralError;
-        }
         const count = evaluateRepeatCountExpression(node.countExpression, span, context, input);
         if (count instanceof ParseFailure) {
           return count;
@@ -2472,14 +2301,14 @@ const additiveOperators = Choice([
 
 const composeOperator = wsLiteral('$', { ctor: 'ComposeOp' }).Map(() => (left, right) => Compose(left, right));
 
-// `$$` binds tighter than `*` and `+`, but looser than power `^`.
-// The RHS is parsed as a unary/dot expression, so `D1.x.abs.floor` is atomic.
+const multiplicativeParser = leftAssociative(powerParser, multiplicativeOperators, 'MulDiv');
+const additiveParser = leftAssociative(multiplicativeParser, additiveOperators, 'AddSub');
 const repeatSuffixParser = createParser('RepeatSuffix', (input) => {
   const opResult = wsLiteral('$$', { ctor: 'RepeatOp' }).runNormalized(input);
   if (!opResult.ok) {
     return opResult;
   }
-  const countResult = unaryParser.runNormalized(opResult.next);
+  const countResult = additiveParser.runNormalized(opResult.next);
   if (!countResult.ok) {
     return countResult;
   }
@@ -2491,8 +2320,8 @@ const repeatSuffixParser = createParser('RepeatSuffix', (input) => {
   });
 });
 
-const repeatableParser = createParser('Repeatable', (input) => {
-  const head = powerParser.runNormalized(input);
+const repeatComposeParser = createParser('RepeatCompose', (input) => {
+  const head = additiveParser.runNormalized(input);
   if (!head.ok) {
     return head;
   }
@@ -2515,17 +2344,14 @@ const repeatableParser = createParser('Repeatable', (input) => {
   }
   const span = spanBetween(input, cursor);
   return new ParseSuccess({
-    ctor: 'Repeatable',
+    ctor: 'RepeatCompose',
     value: node,
     span,
     next: cursor,
   });
 });
 
-const multiplicativeParser = leftAssociative(repeatableParser, multiplicativeOperators, 'MulDiv');
-const additiveParser = leftAssociative(multiplicativeParser, additiveOperators, 'AddSub');
-
-const compositionChainParser = leftAssociative(additiveParser, composeOperator, 'Composition');
+const compositionChainParser = leftAssociative(repeatComposeParser, composeOperator, 'Composition');
 
 const comparisonOperatorParser = Choice([
   wsLiteral('<=', { ctor: 'LessThanOrEqualOp' }).Map(
