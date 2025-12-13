@@ -22,10 +22,37 @@ const fingerIndicatorStack = document.getElementById('finger-indicator-stack');
 const fingerOverlay = document.getElementById('finger-overlay');
 const menuButton = document.getElementById('menu-button');
 const menuDropdown = document.getElementById('menu-dropdown');
+const versionPill = document.getElementById('app-version-pill');
 const rootElement = typeof document !== 'undefined' ? document.documentElement : null;
 
 let fatalErrorActive = false;
 
+const APP_VERSION = 2;
+
+if (versionPill) {
+  versionPill.textContent = `v${APP_VERSION}`;
+  versionPill.setAttribute('data-version', String(APP_VERSION));
+}
+
+const FORMULA_PARAM = 'formula';
+const FORMULA_B64_PARAM = 'formulab64';
+const sharedTextEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
+const sharedTextDecoder = typeof TextDecoder !== 'undefined' ? new TextDecoder() : null;
+const hasSecureContext = typeof window !== 'undefined' && Boolean(window.isSecureContext);
+const compressionStreamsAvailable =
+  typeof CompressionStream === 'function' && typeof DecompressionStream === 'function' && hasSecureContext;
+let supportsCompressionStream = compressionStreamsAvailable;
+let supportsDecompressionStream = compressionStreamsAvailable;
+
+function disableCompressionStreams() {
+  if (supportsCompressionStream || supportsDecompressionStream) {
+    supportsCompressionStream = false;
+    supportsDecompressionStream = false;
+    if (typeof window !== 'undefined') {
+      window.__reflexCompressionEnabled = false;
+    }
+  }
+}
 const EDIT_PARAM = 'edit';
 const ANIMATION_TIME_PARAM = 't';
 
@@ -1252,4 +1279,14 @@ function triggerImageDownload(url, filename, shouldRevoke) {
   if (shouldRevoke) {
     URL.revokeObjectURL(url);
   }
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('./service-worker.js')
+      .catch((error) => {
+        console.warn('Reflex4You service worker registration failed.', error);
+      });
+  });
 }
