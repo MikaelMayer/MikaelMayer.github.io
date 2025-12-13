@@ -1107,11 +1107,18 @@ vec3 reflexColor(vec2 w) {
     return vec3(1.0);
   }
 
-  // Some GPUs/driver combos can underflow tiny denominators to 0.0 in the
-  // "negative real axis" case (im == 0 and re < 0), which can then trigger a
-  // division-by-zero path and produce NaNs in the final color. Short-circuit
-  // strictly negative reals so no denominator-based formula is evaluated.
-  if (im == 0.0 && re < 0.0) {
+  float rpm  = re + m;
+  float rpm2 = rpm * rpm;
+  float i2   = im * im;
+  float denRaw = rpm2 + i2;
+
+  // The only place the denominator can legitimately collapse toward 0 is on
+  // the negative real axis (re < 0, im ≈ 0) where rpm = re + |re| → 0 and i2 → 0.
+  // In some WebGL/PWA configurations (notably on mobile GPUs where precision is
+  // effectively lower), denRaw and/or COLOR_MIN_DEN can underflow to 0.0 and
+  // lead to NaNs. Detect that singular case by the denominator itself, rather
+  // than relying on exact im == 0.0 pixel alignment.
+  if (re < 0.0 && denRaw <= COLOR_MIN_DEN) {
     float r = 0.0;
     float g = 190.0;
     float b = 190.0;
@@ -1139,10 +1146,7 @@ vec3 reflexColor(vec2 w) {
   float g = 0.0;
   float b = 0.0;
 
-  float rpm  = re + m;
-  float rpm2 = rpm * rpm;
-  float i2   = im * im;
-  float den  = max(rpm2 + i2, COLOR_MIN_DEN);
+  float den  = max(denRaw, COLOR_MIN_DEN);
 
   r = 255.0 * (1.0 - i2 / den);
   g = 255.0 * (0.25 + 0.5 * im * (SQ3 * rpm + im) / den);
