@@ -23,17 +23,37 @@ export function Pow(base, exponent) {
   return { kind: "Pow", base, exponent };
 }
 
-const FIXED_FINGER_LABELS = Object.freeze(["F1", "F2", "F3"]);
-const DYNAMIC_FINGER_LABELS = Object.freeze(["D1", "D2", "D3"]);
 const W_FINGER_LABELS = Object.freeze(["W1", "W2"]);
-const ALL_FINGER_LABELS = Object.freeze([
-  ...FIXED_FINGER_LABELS,
-  ...DYNAMIC_FINGER_LABELS,
-  ...W_FINGER_LABELS,
-]);
+
+function parseFingerLabel(label) {
+  if (!label || typeof label !== "string") {
+    return null;
+  }
+  if (label === "W1") {
+    return { family: "w", index: 0 };
+  }
+  if (label === "W2") {
+    return { family: "w", index: 1 };
+  }
+  const match = /^([FD])([1-9]\d*)$/.exec(label);
+  if (!match) {
+    return null;
+  }
+  const prefix = match[1];
+  const rawIndex = Number(match[2]);
+  if (!Number.isInteger(rawIndex) || rawIndex < 1) {
+    return null;
+  }
+  const index = rawIndex - 1;
+  return {
+    family: prefix === "F" ? "fixed" : "dynamic",
+    index,
+  };
+}
 
 function validateFingerLabel(slot) {
-  if (!ALL_FINGER_LABELS.includes(slot)) {
+  const parsed = parseFingerLabel(slot);
+  if (!parsed) {
     throw new Error(`Unknown finger slot: ${slot}`);
   }
   return slot;
@@ -170,6 +190,93 @@ export function oo(f, n) {
   return node;
 }
 
+function analyzeFingerUniformCounts(ast) {
+  let maxFixed = -1;
+  let maxDynamic = -1;
+  function visit(node) {
+    if (!node || typeof node !== "object") {
+      return;
+    }
+    if (node.kind === "FingerOffset") {
+      const parsed = parseFingerLabel(node.slot);
+      if (parsed) {
+        if (parsed.family === "fixed") {
+          maxFixed = Math.max(maxFixed, parsed.index);
+        } else if (parsed.family === "dynamic") {
+          maxDynamic = Math.max(maxDynamic, parsed.index);
+        }
+      }
+      return;
+    }
+    switch (node.kind) {
+      case "Pow":
+        visit(node.base);
+        return;
+      case "Exp":
+      case "Sin":
+      case "Cos":
+      case "Tan":
+      case "Atan":
+      case "Asin":
+      case "Acos":
+      case "Abs":
+      case "Abs2":
+      case "Floor":
+      case "Conjugate":
+        visit(node.value);
+        return;
+      case "Ln":
+        visit(node.value);
+        if (node.branch) {
+          visit(node.branch);
+        }
+        return;
+      case "Sub":
+      case "Mul":
+      case "Op":
+      case "Add":
+      case "Div":
+      case "LessThan":
+      case "GreaterThan":
+      case "LessThanOrEqual":
+      case "GreaterThanOrEqual":
+      case "Equal":
+      case "LogicalAnd":
+      case "LogicalOr":
+        visit(node.left);
+        visit(node.right);
+        return;
+      case "If":
+        visit(node.condition);
+        visit(node.thenBranch);
+        visit(node.elseBranch);
+        return;
+      case "Compose":
+        visit(node.f);
+        visit(node.g);
+        return;
+      case "SetBinding":
+        visit(node.value);
+        visit(node.body);
+        return;
+      case "SetRef":
+      case "Var":
+      case "VarX":
+      case "VarY":
+      case "Const":
+        return;
+      default:
+        return;
+    }
+  }
+  visit(ast);
+  return {
+    fixedCount: Math.max(1, maxFixed + 1),
+    dynamicCount: Math.max(1, maxDynamic + 1),
+    wCount: 2,
+  };
+}
+
 function materializeComposeMultiples(ast) {
   let root = ast;
   function visit(node, parent, key) {
@@ -272,23 +379,13 @@ export function SetRef(name, binding = null) {
 }
 
 function fingerIndexFromLabel(label) {
-  return Number(label.slice(1)) - 1;
+  const parsed = parseFingerLabel(label);
+  return parsed ? parsed.index : -1;
 }
 
 function fingerFamilyFromLabel(label) {
-  if (!label) {
-    return null;
-  }
-  switch (label[0]) {
-    case "F":
-      return "fixed";
-    case "D":
-      return "dynamic";
-    case "W":
-      return "w";
-    default:
-      return null;
-  }
+  const parsed = parseFingerLabel(label);
+  return parsed ? parsed.family : null;
 }
 
 export const defaultFormulaSource = 'VarZ()';
@@ -541,7 +638,7 @@ vec2 ${name}(vec2 z) {
 
   if (ast.kind === "FingerOffset") {
     const slot = ast.slot;
-    const index = Number(slot.slice(1)) - 1;
+    const index = fingerIndexFromLabel(slot);
     let uniform;
     if (slot[0] === "F") {
       uniform = `u_fixedOffsets[${index}]`;
@@ -952,8 +1049,8 @@ precision highp float;
 uniform vec2 u_min;
 uniform vec2 u_max;
 uniform vec2 u_resolution;
-uniform vec2 u_fixedOffsets[3];
-uniform vec2 u_dynamicOffsets[3];
+uniform vec2 u_fixedOffsets[/*FIXED_OFFSETS_COUNT*/];
+uniform vec2 u_dynamicOffsets[/*DYNAMIC_OFFSETS_COUNT*/];
 uniform vec2 u_wOffsets[2];
 
 out vec4 outColor;
@@ -1185,8 +1282,11 @@ void main() {
 
 export function buildFragmentSourceFromAST(ast) {
   const preparedAst = materializeComposeMultiples(ast);
+  const uniformCounts = analyzeFingerUniformCounts(preparedAst);
   const { funcs, topName } = buildNodeFunctionsAndTop(preparedAst);
   return fragmentTemplate
+    .replace("/*FIXED_OFFSETS_COUNT*/", String(uniformCounts.fixedCount))
+    .replace("/*DYNAMIC_OFFSETS_COUNT*/", String(uniformCounts.dynamicCount))
     .replace("/*NODE_FUNCS*/", funcs)
     .replace("/*TOP_FUNC*/", topName);
 }

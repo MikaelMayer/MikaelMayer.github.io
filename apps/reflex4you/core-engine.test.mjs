@@ -87,14 +87,14 @@ test('Pow nodes emit exponentiation by squaring and allow negatives', () => {
 test('Offset2 nodes read from the fixed offset array', () => {
   const ast = Offset2();
   const fragment = buildFragmentSourceFromAST(ast);
-  assert.match(fragment, /uniform vec2 u_fixedOffsets\[3\]/);
+  assert.match(fragment, /uniform vec2 u_fixedOffsets\[2\]/);
   assert.match(fragment, /return u_fixedOffsets\[1\];/);
 });
 
 test('dynamic fingers read from the dynamic offset array', () => {
   const ast = FingerOffset('D1');
   const fragment = buildFragmentSourceFromAST(ast);
-  assert.match(fragment, /uniform vec2 u_dynamicOffsets\[3\]/);
+  assert.match(fragment, /uniform vec2 u_dynamicOffsets\[1\]/);
   assert.match(fragment, /return u_dynamicOffsets\[0\];/);
 });
 
