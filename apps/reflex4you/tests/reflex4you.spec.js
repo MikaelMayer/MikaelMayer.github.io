@@ -67,6 +67,16 @@ test('formula page renders heav(...) as a function name', async ({ page }) => {
   await expect(render).toContainText('heav');
 });
 
+test('formula page renders set ... in on multiple lines (no parentheses)', async ({ page }) => {
+  await page.goto(`/formula.html?formula=${encodeURIComponent('set a = 1 in a + 1')}`);
+  const render = page.locator('#formula-render');
+  await expect(render).toBeVisible();
+  await expect(render).toContainText('set');
+  await expect(render.locator('br')).toHaveCount(1);
+  // For a top-level set-binding, the first character should be "s" not "(".
+  await expect(render).not.toHaveText(/^\s*\(/);
+});
+
 test('reflex4you updates formula query param after successful apply', async ({ page }) => {
   await page.goto('/index.html');
   await waitForReflexReady(page);
