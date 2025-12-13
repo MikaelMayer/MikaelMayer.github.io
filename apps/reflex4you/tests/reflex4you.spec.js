@@ -223,6 +223,21 @@ test('menu can copy a share link for the current reflex', async ({ page }) => {
   }
 });
 
+test('pwa relaunch restores last reflex when opened without query string', async ({ page }) => {
+  await page.goto('/index.html');
+  await waitForReflexReady(page);
+
+  const textarea = page.locator('#formula');
+  await expect(textarea).toBeVisible();
+  await textarea.fill(SIMPLE_FORMULA);
+  await expectNoRendererError(page);
+
+  // Simulate a PWA relaunch that goes to the bare start_url without query params.
+  await page.goto('/index.html');
+  await waitForReflexReady(page);
+  await expect(page.locator('#formula')).toHaveValue(SIMPLE_FORMULA);
+});
+
 test('re-runs parse/desugar pipeline when D1 changes for $$ repeat counts', async ({ page }) => {
   await page.goto('/index.html');
   await waitForReflexReady(page);
