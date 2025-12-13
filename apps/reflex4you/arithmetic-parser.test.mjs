@@ -50,6 +50,24 @@ test('parses negative exponents', () => {
   assert.equal(result.value.exponent, -2);
 });
 
+test('unary minus binds weaker than exponentiation', () => {
+  const result = parseFormulaInput('-z^4');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Sub');
+  assert.equal(result.value.left.kind, 'Const');
+  assert.equal(result.value.right.kind, 'Pow');
+  assert.equal(result.value.right.base.kind, 'Var');
+  assert.equal(result.value.right.exponent, 4);
+});
+
+test('parentheses can force (-z)^4', () => {
+  const result = parseFormulaInput('(-z)^4');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Pow');
+  assert.equal(result.value.exponent, 4);
+  assert.equal(result.value.base.kind, 'Sub');
+});
+
 test('non-integer exponents lower to exp form', () => {
   const result = parseFormulaInput('z ^ 1.5');
   assert.equal(result.ok, true);

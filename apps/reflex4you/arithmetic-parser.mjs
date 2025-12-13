@@ -616,8 +616,8 @@ const primaryParser = Choice([
   primitiveParser,
 ], { ctor: 'Primary' });
 
-let unaryParser;
-const unaryRef = lazy(() => unaryParser, { ctor: 'UnaryRef' });
+let prefixParser;
+const prefixRef = lazy(() => prefixParser, { ctor: 'PrefixRef' });
 
 const functionCallSuffixParser = Sequence(
   [
@@ -710,33 +710,12 @@ const dotExpressionParser = createParser('DotExpression', (input) => {
   });
 });
 
-const unaryNegative = Sequence([
-  wsLiteral('-', { ctor: 'UnaryMinusSymbol' }),
-  unaryRef,
-], {
-  ctor: 'UnaryMinusSeq',
-  projector: (values) => values[1],
-}).Map((expr, result) => {
-  const zero = withSpan(Const(0, 0), result.span);
-  return withSpan(Sub(zero, expr), result.span);
-});
-
-const unaryPositive = Sequence([
-  wsLiteral('+', { ctor: 'UnaryPlusSymbol' }),
-  unaryRef,
-], {
-  ctor: 'UnaryPlusSeq',
-  projector: (values) => values[1],
-}).Map((expr, result) => withSpan(expr, result.span));
-
-unaryParser = Choice([
-  dotExpressionParser,
-  unaryNegative,
-  unaryPositive,
-], { ctor: 'Unary' });
+// Exponentiation binds tighter than unary +/-.
+// This ensures `-z^4` parses as `-(z^4)`, not `(-z)^4`.
+const postfixParser = dotExpressionParser;
 
 const powerParser = createParser('Power', (input) => {
-  const head = unaryParser.runNormalized(input);
+  const head = postfixParser.runNormalized(input);
   if (!head.ok) {
     return head;
   }
@@ -762,6 +741,31 @@ const powerParser = createParser('Power', (input) => {
     next: cursor,
   });
 });
+
+const unaryNegative = Sequence([
+  wsLiteral('-', { ctor: 'UnaryMinusSymbol' }),
+  prefixRef,
+], {
+  ctor: 'UnaryMinusSeq',
+  projector: (values) => values[1],
+}).Map((expr, result) => {
+  const zero = withSpan(Const(0, 0), result.span);
+  return withSpan(Sub(zero, expr), result.span);
+});
+
+const unaryPositive = Sequence([
+  wsLiteral('+', { ctor: 'UnaryPlusSymbol' }),
+  prefixRef,
+], {
+  ctor: 'UnaryPlusSeq',
+  projector: (values) => values[1],
+}).Map((expr, result) => withSpan(expr, result.span));
+
+prefixParser = Choice([
+  powerParser,
+  unaryNegative,
+  unaryPositive,
+], { ctor: 'Prefix' });
 
 function createPowerApplication(baseNode, exponentNode, span) {
   const literal = extractSmallIntegerExponent(exponentNode);
@@ -2300,7 +2304,7 @@ const powerSuffixParser = createParser('PowerSuffix', (input) => {
   if (!caret.ok) {
     return caret;
   }
-  const exponentResult = unaryParser.runNormalized(caret.next);
+  const exponentResult = prefixParser.runNormalized(caret.next);
   if (!exponentResult.ok) {
     return exponentResult;
   }
@@ -2325,7 +2329,7 @@ const additiveOperators = Choice([
 
 const composeOperator = wsLiteral('$', { ctor: 'ComposeOp' }).Map(() => (left, right) => Compose(left, right));
 
-const multiplicativeParser = leftAssociative(powerParser, multiplicativeOperators, 'MulDiv');
+const multiplicativeParser = leftAssociative(prefixParser, multiplicativeOperators, 'MulDiv');
 const additiveParser = leftAssociative(multiplicativeParser, additiveOperators, 'AddSub');
 const repeatSuffixParser = createParser('RepeatSuffix', (input) => {
   const opResult = wsLiteral('$$', { ctor: 'RepeatOp' }).runNormalized(input);
