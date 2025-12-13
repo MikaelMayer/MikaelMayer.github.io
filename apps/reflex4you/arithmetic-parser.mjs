@@ -1579,6 +1579,18 @@ function normalizeComplexInput(value) {
 
 const REPEAT_COUNT_TOLERANCE = 1e-9;
 
+function spanLooksParenthesized(span) {
+  if (!span || typeof span.text !== 'function') {
+    return false;
+  }
+  const raw = span.text();
+  if (typeof raw !== 'string') {
+    return false;
+  }
+  const trimmed = raw.trim();
+  return trimmed.startsWith('(') && trimmed.endsWith(')');
+}
+
 function resolveRepeatPlaceholders(ast, parseOptions, input) {
   const context = {
     fingerValues: parseOptions.fingerValues,
@@ -1609,6 +1621,35 @@ function resolveRepeatPlaceholders(ast, parseOptions, input) {
         if (count instanceof ParseFailure) {
           return count;
         }
+        // Ambiguity guard: allow `z $$ 2 + 3` without parentheses to mean
+        // `z $$ (2 + 3)` by consuming the additive expression as the repeat
+        // count, but then materialize the repeat into an explicit composition
+        // chain so it behaves like `oo(z, 5)` (and matches existing tests).
+        const isBareAdditiveCount =
+          node.countExpression &&
+          (node.countExpression.kind === 'Add' || node.countExpression.kind === 'Sub') &&
+          !spanLooksParenthesized(span);
+        if (isBareAdditiveCount) {
+          let replacement;
+          if (count <= 0) {
+            replacement = VarZ();
+          } else if (count === 1) {
+            replacement = node.base;
+          } else {
+            replacement = oo(node.base, count);
+          }
+          if (node.span && replacement && typeof replacement === 'object') {
+            replacement.span = node.span;
+            replacement.input = node.input;
+          }
+          if (parent && key) {
+            parent[key] = replacement;
+            return null;
+          }
+          ast = replacement;
+          return null;
+        }
+
         const composeMultiple = createComposeMultipleNode({
           base: node.base,
           countExpression: node.countExpression,

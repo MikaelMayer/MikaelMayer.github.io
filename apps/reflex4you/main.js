@@ -34,25 +34,6 @@ if (versionPill) {
   versionPill.setAttribute('data-version', String(APP_VERSION));
 }
 
-const FORMULA_PARAM = 'formula';
-const FORMULA_B64_PARAM = 'formulab64';
-const sharedTextEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
-const sharedTextDecoder = typeof TextDecoder !== 'undefined' ? new TextDecoder() : null;
-const hasSecureContext = typeof window !== 'undefined' && Boolean(window.isSecureContext);
-const compressionStreamsAvailable =
-  typeof CompressionStream === 'function' && typeof DecompressionStream === 'function' && hasSecureContext;
-let supportsCompressionStream = compressionStreamsAvailable;
-let supportsDecompressionStream = compressionStreamsAvailable;
-
-function disableCompressionStreams() {
-  if (supportsCompressionStream || supportsDecompressionStream) {
-    supportsCompressionStream = false;
-    supportsDecompressionStream = false;
-    if (typeof window !== 'undefined') {
-      window.__reflexCompressionEnabled = false;
-    }
-  }
-}
 const EDIT_PARAM = 'edit';
 const ANIMATION_TIME_PARAM = 't';
 
