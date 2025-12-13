@@ -4,6 +4,22 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#000000" />
+  <script>
+    // Some static hosts serve this page at `/apps/reflex4you` (no trailing slash)
+    // without redirecting to `/apps/reflex4you/`. In that case, relative asset
+    // URLs like `./main.js` resolve to `/apps/main.js` and the app fails to load.
+    // Normalize to a trailing-slash URL before loading any modules.
+    (function () {
+      try {
+        const { pathname, search, hash } = window.location;
+        if (pathname && !pathname.endsWith('/') && !pathname.endsWith('.html')) {
+          window.location.replace(`${pathname}/${search || ''}${hash || ''}`);
+        }
+      } catch (_) {
+        // Ignore redirect failures (non-browser contexts).
+      }
+    })();
+  </script>
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
   <link rel="apple-touch-icon" href="./icon-192.png" />

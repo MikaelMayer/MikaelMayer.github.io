@@ -4,7 +4,7 @@ Reflex4You is an interactive complex-function explorer. Type a formula, drag the
 
 ## Quick Start
 
-1. **Open the live app:** https://mikaelmayer.github.io/apps/reflex4you  
+1. **Open the live app:** https://mikaelmayer.github.io/apps/reflex4you/  
    The viewer presents the complex function `z → z` across the rectangular domain `[-4 - 4i, 4 + 4i]`, clamped to your screen. Because every formula describes a function of `z`, the shorthand `z` means “map `z` to itself.”
 
 2. **Enter a formula.** Try:
@@ -39,7 +39,7 @@ Reflex4You is an interactive complex-function explorer. Type a formula, drag the
 
 ## Install as a PWA
 
-- On Chrome/Edge/Android, open https://mikaelmayer.github.io/apps/reflex4you, open the browser menu, and choose **Install app** (or **Add to Home screen** on iOS Safari).  
+- On Chrome/Edge/Android, open https://mikaelmayer.github.io/apps/reflex4you/, open the browser menu, and choose **Install app** (or **Add to Home screen** on iOS Safari).  
 - The shipped `manifest.json` and service worker let the viewer cache `index.html`, all ES modules, and the WebGL assets so you can explore saved formulas even when you're offline.
 - Updates ship automatically: when a new version is published, the service worker pulls fresh files after the next load and activates on the following visit.
 
