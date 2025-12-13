@@ -10,6 +10,7 @@ import {
   FORMULA_B64_PARAM,
   verifyCompressionSupport,
   readFormulaFromQuery,
+  writeFormulaToSearchParams,
   updateFormulaQueryParam,
   updateFormulaQueryParamImmediately,
   replaceUrlSearch,
@@ -938,6 +939,11 @@ function isMenuOpen() {
 
 function handleMenuAction(action) {
   switch (action) {
+    case 'copy-share-link':
+      copyShareLinkToClipboard().catch((error) => {
+        console.warn('Failed to copy share link.', error);
+      });
+      break;
     case 'reset':
       confirmAndReset();
       break;
@@ -961,6 +967,79 @@ function handleMenuAction(action) {
       break;
     default:
       break;
+  }
+}
+
+async function buildShareUrl() {
+  const href = typeof window !== 'undefined' ? window.location.href : '';
+  const url = new URL(href);
+  url.hash = '';
+
+  const params = new URLSearchParams(url.search);
+  // Sharing should default to viewer mode; do not force edit UI for recipients.
+  params.delete(EDIT_PARAM);
+
+  // Re-encode the current formula so the share URL is canonical and can use
+  // `formulab64` when supported, even if the current URL hasn't upgraded yet.
+  await writeFormulaToSearchParams(params, formulaTextarea?.value || '');
+
+  url.search = params.toString();
+  return url.toString();
+}
+
+async function copyTextToClipboard(text) {
+  if (!text) {
+    throw new Error('Nothing to copy');
+  }
+  const clipboard = navigator?.clipboard;
+  if (clipboard && typeof clipboard.writeText === 'function') {
+    try {
+      await clipboard.writeText(text);
+      return;
+    } catch (error) {
+      // Fall through to the execCommand-based fallback (e.g. insecure contexts).
+      console.warn('navigator.clipboard.writeText failed; falling back.', error);
+    }
+  }
+
+  // Fallback for older browsers / insecure contexts.
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.top = '-1000px';
+  textarea.style.left = '-1000px';
+  document.body.appendChild(textarea);
+  textarea.select();
+  textarea.setSelectionRange(0, text.length);
+  const ok = typeof document.execCommand === 'function' ? document.execCommand('copy') : false;
+  document.body.removeChild(textarea);
+  if (!ok) {
+    throw new Error('Clipboard copy fallback failed');
+  }
+}
+
+function showTransientStatus(message, { timeoutMs = 1400 } = {}) {
+  if (!versionPill) {
+    return;
+  }
+  const baseline = `v${APP_VERSION}`;
+  versionPill.textContent = message;
+  window.setTimeout(() => {
+    if (versionPill.textContent === message) {
+      versionPill.textContent = baseline;
+    }
+  }, timeoutMs);
+}
+
+async function copyShareLinkToClipboard() {
+  const shareUrl = await buildShareUrl();
+  try {
+    await copyTextToClipboard(shareUrl);
+    showTransientStatus('Copied link');
+  } catch (error) {
+    console.warn('Clipboard write failed; falling back to prompt.', error);
+    window.prompt('Copy this Reflex4You link:', shareUrl);
   }
 }
 
