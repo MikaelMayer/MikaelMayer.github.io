@@ -131,6 +131,20 @@ function renderFunctionCall(name, arg, options) {
   return joinInline([nameEl, span('rf-paren', '('), argEl, span('rf-paren', ')')]);
 }
 
+function renderFunctionCallWithArgs(name, args, options) {
+  const nameEl = span('rf-fn', name);
+  const renderedArgs = (args || []).map((arg) => renderNode(arg, 0, options));
+  const parts = [nameEl, span('rf-paren', '(')];
+  renderedArgs.forEach((argEl, idx) => {
+    if (idx > 0) {
+      parts.push(span('rf-op', ', '));
+    }
+    parts.push(argEl);
+  });
+  parts.push(span('rf-paren', ')'));
+  return joinInline(parts);
+}
+
 function fingerLabelToPretty(slot) {
   const family = slot?.[0] ?? '';
   const idx = slot?.slice(1) ?? '';
@@ -141,6 +155,11 @@ function fingerLabelToPretty(slot) {
 function renderNode(node, parentPrec = 0, options = {}) {
   if (!node || typeof node !== 'object') {
     return span('rf-atom', '?');
+  }
+
+  if (node.__syntheticCall && typeof node.__syntheticCall.name === 'string') {
+    const call = node.__syntheticCall;
+    return renderFunctionCallWithArgs(call.name, call.args, options);
   }
 
   switch (node.kind) {
