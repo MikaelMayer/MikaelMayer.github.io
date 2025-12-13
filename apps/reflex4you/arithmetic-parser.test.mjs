@@ -4,6 +4,7 @@ import {
   parseFormulaInput,
   parseFormulaToAST,
 } from './arithmetic-parser.mjs';
+import { visitAst } from './ast-utils.mjs';
 
 test('parses additive and multiplicative precedence', () => {
   const result = parseFormulaInput('1 + 2 * 3');
@@ -142,6 +143,37 @@ test('parses ln calls with optional branch shift', () => {
   assert.equal(node.branch.left.kind, 'VarX');
 });
 
+test('parses sqrt calls via ln desugaring', () => {
+  const result = parseFormulaInput('sqrt(z)');
+  assert.equal(result.ok, true);
+  const expNode = result.value;
+  assert.equal(expNode.kind, 'Exp');
+  assert.equal(expNode.value.kind, 'Mul');
+  assert.equal(expNode.value.left.kind, 'Const');
+  assert.equal(expNode.value.left.re, 0.5);
+  assert.equal(expNode.value.right.kind, 'Ln');
+});
+
+test('sqrt forwards optional branch arguments into ln', () => {
+  const result = parseFormulaInput('sqrt(z, x + 1)');
+  assert.equal(result.ok, true);
+  const lnNode = result.value.value.right;
+  assert.equal(lnNode.kind, 'Ln');
+  assert.equal(lnNode.branch.kind, 'Add');
+});
+
+test('heav desugars to a conditional step function', () => {
+  const result = parseFormulaInput('heav(z)');
+  assert.equal(result.ok, true);
+  const node = result.value;
+  assert.equal(node.kind, 'If');
+  assert.equal(node.condition.kind, 'GreaterThan');
+  assert.equal(node.thenBranch.kind, 'Const');
+  assert.equal(node.thenBranch.re, 1);
+  assert.equal(node.elseBranch.kind, 'Const');
+  assert.equal(node.elseBranch.re, 0);
+});
+
 test('parses F2 primitive', () => {
   const result = parseFormulaInput('F2 + 1');
   assert.equal(result.ok, true);
@@ -192,17 +224,34 @@ test('$$ postfix binds tighter than $', () => {
   assert.equal(result.value.kind, 'Compose');
   assert.equal(result.value.g.kind, 'FingerOffset');
   assert.equal(result.value.g.slot, 'F1');
-  assert.equal(result.value.f.kind, 'Compose');
+  assert.equal(result.value.f.kind, 'ComposeMultiple');
+  assert.equal(result.value.f.resolvedCount, 2);
 });
 
-test('$$ requires positive integer counts', () => {
+test('$$ accepts zero counts as identity', () => {
   const result = parseFormulaInput('z $$ 0');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'ComposeMultiple');
+  assert.equal(result.value.resolvedCount, 0);
+  assert.equal(result.value.base.kind, 'Var');
+});
+
+test('$$ rejects negative counts', () => {
+  const result = parseFormulaInput('z $$ -1');
   assert.equal(result.ok, false);
-  assert.match(result.message, /positive integer/i);
+  assert.match(result.message, /non-negative/i);
 });
 
 test('$$ accepts parenthesized expressions with constant propagation', () => {
   const result = parseFormulaInput('z $$ (2 + 3)');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'ComposeMultiple');
+  assert.equal(result.value.resolvedCount, 5);
+  assert.equal(result.value.base.kind, 'Var');
+});
+
+test('$$ accepts bare additive expressions on the right-hand side', () => {
+  const result = parseFormulaInput('z $$ 2 + 3');
   assert.equal(result.ok, true);
   assert.equal(result.value.kind, 'Compose');
   const stack = [result.value];
@@ -228,20 +277,16 @@ test('$$ can derive counts from finger values', () => {
     },
   });
   assert.equal(result.ok, true);
-  const stack = [result.value];
-  let sinCount = 0;
-  while (stack.length) {
-    const node = stack.pop();
-    if (!node || typeof node !== 'object') {
-      continue;
+  assert.equal(result.value.kind, 'ComposeMultiple');
+  assert.equal(result.value.resolvedCount, 5);
+  assert.equal(result.value.base.kind, 'Sin');
+  let fingerSeen = false;
+  visitAst(result.value.countExpression, (node) => {
+    if (node.kind === 'FingerOffset' && node.slot === 'D1') {
+      fingerSeen = true;
     }
-    if (node.kind === 'Compose') {
-      stack.push(node.f, node.g);
-    } else if (node.kind === 'Sin') {
-      sinCount += 1;
-    }
-  }
-  assert.equal(sinCount, 5);
+  });
+  assert.equal(fingerSeen, true);
 });
 
 test('$$ count expressions must be constant', () => {
@@ -344,7 +389,9 @@ test('explicit composition accepts built-in literals', () => {
 test('built-in literals work with repeat composition suffix', () => {
   const result = parseFormulaInput('abs $$ 2');
   assert.equal(result.ok, true);
-  assert.equal(result.value.kind, 'Compose');
+  assert.equal(result.value.kind, 'ComposeMultiple');
+  assert.equal(result.value.base.kind, 'Abs');
+  assert.equal(result.value.resolvedCount, 2);
 });
 
 test('dot composition syntax treats a.b as (b $ a)', () => {
@@ -401,12 +448,20 @@ test('user-defined functions support call syntax f(z)', () => {
   assert.equal(ast.g.kind, 'Var');
 });
 
+test('missing "in" after let binding does not backtrack', () => {
+  const result = parseFormulaInput('let foo = z + 1 foo(z)');
+  assert.equal(result.ok, false);
+  assert.equal(result.ctor, 'SetInKeyword');
+  assert.equal(result.expected, 'in');
+});
+
 test('set bindings associate weaker than $$ and $', () => {
   const result = parseFormulaInput('set f = z $$ 2 in f $ f');
   assert.equal(result.ok, true);
   const ast = result.value;
   assert.equal(ast.kind, 'SetBinding');
-  assert.equal(ast.value.kind, 'Compose');
+  assert.equal(ast.value.kind, 'ComposeMultiple');
+  assert.equal(ast.value.resolvedCount, 2);
   assert.equal(ast.body.kind, 'Compose');
   assert.equal(ast.body.f.kind, 'SetRef');
   assert.equal(ast.body.g.kind, 'SetRef');

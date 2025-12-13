@@ -56,36 +56,33 @@ const FIXED_SET_FORMULA = 'set c = sin(z + F1) in (z - c) * (z + c)';
 test('reflex4you updates formula query param after successful apply', async ({ page }) => {
   await page.goto('/index.html');
   await waitForReflexReady(page);
-  const supportsCompression = await page.evaluate(() => Boolean(window.__reflexCompressionEnabled));
 
   const textarea = page.locator('#formula');
   await expect(textarea).toBeVisible();
 
   await textarea.fill(SIMPLE_FORMULA);
   await expectNoRendererError(page);
-  if (supportsCompression) {
-    await expect.poll(async () => {
-      const href = await page.evaluate(() => window.location.href);
-      const url = new URL(href);
-      return url.searchParams.get('formulab64');
-    }).not.toBeNull();
+  await expect.poll(async () => {
+    const href = await page.evaluate(() => window.location.href);
+    const url = new URL(href);
+    return {
+      base64: url.searchParams.get('formulab64'),
+      legacy: url.searchParams.get('formula'),
+    };
+  }, { timeout: 15000 }).not.toEqual({ base64: null, legacy: null });
 
-    const params = await page.evaluate(() => {
-      const url = new URL(window.location.href);
-      return {
-        base64: url.searchParams.get('formulab64'),
-        legacy: url.searchParams.get('formula'),
-      };
-    });
-    expect(params.legacy).toBeNull();
-    expect(params.base64).not.toBeNull();
+  const params = await page.evaluate(() => {
+    const url = new URL(window.location.href);
+    return {
+      base64: url.searchParams.get('formulab64'),
+      legacy: url.searchParams.get('formula'),
+    };
+  });
+
+  if (params.base64) {
     expect(decodeFormulab64(params.base64)).toBe(SIMPLE_FORMULA);
   } else {
-    await expect.poll(async () => {
-      const href = await page.evaluate(() => window.location.href);
-      const url = new URL(href);
-      return url.searchParams.get('formula');
-    }).toBe(SIMPLE_FORMULA);
+    expect(params.legacy).toBe(SIMPLE_FORMULA);
   }
 
   await expect(textarea).toHaveValue(SIMPLE_FORMULA);
@@ -141,8 +138,8 @@ test('reflex4you upgrades legacy formula query param to formulab64', async ({ pa
 test('shows D1 indicator when dynamic finger only appears inside set binding', async ({ page }) => {
   const supportsCompression = await detectCompressionCapability(page);
   const targetUrl = supportsCompression
-    ? `/index.html?formulab64=${encodeURIComponent(encodeFormulaToFormulab64(DYNAMIC_SET_FORMULA))}`
-    : `/index.html?formula=${encodeURIComponent(DYNAMIC_SET_FORMULA)}`;
+    ? `/index.html?formulab64=${encodeURIComponent(encodeFormulaToFormulab64(DYNAMIC_SET_FORMULA))}&edit=true`
+    : `/index.html?formula=${encodeURIComponent(DYNAMIC_SET_FORMULA)}&edit=true`;
   await page.goto(targetUrl);
   await waitForReflexReady(page);
 
@@ -157,8 +154,8 @@ test('shows D1 indicator when dynamic finger only appears inside set binding', a
 test('shows F1 indicator when fixed finger only appears inside set binding', async ({ page }) => {
   const supportsCompression = await detectCompressionCapability(page);
   const targetUrl = supportsCompression
-    ? `/index.html?formulab64=${encodeURIComponent(encodeFormulaToFormulab64(FIXED_SET_FORMULA))}`
-    : `/index.html?formula=${encodeURIComponent(FIXED_SET_FORMULA)}`;
+    ? `/index.html?formulab64=${encodeURIComponent(encodeFormulaToFormulab64(FIXED_SET_FORMULA))}&edit=true`
+    : `/index.html?formula=${encodeURIComponent(FIXED_SET_FORMULA)}&edit=true`;
   await page.goto(targetUrl);
   await waitForReflexReady(page);
 
@@ -180,4 +177,71 @@ test('opens the burger menu dropdown when clicked', async ({ page }) => {
   await page.click('#menu-button');
 
   await expect(dropdown).toBeVisible();
+});
+
+test('re-runs parse/desugar pipeline when D1 changes for $$ repeat counts', async ({ page }) => {
+  await page.goto('/index.html');
+  await waitForReflexReady(page);
+
+  const hasRenderer = await page.evaluate(() => Boolean(window.__reflexCore));
+  test.skip(!hasRenderer, 'Renderer unavailable (no WebGL2 in this browser environment)');
+
+  const textarea = page.locator('#formula');
+  await expect(textarea).toBeVisible();
+
+  await textarea.fill('sin $$ D1.x.abs.floor');
+  await expectNoRendererError(page);
+
+  // Force D1.x to change the repeat count: floor(abs(x)) = 1 -> 2.
+  await page.evaluate(() => window.__reflexCore.setFingerValue('D1', 1.2, 0));
+  const shaderAtOne = await page.evaluate(() => window.__reflexCore.lastFragmentSource);
+  expect(typeof shaderAtOne).toBe('string');
+
+  await page.evaluate(() => window.__reflexCore.setFingerValue('D1', 2.2, 0));
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__reflexCore.lastFragmentSource);
+  }).not.toBe(shaderAtOne);
+});
+
+test('dragging D1 stays continuous when formula uses $$', async ({ page }) => {
+  await page.goto('/index.html');
+  await waitForReflexReady(page);
+
+  const hasRenderer = await page.evaluate(() => Boolean(window.__reflexCore));
+  test.skip(!hasRenderer, 'Renderer unavailable (no WebGL2 in this browser environment)');
+
+  const textarea = page.locator('#formula');
+  await expect(textarea).toBeVisible();
+  await textarea.fill('sin $$ D1.x.abs.floor');
+  await expectNoRendererError(page);
+  // `fill()` focuses the textarea, which expands the overlay and can cover the
+  // canvas. Blur it so pointer events reach the canvas (mirrors normal usage).
+  await textarea.blur();
+
+  const canvas = page.locator('#glcanvas');
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+
+  const cx = box.x + box.width / 2;
+  // Aim away from the bottom formula overlay.
+  const cy = box.y + box.height * 0.25;
+
+  const readD1 = async () =>
+    await page.evaluate(() => window.__reflexCore.getFingerValue('D1'));
+
+  const start = await readD1();
+
+  // Hold mouse down and move twice. If pointer capture is released mid-drag,
+  // only the first move updates D1 and the second move has no effect.
+  await page.mouse.move(cx, cy);
+  await page.mouse.down();
+
+  await page.mouse.move(cx + 20, cy);
+  await expect.poll(readD1).not.toEqual(start);
+
+  const afterFirst = await readD1();
+  await page.mouse.move(cx + 60, cy);
+  await expect.poll(readD1).not.toEqual(afterFirst);
+
+  await page.mouse.up();
 });

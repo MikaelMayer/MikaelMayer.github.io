@@ -170,6 +170,99 @@ export function oo(f, n) {
   return node;
 }
 
+function materializeComposeMultiples(ast) {
+  let root = ast;
+  function visit(node, parent, key) {
+    if (!node || typeof node !== "object") {
+      return;
+    }
+    if (node.kind === "ComposeMultiple") {
+      if (node.base) {
+        visit(node.base, node, "base");
+      }
+      const count = typeof node.resolvedCount === "number" ? node.resolvedCount : null;
+      let replacement;
+      if (count === null) {
+        replacement = node.base || VarZ();
+      } else if (count <= 0) {
+        replacement = VarZ();
+      } else if (count === 1) {
+        replacement = node.base;
+      } else {
+        replacement = oo(node.base, count);
+      }
+      if (node.span && replacement && typeof replacement === "object") {
+        replacement.span = node.span;
+        replacement.input = node.input;
+      }
+      if (parent && key) {
+        parent[key] = replacement;
+        visit(parent[key], parent, key);
+      } else {
+        root = replacement;
+        visit(root, null, null);
+      }
+      return;
+    }
+    switch (node.kind) {
+      case "Pow":
+        visit(node.base, node, "base");
+        return;
+      case "Exp":
+      case "Sin":
+      case "Cos":
+      case "Tan":
+      case "Atan":
+      case "Asin":
+      case "Acos":
+      case "Abs":
+      case "Abs2":
+      case "Floor":
+      case "Conjugate":
+        visit(node.value, node, "value");
+        return;
+      case "Ln":
+        visit(node.value, node, "value");
+        if (node.branch) {
+          visit(node.branch, node, "branch");
+        }
+        return;
+      case "Sub":
+      case "Mul":
+      case "Op":
+      case "Add":
+      case "Div":
+      case "LessThan":
+      case "GreaterThan":
+      case "LessThanOrEqual":
+      case "GreaterThanOrEqual":
+      case "Equal":
+      case "LogicalAnd":
+      case "LogicalOr":
+        visit(node.left, node, "left");
+        visit(node.right, node, "right");
+        return;
+      case "Compose":
+        visit(node.f, node, "f");
+        visit(node.g, node, "g");
+        return;
+      case "If":
+        visit(node.condition, node, "condition");
+        visit(node.thenBranch, node, "thenBranch");
+        visit(node.elseBranch, node, "elseBranch");
+        return;
+      case "SetBinding":
+        visit(node.value, node, "value");
+        visit(node.body, node, "body");
+        return;
+      default:
+        return;
+    }
+  }
+  visit(root, null, null);
+  return root;
+}
+
 export function SetBindingNode(name, value, body) {
   return { kind: "SetBinding", name, value, body };
 }
@@ -950,22 +1043,6 @@ vec2 c_sqrt(vec2 z) {
   return vec2(realPart, imagPart);
 }
 
-vec2 c_asin(vec2 z) {
-  vec2 iz = vec2(-z.y, z.x);
-  vec2 one = vec2(1.0, 0.0);
-  vec2 zSquared = c_mul(z, z);
-  vec2 underSqrt = one - zSquared;
-  vec2 sqrtTerm = c_sqrt(underSqrt);
-  vec2 inside = iz + sqrtTerm;
-  vec2 lnInside = c_ln(inside);
-  return vec2(lnInside.y, -lnInside.x);
-}
-
-vec2 c_acos(vec2 z) {
-  vec2 asinValue = c_asin(z);
-  return vec2(0.5 * PI - asinValue.x, -asinValue.y);
-}
-
 float wrapAngleToRange(float angle, float center) {
   float shifted = angle - center;
   float normalized = shifted - TAU * floor((shifted + PI) / TAU);
@@ -984,6 +1061,22 @@ vec2 c_ln_branch(vec2 z, float center) {
 
 vec2 c_ln(vec2 z) {
   return c_ln_branch(z, 0.0);
+}
+
+vec2 c_asin(vec2 z) {
+  vec2 iz = vec2(-z.y, z.x);
+  vec2 one = vec2(1.0, 0.0);
+  vec2 zSquared = c_mul(z, z);
+  vec2 underSqrt = one - zSquared;
+  vec2 sqrtTerm = c_sqrt(underSqrt);
+  vec2 inside = iz + sqrtTerm;
+  vec2 lnInside = c_ln(inside);
+  return vec2(lnInside.y, -lnInside.x);
+}
+
+vec2 c_acos(vec2 z) {
+  vec2 asinValue = c_asin(z);
+  return vec2(0.5 * PI - asinValue.x, -asinValue.y);
 }
 
 vec2 c_atan(vec2 z) {
@@ -1068,7 +1161,8 @@ void main() {
 }`;
 
 export function buildFragmentSourceFromAST(ast) {
-  const { funcs, topName } = buildNodeFunctionsAndTop(ast);
+  const preparedAst = materializeComposeMultiples(ast);
+  const { funcs, topName } = buildNodeFunctionsAndTop(preparedAst);
   return fragmentTemplate
     .replace("/*NODE_FUNCS*/", funcs)
     .replace("/*TOP_FUNC*/", topName);
@@ -1144,7 +1238,7 @@ export class ReflexCore {
   }
 
   setFormulaAST(ast) {
-    this.formulaAST = ast;
+    this.formulaAST = materializeComposeMultiples(ast);
     this.rebuildProgram();
     this.render();
   }
@@ -1314,6 +1408,7 @@ export class ReflexCore {
 
   rebuildProgram() {
     const fragmentSource = buildFragmentSourceFromAST(this.formulaAST);
+    this.lastFragmentSource = fragmentSource;
     const newProgram = this.createProgram(vertexSource, fragmentSource);
     this.program = newProgram;
     this.gl.useProgram(this.program);

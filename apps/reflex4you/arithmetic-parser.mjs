@@ -79,6 +79,37 @@ function withSyntax(node, syntaxLabel) {
   return node;
 }
 
+function createConstNode(re, im, span) {
+  if (!span) {
+    return Const(re, im);
+  }
+  return withSpan(Const(re, im), span);
+}
+
+function createSqrtExpression(valueNode, branchNode = null, spanOverride = null) {
+  const primarySpan = spanOverride || valueNode?.span || branchNode?.span;
+  const lnSpan = valueNode?.span || primarySpan;
+  const lnNode = lnSpan ? withSpan(Ln(valueNode, branchNode), lnSpan) : Ln(valueNode, branchNode);
+  if (!primarySpan) {
+    return Exp(Mul(Const(0.5, 0), lnNode));
+  }
+  const halfConst = createConstNode(0.5, 0, primarySpan);
+  const mulNode = withSpan(Mul(halfConst, lnNode), primarySpan);
+  return withSpan(Exp(mulNode), primarySpan);
+}
+
+function createHeavExpression(valueNode, spanOverride = null) {
+  const primarySpan = spanOverride || valueNode?.span;
+  const zeroForComparison = createConstNode(0, 0, primarySpan);
+  const oneConst = createConstNode(1, 0, primarySpan);
+  const zeroConst = createConstNode(0, 0, primarySpan);
+  if (!primarySpan) {
+    return If(GreaterThan(valueNode, Const(0, 0)), Const(1, 0), Const(0, 0));
+  }
+  const comparison = withSpan(GreaterThan(valueNode, zeroForComparison), primarySpan);
+  return withSpan(If(comparison, oneConst, zeroConst), primarySpan);
+}
+
 const BUILTIN_FUNCTION_DEFINITIONS = [
   { name: 'exp', factory: Exp },
   { name: 'sin', factory: Sin },
@@ -91,10 +122,12 @@ const BUILTIN_FUNCTION_DEFINITIONS = [
   { name: 'acos', factory: Acos },
   { name: 'arccos', factory: Acos },
   { name: 'ln', factory: (value) => Ln(value, null) },
+  { name: 'sqrt', factory: (value) => createSqrtExpression(value, null) },
   { name: 'abs', factory: Abs },
   { name: 'abs2', factory: Abs2 },
   { name: 'conj', factory: Conjugate },
   { name: 'floor', factory: Floor },
+  { name: 'heav', factory: (value) => createHeavExpression(value) },
 ];
 
 function createBuiltinFunctionLiteral(name, factory, span) {
@@ -228,10 +261,12 @@ const RESERVED_BINDING_NAMES = new Set([
   'arccos',
   'arctan',
   'ln',
+  'sqrt',
   'abs',
   'abs2',
   'floor',
   'conj',
+  'heav',
   'oo',
   'comp',
   'o',
@@ -503,6 +538,45 @@ const lnParser = createParser('LnCall', (input) => {
   });
 });
 
+const sqrtParser = createParser('SqrtCall', (input) => {
+  const keyword = keywordLiteral('sqrt', { ctor: 'sqrtKeyword' }).runNormalized(input);
+  if (!keyword.ok) {
+    return keyword;
+  }
+  const open = wsLiteral('(', { ctor: 'sqrtOpen' }).runNormalized(keyword.next);
+  if (!open.ok) {
+    return open;
+  }
+  const valueResult = expressionRef.runNormalized(open.next);
+  if (!valueResult.ok) {
+    return valueResult;
+  }
+  let cursor = valueResult.next;
+  let branchNode = null;
+  const comma = wsLiteral(',', { ctor: 'sqrtComma' }).runNormalized(cursor);
+  if (comma.ok) {
+    const branchResult = expressionRef.runNormalized(comma.next);
+    if (!branchResult.ok) {
+      return branchResult;
+    }
+    branchNode = branchResult.value;
+    cursor = branchResult.next;
+  } else if (comma.severity === ParseSeverity.error) {
+    return comma;
+  }
+  const close = wsLiteral(')', { ctor: 'sqrtClose' }).runNormalized(cursor);
+  if (!close.ok) {
+    return close;
+  }
+  const span = spanBetween(input, close.next);
+  return new ParseSuccess({
+    ctor: 'SqrtCall',
+    value: createSqrtExpression(valueResult.value, branchNode, span),
+    span,
+    next: close.next,
+  });
+});
+
 const elementaryFunctionParser = Choice([
   ...createUnaryFunctionParsers(['exp'], Exp),
   ...createUnaryFunctionParsers(['sin'], Sin),
@@ -512,10 +586,12 @@ const elementaryFunctionParser = Choice([
   ...createUnaryFunctionParsers(['asin', 'arcsin'], Asin),
   ...createUnaryFunctionParsers(['acos', 'arccos'], Acos),
   lnParser,
+  sqrtParser,
   ...createUnaryFunctionParsers(['abs'], Abs),
   ...createUnaryFunctionParsers(['abs2'], Abs2),
   ...createUnaryFunctionParsers(['floor'], Floor),
   ...createUnaryFunctionParsers(['conj'], Conjugate),
+  ...createUnaryFunctionParsers(['heav'], (value) => createHeavExpression(value)),
 ], { ctor: 'ElementaryFunction' });
 
 const builtinFunctionLiteralParser = Choice(
@@ -774,6 +850,35 @@ function spanBetween(startInput, endInput) {
   return startInput.createSpan(0, startInput.length - endInput.length);
 }
 
+function failureAdvancedPastInput(failure, originInput) {
+  if (!failure || failure.ok) {
+    return false;
+  }
+  const originStart = originInput?.start ?? 0;
+  return failureContainsStartPastOrigin(failure, originStart);
+}
+
+function failureContainsStartPastOrigin(node, originStart) {
+  if (!node) {
+    return false;
+  }
+  if (node.span && typeof node.span.start === 'number' && node.span.start > originStart) {
+    const spanInput = node.span.input;
+    const source = spanInput?.buffer;
+    if (source) {
+      const deltaSlice = source.slice(originStart, node.span.start);
+      if (deltaSlice.trim().length === 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+  if (!node.children || node.children.length === 0) {
+    return false;
+  }
+  return node.children.some((child) => failureContainsStartPastOrigin(child, originStart));
+}
+
 function createRepeatComposePlaceholder(base, countExpression, countSpan) {
   return {
     kind: 'RepeatComposePlaceholder',
@@ -781,6 +886,21 @@ function createRepeatComposePlaceholder(base, countExpression, countSpan) {
     countExpression,
     countSpan,
   };
+}
+
+function createComposeMultipleNode({ base, countExpression, countSpan, span, resolvedCount }) {
+  const node = {
+    kind: 'ComposeMultiple',
+    base,
+    countExpression: countExpression || null,
+    countSpan: countSpan || null,
+    resolvedCount,
+  };
+  if (span) {
+    node.span = span;
+    node.input = span.input;
+  }
+  return node;
 }
 
 function buildCompAST({ body, placeholder, seed, iterations, span }) {
@@ -856,6 +976,14 @@ function substitutePlaceholder(node, placeholder, replacement) {
         ...node,
         f: substitutePlaceholder(node.f, placeholder, replacement),
         g: substitutePlaceholder(node.g, placeholder, replacement),
+      };
+    case 'ComposeMultiple':
+      return {
+        ...node,
+        base: substitutePlaceholder(node.base, placeholder, replacement),
+        countExpression: node.countExpression
+          ? substitutePlaceholder(node.countExpression, placeholder, replacement)
+          : null,
       };
     case 'RepeatComposePlaceholder':
       return {
@@ -939,6 +1067,12 @@ function cloneAst(node) {
       };
     case 'Compose':
       return { ...node, f: cloneAst(node.f), g: cloneAst(node.g) };
+    case 'ComposeMultiple':
+      return {
+        ...node,
+        base: cloneAst(node.base),
+        countExpression: node.countExpression ? cloneAst(node.countExpression) : null,
+      };
     case 'If':
       return {
         ...node,
@@ -1024,6 +1158,14 @@ function substituteIdentifierWithClone(node, targetName, replacement) {
         f: substituteIdentifierWithClone(node.f, targetName, replacement),
         g: substituteIdentifierWithClone(node.g, targetName, replacement),
       };
+    case 'ComposeMultiple':
+      return {
+        ...node,
+        base: substituteIdentifierWithClone(node.base, targetName, replacement),
+        countExpression: node.countExpression
+          ? substituteIdentifierWithClone(node.countExpression, targetName, replacement)
+          : null,
+      };
     case 'If':
       return {
         ...node,
@@ -1107,6 +1249,12 @@ function findFirstPlaceholderNode(ast) {
       case 'Compose':
         stack.push(node.f, node.g);
         break;
+      case 'ComposeMultiple':
+        stack.push(node.base);
+        if (node.countExpression) {
+          stack.push(node.countExpression);
+        }
+        break;
       case 'RepeatComposePlaceholder':
         stack.push(node.base);
         if (node.countExpression) {
@@ -1175,6 +1323,12 @@ function findFirstLetBinding(ast) {
         break;
       case 'Compose':
         stack.push(node.f, node.g);
+        break;
+      case 'ComposeMultiple':
+        stack.push(node.base);
+        if (node.countExpression) {
+          stack.push(node.countExpression);
+        }
         break;
       case 'SetBinding':
         stack.push(node.value, node.body);
@@ -1318,6 +1472,16 @@ function resolveSetReferences(ast, input) {
         }
         return visit(node.g);
       }
+      case 'ComposeMultiple': {
+        const baseErr = visit(node.base);
+        if (baseErr) {
+          return baseErr;
+        }
+        if (node.countExpression) {
+          return visit(node.countExpression);
+        }
+        return null;
+      }
       case 'RepeatComposePlaceholder': {
         const baseErr = visit(node.base);
         if (baseErr) {
@@ -1445,17 +1609,19 @@ function resolveRepeatPlaceholders(ast, parseOptions, input) {
         if (count instanceof ParseFailure) {
           return count;
         }
-        const expanded = oo(node.base, count);
-        if (node.span) {
-          expanded.span = node.span;
-          expanded.input = node.input;
-        }
+        const composeMultiple = createComposeMultipleNode({
+          base: node.base,
+          countExpression: node.countExpression,
+          countSpan: span,
+          span: node.span,
+          resolvedCount: count,
+        });
         if (parent && key) {
-          parent[key] = expanded;
-          return visit(expanded, parent, key);
+          parent[key] = composeMultiple;
+          return null;
         }
-        ast = expanded;
-        return visit(ast, null, null);
+        ast = composeMultiple;
+        return null;
       }
       case 'SetBinding': {
         const valueErr = visit(node.value, node, 'value');
@@ -1587,7 +1753,7 @@ function evaluateRepeatCountExpression(node, span, context) {
       ctor: 'RepeatCount',
       message: 'Repeat count must be a constant expression',
       severity: ParseSeverity.error,
-      expected: 'constant positive integer',
+      expected: 'constant non-negative integer',
       span,
       input: span.input,
     });
@@ -1623,12 +1789,12 @@ function evaluateRepeatCountExpression(node, span, context) {
       input: span.input,
     });
   }
-  if (rounded < 1) {
+  if (rounded < 0) {
     return new ParseFailure({
       ctor: 'RepeatCount',
-      message: 'Repeat count must be a positive integer',
+      message: 'Repeat count must be a non-negative integer',
       severity: ParseSeverity.error,
-      expected: 'positive integer',
+      expected: 'non-negative integer',
       span,
       input: span.input,
     });
@@ -1773,6 +1939,24 @@ function evaluateConstantNode(node, context, scope = {}, localBindings = []) {
         return null;
       }
       return evaluateConstantNode(node.f, context, { z: inner }, localBindings);
+    }
+    case 'ComposeMultiple': {
+      const count = typeof node.resolvedCount === 'number' ? node.resolvedCount : null;
+      if (count === null) {
+        return null;
+      }
+      if (count === 0) {
+        return scope.z ? { re: scope.z.re, im: scope.z.im } : null;
+      }
+      if (count === 1) {
+        return evaluateConstantNode(node.base, context, scope, localBindings);
+      }
+      const repeated = oo(node.base, count);
+      if (node.span && repeated && typeof repeated === 'object') {
+        repeated.span = node.span;
+        repeated.input = node.input;
+      }
+      return evaluateConstantNode(repeated, context, scope, localBindings);
     }
     case 'LessThan':
     case 'GreaterThan':
@@ -2124,7 +2308,7 @@ const repeatSuffixParser = createParser('RepeatSuffix', (input) => {
   if (!opResult.ok) {
     return opResult;
   }
-  const countResult = unaryParser.runNormalized(opResult.next);
+  const countResult = additiveParser.runNormalized(opResult.next);
   if (!countResult.ok) {
     return countResult;
   }
@@ -2323,14 +2507,14 @@ expressionParser = createParser('Expression', (input) => {
   if (letResult.ok) {
     return letResult;
   }
-  if (letResult.severity === ParseSeverity.error) {
+  if (letResult.severity === ParseSeverity.error || failureAdvancedPastInput(letResult, input)) {
     return letResult;
   }
   const setResult = setBindingParser.runNormalized(input);
   if (setResult.ok) {
     return setResult;
   }
-  if (setResult.severity === ParseSeverity.error) {
+  if (setResult.severity === ParseSeverity.error || failureAdvancedPastInput(setResult, input)) {
     return setResult;
   }
   return logicalOrParser.runNormalized(input);

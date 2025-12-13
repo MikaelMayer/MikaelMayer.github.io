@@ -4,6 +4,16 @@ import {
 } from './core-engine.mjs';
 import { visitAst } from './ast-utils.mjs';
 import { parseFormulaInput } from './arithmetic-parser.mjs';
+import { formatCaretIndicator } from './parse-error-format.mjs';
+import {
+  FORMULA_PARAM,
+  FORMULA_B64_PARAM,
+  verifyCompressionSupport,
+  readFormulaFromQuery,
+  updateFormulaQueryParam,
+  updateFormulaQueryParamImmediately,
+  replaceUrlSearch,
+} from './formula-url.mjs';
 
 const canvas = document.getElementById('glcanvas');
 const formulaTextarea = document.getElementById('formula');
@@ -43,10 +53,10 @@ function disableCompressionStreams() {
     }
   }
 }
+const EDIT_PARAM = 'edit';
+const ANIMATION_TIME_PARAM = 't';
 
-if (typeof window !== 'undefined') {
-  window.__reflexCompressionEnabled = supportsCompressionStream && supportsDecompressionStream;
-}
+const DEFAULT_ANIMATION_SECONDS = 5;
 
 const FIXED_FINGER_ORDER = ['F1', 'F2', 'F3'];
 const DYNAMIC_FINGER_ORDER = ['D1', 'D2', 'D3'];
@@ -91,6 +101,18 @@ function getParserOptionsFromFingers() {
 }
 
 let activeFingerState = createEmptyFingerState();
+
+let suppressFingerQueryUpdates = false;
+
+const ANIMATION_SUFFIX = 'A';
+
+let viewerModeActive = false;
+let viewerModeRevealed = false;
+
+let animationSeconds = DEFAULT_ANIMATION_SECONDS;
+let animationController = null;
+let animationDraftStart = null;
+let sessionEditMode = false;
 
 function createEmptyFingerState() {
   return {
@@ -154,189 +176,31 @@ const DEFAULT_FORMULA_TEXT = 'z';
 const defaultParseResult = parseFormulaInput(DEFAULT_FORMULA_TEXT, getParserOptionsFromFingers());
 const fallbackDefaultAST = defaultParseResult.ok ? defaultParseResult.value : createDefaultFormulaAST();
 let reflexCore = null;
+let scheduledFingerDrivenReparse = false;
 
-async function transformWithStream(bytes, StreamConstructor) {
-  if (typeof Blob === 'undefined' || typeof ReadableStream === 'undefined') {
-    throw new Error('Streaming compression not supported');
+function formulaNeedsFingerDrivenReparse(source) {
+  if (!source || typeof source !== 'string') {
+    return false;
   }
-  const stream = new Blob([bytes]).stream().pipeThrough(new StreamConstructor('gzip'));
-  const buffer = await new Response(stream).arrayBuffer();
-  return new Uint8Array(buffer);
+  // These operators trigger parse-time desugaring / constant-folding that may
+  // depend on finger values (e.g. repeat counts and small integer exponents).
+  return source.includes('$$') || source.includes('^');
 }
 
-async function compressBytes(bytes) {
-  if (!supportsCompressionStream) {
-    throw new Error('CompressionStream API not supported');
-  }
-  return transformWithStream(bytes, CompressionStream);
-}
-
-async function decompressBytes(bytes) {
-  if (!supportsDecompressionStream) {
-    throw new Error('DecompressionStream API not supported');
-  }
-  return transformWithStream(bytes, DecompressionStream);
-}
-
-async function verifyCompressionSupport() {
-  if (!supportsCompressionStream) {
+function scheduleFingerDrivenReparse() {
+  if (scheduledFingerDrivenReparse) {
     return;
   }
-  try {
-    await compressBytes(encodeUtf8('probe'));
-  } catch (error) {
-    console.warn('CompressionStream is unavailable in this context; falling back to legacy query parameters.', error);
-    disableCompressionStreams();
-  }
-}
-
-function encodeUtf8(value) {
-  if (sharedTextEncoder) {
-    return sharedTextEncoder.encode(value);
-  }
-  const percentEncoded = encodeURIComponent(value);
-  const bytes = [];
-  for (let i = 0; i < percentEncoded.length; ) {
-    const char = percentEncoded[i];
-    if (char === '%') {
-      const hex = percentEncoded.slice(i + 1, i + 3);
-      bytes.push(parseInt(hex, 16));
-      i += 3;
-    } else {
-      bytes.push(char.charCodeAt(0));
-      i += 1;
-    }
-  }
-  return Uint8Array.from(bytes);
-}
-
-function decodeUtf8(bytes) {
-  if (sharedTextDecoder) {
-    return sharedTextDecoder.decode(bytes);
-  }
-  let percentEncoded = '';
-  for (let i = 0; i < bytes.length; i++) {
-    percentEncoded += `%${bytes[i].toString(16).padStart(2, '0')}`;
-  }
-  try {
-    return decodeURIComponent(percentEncoded);
-  } catch (_) {
-    return percentEncoded;
-  }
-}
-
-function base64UrlEncodeBytes(bytes) {
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function base64UrlDecodeToBytes(encoded) {
-  const normalized = encoded.replace(/-/g, '+').replace(/_/g, '/');
-  const paddingNeeded = (4 - (normalized.length % 4)) % 4;
-  const padded = normalized + '='.repeat(paddingNeeded);
-  const binary = atob(padded);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
-}
-
-async function encodeFormulaToCompressedParam(source) {
-  const utf8 = encodeUtf8(source);
-  if (!supportsCompressionStream) {
-    return null;
-  }
-  try {
-    const compressed = await compressBytes(utf8);
-    return base64UrlEncodeBytes(compressed);
-  } catch (error) {
-    console.warn('CompressionStream failed; falling back to legacy formula parameter.', error);
-    disableCompressionStreams();
-    return null;
-  }
-}
-
-async function decodeFormulaFromCompressedParam(encoded) {
-  if (!supportsDecompressionStream) {
-    return { ok: false, error: new Error('CompressionStream API unavailable') };
-  }
-  try {
-    const compressed = base64UrlDecodeToBytes(encoded);
-    const decompressed = await decompressBytes(compressed);
-    const decoded = decodeUtf8(decompressed);
-    return { ok: true, value: decoded };
-  } catch (error) {
-    disableCompressionStreams();
-    return { ok: false, error };
-  }
-}
-
-async function writeFormulaToSearchParams(params, source) {
-  params.delete(FORMULA_PARAM);
-  params.delete(FORMULA_B64_PARAM);
-  if (!source || !source.trim()) {
+  if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+    // Fall back to immediate reparse if rAF is unavailable.
+    applyFormulaFromTextarea({ updateQuery: false, preserveFingerState: true });
     return;
   }
-  try {
-    const encoded = await encodeFormulaToCompressedParam(source);
-    if (encoded) {
-      params.set(FORMULA_B64_PARAM, encoded);
-    } else {
-      params.set(FORMULA_PARAM, source);
-    }
-  } catch (error) {
-    console.warn('Failed to encode formula into formulab64 parameter. Falling back to raw text.', error);
-    params.set(FORMULA_PARAM, source);
-  }
-}
-
-function replaceUrlSearch(params) {
-  const newQuery = params.toString();
-  const newUrl = `${window.location.pathname}${newQuery ? `?${newQuery}` : ''}`;
-  window.history.replaceState({}, '', newUrl);
-}
-
-async function upgradeLegacyFormulaParam(source) {
-  const params = new URLSearchParams(window.location.search);
-  await writeFormulaToSearchParams(params, source);
-  replaceUrlSearch(params);
-}
-
-async function readFormulaFromQuery() {
-  const params = new URLSearchParams(window.location.search);
-  const encoded = params.get(FORMULA_B64_PARAM);
-  if (encoded) {
-    const decoded = await decodeFormulaFromCompressedParam(encoded);
-    if (decoded.ok) {
-      return decoded.value;
-    }
-    console.warn('Failed to decode formulab64 parameter, falling back to default formula.', decoded.error);
-    showError('We could not decode the formula embedded in this link. Resetting to the default formula.');
-    params.delete(FORMULA_B64_PARAM);
-    replaceUrlSearch(params);
-  }
-  const raw = params.get(FORMULA_PARAM);
-  if (!raw) {
-    return null;
-  }
-  let decoded = raw;
-  try {
-    decoded = decodeURIComponent(raw);
-  } catch (_) {
-    // Already decoded, ignore.
-  }
-  await upgradeLegacyFormulaParam(decoded);
-  return decoded;
-}
-
-async function updateFormulaQueryParam(source) {
-  const params = new URLSearchParams(window.location.search);
-  await writeFormulaToSearchParams(params, source);
-  replaceUrlSearch(params);
+  scheduledFingerDrivenReparse = true;
+  window.requestAnimationFrame(() => {
+    scheduledFingerDrivenReparse = false;
+    applyFormulaFromTextarea({ updateQuery: false, preserveFingerState: true });
+  });
 }
 
 function roundToThreeDecimals(value) {
@@ -422,6 +286,126 @@ function parseComplexString(raw) {
   return null;
 }
 
+function parseSecondsFromQuery(raw) {
+  if (raw == null) {
+    return null;
+  }
+  const trimmed = String(raw).trim().toLowerCase();
+  if (!trimmed) {
+    return null;
+  }
+  const numeric = trimmed.endsWith('s') ? trimmed.slice(0, -1) : trimmed;
+  const seconds = Number(numeric);
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return null;
+  }
+  return seconds;
+}
+
+function formatSecondsForQuery(seconds) {
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return null;
+  }
+  const normalized = Math.round(seconds * 1000) / 1000;
+  return `${normalized}s`;
+}
+
+function parseComplexInterval(raw) {
+  if (!raw) {
+    return null;
+  }
+  const normalized = String(raw).trim().replace(/\s+/g, '');
+  if (!normalized || normalized.includes(';') || normalized.includes('|')) {
+    return null;
+  }
+  const parts = normalized.split('..');
+  if (parts.length !== 2) {
+    return null;
+  }
+  const start = parseComplexString(parts[0]);
+  const end = parseComplexString(parts[1]);
+  if (!start || !end) {
+    return null;
+  }
+  return { start, end };
+}
+
+function readAnimationIntervalFromQuery(label) {
+  const params = new URLSearchParams(window.location.search);
+  const key = `${label}${ANIMATION_SUFFIX}`;
+  const raw = params.get(key);
+  return parseComplexInterval(raw);
+}
+
+function serializeAnimationInterval(interval) {
+  if (!interval) {
+    return null;
+  }
+  const start = interval?.start;
+  const end = interval?.end;
+  const startText = start ? formatComplexForQuery(start.x, start.y) : null;
+  const endText = end ? formatComplexForQuery(end.x, end.y) : null;
+  if (!startText || !endText) {
+    return null;
+  }
+  return `${startText}..${endText}`;
+}
+
+function updateSearchParam(key, valueOrNull) {
+  const params = new URLSearchParams(window.location.search);
+  if (valueOrNull == null || valueOrNull === '') {
+    params.delete(key);
+  } else {
+    params.set(key, String(valueOrNull));
+  }
+  replaceUrlSearch(params);
+}
+
+function hasFormulaQueryParam() {
+  const params = new URLSearchParams(window.location.search);
+  return params.has(FORMULA_PARAM) || params.has(FORMULA_B64_PARAM);
+}
+
+function isEditModeEnabled() {
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get(EDIT_PARAM);
+  if (!raw) {
+    return false;
+  }
+  const normalized = String(raw).trim().toLowerCase();
+  return normalized === 'true' || normalized === '1' || normalized === 'yes';
+}
+
+function isEditModeActive() {
+  return sessionEditMode || isEditModeEnabled();
+}
+
+function enterEditModeForSession() {
+  sessionEditMode = true;
+  revealViewerModeUIOnce();
+  if (animationController) {
+    animationController.stop();
+  }
+}
+
+function setViewerModeActive(active) {
+  viewerModeActive = Boolean(active);
+  if (!rootElement) {
+    return;
+  }
+  rootElement.classList.toggle('viewer-mode', viewerModeActive && !viewerModeRevealed);
+}
+
+function revealViewerModeUIOnce() {
+  if (!viewerModeActive || viewerModeRevealed) {
+    return;
+  }
+  viewerModeRevealed = true;
+  if (rootElement) {
+    rootElement.classList.remove('viewer-mode');
+  }
+}
+
 function ensureFingerIndicator(label) {
   if (fingerIndicators.has(label)) {
     return fingerIndicators.get(label);
@@ -501,12 +485,23 @@ function handleFingerValueChange(label, offset) {
   latestOffsets[label] = { x: offset.x, y: offset.y };
   refreshFingerIndicator(label);
   updateFingerDotPosition(label);
-  if (activeFingerState.activeLabelSet.has(label)) {
+  if (!suppressFingerQueryUpdates && activeFingerState.activeLabelSet.has(label)) {
     const serialized = formatComplexForQuery(offset.x, offset.y);
     if (serialized !== fingerLastSerialized[label]) {
       fingerLastSerialized[label] = serialized;
       updateFingerQueryParam(label, offset.x, offset.y);
     }
+  }
+
+  // If the current formula performs finger-dependent desugaring (e.g. `$$` repeat
+  // counts), a finger move must re-run the parse/desugar pipeline so the shader
+  // reflects the updated constant-folded structure.
+  if (
+    !suppressFingerQueryUpdates &&
+    activeFingerState.activeLabelSet.has(label) &&
+    formulaNeedsFingerDrivenReparse(formulaTextarea?.value || '')
+  ) {
+    scheduleFingerDrivenReparse();
   }
 }
 
@@ -551,18 +546,6 @@ function handleRendererInitializationFailure(error) {
     canvas.setAttribute('aria-disabled', 'true');
   }
   showFatalError(guidance);
-}
-
-function formatCaretIndicator(source, failure) {
-  const displaySource = source.length ? source : '(empty)';
-  const origin = failure?.span?.input?.start ?? 0;
-  const pointer = failure?.span ? failure.span.start - origin : 0;
-  const clamped = Number.isFinite(pointer)
-    ? Math.max(0, Math.min(pointer, source.length))
-    : 0;
-  const caretLine = `${' '.repeat(clamped)}^`;
-  const message = failure?.message || 'Parse error';
-  return `${displaySource}\n${caretLine}\n${message}`;
 }
 
 function showParseError(source, failure) {
@@ -752,7 +735,26 @@ function updateFingerDotPosition(label) {
 
 async function bootstrapReflexApplication() {
   await verifyCompressionSupport();
-  let initialFormulaSource = await readFormulaFromQuery();
+
+  const editEnabled = isEditModeActive();
+  const shouldStartInViewerMode = hasFormulaQueryParam() && !editEnabled;
+  setViewerModeActive(shouldStartInViewerMode);
+
+  // Any interaction reveals the UI when in viewer mode.
+  if (typeof window !== 'undefined') {
+    const reveal = () => revealViewerModeUIOnce();
+    window.addEventListener('pointerdown', reveal, { once: true, capture: true });
+    window.addEventListener('keydown', reveal, { once: true, capture: true });
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  animationSeconds = parseSecondsFromQuery(params.get(ANIMATION_TIME_PARAM)) ?? DEFAULT_ANIMATION_SECONDS;
+
+  let initialFormulaSource = await readFormulaFromQuery({
+    onDecodeError: () => {
+      showError('We could not decode the formula embedded in this link. Resetting to the default formula.');
+    },
+  });
   if (!initialFormulaSource || !initialFormulaSource.trim()) {
     initialFormulaSource = DEFAULT_FORMULA_TEXT;
   }
@@ -785,6 +787,9 @@ async function bootstrapReflexApplication() {
   }
 
   if (reflexCore) {
+    if (typeof window !== 'undefined') {
+      window.__reflexCore = reflexCore;
+    }
     ALL_FINGER_LABELS.forEach((label) => {
       reflexCore.onFingerChange(label, (offset) => handleFingerValueChange(label, offset));
     });
@@ -812,6 +817,27 @@ async function bootstrapReflexApplication() {
   } else if (canvas) {
     canvas.style.pointerEvents = 'none';
   }
+
+  // Load any animation intervals from the URL and start animating (unless edit mode).
+  if (reflexCore) {
+    const tracks = buildAnimationTracksFromQuery();
+    if (tracks.size) {
+      applyAnimationStartValues(tracks);
+      if (!editEnabled) {
+        startAnimations(tracks);
+      }
+    }
+    // Tap anywhere while animations are playing switches into edit mode for this session.
+    document.addEventListener(
+      'pointerdown',
+      () => {
+        if (animationController?.isPlaying()) {
+          enterEditModeForSession();
+        }
+      },
+      { capture: true },
+    );
+  }
 }
 
 const bootstrapPromise = bootstrapReflexApplication();
@@ -830,7 +856,7 @@ formulaTextarea.addEventListener('blur', () => {
   formulaTextarea.classList.remove('expanded');
 });
 
-function applyFormulaFromTextarea({ updateQuery = true } = {}) {
+function applyFormulaFromTextarea({ updateQuery = true, preserveFingerState = false } = {}) {
   const source = formulaTextarea.value;
   if (!source.trim()) {
     showError('Formula cannot be empty.');
@@ -849,8 +875,17 @@ function applyFormulaFromTextarea({ updateQuery = true } = {}) {
   }
   clearError();
   reflexCore?.setFormulaAST(result.value);
-  applyFingerState(nextState);
+  // Finger-driven reparses happen while a pointer is down (e.g. `$$` repeat counts
+  // derived from D1). Re-applying the finger state would call into ReflexCore's
+  // `setActiveFingerConfig`, which intentionally releases pointer capture and
+  // clears active pointer assignments — interrupting the drag mid-gesture.
+  if (!preserveFingerState) {
+    applyFingerState(nextState);
+  }
   if (updateQuery) {
+    // Update immediately (tests + deterministic sharing), then try to upgrade
+    // to the compressed param asynchronously when supported.
+    updateFormulaQueryParamImmediately(source);
     updateFormulaQueryParam(source).catch((error) =>
       console.warn('Failed to persist formula parameter.', error),
     );
@@ -925,14 +960,235 @@ function handleMenuAction(action) {
     case 'reset':
       confirmAndReset();
       break;
+    case 'set-animation-start':
+      setAnimationStartFromCurrent();
+      break;
+    case 'set-animation-end':
+      setAnimationEndFromCurrent();
+      break;
+    case 'set-animation-time':
+      promptAndSetAnimationTime();
+      break;
     case 'save-image':
       saveCanvasImage().catch((error) => {
         console.error('Failed to save canvas image.', error);
         alert('Unable to save image. Check console for details.');
       });
       break;
+    case 'open-formula-view':
+      window.location.href = `./formula.html${window.location.search || ''}`;
+      break;
     default:
       break;
+  }
+}
+
+function buildAnimationTracksFromQuery() {
+  const tracks = new Map();
+  for (const label of ALL_FINGER_LABELS) {
+    const interval = readAnimationIntervalFromQuery(label);
+    if (interval) {
+      tracks.set(label, interval);
+    }
+  }
+  return tracks;
+}
+
+function applyAnimationStartValues(tracks) {
+  if (!reflexCore) {
+    return;
+  }
+  suppressFingerQueryUpdates = true;
+  try {
+    for (const [label, interval] of tracks.entries()) {
+      if (interval?.start) {
+        reflexCore.setFingerValue(label, interval.start.x, interval.start.y, { triggerRender: false });
+      }
+    }
+  } finally {
+    suppressFingerQueryUpdates = false;
+  }
+  reflexCore.render();
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function lerpComplex(a, b, t) {
+  return { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t) };
+}
+
+function startAnimations(tracks) {
+  if (!reflexCore) {
+    return;
+  }
+  if (animationController) {
+    animationController.stop();
+  }
+  animationController = createAnimationController(reflexCore, tracks, animationSeconds);
+  animationController.start();
+}
+
+function createAnimationController(core, tracks, secondsPerSegment) {
+  const state = {
+    core,
+    tracks: new Map(tracks),
+    secondsPerSegment: Math.max(0.001, Number(secondsPerSegment) || DEFAULT_ANIMATION_SECONDS),
+    rafId: null,
+    playing: false,
+    paused: false,
+    lastNowMs: 0,
+    perTrack: new Map(),
+  };
+
+  for (const [label, interval] of state.tracks.entries()) {
+    state.perTrack.set(label, {
+      label,
+      interval,
+      baseStartMs: 0,
+      initialized: false,
+    });
+  }
+
+  function stepTrack(track, nowMs) {
+    const durationMs = state.secondsPerSegment * 1000;
+    if (!track.initialized) {
+      track.baseStartMs = nowMs;
+      track.initialized = true;
+    }
+    const interval = track.interval;
+    if (!interval) {
+      return null;
+    }
+    const start = interval.start;
+    const end = interval.end;
+    const elapsed = nowMs - track.baseStartMs;
+    const t = durationMs > 0 ? elapsed / durationMs : 0;
+    const frac = t - Math.floor(t);
+    return { value: lerpComplex(start, end, Math.max(0, Math.min(1, frac))), done: false };
+  }
+
+  function frame(nowMs) {
+    if (!state.playing || state.paused) {
+      return;
+    }
+    state.lastNowMs = nowMs;
+    suppressFingerQueryUpdates = true;
+    try {
+      for (const track of state.perTrack.values()) {
+        const step = stepTrack(track, nowMs);
+        if (!step?.value) {
+          continue;
+        }
+        state.core.setFingerValue(track.label, step.value.x, step.value.y, { triggerRender: false });
+      }
+      state.core.render();
+    } finally {
+      suppressFingerQueryUpdates = false;
+    }
+    state.rafId = window.requestAnimationFrame(frame);
+  }
+
+  return {
+    start() {
+      if (state.playing) {
+        return;
+      }
+      state.playing = true;
+      state.paused = false;
+      state.rafId = window.requestAnimationFrame(frame);
+    },
+    pause() {
+      state.paused = true;
+      if (state.rafId != null) {
+        window.cancelAnimationFrame(state.rafId);
+        state.rafId = null;
+      }
+    },
+    stop() {
+      state.playing = false;
+      state.paused = false;
+      if (state.rafId != null) {
+        window.cancelAnimationFrame(state.rafId);
+        state.rafId = null;
+      }
+    },
+    isPlaying() {
+      return state.playing && !state.paused;
+    },
+  };
+}
+
+function setAnimationStartFromCurrent() {
+  if (!reflexCore) {
+    return;
+  }
+  const snapshot = {};
+  for (const label of activeFingerState.allSlots) {
+    snapshot[label] = reflexCore.getFingerValue(label);
+  }
+  animationDraftStart = snapshot;
+  alert('Animation start recorded for active handles.');
+}
+
+function setAnimationEndFromCurrent() {
+  if (!reflexCore) {
+    return;
+  }
+  if (!animationDraftStart) {
+    alert('Set animation start first.');
+    return;
+  }
+  const params = new URLSearchParams(window.location.search);
+  const affected = [];
+  for (const label of activeFingerState.allSlots) {
+    const start = animationDraftStart[label];
+    if (!start) {
+      continue;
+    }
+    const end = reflexCore.getFingerValue(label);
+    const key = `${label}${ANIMATION_SUFFIX}`;
+    const serialized = serializeAnimationInterval({
+      start: { x: start.x, y: start.y },
+      end: { x: end.x, y: end.y },
+    });
+    if (serialized) {
+      params.set(key, serialized);
+      affected.push(label);
+    } else {
+      params.delete(key);
+    }
+  }
+  replaceUrlSearch(params);
+  animationDraftStart = null;
+
+  const tracks = buildAnimationTracksFromQuery();
+  if (tracks.size) {
+    applyAnimationStartValues(tracks);
+    if (!isEditModeActive()) {
+      startAnimations(tracks);
+    }
+  }
+  alert(affected.length ? `Animation interval set for: ${affected.join(', ')}` : 'No active handles to animate.');
+}
+
+function promptAndSetAnimationTime() {
+  const current = formatSecondsForQuery(animationSeconds) || `${DEFAULT_ANIMATION_SECONDS}s`;
+  const raw = window.prompt('Set animation time (seconds, suffix "s" optional):', current);
+  if (raw === null) {
+    return;
+  }
+  const parsed = parseSecondsFromQuery(raw);
+  if (!parsed) {
+    alert('Could not parse animation time. Example: "5s" or "10".');
+    return;
+  }
+  animationSeconds = parsed;
+  updateSearchParam(ANIMATION_TIME_PARAM, formatSecondsForQuery(parsed));
+  const tracks = buildAnimationTracksFromQuery();
+  if (tracks.size && !isEditModeActive()) {
+    startAnimations(tracks);
   }
 }
 
