@@ -227,23 +227,48 @@ const literalParser = Choice([
   jLiteral,
 ], { ctor: 'Literal' });
 
-const FINGER_TOKENS = ['F1', 'F2', 'F3', 'D1', 'D2', 'D3', 'W1', 'W2'];
+const FINGER_LABEL_REGEX = /(?:[FD][1-9]\d*|W[12])/y;
 
-const DEFAULT_FINGER_VALUE_MAP = {
-  F1: { re: 0, im: 0 },
-  F2: { re: 0, im: 0 },
-  F3: { re: 0, im: 0 },
-  D1: { re: 0, im: 0 },
-  D2: { re: 0, im: 0 },
-  D3: { re: 0, im: 0 },
-  W1: { re: 1, im: 0 },
-  W2: { re: 0, im: 0 },
-};
+function isFingerLabel(label) {
+  if (!label || typeof label !== 'string') {
+    return false;
+  }
+  if (label === 'W1' || label === 'W2') {
+    return true;
+  }
+  return /^[FD][1-9]\d*$/.test(label);
+}
 
-const fingerLiteralParsers = FINGER_TOKENS.map((label) =>
-  keywordLiteral(label, { ctor: `Finger(${label})` }).Map((_, result) =>
-    withSyntax(withSpan(FingerOffset(label), result.span), label),
-  ),
+const fingerToken = wsRegex(FINGER_LABEL_REGEX, {
+  ctor: 'FingerToken',
+  transform: (match) => match[0],
+});
+
+const fingerLiteralParser = createParser('FingerLiteral', (input) => {
+  const result = fingerToken.runNormalized(input);
+  if (!result.ok) {
+    return result;
+  }
+  const nextChar = result.next.peek();
+  if (nextChar && IDENTIFIER_CHAR.test(nextChar)) {
+    // e.g. "F1foo" should be parsed as an identifier, not a finger literal.
+    return new ParseFailure({
+      ctor: 'FingerLiteral',
+      message: 'Expected finger literal',
+      severity: ParseSeverity.recoverable,
+      expected: 'finger literal',
+      span: result.span,
+      input: result.span.input,
+    });
+  }
+  return new ParseSuccess({
+    ctor: 'FingerLiteral',
+    value: result.value,
+    span: result.span,
+    next: result.next,
+  });
+}).Map((label, result) =>
+  withSyntax(withSpan(FingerOffset(label), result.span), label),
 );
 
 const RESERVED_BINDING_NAMES = new Set([
@@ -277,7 +302,6 @@ const RESERVED_BINDING_NAMES = new Set([
   'z',
   'j',
   ITERATION_VARIABLE_NAME,
-  ...FINGER_TOKENS,
 ]);
 
 const iterationVariableLiteral = keywordLiteral(ITERATION_VARIABLE_NAME, { ctor: 'IterationVar' })
@@ -309,7 +333,7 @@ const bindingIdentifierParser = createParser('BindingIdentifier', (input) => {
   if (!identifier.ok) {
     return identifier;
   }
-  if (RESERVED_BINDING_NAMES.has(identifier.value)) {
+  if (RESERVED_BINDING_NAMES.has(identifier.value) || isFingerLabel(identifier.value)) {
     return new ParseFailure({
       ctor: 'BindingIdentifier',
       message: `"${identifier.value}" is a reserved identifier and cannot be bound with set`,
@@ -333,7 +357,7 @@ const primitiveParser = Choice([
   keywordLiteral('real', { ctor: 'VarReal' }).Map((_, result) => withSyntax(withSpan(VarX(), result.span), 'real')),
   keywordLiteral('imag', { ctor: 'VarImag' }).Map((_, result) => withSyntax(withSpan(VarY(), result.span), 'imag')),
   keywordLiteral('z', { ctor: 'VarZ' }).Map((_, result) => withSpan(VarZ(), result.span)),
-  ...fingerLiteralParsers,
+  fingerLiteralParser,
   iterationVariableLiteral,
   identifierReferenceParser,
 ], { ctor: 'Primitive' });
@@ -1554,7 +1578,7 @@ function normalizeParseOptions(options = {}) {
 }
 
 function normalizeFingerValuesSource(source) {
-  const map = createDefaultFingerValueMap();
+  const map = new Map();
   if (!source) {
     return map;
   }
@@ -1572,17 +1596,8 @@ function normalizeFingerValuesSource(source) {
   return map;
 }
 
-function createDefaultFingerValueMap() {
-  const map = new Map();
-  FINGER_TOKENS.forEach((label) => {
-    const defaults = DEFAULT_FINGER_VALUE_MAP[label] || { re: 0, im: 0 };
-    map.set(label, { re: defaults.re, im: defaults.im });
-  });
-  return map;
-}
-
 function assignFingerValue(map, label, value) {
-  if (!FINGER_TOKENS.includes(label)) {
+  if (!isFingerLabel(label)) {
     return;
   }
   const normalized = normalizeComplexInput(value);
@@ -2081,10 +2096,15 @@ function evaluateComparison(kind, left, right) {
 
 function getFingerValueFromContext(label, fingerValues) {
   const value = fingerValues?.get(label);
-  if (!value) {
-    return null;
+  if (value) {
+    return { re: value.re, im: value.im };
   }
-  return { re: value.re, im: value.im };
+  // Default missing finger values to 0 (with W1 defaulting to 1+0i),
+  // matching the previous fixed-token behavior.
+  if (label === 'W1') {
+    return { re: 1, im: 0 };
+  }
+  return { re: 0, im: 0 };
 }
 
 function complexAdd(a, b) {

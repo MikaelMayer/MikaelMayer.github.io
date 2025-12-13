@@ -213,6 +213,22 @@ test('parses additional finger primitives', () => {
   assert.equal(add.right.slot, 'D3');
 });
 
+test('parses non-consecutive finger primitives (any F*/D*)', () => {
+  const result = parseFormulaInput('F7 + D12');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Add');
+  assert.equal(result.value.left.kind, 'FingerOffset');
+  assert.equal(result.value.left.slot, 'F7');
+  assert.equal(result.value.right.kind, 'FingerOffset');
+  assert.equal(result.value.right.slot, 'D12');
+});
+
+test('rejects binding finger names with set', () => {
+  const result = parseFormulaInput('set F7 = 1 in F7');
+  assert.equal(result.ok, false);
+  assert.match(result.message, /reserved identifier/i);
+});
+
 test('parses W finger primitives', () => {
   const result = parseFormulaInput('W1 + W2');
   assert.equal(result.ok, true);
@@ -279,9 +295,9 @@ test('$$ accepts bare additive expressions on the right-hand side', () => {
 });
 
 test('$$ can derive counts from finger values', () => {
-  const result = parseFormulaInput('sin $$ (10 * D1.x).floor', {
+  const result = parseFormulaInput('sin $$ (10 * D12.x).floor', {
     fingerValues: {
-      D1: { x: 0.5, y: 0 },
+      D12: { x: 0.5, y: 0 },
     },
   });
   assert.equal(result.ok, true);
@@ -290,7 +306,7 @@ test('$$ can derive counts from finger values', () => {
   assert.equal(result.value.base.kind, 'Sin');
   let fingerSeen = false;
   visitAst(result.value.countExpression, (node) => {
-    if (node.kind === 'FingerOffset' && node.slot === 'D1') {
+    if (node.kind === 'FingerOffset' && node.slot === 'D12') {
       fingerSeen = true;
     }
   });
