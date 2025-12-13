@@ -8,6 +8,7 @@ import { formatCaretIndicator } from './parse-error-format.mjs';
 import {
   FORMULA_PARAM,
   FORMULA_B64_PARAM,
+  LAST_STATE_SEARCH_KEY,
   verifyCompressionSupport,
   readFormulaFromQuery,
   writeFormulaToSearchParams,
@@ -445,6 +446,51 @@ function readFingerFromQuery(label) {
   return parseComplexString(raw);
 }
 
+function persistLastSearchToLocalStorage(search) {
+  try {
+    window.localStorage?.setItem(LAST_STATE_SEARCH_KEY, String(search || ''));
+  } catch (_) {
+    // ignore storage failures
+  }
+}
+
+function clearPersistedLastSearch() {
+  try {
+    window.localStorage?.removeItem(LAST_STATE_SEARCH_KEY);
+  } catch (_) {
+    // ignore storage failures
+  }
+}
+
+function restorePersistedSearchIfNeeded() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  const params = new URLSearchParams(window.location.search);
+  // If opened via a share link (formula embedded), do not override it.
+  if (params.has(FORMULA_PARAM) || params.has(FORMULA_B64_PARAM)) {
+    return;
+  }
+  let saved = null;
+  try {
+    saved = window.localStorage?.getItem(LAST_STATE_SEARCH_KEY);
+  } catch (_) {
+    saved = null;
+  }
+  if (!saved || typeof saved !== 'string' || !saved.startsWith('?')) {
+    return;
+  }
+  const savedParams = new URLSearchParams(saved.slice(1));
+  if (!savedParams.has(FORMULA_PARAM) && !savedParams.has(FORMULA_B64_PARAM)) {
+    return;
+  }
+  const current = window.location.search || '';
+  if (current === saved) {
+    return;
+  }
+  window.history.replaceState({}, '', `${window.location.pathname}${saved}`);
+}
+
 function updateFingerQueryParam(label, re, im) {
   const serialized = formatComplexForQuery(re, im);
   const params = new URLSearchParams(window.location.search);
@@ -456,6 +502,7 @@ function updateFingerQueryParam(label, re, im) {
   const newQuery = params.toString();
   const newUrl = `${window.location.pathname}${newQuery ? `?${newQuery}` : ''}`;
   window.history.replaceState({}, '', newUrl);
+  persistLastSearchToLocalStorage(newQuery ? `?${newQuery}` : '');
 }
 
 function clearFingerQueryParam(label) {
@@ -716,6 +763,10 @@ function updateFingerDotPosition(label) {
 }
 
 async function bootstrapReflexApplication() {
+  // Installed PWAs often relaunch at `start_url` without the last query string.
+  // Restore the last known reflex state unless the user opened an explicit share link.
+  restorePersistedSearchIfNeeded();
+
   await verifyCompressionSupport();
 
   const editEnabled = isEditModeActive();
@@ -1269,6 +1320,7 @@ function resetApplicationState() {
   updateFormulaQueryParam(null).catch((error) =>
     console.warn('Failed to clear formula parameter.', error),
   );
+  clearPersistedLastSearch();
   resetFingerValuesToDefaults();
   clearError();
 }
