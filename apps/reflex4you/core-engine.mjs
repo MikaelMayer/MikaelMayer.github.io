@@ -430,6 +430,20 @@ const formulaGlobals = Object.freeze({
 
 const FINGER_SWITCH_PIXEL_THRESHOLD = 6;
 
+// Finger values are serialized into the URL (and displayed) at a fixed decimal
+// precision. Keep the internal state quantized to the same representation so
+// that reloads are deterministic and GPU uniforms always match the URL display.
+export const FINGER_DECIMAL_PLACES = 4;
+const FINGER_DECIMAL_FACTOR = 10 ** FINGER_DECIMAL_PLACES;
+
+function roundFingerComponent(value) {
+  if (!Number.isFinite(value)) {
+    return NaN;
+  }
+  const rounded = Math.round(value * FINGER_DECIMAL_FACTOR) / FINGER_DECIMAL_FACTOR;
+  return Object.is(rounded, -0) ? 0 : rounded;
+}
+
 export function evaluateFormulaSource(source, extraGlobals = {}) {
   const scope = Object.assign({}, formulaGlobals, extraGlobals);
   const argNames = Object.keys(scope);
@@ -1427,31 +1441,36 @@ export class ReflexCore {
     if (!Number.isFinite(x) || !Number.isFinite(y)) {
       return;
     }
-    const current = this.fingerValues.get(slot);
-    if (current && current.x === x && current.y === y) {
+    const qx = roundFingerComponent(x);
+    const qy = roundFingerComponent(y);
+    if (!Number.isFinite(qx) || !Number.isFinite(qy)) {
       return;
     }
-    this.fingerValues.set(slot, { x, y });
+    const current = this.fingerValues.get(slot);
+    if (current && current.x === qx && current.y === qy) {
+      return;
+    }
+    this.fingerValues.set(slot, { x: qx, y: qy });
     const index = fingerIndexFromLabel(slot);
     const family = fingerFamilyFromLabel(slot);
     if (family === "fixed") {
       if (index >= 0) {
         this.ensureOffsetsBufferCapacity('fixed', index + 1);
-        this.fixedOffsetsBuffer[index * 2] = x;
-        this.fixedOffsetsBuffer[index * 2 + 1] = y;
+        this.fixedOffsetsBuffer[index * 2] = qx;
+        this.fixedOffsetsBuffer[index * 2 + 1] = qy;
         this.fixedOffsetsDirty = true;
       }
     } else if (family === "dynamic") {
       if (index >= 0) {
         this.ensureOffsetsBufferCapacity('dynamic', index + 1);
-        this.dynamicOffsetsBuffer[index * 2] = x;
-        this.dynamicOffsetsBuffer[index * 2 + 1] = y;
+        this.dynamicOffsetsBuffer[index * 2] = qx;
+        this.dynamicOffsetsBuffer[index * 2 + 1] = qy;
         this.dynamicOffsetsDirty = true;
       }
     } else if (family === "w") {
       if (index >= 0) {
-        this.wOffsetsBuffer[index * 2] = x;
-        this.wOffsetsBuffer[index * 2 + 1] = y;
+        this.wOffsetsBuffer[index * 2] = qx;
+        this.wOffsetsBuffer[index * 2 + 1] = qy;
         this.wOffsetsDirty = true;
       }
     }
