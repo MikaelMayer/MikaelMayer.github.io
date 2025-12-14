@@ -30,4 +30,6 @@ jobs:
           folder: .
           enable_jekyll: false
           clean: true
+          clean-exclude: |
+            pr-preview
           single-commit: true
