@@ -28,7 +28,7 @@ jobs:
         with:
           branch: gh-pages
           folder: apps/reflex4you
-          target-folder: pr-preview/pr-${{ github.event.pull_request.number }}
+          target-folder: pr-preview/pr-${{ github.event.pull_request.number }}/apps/reflex4you
           clean: false
           single-commit: false
 
@@ -38,7 +38,7 @@ jobs:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
             ✅ **PR Preview deployed**
-            - **Preview URL**: https://${{ github.repository_owner }}.github.io/pr-preview/pr-${{ github.event.pull_request.number }}/
+            - **Preview URL**: https://${{ github.repository_owner }}.github.io/pr-preview/pr-${{ github.event.pull_request.number }}/apps/reflex4you/
             - **Commit**: ${{ github.event.pull_request.head.sha }}
 
   no_preview_for_forks:
