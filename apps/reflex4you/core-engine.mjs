@@ -1339,6 +1339,10 @@ export class ReflexCore {
       throw new Error('WebGL2 not supported in this browser');
     }
 
+    this._contextLost = false;
+    this._contextLostListener = null;
+    this._contextRestoredListener = null;
+
     this.program = null;
     this.vao = null;
     this.uMinLoc = null;
@@ -1440,6 +1444,55 @@ export class ReflexCore {
     if (typeof window !== 'undefined') {
       this._pageShowListener = () => this.render();
       window.addEventListener('pageshow', this._pageShowListener);
+    }
+
+    // Mobile PWAs can lose the WebGL context while backgrounded. Without explicit
+    // handling, the canvas often comes back black until a full reload.
+    // When a context is restored, all GPU resources must be recreated.
+    this._contextLostListener = (event) => {
+      try {
+        event.preventDefault();
+      } catch (_) {
+        // ignore
+      }
+      this._contextLost = true;
+    };
+    this._contextRestoredListener = () => {
+      this._contextLost = false;
+      this.handleContextRestored();
+    };
+    try {
+      this.canvas.addEventListener('webglcontextlost', this._contextLostListener, false);
+      this.canvas.addEventListener('webglcontextrestored', this._contextRestoredListener, false);
+    } catch (_) {
+      // ignore listener failures
+    }
+  }
+
+  handleContextRestored() {
+    // Try to re-acquire the context (some browsers return a "new" object).
+    const nextGl =
+      this.canvas.getContext('webgl2', { preserveDrawingBuffer: true }) ||
+      this.canvas.getContext('webgl2');
+    if (nextGl) {
+      this.gl = nextGl;
+    }
+    // Clear references to GL resources created before the loss.
+    this.program = null;
+    this.vao = null;
+    this.uMinLoc = null;
+    this.uMaxLoc = null;
+    this.uResolutionLoc = null;
+    this.uFixedOffsetsLoc = null;
+    this.uDynamicOffsetsLoc = null;
+    this.uWOffsetsLoc = null;
+
+    try {
+      this.rebuildProgram();
+      this.render();
+    } catch (error) {
+      // Keep the app alive; callers can decide how to surface errors.
+      console.error('Failed to restore WebGL resources after context restore.', error);
     }
   }
 
@@ -1802,6 +1855,12 @@ export class ReflexCore {
 
   render() {
     if (!this.program) return;
+    if (
+      this._contextLost ||
+      (this.gl && typeof this.gl.isContextLost === 'function' && this.gl.isContextLost())
+    ) {
+      return;
+    }
     const { layoutReady } = this.resizeCanvasToDisplaySize();
     if (!layoutReady && typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
       if (this._layoutRetryRaf == null) {

@@ -74,15 +74,30 @@ async function cacheFirst(request) {
   return response;
 }
 
-async function networkFirst(request, { fallbackUrl } = {}) {
+async function networkFirst(request, { fallbackUrl, timeoutMs = 3500 } = {}) {
+  // On mobile/PWA resumes, `fetch()` for navigations can hang indefinitely.
+  // Use an AbortController timeout and fall back to cache/app-shell.
+  const hasAbortController = typeof AbortController === 'function';
+  const controller = hasAbortController ? new AbortController() : null;
+  const useTimeout = Number.isFinite(timeoutMs) && timeoutMs > 0;
+  const timeoutId =
+    controller && useTimeout
+      ? setTimeout(() => {
+          try {
+            controller.abort();
+          } catch (_) {
+            // ignore
+          }
+        }, timeoutMs)
+      : null;
   try {
-    const response = await fetch(request);
+    const response = controller ? await fetch(request, { signal: controller.signal }) : await fetch(request);
     if (response && response.ok) {
       const cache = await caches.open(RUNTIME_CACHE_NAME);
       cache.put(request, response.clone()).catch(() => {});
     }
     return response;
-  } catch (_) {
+  } catch (error) {
     const cached = await caches.match(request);
     if (cached) {
       return cached;
@@ -93,7 +108,11 @@ async function networkFirst(request, { fallbackUrl } = {}) {
         return fallback;
       }
     }
-    throw _;
+    throw error;
+  } finally {
+    if (timeoutId != null) {
+      clearTimeout(timeoutId);
+    }
   }
 }
 
@@ -115,7 +134,7 @@ self.addEventListener('fetch', (event) => {
 
   if (isNavigation) {
     const fallbackUrl = url.pathname.endsWith('/formula.html') ? './formula.html' : './index.html';
-    event.respondWith(networkFirst(request, { fallbackUrl }));
+    event.respondWith(networkFirst(request, { fallbackUrl, timeoutMs: 3500 }));
     return;
   }
 

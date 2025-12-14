@@ -33,6 +33,7 @@ const rootElement = typeof document !== 'undefined' ? document.documentElement :
 let fatalErrorActive = false;
 
 const APP_VERSION = 8;
+const CONTEXT_LOSS_RELOAD_KEY = `reflex4you:contextLossReloaded:v${APP_VERSION}`;
 
 if (versionPill) {
   versionPill.textContent = `v${APP_VERSION}`;
@@ -862,6 +863,50 @@ function handleRendererInitializationFailure(error) {
   showFatalError(guidance);
 }
 
+function scheduleReloadOnceForContextLoss() {
+  if (typeof window === 'undefined' || typeof window.location?.reload !== 'function') {
+    return;
+  }
+  let already = false;
+  try {
+    already = Boolean(window.sessionStorage?.getItem(CONTEXT_LOSS_RELOAD_KEY));
+  } catch (_) {
+    already = false;
+  }
+  if (already) {
+    return;
+  }
+  try {
+    window.sessionStorage?.setItem(CONTEXT_LOSS_RELOAD_KEY, String(Date.now()));
+  } catch (_) {
+    // ignore
+  }
+  window.setTimeout(() => {
+    try {
+      window.location.reload();
+    } catch (_) {
+      // ignore
+    }
+  }, 250);
+}
+
+function maybeRecoverFromWebglContextLoss() {
+  const gl = reflexCore?.gl;
+  if (!gl || typeof gl.isContextLost !== 'function') {
+    return;
+  }
+  if (!gl.isContextLost()) {
+    return;
+  }
+  showFatalError(
+    [
+      'Graphics context was lost (common after being backgrounded on mobile PWAs).',
+      'Reloading the app to recover…',
+    ].join('\n'),
+  );
+  scheduleReloadOnceForContextLoss();
+}
+
 function showParseError(source, failure) {
   showError(formatCaretIndicator(source, failure));
 }
@@ -1192,6 +1237,72 @@ bootstrapPromise.catch((error) => {
   console.error('Failed to bootstrap Reflex4You.', error);
   showFatalError('Unable to initialize Reflex4You.');
 });
+
+if (typeof window !== 'undefined') {
+  // Surface unexpected runtime errors in-app on mobile, where devtools are harder.
+  window.addEventListener('error', (event) => {
+    const message =
+      event?.error?.stack ||
+      event?.error?.message ||
+      event?.message ||
+      'Unknown error';
+    console.error('Uncaught error', event?.error || event);
+    showFatalError(`Uncaught error:\n${message}`);
+  });
+  window.addEventListener('unhandledrejection', (event) => {
+    const reason = event?.reason;
+    const message =
+      reason?.stack ||
+      reason?.message ||
+      (typeof reason === 'string' ? reason : null) ||
+      'Unknown rejection';
+    console.error('Unhandled promise rejection', reason);
+    showFatalError(`Unhandled promise rejection:\n${message}`);
+  });
+}
+
+if (canvas) {
+  // If the WebGL context is lost, the most reliable recovery in mobile PWAs is a reload.
+  canvas.addEventListener(
+    'webglcontextlost',
+    (event) => {
+      try {
+        event.preventDefault();
+      } catch (_) {
+        // ignore
+      }
+      showFatalError(
+        [
+          'Graphics context was lost (common after being backgrounded on mobile PWAs).',
+          'Reloading the app to recover…',
+        ].join('\n'),
+      );
+      scheduleReloadOnceForContextLoss();
+    },
+    false,
+  );
+  canvas.addEventListener(
+    'webglcontextrestored',
+    () => {
+      // ReflexCore will attempt to rebuild GPU resources, but also re-check after restore.
+      maybeRecoverFromWebglContextLoss();
+    },
+    false,
+  );
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      maybeRecoverFromWebglContextLoss();
+    }
+  });
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('pageshow', () => {
+    maybeRecoverFromWebglContextLoss();
+  });
+}
 
 formulaTextarea.addEventListener('focus', () => {
   formulaTextarea.classList.add('expanded');
