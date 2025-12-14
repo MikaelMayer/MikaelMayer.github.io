@@ -1369,6 +1369,10 @@ export class ReflexCore {
     // that tiny size produces a uniform full-screen color until a later resize/re-render.
     // Track a single scheduled retry render once layout stabilizes.
     this._layoutRetryRaf = null;
+    this._resizeObserver = null;
+    this._resizeObserverRaf = null;
+    this._visibilityListener = null;
+    this._pageShowListener = null;
 
     this.formulaAST = initialAST;
 
@@ -1377,6 +1381,47 @@ export class ReflexCore {
 
     if (typeof window !== 'undefined') {
       window.addEventListener('resize', () => this.render());
+    }
+
+    // Some browsers (notably mobile/PWA shells) can change the CSS pixel size of the
+    // canvas without firing a window 'resize' event (address bar collapse/expand,
+    // viewport restoration after app switch, etc). Observe the canvas element and
+    // re-render whenever its box size changes.
+    if (typeof ResizeObserver !== 'undefined') {
+      this._resizeObserver = new ResizeObserver(() => {
+        if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+          this.render();
+          return;
+        }
+        if (this._resizeObserverRaf != null) {
+          return;
+        }
+        this._resizeObserverRaf = window.requestAnimationFrame(() => {
+          this._resizeObserverRaf = null;
+          this.render();
+        });
+      });
+      try {
+        this._resizeObserver.observe(this.canvas);
+      } catch (_) {
+        // ignore observer failures
+      }
+    }
+
+    // When returning to a tab/PWA, WebGL canvases can display stale content until the
+    // next explicit draw. Ensure we re-render on visibility restoration.
+    if (typeof document !== 'undefined') {
+      this._visibilityListener = () => {
+        if (document.hidden) {
+          return;
+        }
+        this.render();
+      };
+      document.addEventListener('visibilitychange', this._visibilityListener);
+    }
+    if (typeof window !== 'undefined') {
+      this._pageShowListener = () => this.render();
+      window.addEventListener('pageshow', this._pageShowListener);
     }
   }
 
