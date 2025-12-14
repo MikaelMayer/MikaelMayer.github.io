@@ -38,7 +38,10 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          # Reflex4You is a standalone static app with its own index.html.
+          # Uploading just this folder makes the preview URL render the app directly,
+          # even if the repo root doesn't have a production homepage.
+          path: apps/reflex4you
 
       - name: Deploy preview to GitHub Pages
         id: deployment
