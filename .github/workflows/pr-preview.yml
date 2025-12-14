@@ -19,6 +19,9 @@ jobs:
     name: Deploy PR preview (no commits)
     runs-on: ubuntu-latest
     if: github.event.pull_request.head.repo.full_name == github.repository
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     permissions:
       contents: read
       pages: write
