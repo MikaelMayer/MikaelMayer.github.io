@@ -1332,7 +1332,12 @@ export function buildFragmentSourceFromAST(ast) {
 // =========================
 
 export class ReflexCore {
-  constructor(canvas, initialAST = createDefaultFormulaAST()) {
+  constructor(canvas, initialAST = createDefaultFormulaAST(), options = {}) {
+    const {
+      autoRender = true,
+      installEventListeners = true,
+    } = options || {};
+
     this.canvas = canvas;
     this.gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true }) || canvas.getContext('webgl2');
     if (!this.gl) {
@@ -1342,6 +1347,7 @@ export class ReflexCore {
     this._contextLost = false;
     this._contextLostListener = null;
     this._contextRestoredListener = null;
+    this._windowResizeListener = null;
 
     this.program = null;
     this.vao = null;
@@ -1399,17 +1405,20 @@ export class ReflexCore {
     this.formulaAST = initialAST;
 
     this.rebuildProgram();
-    this.render();
+    if (autoRender) {
+      this.render();
+    }
 
-    if (typeof window !== 'undefined') {
-      window.addEventListener('resize', () => this.render());
+    if (installEventListeners && typeof window !== 'undefined') {
+      this._windowResizeListener = () => this.render();
+      window.addEventListener('resize', this._windowResizeListener);
     }
 
     // Some browsers (notably mobile/PWA shells) can change the CSS pixel size of the
     // canvas without firing a window 'resize' event (address bar collapse/expand,
     // viewport restoration after app switch, etc). Observe the canvas element and
     // re-render whenever its box size changes.
-    if (typeof ResizeObserver !== 'undefined') {
+    if (installEventListeners && typeof ResizeObserver !== 'undefined') {
       this._resizeObserver = new ResizeObserver(() => {
         if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
           this.render();
@@ -1432,7 +1441,7 @@ export class ReflexCore {
 
     // When returning to a tab/PWA, WebGL canvases can display stale content until the
     // next explicit draw. Ensure we re-render on visibility restoration.
-    if (typeof document !== 'undefined') {
+    if (installEventListeners && typeof document !== 'undefined') {
       this._visibilityListener = () => {
         if (document.hidden) {
           return;
@@ -1441,7 +1450,7 @@ export class ReflexCore {
       };
       document.addEventListener('visibilitychange', this._visibilityListener);
     }
-    if (typeof window !== 'undefined') {
+    if (installEventListeners && typeof window !== 'undefined') {
       this._pageShowListener = () => this.render();
       window.addEventListener('pageshow', this._pageShowListener);
     }
@@ -1461,11 +1470,81 @@ export class ReflexCore {
       this._contextLost = false;
       this.handleContextRestored();
     };
-    try {
-      this.canvas.addEventListener('webglcontextlost', this._contextLostListener, false);
-      this.canvas.addEventListener('webglcontextrestored', this._contextRestoredListener, false);
-    } catch (_) {
-      // ignore listener failures
+    if (installEventListeners) {
+      try {
+        this.canvas.addEventListener('webglcontextlost', this._contextLostListener, false);
+        this.canvas.addEventListener('webglcontextrestored', this._contextRestoredListener, false);
+      } catch (_) {
+        // ignore listener failures
+      }
+    }
+  }
+
+  dispose() {
+    // Best-effort cleanup for offscreen renderers (export, tests, etc.).
+    if (typeof window !== 'undefined' && this._windowResizeListener) {
+      try {
+        window.removeEventListener('resize', this._windowResizeListener);
+      } catch (_) {
+        // ignore
+      }
+      this._windowResizeListener = null;
+    }
+    if (this._resizeObserver) {
+      try {
+        this._resizeObserver.disconnect();
+      } catch (_) {
+        // ignore
+      }
+      this._resizeObserver = null;
+    }
+    if (this._resizeObserverRaf != null && typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function') {
+      try {
+        window.cancelAnimationFrame(this._resizeObserverRaf);
+      } catch (_) {
+        // ignore
+      }
+      this._resizeObserverRaf = null;
+    }
+    if (this._layoutRetryRaf != null && typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function') {
+      try {
+        window.cancelAnimationFrame(this._layoutRetryRaf);
+      } catch (_) {
+        // ignore
+      }
+      this._layoutRetryRaf = null;
+    }
+    if (typeof document !== 'undefined' && this._visibilityListener) {
+      try {
+        document.removeEventListener('visibilitychange', this._visibilityListener);
+      } catch (_) {
+        // ignore
+      }
+      this._visibilityListener = null;
+    }
+    if (typeof window !== 'undefined' && this._pageShowListener) {
+      try {
+        window.removeEventListener('pageshow', this._pageShowListener);
+      } catch (_) {
+        // ignore
+      }
+      this._pageShowListener = null;
+    }
+    if (this.canvas && this._contextLostListener) {
+      try {
+        this.canvas.removeEventListener('webglcontextlost', this._contextLostListener, false);
+      } catch (_) {
+        // ignore
+      }
+      this._contextLostListener = null;
+    }
+    if (this.canvas && this._contextRestoredListener) {
+      try {
+        this.canvas.removeEventListener('webglcontextrestored', this._contextRestoredListener, false);
+      } catch (_) {
+        // ignore
+      }
+      this._contextRestoredListener = null;
     }
   }
 
@@ -1873,6 +1952,40 @@ export class ReflexCore {
     this.gl.useProgram(this.program);
     this.uploadFingerUniforms();
     this.gl.uniform2f(this.uResolutionLoc, this.canvas.width, this.canvas.height);
+    this.updateView();
+
+    this.gl.clearColor(0, 0, 0, 1);
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+    this.gl.drawArrays(this.gl.TRIANGLES, 0, 3);
+  }
+
+  renderToPixelSize(width, height) {
+    if (!this.program) return;
+    if (
+      this._contextLost ||
+      (this.gl && typeof this.gl.isContextLost === 'function' && this.gl.isContextLost())
+    ) {
+      return;
+    }
+
+    const w = Math.floor(Number(width));
+    const h = Math.floor(Number(height));
+    if (!(w > 0 && h > 0)) {
+      throw new Error(`Invalid render size: ${width}x${height}`);
+    }
+
+    // Force the backing store to exact pixel dimensions (ignore DPR/client size).
+    if (this.canvas.width !== w) {
+      this.canvas.width = w;
+    }
+    if (this.canvas.height !== h) {
+      this.canvas.height = h;
+    }
+    this.gl.viewport(0, 0, w, h);
+
+    this.gl.useProgram(this.program);
+    this.uploadFingerUniforms();
+    this.gl.uniform2f(this.uResolutionLoc, w, h);
     this.updateView();
 
     this.gl.clearColor(0, 0, 0, 1);
