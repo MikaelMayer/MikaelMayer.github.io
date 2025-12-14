@@ -1,11 +1,7 @@
 name: PR Preview (GitHub Pages)
 
 on:
-  # Use pull_request_target so the workflow runs with the base ref (e.g. master),
-  # which satisfies common github-pages environment protection rules that reject
-  # deployments from refs/pull/*.
-  # We still check out the PR's head SHA to deploy the preview content.
-  pull_request_target:
+  pull_request:
     types: [opened, synchronize, reopened]
 
 permissions:
