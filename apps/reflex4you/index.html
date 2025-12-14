@@ -217,8 +217,57 @@
       display: inline-flex;
       flex-direction: column;
       align-items: flex-end;
-  gap: 6px;
+      gap: 6px;
       pointer-events: auto;
+    }
+
+    #menu-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    #menu-anchor {
+      position: relative;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+
+    .icon-button {
+      width: 44px;
+      height: 44px;
+      border-radius: 22px;
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      background: rgba(0, 0, 0, 0.65);
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      padding: 0;
+      color: #fff;
+      touch-action: manipulation;
+      transition: border-color 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+    }
+
+    .icon-button:hover,
+    .icon-button:focus-visible {
+      border-color: rgba(255, 255, 255, 0.9);
+      background: rgba(0, 0, 0, 0.85);
+      outline: none;
+    }
+
+    .icon-button:disabled {
+      opacity: 0.35;
+      cursor: default;
+      pointer-events: none;
+    }
+
+    .icon-button svg {
+      width: 22px;
+      height: 22px;
+      display: block;
     }
 
     #menu-button {
@@ -336,77 +385,131 @@
 <div id="finger-overlay" aria-hidden="true"></div>
 
 <div id="menu-container">
-  <button
-    id="menu-button"
-    type="button"
-    aria-label="Open menu"
-    aria-haspopup="menu"
-    aria-expanded="false"
-    aria-controls="menu-dropdown"
-  >
-    <span aria-hidden="true"></span>
-    <span aria-hidden="true"></span>
-    <span aria-hidden="true"></span>
-  </button>
-  <div id="menu-dropdown" role="menu" aria-hidden="true">
+  <div id="menu-top-row">
     <button
+      id="undo-button"
+      class="icon-button"
       type="button"
-      class="menu-dropdown__item"
-      data-menu-action="copy-share-link"
-      role="menuitem"
+      aria-label="Undo"
+      title="Undo"
+      disabled
     >
-      Copy share link
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+          d="M9 9H4V4"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+        <path
+          d="M4 9c1.6-3.4 5-5.5 8.8-5.5 5.4 0 9.7 4.3 9.7 9.7 0 5.4-4.3 9.7-9.7 9.7-3.4 0-6.4-1.6-8.2-4.2"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
     </button>
     <button
+      id="redo-button"
+      class="icon-button"
       type="button"
-      class="menu-dropdown__item"
-      data-menu-action="reset"
-      role="menuitem"
+      aria-label="Redo"
+      title="Redo"
+      disabled
     >
-      Reset
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+          d="M15 9h5V4"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+        <path
+          d="M20 9c-1.6-3.4-5-5.5-8.8-5.5C5.8 3.5 1.5 7.8 1.5 13.2c0 5.4 4.3 9.7 9.7 9.7 3.4 0 6.4-1.6 8.2-4.2"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
     </button>
-    <button
-      type="button"
-      class="menu-dropdown__item"
-      data-menu-action="set-animation-start"
-      role="menuitem"
-    >
-      Set animation start
-    </button>
-    <button
-      type="button"
-      class="menu-dropdown__item"
-      data-menu-action="set-animation-end"
-      role="menuitem"
-    >
-      Set animation end
-    </button>
-    <button
-      type="button"
-      class="menu-dropdown__item"
-      data-menu-action="set-animation-time"
-      role="menuitem"
-    >
-      Set animation time
-    </button>
-    <button
-      type="button"
-      class="menu-dropdown__item"
-      data-menu-action="save-image"
-      role="menuitem"
-    >
-      Save image
-    </button>
-    <button
-      type="button"
-      class="menu-dropdown__item"
-      data-menu-action="open-formula-view"
-      role="menuitem"
-    >
-      Formula view
-    </button>
+    <div id="menu-anchor">
+      <button
+        id="menu-button"
+        type="button"
+        aria-label="Open menu"
+        aria-haspopup="menu"
+        aria-expanded="false"
+        aria-controls="menu-dropdown"
+      >
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+      </button>
+      <div id="menu-dropdown" role="menu" aria-hidden="true">
+        <button
+          type="button"
+          class="menu-dropdown__item"
+          data-menu-action="copy-share-link"
+          role="menuitem"
+        >
+          Copy share link
+        </button>
+        <button
+          type="button"
+          class="menu-dropdown__item"
+          data-menu-action="reset"
+          role="menuitem"
+        >
+          Reset
+        </button>
+        <button
+          type="button"
+          class="menu-dropdown__item"
+          data-menu-action="set-animation-start"
+          role="menuitem"
+        >
+          Set animation start
+        </button>
+        <button
+          type="button"
+          class="menu-dropdown__item"
+          data-menu-action="set-animation-end"
+          role="menuitem"
+        >
+          Set animation end
+        </button>
+        <button
+          type="button"
+          class="menu-dropdown__item"
+          data-menu-action="set-animation-time"
+          role="menuitem"
+        >
+          Set animation time
+        </button>
+        <button
+          type="button"
+          class="menu-dropdown__item"
+          data-menu-action="save-image"
+          role="menuitem"
+        >
+          Save image
+        </button>
+        <button
+          type="button"
+          class="menu-dropdown__item"
+          data-menu-action="open-formula-view"
+          role="menuitem"
+        >
+          Formula view
+        </button>
+      </div>
+    </div>
   </div>
-  <div id="app-version-pill" aria-live="polite" aria-label="Reflex4You version">v7</div>
+  <div id="app-version-pill" aria-live="polite" aria-label="Reflex4You version">v8</div>
 </div>
 
 <div id="error"></div>
