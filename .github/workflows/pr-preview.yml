@@ -14,12 +14,16 @@ concurrency:
 
 jobs:
   deploy_preview:
-    name: Deploy PR preview to gh-pages subfolder
+    name: Deploy PR preview to master subfolder
     runs-on: ubuntu-latest
     if: github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: write
       pull-requests: write
+    env:
+      # If this is a user/organization Pages repo (<owner>.github.io), Pages is served at the root.
+      # Otherwise it's served under /<repo>/.
+      PAGES_BASE_URL: ${{ github.event.repository.name == format('{0}.github.io', github.repository_owner) && format('https://{0}.github.io', github.repository_owner) || format('https://{0}.github.io/{1}', github.repository_owner, github.event.repository.name) }}
     steps:
       - name: Checkout PR head
         uses: actions/checkout@v4
@@ -29,14 +33,15 @@ jobs:
       # Static site: deploy this app as-is.
       # If you later add a build step, build here and deploy the build output folder.
 
-      - name: Deploy preview to gh-pages
+      - name: Deploy preview to master (Pages source: master)
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          branch: gh-pages
+          branch: master
           folder: apps/reflex4you
           target-folder: pr-preview/pr-${{ github.event.pull_request.number }}
           enable_jekyll: false
-          clean: true
+          # Never wipe master; only replace the target-folder contents.
+          clean: false
           single-commit: false
 
       - name: Comment preview URL on PR
@@ -56,7 +61,7 @@ jobs:
           body: |
             ✅ **PR Preview deployed**
 
-            - **Preview URL**: https://${{ github.repository_owner }}.github.io/pr-preview/pr-${{ github.event.pull_request.number }}/
+            - **Preview URL**: ${{ env.PAGES_BASE_URL }}/pr-preview/pr-${{ github.event.pull_request.number }}/
             - **Commit**: ${{ github.event.pull_request.head.sha }}
 
   no_preview_for_forks:

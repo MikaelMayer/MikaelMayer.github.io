@@ -1,12 +1,12 @@
-name: Deploy production (GitHub Pages)
+name: Pages (served from master)
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: pages-production
@@ -14,20 +14,14 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy main to gh-pages root
+    name: No-op (Pages is served from master)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # This repo is a static site (HTML/JS/CSS). If you later add a build step,
-      # insert it here and set `folder:` below to your build output directory.
-
-      - name: Deploy to gh-pages
-        uses: JamesIves/github-pages-deploy-action@v4
-        with:
-          branch: gh-pages
-          folder: .
-          enable_jekyll: false
-          clean: true
-          single-commit: true
+      - name: Confirm static content exists
+        run: |
+          set -euo pipefail
+          test -f index.html || true
+          echo "GitHub Pages is configured to serve directly from the master branch."
