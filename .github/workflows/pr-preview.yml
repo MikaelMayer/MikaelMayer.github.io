@@ -1,13 +1,11 @@
-name: PR Preview (GitHub Pages)
+name: PR Preview
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, reopened, synchronize, closed]
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
   pull-requests: write
 
 concurrency:
@@ -16,86 +14,41 @@ concurrency:
 
 jobs:
   deploy_preview:
-    name: Deploy PR preview (no commits)
+    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    if: github.event.pull_request.head.repo.full_name == github.repository
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-      pull-requests: write
     steps:
       - name: Checkout PR head
         uses: actions/checkout@v4
         with:
-          # Ensure we deploy the PR content (not the base branch content).
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-
-      # Static site: upload the repo content as-is. If you later add a build step,
-      # build here and set `path:` below to your build output directory.
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Deploy preview to gh-pages
+        uses: JamesIves/github-pages-deploy-action@v4
         with:
-          # Reflex4You is a standalone static app with its own index.html.
-          # Uploading just this folder makes the preview URL render the app directly,
-          # even if the repo root doesn't have a production homepage.
-          path: apps/reflex4you
-
-      - name: Deploy preview to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-        with:
-          preview: true
+          branch: gh-pages
+          folder: apps/reflex4you
+          target-folder: pr-preview/pr-${{ github.event.pull_request.number }}
+          clean: false
+          single-commit: false
 
       - name: Comment preview URL on PR
-        id: preview-comment
-        uses: peter-evans/find-comment@v3
-        with:
-          issue-number: ${{ github.event.pull_request.number }}
-          comment-author: github-actions[bot]
-          body-includes: "PR Preview deployed"
-
-      - name: Create or update PR comment with preview URL
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.pull_request.number }}
-          comment-id: ${{ steps.preview-comment.outputs.comment-id }}
-          edit-mode: replace
           body: |
             ✅ **PR Preview deployed**
-
-            - **Preview URL**: ${{ steps.deployment.outputs.page_url }}
+            - **Preview URL**: https://${{ github.repository_owner }}.github.io/pr-preview/pr-${{ github.event.pull_request.number }}/
             - **Commit**: ${{ github.event.pull_request.head.sha }}
 
   no_preview_for_forks:
-    name: Inform forks that previews are disabled
+    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
-    if: github.event.pull_request.head.repo.full_name != github.repository
-    permissions:
-      pull-requests: write
     steps:
-      - name: Find existing "skipped" comment
-        id: skipped-comment
-        uses: peter-evans/find-comment@v3
-        with:
-          issue-number: ${{ github.event.pull_request.number }}
-          comment-author: github-actions[bot]
-          body-includes: "PR Preview not deployed"
-
-      - name: Create or update comment why preview is skipped
+      - name: Comment why preview isn't deployed
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.pull_request.number }}
-          comment-id: ${{ steps.skipped-comment.outputs.comment-id }}
-          edit-mode: replace
           body: |
             ⚠️ **PR Preview not deployed**
-
-            This PR comes from a fork, so GitHub restricts `GITHUB_TOKEN` permissions and the workflow cannot publish a Pages preview.
+            This PR comes from a fork, so GitHub restricts token permissions and the workflow cannot push to `gh-pages`.
