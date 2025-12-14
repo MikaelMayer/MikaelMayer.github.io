@@ -251,6 +251,7 @@ function refreshFingerIndicator(label) {
 }
 
 const DEFAULT_FORMULA_TEXT = 'z';
+let lastAppliedFormulaSource = DEFAULT_FORMULA_TEXT;
 
 const defaultParseResult = parseFormulaInput(DEFAULT_FORMULA_TEXT, getParserOptionsFromFingers());
 const fallbackDefaultAST = defaultParseResult.ok ? defaultParseResult.value : createDefaultFormulaAST();
@@ -291,7 +292,9 @@ function captureHistorySnapshot() {
     fingers[label] = { x: latest.x, y: latest.y };
   }
   return {
-    formulaSource: String(formulaTextarea?.value || ''),
+    // Only store formulas that successfully parsed/applied; while the user is
+    // typing an invalid formula, history should keep the last valid state.
+    formulaSource: String(lastAppliedFormulaSource || DEFAULT_FORMULA_TEXT),
     fingers,
   };
 }
@@ -1097,6 +1100,9 @@ async function bootstrapReflexApplication() {
   }
 
   formulaTextarea.value = initialFormulaSource;
+  if (initialParse.ok) {
+    lastAppliedFormulaSource = initialFormulaSource;
+  }
 
   try {
     reflexCore = new ReflexCore(canvas, initialAST);
@@ -1219,6 +1225,7 @@ function applyFormulaFromTextarea({ updateQuery = true, preserveFingerState = fa
     return;
   }
   clearError();
+  lastAppliedFormulaSource = source;
   reflexCore?.setFormulaAST(result.value);
   // Finger-driven reparses happen while a pointer is down (e.g. `$$` repeat counts
   // derived from D1). Re-applying the finger state would call into ReflexCore's
