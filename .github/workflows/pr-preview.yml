@@ -1,7 +1,11 @@
 name: PR Preview (GitHub Pages)
 
 on:
-  pull_request:
+  # Use pull_request_target so the workflow runs with the base ref (e.g. master),
+  # which satisfies common github-pages environment protection rules that reject
+  # deployments from refs/pull/*.
+  # We still check out the PR's head SHA to deploy the preview content.
+  pull_request_target:
     types: [opened, synchronize, reopened]
 
 permissions:
@@ -31,6 +35,8 @@ jobs:
       - name: Checkout PR head
         uses: actions/checkout@v4
         with:
+          # Ensure we deploy the PR content (not the base branch content).
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Configure Pages
