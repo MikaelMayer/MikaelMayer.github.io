@@ -1364,6 +1364,11 @@ export class ReflexCore {
     this.fingerAxisConstraints = new Map();
     this.wGestureState = null;
     this.wGestureLatched = false;
+    // If we render before the browser has computed layout, canvas.clientWidth/Height can
+    // temporarily report 0–1px (notably on mobile/PWA). Resizing the backing store to
+    // that tiny size produces a uniform full-screen color until a later resize/re-render.
+    // Track a single scheduled retry render once layout stabilizes.
+    this._layoutRetryRaf = null;
 
     this.formulaAST = initialAST;
 
@@ -1653,14 +1658,35 @@ export class ReflexCore {
 
   resizeCanvasToDisplaySize() {
     const dpr = (typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1;
-    const displayWidth = Math.floor(this.canvas.clientWidth * dpr);
-    const displayHeight = Math.floor(this.canvas.clientHeight * dpr);
+    const cssWidth = this.canvas.clientWidth;
+    const cssHeight = this.canvas.clientHeight;
 
-    if (this.canvas.width !== displayWidth || this.canvas.height !== displayHeight) {
+    // If layout isn't ready, avoid shrinking the backing store to 0–1px. Keep the
+    // previous canvas size (or a sane fallback) and request a retry on the next frame.
+    if (!(cssWidth > 1 && cssHeight > 1)) {
+      // If a previous render already shrunk us to 0–1px, restore a reasonable default
+      // so the first visible frame isn't a single stretched pixel.
+      if (this.canvas.width <= 1 || this.canvas.height <= 1) {
+        this.canvas.width = 300;
+        this.canvas.height = 150;
+      }
+      if (this.canvas.width > 0 && this.canvas.height > 0) {
+        this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+      }
+      return { layoutReady: false, resized: false };
+    }
+
+    const displayWidth = Math.floor(cssWidth * dpr);
+    const displayHeight = Math.floor(cssHeight * dpr);
+    const resized = this.canvas.width !== displayWidth || this.canvas.height !== displayHeight;
+
+    if (resized) {
       this.canvas.width = displayWidth;
       this.canvas.height = displayHeight;
       this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     }
+
+    return { layoutReady: true, resized };
   }
 
   updateView() {
@@ -1713,7 +1739,15 @@ export class ReflexCore {
 
   render() {
     if (!this.program) return;
-    this.resizeCanvasToDisplaySize();
+    const { layoutReady } = this.resizeCanvasToDisplaySize();
+    if (!layoutReady && typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      if (this._layoutRetryRaf == null) {
+        this._layoutRetryRaf = window.requestAnimationFrame(() => {
+          this._layoutRetryRaf = null;
+          this.render();
+        });
+      }
+    }
     this.gl.useProgram(this.program);
     this.uploadFingerUniforms();
     this.gl.uniform2f(this.uResolutionLoc, this.canvas.width, this.canvas.height);
