@@ -30,7 +30,7 @@ const rootElement = typeof document !== 'undefined' ? document.documentElement :
 
 let fatalErrorActive = false;
 
-const APP_VERSION = 4;
+const APP_VERSION = 5;
 
 if (versionPill) {
   versionPill.textContent = `v${APP_VERSION}`;
@@ -867,6 +867,7 @@ function updateFingerDotPosition(label) {
 async function bootstrapReflexApplication() {
   // Installed PWAs often relaunch at `start_url` without the last query string.
   // Restore the last known reflex state unless the user opened an explicit share link.
+  // This also improves the non-installed experience (reloads keep state).
   restorePersistedSearchIfNeeded();
 
   await verifyCompressionSupport();
@@ -1527,10 +1528,23 @@ function triggerImageDownload(url, filename, shouldRevoke) {
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('./service-worker.js')
-      .catch((error) => {
-        console.warn('Reflex4You service worker registration failed.', error);
+    navigator.serviceWorker.register('./service-worker.js').then((registration) => {
+      // Auto-activate updated workers so cache/version bumps take effect quickly.
+      if (registration?.waiting) {
+        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }
+      registration?.addEventListener('updatefound', () => {
+        const installing = registration.installing;
+        if (!installing) return;
+        installing.addEventListener('statechange', () => {
+          if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+            // New content is available; activate it immediately.
+            installing.postMessage({ type: 'SKIP_WAITING' });
+          }
+        });
       });
+    }).catch((error) => {
+      console.warn('Reflex4You service worker registration failed.', error);
+    });
   });
 }

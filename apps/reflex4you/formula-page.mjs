@@ -3,6 +3,16 @@ import { formatCaretIndicator } from './parse-error-format.mjs';
 import { renderFormulaToContainer } from './formula-renderer.mjs';
 import { verifyCompressionSupport, readFormulaFromQuery } from './formula-url.mjs';
 
+// Ensure the PWA service worker is installed even when users land directly
+// on the formula page (e.g. from a shared link).
+if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js').catch((error) => {
+      console.warn('Reflex4You service worker registration failed.', error);
+    });
+  });
+}
+
 const DEFAULT_FORMULA_TEXT = 'z';
 
 function $(id) {
