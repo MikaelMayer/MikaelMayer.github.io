@@ -3,6 +3,12 @@ import {
   createDefaultFormulaAST,
   FINGER_DECIMAL_PLACES,
 } from './core-engine.mjs';
+import {
+  defaultImageExportPresets,
+  downloadBlob,
+  promptImageExportSize,
+  renderOffscreenCanvasToPngBlob,
+} from '../shared/image-export.mjs';
 import { visitAst } from './ast-utils.mjs';
 import { parseFormulaInput } from './arithmetic-parser.mjs';
 import { formatCaretIndicator } from './parse-error-format.mjs';
@@ -1807,17 +1813,75 @@ async function saveCanvasImage() {
   if (!canvas) {
     return;
   }
-  await ensureCanvasSnapshotReady();
-  const filename = `reflex4you-${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
-  if (canvas.toBlob) {
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
-    if (blob && blob.size > 0) {
-      const objectUrl = URL.createObjectURL(blob);
-      triggerImageDownload(objectUrl, filename, true);
-      return;
-    }
+  if (!reflexCore) {
+    alert('Unable to save image because the renderer is unavailable.');
+    return;
   }
-  saveCanvasImageFallback(filename);
+
+  const defaultSize = canvas.width && canvas.height ? { width: canvas.width, height: canvas.height } : null;
+  const presets = [
+    ...(defaultSize
+      ? [
+        {
+          key: 'current',
+          label: `Current (${defaultSize.width}×${defaultSize.height} px)`,
+          width: defaultSize.width,
+          height: defaultSize.height,
+        },
+      ]
+      : []),
+    ...defaultImageExportPresets(),
+  ];
+
+  const requested = await promptImageExportSize({
+    title: 'Export image (PNG)',
+    presets,
+    defaultSize: defaultSize || undefined,
+  });
+  if (!requested) {
+    return;
+  }
+
+  showTransientStatus('Rendering…', { timeoutMs: 4000 });
+
+  const activeLabels = new Set([
+    ...Array.from(knownFingerLabels),
+    ...(activeFingerState?.allSlots || []),
+    'W1',
+    'W2',
+  ]);
+
+  const blob = await renderOffscreenCanvasToPngBlob({
+    width: requested.width,
+    height: requested.height,
+    render: async (exportCanvas) => {
+      // Build a one-shot renderer that ignores DPR/client sizing and renders at exact pixel dimensions.
+      const exportCore = new ReflexCore(exportCanvas, reflexCore.getFormulaAST(), {
+        autoRender: false,
+        installEventListeners: false,
+      });
+
+      try {
+        // Match the current finger state.
+        for (const label of activeLabels) {
+          if (!isFingerLabel(label)) continue;
+          const v = reflexCore.getFingerValue(label);
+          exportCore.setFingerValue(label, v.x, v.y, { triggerRender: false });
+        }
+
+        exportCore.renderToPixelSize(requested.width, requested.height);
+        if (exportCore.gl && typeof exportCore.gl.finish === 'function') {
+          exportCore.gl.finish();
+        }
+      } finally {
+        exportCore.dispose?.();
+      }
+    },
+  });
+
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const filename = `reflex4you-${requested.width}x${requested.height}-${stamp}.png`;
+  downloadBlob(blob, filename);
 }
 
 async function ensureCanvasSnapshotReady() {

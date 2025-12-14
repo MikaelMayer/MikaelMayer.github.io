@@ -1332,7 +1332,12 @@ export function buildFragmentSourceFromAST(ast) {
 // =========================
 
 export class ReflexCore {
-  constructor(canvas, initialAST = createDefaultFormulaAST()) {
+  constructor(canvas, initialAST = createDefaultFormulaAST(), options = {}) {
+    const {
+      autoRender = true,
+      installEventListeners = true,
+    } = options || {};
+
     this.canvas = canvas;
     this.gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true }) || canvas.getContext('webgl2');
     if (!this.gl) {
@@ -1400,9 +1405,11 @@ export class ReflexCore {
     this.formulaAST = initialAST;
 
     this.rebuildProgram();
-    this.render();
+    if (autoRender) {
+      this.render();
+    }
 
-    if (typeof window !== 'undefined') {
+    if (installEventListeners && typeof window !== 'undefined') {
       this._windowResizeListener = () => this.render();
       window.addEventListener('resize', this._windowResizeListener);
     }
@@ -1411,7 +1418,7 @@ export class ReflexCore {
     // canvas without firing a window 'resize' event (address bar collapse/expand,
     // viewport restoration after app switch, etc). Observe the canvas element and
     // re-render whenever its box size changes.
-    if (typeof ResizeObserver !== 'undefined') {
+    if (installEventListeners && typeof ResizeObserver !== 'undefined') {
       this._resizeObserver = new ResizeObserver(() => {
         if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
           this.render();
@@ -1434,7 +1441,7 @@ export class ReflexCore {
 
     // When returning to a tab/PWA, WebGL canvases can display stale content until the
     // next explicit draw. Ensure we re-render on visibility restoration.
-    if (typeof document !== 'undefined') {
+    if (installEventListeners && typeof document !== 'undefined') {
       this._visibilityListener = () => {
         if (document.hidden) {
           return;
@@ -1443,7 +1450,7 @@ export class ReflexCore {
       };
       document.addEventListener('visibilitychange', this._visibilityListener);
     }
-    if (typeof window !== 'undefined') {
+    if (installEventListeners && typeof window !== 'undefined') {
       this._pageShowListener = () => this.render();
       window.addEventListener('pageshow', this._pageShowListener);
     }
@@ -1463,11 +1470,13 @@ export class ReflexCore {
       this._contextLost = false;
       this.handleContextRestored();
     };
-    try {
-      this.canvas.addEventListener('webglcontextlost', this._contextLostListener, false);
-      this.canvas.addEventListener('webglcontextrestored', this._contextRestoredListener, false);
-    } catch (_) {
-      // ignore listener failures
+    if (installEventListeners) {
+      try {
+        this.canvas.addEventListener('webglcontextlost', this._contextLostListener, false);
+        this.canvas.addEventListener('webglcontextrestored', this._contextRestoredListener, false);
+      } catch (_) {
+        // ignore listener failures
+      }
     }
   }
 
@@ -1943,6 +1952,40 @@ export class ReflexCore {
     this.gl.useProgram(this.program);
     this.uploadFingerUniforms();
     this.gl.uniform2f(this.uResolutionLoc, this.canvas.width, this.canvas.height);
+    this.updateView();
+
+    this.gl.clearColor(0, 0, 0, 1);
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+    this.gl.drawArrays(this.gl.TRIANGLES, 0, 3);
+  }
+
+  renderToPixelSize(width, height) {
+    if (!this.program) return;
+    if (
+      this._contextLost ||
+      (this.gl && typeof this.gl.isContextLost === 'function' && this.gl.isContextLost())
+    ) {
+      return;
+    }
+
+    const w = Math.floor(Number(width));
+    const h = Math.floor(Number(height));
+    if (!(w > 0 && h > 0)) {
+      throw new Error(`Invalid render size: ${width}x${height}`);
+    }
+
+    // Force the backing store to exact pixel dimensions (ignore DPR/client size).
+    if (this.canvas.width !== w) {
+      this.canvas.width = w;
+    }
+    if (this.canvas.height !== h) {
+      this.canvas.height = h;
+    }
+    this.gl.viewport(0, 0, w, h);
+
+    this.gl.useProgram(this.program);
+    this.uploadFingerUniforms();
+    this.gl.uniform2f(this.uResolutionLoc, w, h);
     this.updateView();
 
     this.gl.clearColor(0, 0, 0, 1);
