@@ -1,4 +1,4 @@
-name: Pages (served from master)
+name: Pages (production)
 
 on:
   push:
@@ -7,21 +7,32 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 concurrency:
-  group: pages-production
+  group: github-pages
   cancel-in-progress: true
 
 jobs:
   deploy:
-    name: No-op (Pages is served from master)
+    name: Deploy production site
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Confirm static content exists
-        run: |
-          set -euo pipefail
-          test -f index.html || true
-          echo "GitHub Pages is configured to serve directly from the master branch."
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

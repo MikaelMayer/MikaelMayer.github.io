@@ -6,6 +6,8 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
   pull-requests: write
 
 concurrency:
@@ -14,35 +16,35 @@ concurrency:
 
 jobs:
   deploy_preview:
-    name: Deploy PR preview to master subfolder
+    name: Deploy PR preview (no commits)
     runs-on: ubuntu-latest
     if: github.event.pull_request.head.repo.full_name == github.repository
     permissions:
-      contents: write
+      contents: read
+      pages: write
+      id-token: write
       pull-requests: write
-    env:
-      # If this is a user/organization Pages repo (<owner>.github.io), Pages is served at the root.
-      # Otherwise it's served under /<repo>/.
-      PAGES_BASE_URL: ${{ github.event.repository.name == format('{0}.github.io', github.repository_owner) && format('https://{0}.github.io', github.repository_owner) || format('https://{0}.github.io/{1}', github.repository_owner, github.event.repository.name) }}
     steps:
       - name: Checkout PR head
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
-      # Static site: deploy this app as-is.
-      # If you later add a build step, build here and deploy the build output folder.
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
 
-      - name: Deploy preview to master (Pages source: master)
-        uses: JamesIves/github-pages-deploy-action@v4
+      # Static site: upload the repo content as-is. If you later add a build step,
+      # build here and set `path:` below to your build output directory.
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          branch: master
-          folder: apps/reflex4you
-          target-folder: pr-preview/pr-${{ github.event.pull_request.number }}
-          enable_jekyll: false
-          # Never wipe master; only replace the target-folder contents.
-          clean: false
-          single-commit: false
+          path: .
+
+      - name: Deploy preview to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          preview: true
 
       - name: Comment preview URL on PR
         id: preview-comment
@@ -61,7 +63,7 @@ jobs:
           body: |
             ✅ **PR Preview deployed**
 
-            - **Preview URL**: ${{ env.PAGES_BASE_URL }}/pr-preview/pr-${{ github.event.pull_request.number }}/
+            - **Preview URL**: ${{ steps.deployment.outputs.page_url }}
             - **Commit**: ${{ github.event.pull_request.head.sha }}
 
   no_preview_for_forks:
@@ -88,4 +90,4 @@ jobs:
           body: |
             ⚠️ **PR Preview not deployed**
 
-            This PR comes from a fork, so GitHub restricts `GITHUB_TOKEN` permissions and the workflow cannot publish to `gh-pages`.
+            This PR comes from a fork, so GitHub restricts `GITHUB_TOKEN` permissions and the workflow cannot publish a Pages preview.

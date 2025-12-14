@@ -5,7 +5,7 @@ on:
     types: [closed]
 
 permissions:
-  contents: write
+  pull-requests: write
 
 concurrency:
   group: pr-preview-cleanup-${{ github.event.pull_request.number }}
@@ -13,36 +13,26 @@ concurrency:
 
 jobs:
   cleanup:
-    name: Remove PR preview folder from master
+    name: Mark PR preview as closed
     runs-on: ubuntu-latest
     if: github.event.pull_request.head.repo.full_name == github.repository
     steps:
-      - name: Checkout master
-        uses: actions/checkout@v4
+      - name: Find existing preview comment
+        id: preview-comment
+        uses: peter-evans/find-comment@v3
         with:
-          ref: master
-          fetch-depth: 1
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: github-actions[bot]
+          body-includes: "PR Preview deployed"
 
-      - name: Delete preview folder (if present)
-        run: |
-          set -euo pipefail
-          PREVIEW_DIR="pr-preview/pr-${{ github.event.pull_request.number }}"
-          if [ -d "$PREVIEW_DIR" ]; then
-            rm -rf "$PREVIEW_DIR"
-            echo "Deleted $PREVIEW_DIR"
-          else
-            echo "No preview folder to delete: $PREVIEW_DIR"
-          fi
+      - name: Update comment (preview closed)
+        if: steps.preview-comment.outputs.comment-id != ''
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-id: ${{ steps.preview-comment.outputs.comment-id }}
+          edit-mode: replace
+          body: |
+            💤 **PR Preview closed**
 
-      - name: Commit & push (if changed)
-        run: |
-          set -euo pipefail
-          if git status --porcelain | grep -q .; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add -A
-            git commit -m "chore: cleanup PR preview #${{ github.event.pull_request.number }}"
-            git push
-          else
-            echo "No changes to commit."
-          fi
+            This PR is closed, so its preview deployment may no longer be available.
