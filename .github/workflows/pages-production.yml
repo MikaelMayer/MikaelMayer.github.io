@@ -2,7 +2,7 @@ name: Deploy production (GitHub Pages)
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   workflow_dispatch:
 
 permissions:
@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy main to gh-pages root
+    name: Deploy master to gh-pages root
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
