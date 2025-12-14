@@ -1342,6 +1342,7 @@ export class ReflexCore {
     this._contextLost = false;
     this._contextLostListener = null;
     this._contextRestoredListener = null;
+    this._windowResizeListener = null;
 
     this.program = null;
     this.vao = null;
@@ -1402,7 +1403,8 @@ export class ReflexCore {
     this.render();
 
     if (typeof window !== 'undefined') {
-      window.addEventListener('resize', () => this.render());
+      this._windowResizeListener = () => this.render();
+      window.addEventListener('resize', this._windowResizeListener);
     }
 
     // Some browsers (notably mobile/PWA shells) can change the CSS pixel size of the
@@ -1466,6 +1468,74 @@ export class ReflexCore {
       this.canvas.addEventListener('webglcontextrestored', this._contextRestoredListener, false);
     } catch (_) {
       // ignore listener failures
+    }
+  }
+
+  dispose() {
+    // Best-effort cleanup for offscreen renderers (export, tests, etc.).
+    if (typeof window !== 'undefined' && this._windowResizeListener) {
+      try {
+        window.removeEventListener('resize', this._windowResizeListener);
+      } catch (_) {
+        // ignore
+      }
+      this._windowResizeListener = null;
+    }
+    if (this._resizeObserver) {
+      try {
+        this._resizeObserver.disconnect();
+      } catch (_) {
+        // ignore
+      }
+      this._resizeObserver = null;
+    }
+    if (this._resizeObserverRaf != null && typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function') {
+      try {
+        window.cancelAnimationFrame(this._resizeObserverRaf);
+      } catch (_) {
+        // ignore
+      }
+      this._resizeObserverRaf = null;
+    }
+    if (this._layoutRetryRaf != null && typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function') {
+      try {
+        window.cancelAnimationFrame(this._layoutRetryRaf);
+      } catch (_) {
+        // ignore
+      }
+      this._layoutRetryRaf = null;
+    }
+    if (typeof document !== 'undefined' && this._visibilityListener) {
+      try {
+        document.removeEventListener('visibilitychange', this._visibilityListener);
+      } catch (_) {
+        // ignore
+      }
+      this._visibilityListener = null;
+    }
+    if (typeof window !== 'undefined' && this._pageShowListener) {
+      try {
+        window.removeEventListener('pageshow', this._pageShowListener);
+      } catch (_) {
+        // ignore
+      }
+      this._pageShowListener = null;
+    }
+    if (this.canvas && this._contextLostListener) {
+      try {
+        this.canvas.removeEventListener('webglcontextlost', this._contextLostListener, false);
+      } catch (_) {
+        // ignore
+      }
+      this._contextLostListener = null;
+    }
+    if (this.canvas && this._contextRestoredListener) {
+      try {
+        this.canvas.removeEventListener('webglcontextrestored', this._contextRestoredListener, false);
+      } catch (_) {
+        // ignore
+      }
+      this._contextRestoredListener = null;
     }
   }
 
