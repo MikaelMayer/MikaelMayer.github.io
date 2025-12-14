@@ -30,7 +30,7 @@ const rootElement = typeof document !== 'undefined' ? document.documentElement :
 
 let fatalErrorActive = false;
 
-const APP_VERSION = 6;
+const APP_VERSION = 7;
 
 if (versionPill) {
   versionPill.textContent = `v${APP_VERSION}`;
