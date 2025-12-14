@@ -25,12 +25,14 @@ const fingerIndicatorStack = document.getElementById('finger-indicator-stack');
 const fingerOverlay = document.getElementById('finger-overlay');
 const menuButton = document.getElementById('menu-button');
 const menuDropdown = document.getElementById('menu-dropdown');
+const undoButton = document.getElementById('undo-button');
+const redoButton = document.getElementById('redo-button');
 const versionPill = document.getElementById('app-version-pill');
 const rootElement = typeof document !== 'undefined' ? document.documentElement : null;
 
 let fatalErrorActive = false;
 
-const APP_VERSION = 7;
+const APP_VERSION = 8;
 
 if (versionPill) {
   versionPill.textContent = `v${APP_VERSION}`;
@@ -249,11 +251,192 @@ function refreshFingerIndicator(label) {
 }
 
 const DEFAULT_FORMULA_TEXT = 'z';
+let lastAppliedFormulaSource = DEFAULT_FORMULA_TEXT;
 
 const defaultParseResult = parseFormulaInput(DEFAULT_FORMULA_TEXT, getParserOptionsFromFingers());
 const fallbackDefaultAST = defaultParseResult.ok ? defaultParseResult.value : createDefaultFormulaAST();
 let reflexCore = null;
 let scheduledFingerDrivenReparse = false;
+
+// --- Undo/Redo history -------------------------------------------------------
+// We snapshot *only* when all pointers are released (no fingers pressed).
+// Pointer moves do not create new states; the state is recorded on release.
+const HISTORY_LIMIT = 200;
+const activePointerIds = new Set();
+const historyPast = [];
+const historyFuture = [];
+let historyApplying = false;
+let historyCommitRaf = null;
+
+function compareFingerLabels(a, b) {
+  const fa = fingerFamily(a);
+  const fb = fingerFamily(b);
+  if (fa !== fb) {
+    // Keep fixed/dynamic ahead of workspace.
+    if (fa === 'w') return 1;
+    if (fb === 'w') return -1;
+  }
+  return fingerIndex(a) - fingerIndex(b);
+}
+
+function sortedFingerLabelsForHistory() {
+  return Array.from(knownFingerLabels).filter((label) => isFingerLabel(label)).sort(compareFingerLabels);
+}
+
+function captureHistorySnapshot() {
+  const labels = sortedFingerLabelsForHistory();
+  const fingers = {};
+  for (const label of labels) {
+    ensureFingerState(label);
+    const latest = latestOffsets[label] ?? reflexCore?.getFingerValue(label) ?? defaultFingerOffset(label);
+    fingers[label] = { x: latest.x, y: latest.y };
+  }
+  return {
+    // Only store formulas that successfully parsed/applied; while the user is
+    // typing an invalid formula, history should keep the last valid state.
+    formulaSource: String(lastAppliedFormulaSource || DEFAULT_FORMULA_TEXT),
+    fingers,
+  };
+}
+
+function historySnapshotKey(snapshot) {
+  if (!snapshot) return '';
+  const labels = Object.keys(snapshot.fingers || {}).sort(compareFingerLabels);
+  const canonical = {
+    formulaSource: snapshot.formulaSource || '',
+    fingers: Object.fromEntries(
+      labels.map((label) => {
+        const v = snapshot.fingers[label] || { x: 0, y: 0 };
+        return [label, { x: v.x, y: v.y }];
+      }),
+    ),
+  };
+  return JSON.stringify(canonical);
+}
+
+function updateUndoRedoButtons() {
+  if (undoButton) {
+    undoButton.disabled = historyPast.length < 2;
+  }
+  if (redoButton) {
+    redoButton.disabled = historyFuture.length === 0;
+  }
+}
+
+function commitHistorySnapshot({ force = false } = {}) {
+  if (historyApplying) {
+    return;
+  }
+  const snapshot = captureHistorySnapshot();
+  const key = historySnapshotKey(snapshot);
+  const last = historyPast.length ? historyPast[historyPast.length - 1] : null;
+  const lastKey = last ? historySnapshotKey(last) : null;
+  if (!force && lastKey === key) {
+    updateUndoRedoButtons();
+    return;
+  }
+  historyPast.push(snapshot);
+  if (historyPast.length > HISTORY_LIMIT) {
+    historyPast.splice(0, historyPast.length - HISTORY_LIMIT);
+  }
+  historyFuture.length = 0;
+  updateUndoRedoButtons();
+}
+
+function scheduleCommitHistorySnapshot() {
+  if (historyApplying) {
+    return;
+  }
+  if (historyCommitRaf != null || typeof window === 'undefined') {
+    return;
+  }
+  historyCommitRaf = window.requestAnimationFrame(() => {
+    historyCommitRaf = null;
+    commitHistorySnapshot();
+  });
+}
+
+function applyHistorySnapshot(snapshot) {
+  if (!snapshot || !reflexCore) {
+    return;
+  }
+  historyApplying = true;
+  try {
+    // Stop URL-driven animations to avoid them immediately mutating restored state.
+    if (animationController?.isPlaying()) {
+      animationController.stop();
+    }
+
+    const fingers = snapshot.fingers || {};
+    const labels = Object.keys(fingers).filter((label) => isFingerLabel(label)).sort(compareFingerLabels);
+
+    suppressFingerQueryUpdates = true;
+    try {
+      for (const label of labels) {
+        ensureFingerState(label);
+        const v = fingers[label];
+        if (!v) continue;
+        latestOffsets[label] = { x: v.x, y: v.y };
+        reflexCore.setFingerValue(label, v.x, v.y, { triggerRender: false });
+      }
+    } finally {
+      suppressFingerQueryUpdates = false;
+    }
+
+    if (formulaTextarea) {
+      formulaTextarea.value = snapshot.formulaSource || DEFAULT_FORMULA_TEXT;
+    }
+    // Apply formula + derived finger activation; allow finger-state changes (no pointer is down).
+    applyFormulaFromTextarea({ updateQuery: false, preserveFingerState: false });
+
+    // Persist formula in URL (finger params are handled by applyFingerState).
+    const source = formulaTextarea?.value || '';
+    updateFormulaQueryParamImmediately(source);
+    updateFormulaQueryParam(source).catch((error) =>
+      console.warn('Failed to persist formula parameter.', error),
+    );
+
+    reflexCore.render();
+  } finally {
+    historyApplying = false;
+    updateUndoRedoButtons();
+  }
+}
+
+function undoHistory() {
+  if (historyPast.length < 2) {
+    return;
+  }
+  const current = historyPast.pop();
+  historyFuture.push(current);
+  const previous = historyPast[historyPast.length - 1];
+  applyHistorySnapshot(previous);
+}
+
+function redoHistory() {
+  if (!historyFuture.length) {
+    return;
+  }
+  const next = historyFuture.pop();
+  historyPast.push(next);
+  applyHistorySnapshot(next);
+}
+
+if (undoButton) {
+  undoButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    undoHistory();
+  });
+}
+
+if (redoButton) {
+  redoButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    redoHistory();
+  });
+}
 
 function formulaNeedsFingerDrivenReparse(source) {
   if (!source || typeof source !== 'string') {
@@ -536,6 +719,9 @@ function promptFingerValue(label) {
     return;
   }
   reflexCore.setFingerValue(label, parsed.x, parsed.y);
+  if (activePointerIds.size === 0) {
+    scheduleCommitHistorySnapshot();
+  }
 }
 
 function readFingerFromQuery(label) {
@@ -914,6 +1100,9 @@ async function bootstrapReflexApplication() {
   }
 
   formulaTextarea.value = initialFormulaSource;
+  if (initialParse.ok) {
+    lastAppliedFormulaSource = initialFormulaSource;
+  }
 
   try {
     reflexCore = new ReflexCore(canvas, initialAST);
@@ -954,6 +1143,22 @@ async function bootstrapReflexApplication() {
     canvas.style.pointerEvents = 'none';
   }
 
+  // Track active pointers so we can snapshot only when all fingers are released.
+  if (canvas && typeof window !== 'undefined') {
+    canvas.addEventListener('pointerdown', (event) => {
+      activePointerIds.add(event.pointerId);
+    });
+    const handlePointerEndForHistory = (event) => {
+      activePointerIds.delete(event.pointerId);
+      if (activePointerIds.size === 0) {
+        scheduleCommitHistorySnapshot();
+      }
+    };
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach((type) => {
+      canvas.addEventListener(type, handlePointerEndForHistory);
+    });
+  }
+
   // Load any animation intervals from the URL and start animating (unless edit mode).
   if (reflexCore) {
     const tracks = buildAnimationTracksFromQuery();
@@ -974,6 +1179,9 @@ async function bootstrapReflexApplication() {
       { capture: true },
     );
   }
+
+  // Seed the undo stack with the initial ready state.
+  commitHistorySnapshot({ force: true });
 }
 
 const bootstrapPromise = bootstrapReflexApplication();
@@ -990,6 +1198,13 @@ formulaTextarea.addEventListener('focus', () => {
 });
 formulaTextarea.addEventListener('blur', () => {
   formulaTextarea.classList.remove('expanded');
+});
+// Commit formula edits as a single undoable state once editing is "done"
+// (change fires on blur for textarea edits).
+formulaTextarea.addEventListener('change', () => {
+  if (activePointerIds.size === 0) {
+    commitHistorySnapshot();
+  }
 });
 
 function applyFormulaFromTextarea({ updateQuery = true, preserveFingerState = false } = {}) {
@@ -1010,6 +1225,7 @@ function applyFormulaFromTextarea({ updateQuery = true, preserveFingerState = fa
     return;
   }
   clearError();
+  lastAppliedFormulaSource = source;
   reflexCore?.setFormulaAST(result.value);
   // Finger-driven reparses happen while a pointer is down (e.g. `$$` repeat counts
   // derived from D1). Re-applying the finger state would call into ReflexCore's
@@ -1105,10 +1321,14 @@ function handleMenuAction(action) {
       setAnimationStartFromCurrent();
       break;
     case 'set-animation-end':
+      commitHistorySnapshot();
       setAnimationEndFromCurrent();
+      scheduleCommitHistorySnapshot();
       break;
     case 'set-animation-time':
+      commitHistorySnapshot();
       promptAndSetAnimationTime();
+      scheduleCommitHistorySnapshot();
       break;
     case 'save-image':
       saveCanvasImage().catch((error) => {
@@ -1439,7 +1659,7 @@ function promptAndSetAnimationTime() {
 function confirmAndReset() {
   if (
     !window.confirm(
-      'Reset the current formula and finger positions? This cannot be undone.',
+      'Reset the current formula and finger positions?',
     )
   ) {
     return;
@@ -1456,6 +1676,10 @@ function resetApplicationState() {
   clearPersistedLastSearch();
   resetFingerValuesToDefaults();
   clearError();
+  // Reset is a fresh start: clear undo/redo stacks and seed with the new state.
+  historyPast.length = 0;
+  historyFuture.length = 0;
+  commitHistorySnapshot({ force: true });
 }
 
 function resetFingerValuesToDefaults() {
