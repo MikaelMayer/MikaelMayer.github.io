@@ -102,6 +102,39 @@ test('reflex4you updates formula query param after successful apply', async ({ p
   await expect(textarea).toHaveValue(SIMPLE_FORMULA);
 });
 
+test('undo restores the previous formula after an edit', async ({ page }) => {
+  await page.goto('/index.html');
+  await waitForReflexReady(page);
+
+  const textarea = page.locator('#formula');
+  await expect(textarea).toBeVisible();
+
+  const initialFormula = await textarea.inputValue();
+  expect(initialFormula.length).toBeGreaterThan(0);
+
+  const undoButton = page.locator('#undo-button');
+  const redoButton = page.locator('#redo-button');
+
+  // Initial state: nothing to undo/redo.
+  await expect(undoButton).toBeDisabled();
+  await expect(redoButton).toBeDisabled();
+
+  await textarea.fill(SIMPLE_FORMULA);
+  await expectNoRendererError(page);
+
+  // Commit the edit into the undo history (change event fires on blur).
+  await textarea.blur();
+
+  await expect(undoButton).toBeEnabled();
+  await expect(redoButton).toBeDisabled();
+
+  await undoButton.click();
+
+  await expect.poll(async () => await textarea.inputValue()).toBe(initialFormula);
+  await expect(undoButton).toBeDisabled();
+  await expect(redoButton).toBeEnabled();
+});
+
 test('reflex4you loads formulas from query string on startup', async ({ page }) => {
   const supportsCompression = await detectCompressionCapability(page);
   const targetUrl = supportsCompression
