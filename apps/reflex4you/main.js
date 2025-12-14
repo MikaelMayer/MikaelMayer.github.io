@@ -1315,9 +1315,7 @@ function handleMenuAction(action) {
       });
       break;
     case 'reset':
-      commitHistorySnapshot();
       confirmAndReset();
-      scheduleCommitHistorySnapshot();
       break;
     case 'set-animation-start':
       setAnimationStartFromCurrent();
@@ -1678,9 +1676,10 @@ function resetApplicationState() {
   clearPersistedLastSearch();
   resetFingerValuesToDefaults();
   clearError();
-  if (activePointerIds.size === 0) {
-    scheduleCommitHistorySnapshot();
-  }
+  // Reset is a fresh start: clear undo/redo stacks and seed with the new state.
+  historyPast.length = 0;
+  historyFuture.length = 0;
+  commitHistorySnapshot({ force: true });
 }
 
 function resetFingerValuesToDefaults() {
