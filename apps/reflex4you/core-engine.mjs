@@ -231,6 +231,24 @@ function analyzeFingerUniformCounts(ast) {
           visit(node.branch);
         }
         return;
+      case "ComposeMultiple":
+        // Produced by the parser for the `$$` operator (repeat composition).
+        // Even though we later materialize this node before generating GLSL,
+        // we must count finger usage here so uniform arrays are sized large
+        // enough on the first render (before any formula edit).
+        visit(node.base);
+        if (node.countExpression) {
+          visit(node.countExpression);
+        }
+        return;
+      case "RepeatComposePlaceholder":
+        // Should not reach the renderer (placeholders are resolved during parse),
+        // but handle defensively so uniform sizing never under-allocates.
+        visit(node.base);
+        if (node.countExpression) {
+          visit(node.countExpression);
+        }
+        return;
       case "Sub":
       case "Mul":
       case "Op":
