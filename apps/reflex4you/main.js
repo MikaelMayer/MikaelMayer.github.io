@@ -867,6 +867,7 @@ function updateFingerDotPosition(label) {
 async function bootstrapReflexApplication() {
   // Installed PWAs often relaunch at `start_url` without the last query string.
   // Restore the last known reflex state unless the user opened an explicit share link.
+  // This also improves the non-installed experience (reloads keep state).
   restorePersistedSearchIfNeeded();
 
   await verifyCompressionSupport();
