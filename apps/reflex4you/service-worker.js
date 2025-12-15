@@ -2,8 +2,22 @@
 
 // Bump these to force clients to pick up new precache content.
 // Keep the main app version stable; bump only this minor cache suffix when needed.
-const PRECACHE_NAME = 'reflex4you-precache-v11.3';
-const RUNTIME_CACHE_NAME = 'reflex4you-runtime-v11.3';
+//
+// IMPORTANT: cache storage is shared across the entire origin (including GitHub Pages
+// PR previews under `/pr-preview/...`). If we use a single global cache name, different
+// deployments can overwrite each other and serve stale/mismatched assets.
+// Include the service worker registration scope in cache keys to isolate deployments.
+const CACHE_MINOR = '11.4';
+const SCOPE =
+  typeof self !== 'undefined' && self.registration && typeof self.registration.scope === 'string'
+    ? self.registration.scope
+    : '';
+const SCOPE_KEY = SCOPE
+  ? SCOPE.replace(/^https?:\/\//, '').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '').slice(-64)
+  : 'default';
+const CACHE_PREFIX = `reflex4you:${SCOPE_KEY}:`;
+const PRECACHE_NAME = `${CACHE_PREFIX}precache:v${CACHE_MINOR}`;
+const RUNTIME_CACHE_NAME = `${CACHE_PREFIX}runtime:v${CACHE_MINOR}`;
 
 // Precache the app shell + all ESM modules required to boot offline.
 const PRECACHE_URLS = [
@@ -47,7 +61,8 @@ self.addEventListener('activate', (event) => {
       const keys = await caches.keys();
       await Promise.all(
         keys.map((key) => {
-          if (!keep.has(key) && key.startsWith('reflex4you-')) {
+          // Only clean up caches for *this* deployment scope.
+          if (!keep.has(key) && key.startsWith(CACHE_PREFIX)) {
             return caches.delete(key);
           }
         }),
