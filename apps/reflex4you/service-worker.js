@@ -144,6 +144,49 @@ async function networkFirst(request, { fallbackUrl, timeoutMs = 3500 } = {}) {
   }
 }
 
+function navigationRecoveryHtml(requestUrl) {
+  const escapedUrl = String(requestUrl || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <title>Reflex4You – recovering…</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; color: rgba(255,255,255,0.92); font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    .wrap { padding: 18px 16px; max-width: 760px; }
+    .card { margin-top: 14px; border: 1px solid rgba(255,255,255,0.14); border-radius: 14px; background: rgba(255,255,255,0.06); padding: 14px 14px; }
+    .muted { color: rgba(255,255,255,0.68); font-size: 13px; line-height: 1.35; }
+    button { appearance: none; border: 1px solid rgba(255,255,255,0.22); background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.92); border-radius: 10px; padding: 10px 12px; font-size: 14px; cursor: pointer; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div style="font-weight: 650; letter-spacing: 0.01em;">Reflex4You couldn’t start</div>
+      <p class="muted">
+        The app shell failed to load (often after the OS kills a backgrounded PWA).
+        Tap reload to recover.
+      </p>
+      <p class="muted">Requested: <code>${escapedUrl}</code></p>
+      <button type="button" onclick="location.replace('./index.html' + location.search + location.hash)">Reload</button>
+    </div>
+  </div>
+  <script>
+    // Auto-retry once: a fresh navigation often fixes transient fetch/SW glitches.
+    setTimeout(() => {
+      try { location.replace('./index.html' + location.search + location.hash); } catch (_) {}
+    }, 400);
+  </script>
+</body>
+</html>`;
+}
+
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   if (!request || request.method !== 'GET') {
@@ -162,7 +205,20 @@ self.addEventListener('fetch', (event) => {
 
   if (isNavigation) {
     const fallbackUrl = url.pathname.endsWith('/formula.html') ? './formula.html' : './index.html';
-    event.respondWith(networkFirst(request, { fallbackUrl, timeoutMs: 3500 }));
+    event.respondWith(
+      (async () => {
+        try {
+          return await networkFirst(request, { fallbackUrl, timeoutMs: 3500 });
+        } catch (_) {
+          // Last resort: never allow a navigation to reject, because some PWAs render
+          // that as an empty/blank white screen after the splash.
+          return new Response(navigationRecoveryHtml(url.href), {
+            status: 200,
+            headers: { 'content-type': 'text/html; charset=utf-8' },
+          });
+        }
+      })(),
+    );
     return;
   }
 

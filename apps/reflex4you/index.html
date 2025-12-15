@@ -518,7 +518,61 @@
   <textarea id="formula" spellcheck="false" aria-label="Formula"></textarea>
 </div>
 
-<script type="module" src="./main.js"></script>
+<script type="module">
+  // Boot via dynamic import so we can catch failures (instead of a blank white screen).
+  (async function () {
+    const error = document.getElementById('error');
+    const key = 'reflex4you:bootReloadedOnce';
+
+    function showBootError(msg) {
+      if (!error) return;
+      error.setAttribute('data-error-severity', 'fatal');
+      error.textContent = msg;
+      error.style.display = 'block';
+    }
+
+    function reloadOnce(reason) {
+      try {
+        if (sessionStorage.getItem(key)) return false;
+        sessionStorage.setItem(key, String(Date.now()));
+      } catch (_) {
+        // If sessionStorage is unavailable, still try once (best effort).
+      }
+      try {
+        const url = new URL(location.href);
+        url.searchParams.set('bootfix', String(Date.now()));
+        url.hash = location.hash || '';
+        location.replace(url.toString());
+        return true;
+      } catch (_) {
+        try { location.reload(); } catch (_) {}
+        return true;
+      }
+    }
+
+    // If we don’t finish boot quickly, show a message and try a one-time reload.
+    const bootTimer = setTimeout(() => {
+      showBootError('Reflex4You did not finish loading.\nReloading to recover…');
+      reloadOnce('timeout');
+    }, 3500);
+
+    try {
+      await import('./main.js');
+      clearTimeout(bootTimer);
+    } catch (e) {
+      clearTimeout(bootTimer);
+      const details = e && (e.stack || e.message) ? String(e.stack || e.message) : String(e);
+      showBootError(`Reflex4You failed to start.\n\n${details}\n\nTap to reload.`);
+      // Make the “tap -> white screen” become “tap -> recover”.
+      document.addEventListener(
+        'pointerdown',
+        () => reloadOnce('tap'),
+        { once: true, capture: true },
+      );
+      reloadOnce('import-failed');
+    }
+  })();
+</script>
 
 </body>
 </html>
