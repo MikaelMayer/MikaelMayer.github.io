@@ -380,6 +380,19 @@
               'Try: hard reload, or Application → Service Workers → Unregister; then reload.',
             ].join('\n'),
           );
+
+          // Auto-heal once per tab: if we detect staleness, try clearing SW+caches
+          // automatically so users don't have to click a button.
+          try {
+            const key = 'reflex4you:autoFixTried';
+            if (!sessionStorage.getItem(key)) {
+              sessionStorage.setItem(key, String(Date.now()));
+              // Defer so the warning is visible briefly.
+              window.setTimeout(() => fixCacheNow(), 250);
+            }
+          } catch (_) {
+            // ignore storage failures; user can still click the button
+          }
         } else {
           show('stale-warning', false);
           show('stale-actions', false);

@@ -7,7 +7,7 @@
 // PR previews under `/pr-preview/...`). If we use a single global cache name, different
 // deployments can overwrite each other and serve stale/mismatched assets.
 // Include the service worker registration scope in cache keys to isolate deployments.
-const CACHE_MINOR = '11.7';
+const CACHE_MINOR = '11.8';
 const SCOPE =
   typeof self !== 'undefined' && self.registration && typeof self.registration.scope === 'string'
     ? self.registration.scope
@@ -45,6 +45,17 @@ function isSameOrigin(url) {
   return url && url.origin === self.location.origin;
 }
 
+async function matchFromNamedCaches(request) {
+  // IMPORTANT: do not use `caches.match(request)` here.
+  // `caches.match` searches *all* CacheStorage entries for the origin, which can
+  // pick up stale responses from other deployments (e.g. GitHub Pages PR previews).
+  const runtime = await caches.open(RUNTIME_CACHE_NAME);
+  const hitRuntime = await runtime.match(request);
+  if (hitRuntime) return hitRuntime;
+  const precache = await caches.open(PRECACHE_NAME);
+  return await precache.match(request);
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
@@ -79,7 +90,7 @@ self.addEventListener('message', (event) => {
 });
 
 async function cacheFirst(request) {
-  const cached = await caches.match(request);
+  const cached = await matchFromNamedCaches(request);
   if (cached) {
     return cached;
   }
@@ -115,12 +126,12 @@ async function networkFirst(request, { fallbackUrl, timeoutMs = 3500 } = {}) {
     }
     return response;
   } catch (error) {
-    const cached = await caches.match(request);
+    const cached = await matchFromNamedCaches(request);
     if (cached) {
       return cached;
     }
     if (fallbackUrl) {
-      const fallback = await caches.match(fallbackUrl);
+      const fallback = await matchFromNamedCaches(fallbackUrl);
       if (fallback) {
         return fallback;
       }
