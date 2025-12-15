@@ -57,14 +57,30 @@ test('formula page renders sqrt(...) as sqrt (not exp/ln desugaring)', async ({ 
   await page.goto(`/formula.html?formula=${encodeURIComponent('sqrt(z)')}`);
   const render = page.locator('#formula-render');
   await expect(render).toBeVisible();
-  await expect(render).toContainText('√');
+  await expect(render.locator('svg')).toBeVisible();
+  await expect.poll(async () => await render.getAttribute('data-latex')).toContain('\\sqrt');
+  await expect.poll(async () => await render.getAttribute('data-latex')).not.toContain('\\exp');
+  await expect.poll(async () => await render.getAttribute('data-latex')).not.toContain('\\ln');
 });
 
 test('formula page renders heav(...) as a function name', async ({ page }) => {
   await page.goto(`/formula.html?formula=${encodeURIComponent('heav(z)')}`);
   const render = page.locator('#formula-render');
   await expect(render).toBeVisible();
-  await expect(render).toContainText('heav');
+  await expect(render.locator('svg')).toBeVisible();
+  await expect.poll(async () => await render.getAttribute('data-latex')).toContain('\\operatorname{heav}');
+});
+
+test('formula page does not double-parenthesize factors for multiplication', async ({ page }) => {
+  await page.goto(`/formula.html?formula=${encodeURIComponent('(z-D1)*(z-D2)')}`);
+  const render = page.locator('#formula-render');
+  await expect(render).toBeVisible();
+  await expect(render.locator('svg')).toBeVisible();
+  const latex = await render.getAttribute('data-latex');
+  expect(latex).not.toContain('\\left(\\left(');
+  expect(latex).not.toContain('\\right)\\right)');
+  // Also ensure we aren't on an older cached renderer that still uses \cdot.
+  expect(latex).not.toContain('\\cdot');
 });
 
 test('reflex4you updates formula query param after successful apply', async ({ page }) => {

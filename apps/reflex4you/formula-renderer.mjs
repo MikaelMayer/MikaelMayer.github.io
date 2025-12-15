@@ -1,47 +1,10 @@
-function span(className, text) {
-  const el = document.createElement('span');
-  if (className) {
-    el.className = className;
-  }
-  if (text != null) {
-    el.textContent = text;
-  }
-  return el;
-}
+// MathJax-based formula renderer (SVG output).
+// Produces a LaTeX string from the Reflex4You AST and renders it via MathJax.tex2svg.
 
-function joinInline(parts) {
-  const el = document.createElement('span');
-  el.className = 'rf-inline';
-  parts.forEach((part) => {
-    if (part == null) return;
-    if (typeof part === 'string') {
-      el.appendChild(document.createTextNode(part));
-    } else {
-      el.appendChild(part);
-    }
-  });
-  return el;
-}
+// Bump this when changing renderer logic so users can verify cached assets.
+export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2025-12-15.1';
 
-function needsParens(node) {
-  return (
-    node &&
-    typeof node === 'object' &&
-    (node.kind === 'Add' ||
-      node.kind === 'Sub' ||
-      node.kind === 'Mul' ||
-      node.kind === 'Div' ||
-      node.kind === 'Compose' ||
-      node.kind === 'Pow' ||
-      node.kind === 'LessThan' ||
-      node.kind === 'GreaterThan' ||
-      node.kind === 'LessThanOrEqual' ||
-      node.kind === 'GreaterThanOrEqual' ||
-      node.kind === 'Equal' ||
-      node.kind === 'LogicalAnd' ||
-      node.kind === 'LogicalOr')
-  );
-}
+const DEFAULT_MATHJAX_LOAD_TIMEOUT_MS = 9000;
 
 function precedence(node) {
   if (!node || typeof node !== 'object') return 100;
@@ -83,199 +46,174 @@ function formatNumber(value) {
   return String(rounded).replace(/\.?0+$/, '');
 }
 
-function renderConst(node) {
-  const re = node.re;
-  const im = node.im;
-  if (!Number.isFinite(re) || !Number.isFinite(im)) {
-    return span('rf-atom', '?');
-  }
-  if (im === 0) {
-    return span('rf-atom', formatNumber(re));
-  }
-  const imagAbs = Math.abs(im);
-  const imagPart = imagAbs === 1 ? '' : formatNumber(imagAbs);
-  if (re === 0) {
-    const sign = im < 0 ? '-' : '';
-    return joinInline([
-      span('rf-atom', `${sign}${imagPart}`),
-      span('rf-italic', 'i'),
-    ]);
-  }
-  const sign = im >= 0 ? '+' : '−';
-  return joinInline([
-    span('rf-atom', formatNumber(re)),
-    span('rf-op', ` ${sign} `),
-    span('rf-atom', imagPart),
-    span('rf-italic', 'i'),
-  ]);
+function escapeLatexIdentifier(name) {
+  return String(name || '?').replace(/_/g, '\\_');
 }
 
-function wrapParens(content) {
-  return joinInline([span('rf-paren', '('), content, span('rf-paren', ')')]);
+function isLatexAlreadyWrappedInParens(latex) {
+  const t = String(latex || '').trim();
+  // Common case produced by this renderer.
+  if (t.startsWith('\\left(') && t.endsWith('\\right)')) {
+    return true;
+  }
+  // Avoid double-wrapping if a plain parenthesis wrapper already exists.
+  if (t.startsWith('(') && t.endsWith(')')) {
+    return true;
+  }
+  return false;
 }
 
-function maybeWrap(node, rendered, parentPrec, side, opKind) {
+function wrapParensLatex(latex) {
+  if (isLatexAlreadyWrappedInParens(latex)) {
+    return String(latex || '');
+  }
+  return `\\left(${latex}\\right)`;
+}
+
+function maybeWrapLatex(node, latex, parentPrec, side, opKind) {
   const childPrec = precedence(node);
   if (childPrec < parentPrec) {
-    return wrapParens(rendered);
+    return wrapParensLatex(latex);
   }
   if (side === 'right' && (opKind === 'Sub' || opKind === 'Div') && childPrec === parentPrec) {
-    return wrapParens(rendered);
+    return wrapParensLatex(latex);
   }
-  return rendered;
+  return latex;
 }
 
-function renderFunctionCall(name, arg, options) {
-  const nameEl = span('rf-fn', name);
-  const argEl = renderNode(arg, 0, options);
-  return joinInline([nameEl, span('rf-paren', '('), argEl, span('rf-paren', ')')]);
+function constToLatex(node) {
+  const re = node.re;
+  const im = node.im;
+  if (!Number.isFinite(re) || !Number.isFinite(im)) return '?';
+  if (im === 0) return formatNumber(re);
+  const imagAbs = Math.abs(im);
+  const imagCoeff = imagAbs === 1 ? '' : formatNumber(imagAbs);
+  const imag = `${imagCoeff}${imagCoeff ? '\\,' : ''}i`;
+  if (re === 0) {
+    return im < 0 ? `-${imag}` : imag;
+  }
+  const sign = im >= 0 ? '+' : '-';
+  return `${formatNumber(re)} ${sign} ${imag}`;
 }
 
-function renderFunctionCallWithArgs(name, args, options) {
-  const nameEl = span('rf-fn', name);
-  const renderedArgs = (args || []).map((arg) => renderNode(arg, 0, options));
-  const parts = [nameEl, span('rf-paren', '(')];
-  renderedArgs.forEach((argEl, idx) => {
-    if (idx > 0) {
-      parts.push(span('rf-op', ', '));
+function fingerSlotToLatex(slot) {
+  const label = String(slot || '?');
+  const family = label[0] || '?';
+  const idx = label.slice(1);
+  if (!idx) {
+    return `\\mathrm{${escapeLatexIdentifier(family)}}`;
+  }
+  return `\\mathrm{${escapeLatexIdentifier(family)}}_{${escapeLatexIdentifier(idx)}}`;
+}
+
+function functionCallLatex(name, args, options) {
+  const renderedArgs = (args || []).map((arg) => nodeToLatex(arg, 0, options));
+  const fn = String(name || '?');
+
+  // Prefer native TeX operators for common functions.
+  const operatorMap = {
+    exp: '\\exp',
+    sin: '\\sin',
+    cos: '\\cos',
+    tan: '\\tan',
+    atan: '\\arctan',
+    asin: '\\arcsin',
+    acos: '\\arccos',
+    ln: '\\ln',
+  };
+
+  if (fn === 'sqrt') {
+    const value = renderedArgs[0] ?? '?';
+    const branch = renderedArgs[1] ?? null;
+    return branch ? `\\sqrt[${branch}]{${value}}` : `\\sqrt{${value}}`;
+  }
+
+  if (fn in operatorMap) {
+    const op = operatorMap[fn];
+    if (fn === 'ln' && args?.[1]) {
+      // ln(z, k) is rendered as ln_k(z)
+      const value = renderedArgs[0] ?? '?';
+      const branch = renderedArgs[1] ?? '?';
+      return `${op}_{${branch}}\\left(${value}\\right)`;
     }
-    parts.push(argEl);
-  });
-  parts.push(span('rf-paren', ')'));
-  return joinInline(parts);
-}
-
-function renderSqrtCall(args, options) {
-  const valueNode = args?.[0];
-  const branchNode = args?.[1] ?? null;
-  const valueRendered = valueNode ? renderNode(valueNode, 0, options) : span('rf-atom', '?');
-  const radicand = valueNode && needsParens(valueNode) ? wrapParens(valueRendered) : valueRendered;
-
-  const sqrtEl = document.createElement('span');
-  sqrtEl.className = 'rf-sqrt';
-
-  const symbol = document.createElement('span');
-  symbol.className = 'rf-sqrt-symbol';
-  symbol.textContent = '√';
-
-  if (branchNode) {
-    const idx = document.createElement('span');
-    idx.className = 'rf-sqrt-index';
-    idx.appendChild(renderNode(branchNode, 0, options));
-    symbol.appendChild(idx);
+    const value = renderedArgs[0] ?? '?';
+    return `${op}\\left(${value}\\right)`;
   }
 
-  const rad = document.createElement('span');
-  rad.className = 'rf-sqrt-radicand';
-  rad.appendChild(radicand);
-
-  sqrtEl.appendChild(symbol);
-  sqrtEl.appendChild(rad);
-  return sqrtEl;
+  // Generic function call.
+  return `\\operatorname{${escapeLatexIdentifier(fn)}}\\left(${renderedArgs.join(', ')}\\right)`;
 }
 
-function fingerLabelToPretty(slot) {
-  const family = slot?.[0] ?? '';
-  const idx = slot?.slice(1) ?? '';
-  const sub = idx.replace(/1/g, '₁').replace(/2/g, '₂').replace(/3/g, '₃');
-  return `${family}${sub}`;
-}
-
-function renderNode(node, parentPrec = 0, options = {}) {
-  if (!node || typeof node !== 'object') {
-    return span('rf-atom', '?');
-  }
+function nodeToLatex(node, parentPrec = 0, options = {}) {
+  if (!node || typeof node !== 'object') return '?';
 
   if (node.__syntheticCall && typeof node.__syntheticCall.name === 'string') {
-    const call = node.__syntheticCall;
-    if (call.name === 'sqrt') {
-      return renderSqrtCall(call.args, options);
-    }
-    return renderFunctionCallWithArgs(call.name, call.args, options);
+    return functionCallLatex(node.__syntheticCall.name, node.__syntheticCall.args, options);
   }
 
   switch (node.kind) {
     case 'Const':
-      return renderConst(node);
+      return constToLatex(node);
     case 'Var':
-      return span('rf-italic', node.name || 'z');
+      return escapeLatexIdentifier(node.name || 'z');
     case 'VarX':
-      return span('rf-italic', 'x');
+      return 'x';
     case 'VarY':
-      return span('rf-italic', 'y');
+      return 'y';
     case 'Identifier':
     case 'SetRef':
-      return span('rf-italic', node.name || '?');
+      return escapeLatexIdentifier(node.name || '?');
     case 'FingerOffset':
-      return span('rf-finger', fingerLabelToPretty(node.slot));
+      return fingerSlotToLatex(node.slot);
 
     case 'Pow': {
-      const base = renderNode(node.base, precedence(node), options);
-      const baseWrapped = needsParens(node.base) ? wrapParens(base) : base;
-      const exp = span('rf-sup', formatNumber(node.exponent));
-      return joinInline([baseWrapped, exp]);
+      const baseLatex = nodeToLatex(node.base, precedence(node), options);
+      const baseWrapped = precedence(node.base) < precedence(node) ? wrapParensLatex(baseLatex) : baseLatex;
+      return `${baseWrapped}^{${formatNumber(node.exponent)}}`;
     }
 
     case 'ComposeMultiple': {
-      const base = renderNode(node.base, precedence(node), options);
-      const baseWrapped = needsParens(node.base) ? wrapParens(base) : base;
+      const baseLatex = nodeToLatex(node.base, precedence(node), options);
+      const baseWrapped = precedence(node.base) < precedence(node) ? wrapParensLatex(baseLatex) : baseLatex;
       const count =
         typeof node.resolvedCount === 'number'
           ? formatNumber(node.resolvedCount)
           : node.countExpression
-            ? '?'
+            ? nodeToLatex(node.countExpression, 0, options)
             : '?';
-      const sup = joinInline([span('rf-sup', `∘${count}`)]);
-      return joinInline([baseWrapped, sup]);
+      return `${baseWrapped}^{\\circ ${count}}`;
     }
 
     case 'Exp':
-      return renderFunctionCall('exp', node.value, options);
+      return `\\exp\\left(${nodeToLatex(node.value, 0, options)}\\right)`;
     case 'Sin':
-      return renderFunctionCall('sin', node.value, options);
+      return `\\sin\\left(${nodeToLatex(node.value, 0, options)}\\right)`;
     case 'Cos':
-      return renderFunctionCall('cos', node.value, options);
+      return `\\cos\\left(${nodeToLatex(node.value, 0, options)}\\right)`;
     case 'Tan':
-      return renderFunctionCall('tan', node.value, options);
+      return `\\tan\\left(${nodeToLatex(node.value, 0, options)}\\right)`;
     case 'Atan':
-      return renderFunctionCall('atan', node.value, options);
+      return `\\arctan\\left(${nodeToLatex(node.value, 0, options)}\\right)`;
     case 'Asin':
-      return renderFunctionCall('asin', node.value, options);
+      return `\\arcsin\\left(${nodeToLatex(node.value, 0, options)}\\right)`;
     case 'Acos':
-      return renderFunctionCall('acos', node.value, options);
+      return `\\arccos\\left(${nodeToLatex(node.value, 0, options)}\\right)`;
     case 'Ln': {
-      const ln = span('rf-fn', 'ln');
+      const value = nodeToLatex(node.value, 0, options);
       if (node.branch) {
-        const subEl = span('rf-sub', null);
-        subEl.appendChild(renderNode(node.branch, 0, options));
-        const wrap = joinInline([ln, subEl]);
-        return joinInline([
-          wrap,
-          span('rf-paren', '('),
-          renderNode(node.value, 0, options),
-          span('rf-paren', ')'),
-        ]);
+        const branch = nodeToLatex(node.branch, 0, options);
+        return `\\ln_{${branch}}\\left(${value}\\right)`;
       }
-      return renderFunctionCall('ln', node.value, options);
+      return `\\ln\\left(${value}\\right)`;
     }
-    case 'Abs': {
-      const inner = renderNode(node.value, 0, options);
-      return joinInline([span('rf-delim', '|'), inner, span('rf-delim', '|')]);
-    }
-    case 'Abs2': {
-      const abs = joinInline([span('rf-delim', '|'), renderNode(node.value, 0, options), span('rf-delim', '|')]);
-      return joinInline([abs, span('rf-sup', '2')]);
-    }
-    case 'Floor': {
-      const inner = renderNode(node.value, 0, options);
-      return joinInline([span('rf-delim', '⌊'), inner, span('rf-delim', '⌋')]);
-    }
-    case 'Conjugate': {
-      const inner = renderNode(node.value, 0, options);
-      const over = span('rf-overline', null);
-      over.appendChild(inner);
-      return over;
-    }
+    case 'Abs':
+      return `\\left|${nodeToLatex(node.value, 0, options)}\\right|`;
+    case 'Abs2':
+      return `\\left|${nodeToLatex(node.value, 0, options)}\\right|^{2}`;
+    case 'Floor':
+      return `\\left\\lfloor${nodeToLatex(node.value, 0, options)}\\right\\rfloor`;
+    case 'Conjugate':
+      return `\\overline{${nodeToLatex(node.value, 0, options)}}`;
 
     case 'Add':
     case 'Sub':
@@ -290,104 +228,122 @@ function renderNode(node, parentPrec = 0, options = {}) {
     case 'LogicalOr':
     case 'Compose': {
       const prec = precedence(node);
-      const left = renderNode(node.left ?? node.f, prec, options);
-      const right = renderNode(node.right ?? node.g, prec, options);
-
       const leftNode = node.left ?? node.f;
       const rightNode = node.right ?? node.g;
+      const left = nodeToLatex(leftNode, prec, options);
+      const right = nodeToLatex(rightNode, prec, options);
 
-      let op = '?';
+      const leftWrapped = maybeWrapLatex(leftNode, left, prec, 'left', node.kind);
+      const rightWrapped = maybeWrapLatex(rightNode, right, prec, 'right', node.kind);
+
       switch (node.kind) {
-        case 'Add':
-          op = '+';
-          break;
-        case 'Sub':
-          op = '−';
-          break;
-        case 'Mul':
-          op = '·';
-          break;
-        case 'Div':
-          op = '/';
-          break;
-        case 'LessThan':
-          op = '<';
-          break;
-        case 'GreaterThan':
-          op = '>';
-          break;
-        case 'LessThanOrEqual':
-          op = '≤';
-          break;
-        case 'GreaterThanOrEqual':
-          op = '≥';
-          break;
-        case 'Equal':
-          op = '=';
-          break;
-        case 'LogicalAnd':
-          op = '∧';
-          break;
-        case 'LogicalOr':
-          op = '∨';
-          break;
-        case 'Compose':
-          op = '∘';
-          break;
+        case 'Add': {
+          return `${leftWrapped} + ${rightWrapped}`;
+        }
+        case 'Sub': {
+          return `${leftWrapped} - ${rightWrapped}`;
+        }
+        case 'Mul': {
+          // Use a thin space instead of `\\cdot` for readability.
+          return `${leftWrapped}\\,${rightWrapped}`;
+        }
+        case 'Div': {
+          // Prefer fractions for readability; they behave as an "atomic" group in TeX.
+          return `\\frac{${left}}{${right}}`;
+        }
+        case 'LessThan': {
+          return `${leftWrapped} < ${rightWrapped}`;
+        }
+        case 'GreaterThan': {
+          return `${leftWrapped} > ${rightWrapped}`;
+        }
+        case 'LessThanOrEqual': {
+          return `${leftWrapped} \\le ${rightWrapped}`;
+        }
+        case 'GreaterThanOrEqual': {
+          return `${leftWrapped} \\ge ${rightWrapped}`;
+        }
+        case 'Equal': {
+          return `${leftWrapped} = ${rightWrapped}`;
+        }
+        case 'LogicalAnd': {
+          return `${leftWrapped} \\land ${rightWrapped}`;
+        }
+        case 'LogicalOr': {
+          return `${leftWrapped} \\lor ${rightWrapped}`;
+        }
+        case 'Compose': {
+          return `${leftWrapped} \\circ ${rightWrapped}`;
+        }
         default:
-          op = '?';
-          break;
+          return '?';
       }
-
-      const leftWrapped = maybeWrap(leftNode, left, prec, 'left', node.kind);
-      const rightWrapped = maybeWrap(rightNode, right, prec, 'right', node.kind);
-      const rendered = joinInline([leftWrapped, span('rf-op', ` ${op} `), rightWrapped]);
-      return prec < parentPrec ? wrapParens(rendered) : rendered;
     }
 
     case 'If': {
-      const kw = span('rf-keyword', 'if');
-      return joinInline([
-        kw,
-        span('rf-paren', '('),
-        renderNode(node.condition, 0, options),
-        span('rf-op', ', '),
-        renderNode(node.thenBranch, 0, options),
-        span('rf-op', ', '),
-        renderNode(node.elseBranch, 0, options),
-        span('rf-paren', ')'),
-      ]);
+      const cond = nodeToLatex(node.condition, 0, options);
+      const thenBranch = nodeToLatex(node.thenBranch, 0, options);
+      const elseBranch = nodeToLatex(node.elseBranch, 0, options);
+      return `\\operatorname{if}\\left(${cond}, ${thenBranch}, ${elseBranch}\\right)`;
     }
 
     case 'SetBinding': {
-      const kwSet = span('rf-keyword', 'set');
-      const kwIn = span('rf-keyword', 'in');
-      const name = span('rf-italic', node.name || '?');
-      return joinInline([
-        kwSet,
-        ' ',
-        name,
-        span('rf-op', ' = '),
-        renderNode(node.value, 0, options),
-        ' ',
-        kwIn,
-        ' ',
-        renderNode(node.body, 0, options),
-      ]);
+      const name = escapeLatexIdentifier(node.name || '?');
+      const value = nodeToLatex(node.value, 0, options);
+      const body = nodeToLatex(node.body, 0, options);
+      return `\\mathrm{set}\\;${name} = ${value}\\;\\mathrm{in}\\;${body}`;
     }
 
     default:
-      return span('rf-atom', node.kind || '?');
+      return escapeLatexIdentifier(node.kind || '?');
   }
 }
 
-export function renderFormulaToContainer(ast, container, options = {}) {
+async function waitForMathJaxStartup(win, { timeoutMs = DEFAULT_MATHJAX_LOAD_TIMEOUT_MS } = {}) {
+  const deadline = Date.now() + Math.max(0, Number(timeoutMs) || 0);
+  while (Date.now() < deadline) {
+    if (win?.MathJax?.startup?.promise) {
+      await win.MathJax.startup.promise;
+      return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 30));
+  }
+  return Boolean(win?.MathJax?.tex2svg);
+}
+
+export async function renderFormulaToContainer(ast, container, options = {}) {
   if (!container) {
     return;
   }
+
+  const latex = nodeToLatex(ast, 0, options);
+  container.dataset.latex = latex;
+  container.dataset.renderer = 'unknown';
+  container.dataset.rendererBuildId = FORMULA_RENDERER_BUILD_ID;
   container.textContent = '';
-  const node = renderNode(ast, 0, options);
-  node.classList.add('rf-root');
-  container.appendChild(node);
+
+  const win = typeof window !== 'undefined' ? window : null;
+  const hasMathJax = Boolean(win?.MathJax);
+  if (!hasMathJax) {
+    container.dataset.renderer = 'fallback';
+    container.textContent = latex;
+    return;
+  }
+
+  const ready = await waitForMathJaxStartup(win);
+  if (!ready || typeof win.MathJax?.tex2svg !== 'function') {
+    container.dataset.renderer = 'fallback';
+    container.textContent = latex;
+    return;
+  }
+
+  // Render to SVG and attach.
+  const mjxNode = win.MathJax.tex2svg(latex, { display: true });
+  const svg = mjxNode?.querySelector?.('svg');
+  if (svg) {
+    svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  }
+  container.appendChild(mjxNode);
+  container.dataset.renderer = 'mathjax';
 }
 
