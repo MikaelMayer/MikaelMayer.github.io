@@ -1,8 +1,8 @@
 // apps/reflex4you/service-worker.js
 
 // Bump these to force clients to pick up new precache content.
-const PRECACHE_NAME = 'reflex4you-precache-v9';
-const RUNTIME_CACHE_NAME = 'reflex4you-runtime-v9';
+const PRECACHE_NAME = 'reflex4you-precache-v10';
+const RUNTIME_CACHE_NAME = 'reflex4you-runtime-v10';
 
 // Precache the app shell + all ESM modules required to boot offline.
 const PRECACHE_URLS = [
@@ -14,6 +14,7 @@ const PRECACHE_URLS = [
   './icon-512.png',
   './Screenshot_20251213-082055.png',
   './main.js',
+  './image-export.mjs',
   './core-engine.mjs',
   './ast-utils.mjs',
   './arithmetic-parser.mjs',
