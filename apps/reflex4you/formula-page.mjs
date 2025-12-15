@@ -1,7 +1,12 @@
 import { parseFormulaInput } from './arithmetic-parser.mjs';
 import { formatCaretIndicator } from './parse-error-format.mjs';
 import { renderFormulaToContainer } from './formula-renderer.mjs';
-import { verifyCompressionSupport, readFormulaFromQuery } from './formula-url.mjs';
+import {
+  verifyCompressionSupport,
+  readFormulaFromQuery,
+  updateFormulaQueryParam,
+  updateFormulaQueryParamImmediately,
+} from './formula-url.mjs';
 
 // Ensure the PWA service worker is installed even when users land directly
 // on the formula page (e.g. from a shared link).
@@ -31,6 +36,44 @@ function showError(message) {
   }
 }
 
+function setSourcePreview(source) {
+  const sourceEl = $('formula-source');
+  if (sourceEl) {
+    sourceEl.textContent = source;
+  }
+}
+
+function clearRender() {
+  const renderEl = $('formula-render');
+  if (renderEl) {
+    renderEl.textContent = '';
+    renderEl.removeAttribute('data-latex');
+    renderEl.removeAttribute('data-renderer');
+  }
+}
+
+async function renderFromSource(source, { updateUrl = false } = {}) {
+  const normalized = String(source || '');
+  if (updateUrl) {
+    // Keep URL shareable while editing; do an immediate legacy update, then
+    // attempt compressed upgrade asynchronously (debounced by caller).
+    updateFormulaQueryParamImmediately(normalized);
+  }
+
+  setSourcePreview(normalized);
+  const parsed = parseFormulaInput(normalized);
+  if (!parsed.ok) {
+    showError(formatCaretIndicator(normalized, parsed));
+    clearRender();
+    return { ok: false };
+  }
+
+  showError(null);
+  const renderEl = $('formula-render');
+  await renderFormulaToContainer(parsed.value, renderEl);
+  return { ok: true };
+}
+
 async function bootstrap() {
   await verifyCompressionSupport();
 
@@ -42,20 +85,33 @@ async function bootstrap() {
 
   const source = (decoded && decoded.trim()) ? decoded : DEFAULT_FORMULA_TEXT;
 
-  const sourceEl = $('formula-source');
-  if (sourceEl) {
-    sourceEl.textContent = source;
+  const inputEl = $('formula-input');
+  if (inputEl) {
+    inputEl.value = source;
   }
 
-  const parsed = parseFormulaInput(source);
-  if (!parsed.ok) {
-    showError(formatCaretIndicator(source, parsed));
-    return;
-  }
+  await renderFromSource(source, { updateUrl: false });
 
-  showError(null);
-  const renderEl = $('formula-render');
-  await renderFormulaToContainer(parsed.value, renderEl);
+  // Live edit + render loop.
+  let upgradeTimer = null;
+  if (inputEl) {
+    inputEl.addEventListener('input', () => {
+      const current = inputEl.value;
+      renderFromSource(current, { updateUrl: true }).catch((err) => {
+        console.error('Failed to render formula.', err);
+        showError('Unable to render formula.');
+      });
+
+      if (upgradeTimer != null) {
+        window.clearTimeout(upgradeTimer);
+      }
+      upgradeTimer = window.setTimeout(() => {
+        updateFormulaQueryParam(current).catch((error) => {
+          console.warn('Failed to upgrade formula parameter.', error);
+        });
+      }, 450);
+    });
+  }
 }
 
 bootstrap().catch((err) => {
