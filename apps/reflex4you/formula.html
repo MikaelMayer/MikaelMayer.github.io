@@ -199,6 +199,19 @@
       word-break: break-word;
     }
 
+    .build-info {
+      margin: 0 0 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      background: rgba(0, 0, 0, 0.20);
+      color: rgba(255, 255, 255, 0.82);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
     /* Ensure MathJax SVG scales with the card width */
     #formula-render mjx-container {
       display: block;
@@ -246,6 +259,7 @@
     <div class="card">
       <div class="card__body">
         <pre id="stale-warning" class="stale-warning" aria-live="polite"></pre>
+        <pre id="build-info" class="build-info" aria-label="Build info"></pre>
         <div class="editor">
           <p class="editor__label">Reflex source (updates live)</p>
           <textarea id="formula-input" class="editor__input" spellcheck="false" aria-label="Formula source"></textarea>
@@ -264,6 +278,89 @@
   </div>
 
   <script type="module" src="./formula-page.mjs"></script>
+  <script>
+    // Non-module diagnostics so it still runs even if module caching is stale.
+    (function () {
+      function $(id) { return document.getElementById(id); }
+
+      function setText(id, text) {
+        const el = $(id);
+        if (!el) return;
+        el.textContent = String(text || '');
+      }
+
+      function show(id, show) {
+        const el = $(id);
+        if (!el) return;
+        el.style.display = show ? 'block' : 'none';
+      }
+
+      function getControllerInfo() {
+        try {
+          const ctrl = navigator && navigator.serviceWorker && navigator.serviceWorker.controller;
+          if (!ctrl) return 'Controller: none (not controlled)';
+          return `Controller: ${ctrl.scriptURL}`;
+        } catch (_) {
+          return 'Controller: unknown';
+        }
+      }
+
+      async function probeLatestBuildId(url) {
+        try {
+          const res = await fetch(url, { cache: 'no-store' });
+          const text = await res.text();
+          const m = /FORMULA_RENDERER_BUILD_ID\s*=\s*'([^']+)'/.exec(text);
+          return m ? m[1] : null;
+        } catch (_) {
+          return null;
+        }
+      }
+
+      async function refreshBuildInfo() {
+        const render = $('formula-render');
+        const runningBuild = render && render.dataset ? (render.dataset.rendererBuildId || '') : '';
+        const latex = render && render.dataset ? (render.dataset.latex || '') : '';
+
+        const latestBuild = await probeLatestBuildId(`./formula-renderer.mjs?probe=${Date.now()}`);
+
+        const lines = [
+          getControllerInfo(),
+          `Running renderer build: ${runningBuild || '(missing)'}`,
+          `Latest available renderer build: ${latestBuild || '(unavailable)'}`,
+          latex ? `Latex preview (first 140 chars): ${latex.slice(0, 140)}` : 'Latex preview: (not rendered yet)',
+          '',
+          'Manual verification: open ./formula-renderer.mjs and search for FORMULA_RENDERER_BUILD_ID.',
+        ];
+        setText('build-info', lines.join('\n'));
+
+        const looksOld =
+          (typeof latex === 'string' && (latex.includes('\\cdot') || latex.includes('\\left(\\left') || latex.includes('\\right)\\right'))) ||
+          (!runningBuild) ||
+          (latestBuild && runningBuild && latestBuild !== runningBuild);
+
+        if (looksOld) {
+          show('stale-warning', true);
+          setText(
+            'stale-warning',
+            [
+              'WARNING: This page appears to be running stale/mismatched cached JS.',
+              'If you are on a PR preview, cache collisions across deployments are common.',
+              '',
+              'Try: hard reload, or Application → Service Workers → Unregister; then reload.',
+            ].join('\n'),
+          );
+        } else {
+          show('stale-warning', false);
+        }
+      }
+
+      // Give modules a moment to render, then probe; repeat once.
+      window.addEventListener('load', () => {
+        refreshBuildInfo();
+        window.setTimeout(refreshBuildInfo, 1200);
+      });
+    })();
+  </script>
 </body>
 </html>
 
