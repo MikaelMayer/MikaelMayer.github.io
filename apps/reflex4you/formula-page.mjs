@@ -43,6 +43,13 @@ function setSourcePreview(source) {
   }
 }
 
+function setLatexPreview(latex) {
+  const latexEl = $('formula-latex');
+  if (latexEl) {
+    latexEl.textContent = latex || '';
+  }
+}
+
 function clearRender() {
   const renderEl = $('formula-render');
   if (renderEl) {
@@ -50,6 +57,7 @@ function clearRender() {
     renderEl.removeAttribute('data-latex');
     renderEl.removeAttribute('data-renderer');
   }
+  setLatexPreview('');
 }
 
 async function renderFromSource(source, { updateUrl = false } = {}) {
@@ -71,6 +79,7 @@ async function renderFromSource(source, { updateUrl = false } = {}) {
   showError(null);
   const renderEl = $('formula-render');
   await renderFormulaToContainer(parsed.value, renderEl);
+  setLatexPreview(renderEl?.dataset?.latex || '');
   return { ok: true };
 }
 

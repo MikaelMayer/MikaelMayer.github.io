@@ -171,6 +171,20 @@
       color: rgba(255, 255, 255, 0.92);
     }
 
+    .block-label {
+      margin: 0 0 6px;
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+    }
+
+    .block-help {
+      margin: 0 0 10px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.72);
+      line-height: 1.4;
+    }
+
     /* Ensure MathJax SVG scales with the card width */
     #formula-render mjx-container {
       display: block;
@@ -225,14 +239,21 @@
       </div>
       <div class="card__body">
         <div class="editor">
-          <p class="editor__label">Edit (updates live)</p>
+          <p class="editor__label">Reflex source (updates live)</p>
           <textarea id="formula-input" class="editor__input" spellcheck="false" aria-label="Formula source"></textarea>
         </div>
         <pre id="formula-error" class="error" aria-live="polite"></pre>
+        <p class="block-label">Preview (MathJax SVG)</p>
+        <p class="block-help">This is the rendered image generated from the LaTeX below.</p>
         <div id="formula-render" class="formula" aria-label="Rendered formula"></div>
 
         <div class="source">
-          <p class="source__label">Source (from URL)</p>
+          <p class="source__label">Generated LaTeX (input to MathJax)</p>
+          <pre id="formula-latex" class="source__value"></pre>
+        </div>
+
+        <div class="source">
+          <p class="source__label">Current Reflex source</p>
           <pre id="formula-source" class="source__value"></pre>
         </div>
       </div>

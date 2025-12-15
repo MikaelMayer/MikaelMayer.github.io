@@ -219,53 +219,42 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
 
       switch (node.kind) {
         case 'Add': {
-          const rendered = `${leftWrapped} + ${rightWrapped}`;
-          return prec < parentPrec ? wrapParensLatex(rendered) : rendered;
+          return `${leftWrapped} + ${rightWrapped}`;
         }
         case 'Sub': {
-          const rendered = `${leftWrapped} - ${rightWrapped}`;
-          return prec < parentPrec ? wrapParensLatex(rendered) : rendered;
+          return `${leftWrapped} - ${rightWrapped}`;
         }
         case 'Mul': {
-          const rendered = `${leftWrapped} \\cdot ${rightWrapped}`;
-          return prec < parentPrec ? wrapParensLatex(rendered) : rendered;
+          // Use a thin space instead of `\\cdot` for readability.
+          return `${leftWrapped}\\,${rightWrapped}`;
         }
         case 'Div': {
           // Prefer fractions for readability; they behave as an "atomic" group in TeX.
-          const rendered = `\\frac{${left}}{${right}}`;
-          return prec < parentPrec ? wrapParensLatex(rendered) : rendered;
+          return `\\frac{${left}}{${right}}`;
         }
         case 'LessThan': {
-          const rendered = `${leftWrapped} < ${rightWrapped}`;
-          return prec < parentPrec ? wrapParensLatex(rendered) : rendered;
+          return `${leftWrapped} < ${rightWrapped}`;
         }
         case 'GreaterThan': {
-          const rendered = `${leftWrapped} > ${rightWrapped}`;
-          return prec < parentPrec ? wrapParensLatex(rendered) : rendered;
+          return `${leftWrapped} > ${rightWrapped}`;
         }
         case 'LessThanOrEqual': {
-          const rendered = `${leftWrapped} \\le ${rightWrapped}`;
-          return prec < parentPrec ? wrapParensLatex(rendered) : rendered;
+          return `${leftWrapped} \\le ${rightWrapped}`;
         }
         case 'GreaterThanOrEqual': {
-          const rendered = `${leftWrapped} \\ge ${rightWrapped}`;
-          return prec < parentPrec ? wrapParensLatex(rendered) : rendered;
+          return `${leftWrapped} \\ge ${rightWrapped}`;
         }
         case 'Equal': {
-          const rendered = `${leftWrapped} = ${rightWrapped}`;
-          return prec < parentPrec ? wrapParensLatex(rendered) : rendered;
+          return `${leftWrapped} = ${rightWrapped}`;
         }
         case 'LogicalAnd': {
-          const rendered = `${leftWrapped} \\land ${rightWrapped}`;
-          return prec < parentPrec ? wrapParensLatex(rendered) : rendered;
+          return `${leftWrapped} \\land ${rightWrapped}`;
         }
         case 'LogicalOr': {
-          const rendered = `${leftWrapped} \\lor ${rightWrapped}`;
-          return prec < parentPrec ? wrapParensLatex(rendered) : rendered;
+          return `${leftWrapped} \\lor ${rightWrapped}`;
         }
         case 'Compose': {
-          const rendered = `${leftWrapped} \\circ ${rightWrapped}`;
-          return prec < parentPrec ? wrapParensLatex(rendered) : rendered;
+          return `${leftWrapped} \\circ ${rightWrapped}`;
         }
         default:
           return '?';
