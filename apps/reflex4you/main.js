@@ -364,7 +364,7 @@ function scheduleCommitHistorySnapshot() {
 }
 
 function applyHistorySnapshot(snapshot) {
-  if (!snapshot || !reflexCore) {
+  if (!snapshot) {
     return;
   }
   historyApplying = true;
@@ -384,7 +384,7 @@ function applyHistorySnapshot(snapshot) {
         const v = fingers[label];
         if (!v) continue;
         latestOffsets[label] = { x: v.x, y: v.y };
-        reflexCore.setFingerValue(label, v.x, v.y, { triggerRender: false });
+        reflexCore?.setFingerValue(label, v.x, v.y, { triggerRender: false });
       }
     } finally {
       suppressFingerQueryUpdates = false;
@@ -403,7 +403,7 @@ function applyHistorySnapshot(snapshot) {
       console.warn('Failed to persist formula parameter.', error),
     );
 
-    reflexCore.render();
+    reflexCore?.render();
   } finally {
     historyApplying = false;
     updateUndoRedoButtons();
