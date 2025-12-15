@@ -165,3 +165,20 @@ The Playwright specs cover the interactive UI pieces (menu, finger indicators, e
    ```
 
 Use `npx playwright test --project=chromium` if you only want to debug Chromium, but please run the full matrix before sharing your changes so we keep Firefox coverage healthy.***
+
+## Pre-merge checklist (Reflex4You)
+
+- [ ] **Bump the app major version**: update `APP_VERSION` in `apps/reflex4you/main.js`.
+- [ ] **Keep service-worker in sync with the major version**:
+  - [ ] Update `CACHE_MINOR` in `apps/reflex4you/service-worker.js` (should start with the same major, e.g. `12.x`).
+  - [ ] Update the SW registration cache-buster query in **both** places:
+    - [ ] `apps/reflex4you/main.js` (`service-worker.js?sw=…`)
+    - [ ] `apps/reflex4you/formula-page.mjs` (`service-worker.js?sw=…`)
+- [ ] **Update any hardcoded UI version fallback**: `apps/reflex4you/index.html` (`#app-version-pill` initial text) so it matches the current major.
+- [ ] **If you changed any boot-critical files**, ensure they’re precached:
+  - [ ] Verify `PRECACHE_URLS` in `apps/reflex4you/service-worker.js` includes any new/renamed modules/assets (viewer + formula page).
+- [ ] **Run tests**:
+  - [ ] `npm run test:node` (from `apps/reflex4you`)
+  - [ ] `npx playwright test` (from `apps/reflex4you`, after `npx playwright install chromium firefox`)
+- [ ] **PWA sanity**:
+  - [ ] Load `index.html` and `formula.html`, hard reload once, then verify both are controlled by the SW and still work offline (Application → Service Workers + Cache Storage).
