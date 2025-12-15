@@ -8,7 +8,7 @@ import {
   downloadBlob,
   promptImageExportSize,
   renderOffscreenCanvasToPngBlob,
-} from '../shared/image-export.mjs';
+} from './image-export.mjs';
 import { visitAst } from './ast-utils.mjs';
 import { parseFormulaInput } from './arithmetic-parser.mjs';
 import { formatCaretIndicator } from './parse-error-format.mjs';
