@@ -199,6 +199,32 @@
       word-break: break-word;
     }
 
+    .stale-actions {
+      display: none;
+      margin: 0 0 12px;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.28);
+      color: rgba(255, 255, 255, 0.9);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      padding: 8px 10px;
+      cursor: pointer;
+    }
+
+    .btn:hover,
+    .btn:focus-visible {
+      border-color: rgba(255, 255, 255, 0.32);
+      outline: none;
+    }
+
     .build-info {
       margin: 0 0 12px;
       padding: 10px 12px;
@@ -259,6 +285,10 @@
     <div class="card">
       <div class="card__body">
         <pre id="stale-warning" class="stale-warning" aria-live="polite"></pre>
+        <div id="stale-actions" class="stale-actions">
+          <button id="fix-cache" class="btn" type="button">Fix cache now (unregister SW + clear caches)</button>
+          <button id="refresh-build" class="btn" type="button">Re-check build info</button>
+        </div>
         <pre id="build-info" class="build-info" aria-label="Build info"></pre>
         <div class="editor">
           <p class="editor__label">Reflex source (updates live)</p>
@@ -340,6 +370,7 @@
 
         if (looksOld) {
           show('stale-warning', true);
+          show('stale-actions', true);
           setText(
             'stale-warning',
             [
@@ -351,13 +382,61 @@
           );
         } else {
           show('stale-warning', false);
+          show('stale-actions', false);
         }
+      }
+
+      async function fixCacheNow() {
+        // Best-effort: unregister any SW whose scope matches this directory, then clear reflex caches.
+        const logs = [];
+        try {
+          if (navigator?.serviceWorker?.getRegistrations) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            const here = String(location.href || '');
+            const scopePrefix = here.slice(0, here.lastIndexOf('/') + 1);
+            for (const reg of regs) {
+              if (reg?.scope && String(reg.scope).startsWith(scopePrefix)) {
+                const ok = await reg.unregister();
+                logs.push(`unregister ${reg.scope}: ${ok ? 'ok' : 'failed'}`);
+              }
+            }
+          }
+        } catch (e) {
+          logs.push(`unregister failed: ${e?.message || e}`);
+        }
+
+        try {
+          if (window.caches?.keys) {
+            const keys = await caches.keys();
+            for (const key of keys) {
+              if (key.startsWith('reflex4you:') || key.startsWith('reflex4you-')) {
+                await caches.delete(key);
+              }
+            }
+            logs.push('cache delete: ok');
+          }
+        } catch (e) {
+          logs.push(`cache delete failed: ${e?.message || e}`);
+        }
+
+        setText('build-info', `${$('build-info')?.textContent || ''}\n\nFix-cache log:\n${logs.join('\n')}`);
+        // Reload with cache-busting query.
+        location.replace(`${location.pathname}${location.search}${location.hash}`.replace(/([?&])nocache=\d+(&|$)/, '$1').replace(/\?$/, '') + (location.search ? '&' : '?') + `nocache=${Date.now()}`);
       }
 
       // Give modules a moment to render, then probe; repeat once.
       window.addEventListener('load', () => {
         refreshBuildInfo();
         window.setTimeout(refreshBuildInfo, 1200);
+
+        const fixBtn = $('fix-cache');
+        if (fixBtn) {
+          fixBtn.addEventListener('click', () => fixCacheNow());
+        }
+        const refreshBtn = $('refresh-build');
+        if (refreshBtn) {
+          refreshBtn.addEventListener('click', () => refreshBuildInfo());
+        }
       });
     })();
   </script>

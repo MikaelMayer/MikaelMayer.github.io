@@ -11,8 +11,10 @@ import {
 // Ensure the PWA service worker is installed even when users land directly
 // on the formula page (e.g. from a shared link).
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+  // Version the SW script URL so updates can't get stuck behind a cached SW script.
+  const SW_URL = './service-worker.js?sw=11.6';
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./service-worker.js').then((registration) => {
+    navigator.serviceWorker.register(SW_URL).then((registration) => {
       // Match the viewer page behavior: activate updated workers ASAP so
       // users don't get stuck on stale cached assets when only using /formula.html.
       if (registration?.waiting) {
