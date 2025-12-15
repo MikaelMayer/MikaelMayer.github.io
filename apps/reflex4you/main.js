@@ -40,6 +40,13 @@ let fatalErrorActive = false;
 
 const APP_VERSION = 11;
 const CONTEXT_LOSS_RELOAD_KEY = `reflex4you:contextLossReloaded:v${APP_VERSION}`;
+const RESUME_RELOAD_KEY = `reflex4you:resumeReloaded:v${APP_VERSION}`;
+const LAST_HIDDEN_AT_KEY = `reflex4you:lastHiddenAtMs:v${APP_VERSION}`;
+// Empirically, some mobile PWAs end up in a broken/blank state after being backgrounded
+// long enough for the OS to suspend/kill GPU resources. Reloading on resume is the most
+// reliable recovery. The user reports the issue begins around 25s; use a slightly lower
+// threshold to be safe.
+const RESUME_RELOAD_THRESHOLD_MS = 22000;
 
 if (versionPill) {
   versionPill.textContent = `v${APP_VERSION}`;
@@ -896,6 +903,64 @@ function scheduleReloadOnceForContextLoss() {
   }, 250);
 }
 
+function noteAppHiddenTimestamp() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.sessionStorage?.setItem(LAST_HIDDEN_AT_KEY, String(Date.now()));
+  } catch (_) {
+    // ignore storage failures
+  }
+}
+
+function maybeReloadAfterLongBackground() {
+  if (typeof window === 'undefined' || typeof window.location?.reload !== 'function') {
+    return;
+  }
+  let hiddenAt = null;
+  try {
+    const raw = window.sessionStorage?.getItem(LAST_HIDDEN_AT_KEY);
+    hiddenAt = raw ? Number(raw) : null;
+  } catch (_) {
+    hiddenAt = null;
+  }
+  if (!Number.isFinite(hiddenAt) || hiddenAt == null) {
+    return;
+  }
+  const elapsed = Date.now() - hiddenAt;
+  if (!Number.isFinite(elapsed) || elapsed < RESUME_RELOAD_THRESHOLD_MS) {
+    return;
+  }
+  let already = false;
+  try {
+    already = Boolean(window.sessionStorage?.getItem(RESUME_RELOAD_KEY));
+  } catch (_) {
+    already = false;
+  }
+  if (already) {
+    return;
+  }
+  try {
+    window.sessionStorage?.setItem(RESUME_RELOAD_KEY, String(Date.now()));
+  } catch (_) {
+    // ignore
+  }
+  // Persist current URL state before reloading, so a resumed reload doesn't lose work.
+  try {
+    persistLastSearchToLocalStorage(window.location.search || '');
+  } catch (_) {
+    // ignore
+  }
+  window.setTimeout(() => {
+    try {
+      window.location.reload();
+    } catch (_) {
+      // ignore
+    }
+  }, 50);
+}
+
 function maybeRecoverFromWebglContextLoss() {
   const gl = reflexCore?.gl;
   if (!gl || typeof gl.isContextLost !== 'function') {
@@ -1299,6 +1364,13 @@ if (canvas) {
 
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      noteAppHiddenTimestamp();
+      return;
+    }
+    // If the OS backgrounded/suspended the app for long enough, proactively reload.
+    // This avoids a "blank UI" state where the GPU/canvas/event loop never recovers.
+    maybeReloadAfterLongBackground();
     if (!document.hidden) {
       maybeRecoverFromWebglContextLoss();
     }
@@ -1306,6 +1378,7 @@ if (typeof document !== 'undefined') {
 }
 if (typeof window !== 'undefined') {
   window.addEventListener('pageshow', () => {
+    maybeReloadAfterLongBackground();
     maybeRecoverFromWebglContextLoss();
   });
 }
