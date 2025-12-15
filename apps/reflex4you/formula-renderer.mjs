@@ -1,6 +1,9 @@
 // MathJax-based formula renderer (SVG output).
 // Produces a LaTeX string from the Reflex4You AST and renders it via MathJax.tex2svg.
 
+// Bump this when changing renderer logic so users can verify cached assets.
+export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2025-12-15.1';
+
 const DEFAULT_MATHJAX_LOAD_TIMEOUT_MS = 9000;
 
 function precedence(node) {
@@ -316,6 +319,7 @@ export async function renderFormulaToContainer(ast, container, options = {}) {
   const latex = nodeToLatex(ast, 0, options);
   container.dataset.latex = latex;
   container.dataset.renderer = 'unknown';
+  container.dataset.rendererBuildId = FORMULA_RENDERER_BUILD_ID;
   container.textContent = '';
 
   const win = typeof window !== 'undefined' ? window : null;

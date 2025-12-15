@@ -1,6 +1,6 @@
 import { parseFormulaInput } from './arithmetic-parser.mjs';
 import { formatCaretIndicator } from './parse-error-format.mjs';
-import { renderFormulaToContainer } from './formula-renderer.mjs';
+import { renderFormulaToContainer, FORMULA_RENDERER_BUILD_ID } from './formula-renderer.mjs';
 import {
   verifyCompressionSupport,
   readFormulaFromQuery,
@@ -58,6 +58,18 @@ function setLatexPreview(latex) {
   }
 }
 
+function showStaleWarning(message) {
+  const el = $('stale-warning');
+  if (!el) return;
+  if (message) {
+    el.textContent = message;
+    el.style.display = 'block';
+  } else {
+    el.textContent = '';
+    el.style.display = 'none';
+  }
+}
+
 function clearRender() {
   const renderEl = $('formula-render');
   if (renderEl) {
@@ -66,6 +78,36 @@ function clearRender() {
     renderEl.removeAttribute('data-renderer');
   }
   setLatexPreview('');
+  showStaleWarning(null);
+}
+
+function buildStaleDiagnostic({ latex, renderEl }) {
+  const reasons = [];
+  if (typeof latex === 'string') {
+    if (latex.includes('\\cdot')) reasons.push('latex contains \\\\cdot (old renderer)');
+    if (latex.includes('\\left(\\left(') || latex.includes('\\right)\\right)')) reasons.push('latex contains double parentheses');
+  }
+  const datasetBuild = renderEl?.dataset?.rendererBuildId || '';
+  if (datasetBuild && datasetBuild !== FORMULA_RENDERER_BUILD_ID) {
+    reasons.push(`renderer build id mismatch: "${datasetBuild}" != "${FORMULA_RENDERER_BUILD_ID}"`);
+  }
+  if (!datasetBuild) {
+    reasons.push('renderer build id missing (likely stale cached module)');
+  }
+
+  if (!reasons.length) {
+    return null;
+  }
+
+  const controllerUrl = navigator?.serviceWorker?.controller?.scriptURL || 'none';
+  const scope = navigator?.serviceWorker?.controller ? '(controlled)' : '(not controlled)';
+  return [
+    'WARNING: stale/mismatched cached assets detected.',
+    `Reasons: ${reasons.join('; ')}`,
+    `Expected renderer: ${FORMULA_RENDERER_BUILD_ID}`,
+    `Controller: ${controllerUrl} ${scope}`,
+    'Fix: hard reload, or Application → Service Workers → Unregister; then reload.',
+  ].join('\n');
 }
 
 async function renderFromSource(source, { updateUrl = false } = {}) {
@@ -86,7 +128,9 @@ async function renderFromSource(source, { updateUrl = false } = {}) {
   showError(null);
   const renderEl = $('formula-render');
   await renderFormulaToContainer(parsed.value, renderEl);
-  setLatexPreview(renderEl?.dataset?.latex || '');
+  const latex = renderEl?.dataset?.latex || '';
+  setLatexPreview(latex);
+  showStaleWarning(buildStaleDiagnostic({ latex, renderEl }));
   return { ok: true };
 }
 

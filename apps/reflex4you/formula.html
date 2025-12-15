@@ -185,6 +185,20 @@
       line-height: 1.4;
     }
 
+    .stale-warning {
+      display: none;
+      margin: 0 0 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 210, 125, 0.35);
+      background: rgba(40, 26, 0, 0.45);
+      color: rgba(255, 235, 200, 0.92);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
     /* Ensure MathJax SVG scales with the card width */
     #formula-render mjx-container {
       display: block;
@@ -230,14 +244,8 @@
     </div>
 
     <div class="card">
-      <div class="card__header">
-        <h1>Formula</h1>
-        <div class="chip">
-          <span style="color: var(--accent); font-weight: 650;">Tip</span>
-          <span>Use the same <code>?formula=</code> / <code>?formulab64=</code> links</span>
-        </div>
-      </div>
       <div class="card__body">
+        <pre id="stale-warning" class="stale-warning" aria-live="polite"></pre>
         <div class="editor">
           <p class="editor__label">Reflex source (updates live)</p>
           <textarea id="formula-input" class="editor__input" spellcheck="false" aria-label="Formula source"></textarea>
