@@ -47,7 +47,23 @@ function escapeLatexIdentifier(name) {
   return String(name || '?').replace(/_/g, '\\_');
 }
 
+function isLatexAlreadyWrappedInParens(latex) {
+  const t = String(latex || '').trim();
+  // Common case produced by this renderer.
+  if (t.startsWith('\\left(') && t.endsWith('\\right)')) {
+    return true;
+  }
+  // Avoid double-wrapping if a plain parenthesis wrapper already exists.
+  if (t.startsWith('(') && t.endsWith(')')) {
+    return true;
+  }
+  return false;
+}
+
 function wrapParensLatex(latex) {
+  if (isLatexAlreadyWrappedInParens(latex)) {
+    return String(latex || '');
+  }
   return `\\left(${latex}\\right)`;
 }
 
