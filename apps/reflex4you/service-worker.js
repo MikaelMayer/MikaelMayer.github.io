@@ -2,8 +2,8 @@
 
 // Bump these to force clients to pick up new precache content.
 // Keep the main app version stable; bump only this minor cache suffix when needed.
-const PRECACHE_NAME = 'reflex4you-precache-v11.2';
-const RUNTIME_CACHE_NAME = 'reflex4you-runtime-v11.2';
+const PRECACHE_NAME = 'reflex4you-precache-v11.3';
+const RUNTIME_CACHE_NAME = 'reflex4you-runtime-v11.3';
 
 // Precache the app shell + all ESM modules required to boot offline.
 const PRECACHE_URLS = [

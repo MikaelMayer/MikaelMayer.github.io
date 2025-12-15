@@ -12,7 +12,22 @@ import {
 // on the formula page (e.g. from a shared link).
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./service-worker.js').catch((error) => {
+    navigator.serviceWorker.register('./service-worker.js').then((registration) => {
+      // Match the viewer page behavior: activate updated workers ASAP so
+      // users don't get stuck on stale cached assets when only using /formula.html.
+      if (registration?.waiting) {
+        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }
+      registration?.addEventListener('updatefound', () => {
+        const installing = registration.installing;
+        if (!installing) return;
+        installing.addEventListener('statechange', () => {
+          if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+            installing.postMessage({ type: 'SKIP_WAITING' });
+          }
+        });
+      });
+    }).catch((error) => {
       console.warn('Reflex4You service worker registration failed.', error);
     });
   });
