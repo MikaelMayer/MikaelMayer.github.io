@@ -40,6 +40,12 @@ let fatalErrorActive = false;
 
 const APP_VERSION = 11;
 const CONTEXT_LOSS_RELOAD_KEY = `reflex4you:contextLossReloaded:v${APP_VERSION}`;
+const RESUME_RELOAD_KEY = `reflex4you:resumeReloaded:v${APP_VERSION}`;
+const LAST_HIDDEN_AT_KEY = `reflex4you:lastHiddenAtMs:v${APP_VERSION}`;
+// Empirically, some mobile PWAs end up in a broken/blank state after being backgrounded
+// long enough for the OS to suspend/kill GPU resources. Reloading on resume is the most
+// reliable recovery. The user reports the issue begins around 20s.
+const RESUME_RELOAD_THRESHOLD_MS = 20000;
 
 if (versionPill) {
   versionPill.textContent = `v${APP_VERSION}`;
@@ -364,7 +370,7 @@ function scheduleCommitHistorySnapshot() {
 }
 
 function applyHistorySnapshot(snapshot) {
-  if (!snapshot || !reflexCore) {
+  if (!snapshot) {
     return;
   }
   historyApplying = true;
@@ -384,7 +390,7 @@ function applyHistorySnapshot(snapshot) {
         const v = fingers[label];
         if (!v) continue;
         latestOffsets[label] = { x: v.x, y: v.y };
-        reflexCore.setFingerValue(label, v.x, v.y, { triggerRender: false });
+        reflexCore?.setFingerValue(label, v.x, v.y, { triggerRender: false });
       }
     } finally {
       suppressFingerQueryUpdates = false;
@@ -403,7 +409,7 @@ function applyHistorySnapshot(snapshot) {
       console.warn('Failed to persist formula parameter.', error),
     );
 
-    reflexCore.render();
+    reflexCore?.render();
   } finally {
     historyApplying = false;
     updateUndoRedoButtons();
@@ -896,6 +902,64 @@ function scheduleReloadOnceForContextLoss() {
   }, 250);
 }
 
+function noteAppHiddenTimestamp() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.sessionStorage?.setItem(LAST_HIDDEN_AT_KEY, String(Date.now()));
+  } catch (_) {
+    // ignore storage failures
+  }
+}
+
+function maybeReloadAfterLongBackground() {
+  if (typeof window === 'undefined' || typeof window.location?.reload !== 'function') {
+    return;
+  }
+  let hiddenAt = null;
+  try {
+    const raw = window.sessionStorage?.getItem(LAST_HIDDEN_AT_KEY);
+    hiddenAt = raw ? Number(raw) : null;
+  } catch (_) {
+    hiddenAt = null;
+  }
+  if (!Number.isFinite(hiddenAt) || hiddenAt == null) {
+    return;
+  }
+  const elapsed = Date.now() - hiddenAt;
+  if (!Number.isFinite(elapsed) || elapsed < RESUME_RELOAD_THRESHOLD_MS) {
+    return;
+  }
+  let already = false;
+  try {
+    already = Boolean(window.sessionStorage?.getItem(RESUME_RELOAD_KEY));
+  } catch (_) {
+    already = false;
+  }
+  if (already) {
+    return;
+  }
+  try {
+    window.sessionStorage?.setItem(RESUME_RELOAD_KEY, String(Date.now()));
+  } catch (_) {
+    // ignore
+  }
+  // Persist current URL state before reloading, so a resumed reload doesn't lose work.
+  try {
+    persistLastSearchToLocalStorage(window.location.search || '');
+  } catch (_) {
+    // ignore
+  }
+  window.setTimeout(() => {
+    try {
+      window.location.reload();
+    } catch (_) {
+      // ignore
+    }
+  }, 50);
+}
+
 function maybeRecoverFromWebglContextLoss() {
   const gl = reflexCore?.gl;
   if (!gl || typeof gl.isContextLost !== 'function') {
@@ -1299,6 +1363,13 @@ if (canvas) {
 
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      noteAppHiddenTimestamp();
+      return;
+    }
+    // If the OS backgrounded/suspended the app for long enough, proactively reload.
+    // This avoids a "blank UI" state where the GPU/canvas/event loop never recovers.
+    maybeReloadAfterLongBackground();
     if (!document.hidden) {
       maybeRecoverFromWebglContextLoss();
     }
@@ -1306,6 +1377,7 @@ if (typeof document !== 'undefined') {
 }
 if (typeof window !== 'undefined') {
   window.addEventListener('pageshow', () => {
+    maybeReloadAfterLongBackground();
     maybeRecoverFromWebglContextLoss();
   });
 }
@@ -1927,7 +1999,7 @@ function triggerImageDownload(url, filename, shouldRevoke) {
 
 if ('serviceWorker' in navigator) {
   // Version the SW script URL so updates can't get stuck behind a cached SW script.
-  const SW_URL = './service-worker.js?sw=11.8';
+  const SW_URL = './service-worker.js?sw=11.9';
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(SW_URL).then((registration) => {
       // Auto-activate updated workers so cache/version bumps take effect quickly.

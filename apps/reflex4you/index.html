@@ -376,6 +376,63 @@
       visibility: hidden !important;
       pointer-events: none !important;
     }
+
+    /* Boot/recovery overlay should always be visible, even in viewer mode. */
+    #boot-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      z-index: 9999;
+      background: rgba(0, 0, 0, 0.92);
+      color: rgba(255, 255, 255, 0.92);
+      padding: calc(var(--safe-area-top) + 18px) 16px calc(var(--safe-area-bottom) + 18px);
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+
+    #boot-overlay .boot-card {
+      max-width: 720px;
+      margin: 0 auto;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.06);
+      padding: 14px 14px;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    #boot-overlay .boot-title {
+      font-weight: 650;
+      letter-spacing: 0.01em;
+      margin-bottom: 8px;
+    }
+
+    #boot-overlay .boot-msg {
+      white-space: pre-wrap;
+      color: rgba(255, 255, 255, 0.82);
+      font-size: 13px;
+      line-height: 1.4;
+      margin: 0 0 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    #boot-overlay .boot-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    #boot-overlay button {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.92);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
   </style>
 </head>
 <body>
@@ -514,11 +571,103 @@
 
 <div id="error"></div>
 
+<div id="boot-overlay" role="dialog" aria-modal="true" aria-label="Reflex4You recovery">
+  <div class="boot-card">
+    <div class="boot-title">Reflex4You didn’t load</div>
+    <div id="boot-overlay-message" class="boot-msg"></div>
+    <div class="boot-actions">
+      <button id="boot-overlay-reload" type="button">Reload</button>
+    </div>
+  </div>
+</div>
+
 <div id="formula-panel">
   <textarea id="formula" spellcheck="false" aria-label="Formula"></textarea>
 </div>
 
-<script type="module" src="./main.js"></script>
+<script type="module">
+  // Boot via dynamic import so we can catch failures (instead of a blank white screen).
+  (async function () {
+    const error = document.getElementById('error');
+    const bootOverlay = document.getElementById('boot-overlay');
+    const bootOverlayMessage = document.getElementById('boot-overlay-message');
+    const bootOverlayReload = document.getElementById('boot-overlay-reload');
+    const key = 'reflex4you:bootReloadedOnce';
+
+    function showBootError(msg) {
+      try {
+        if (bootOverlay) bootOverlay.style.display = 'block';
+        if (bootOverlayMessage) bootOverlayMessage.textContent = String(msg || '');
+      } catch (_) {
+        // ignore
+      }
+      if (!error) return;
+      error.setAttribute('data-error-severity', 'fatal');
+      error.textContent = msg;
+      error.style.display = 'block';
+    }
+
+    function reloadOnce(reason) {
+      try {
+        if (sessionStorage.getItem(key)) return false;
+        sessionStorage.setItem(key, String(Date.now()));
+      } catch (_) {
+        // If sessionStorage is unavailable, still try once (best effort).
+      }
+      try {
+        const url = new URL(location.href);
+        url.searchParams.set('bootfix', String(Date.now()));
+        url.hash = location.hash || '';
+        location.replace(url.toString());
+        return true;
+      } catch (_) {
+        try { location.reload(); } catch (_) {}
+        return true;
+      }
+    }
+
+    // If we don’t finish boot quickly, show a message and try a one-time reload.
+    const bootTimer = setTimeout(() => {
+      showBootError('Reflex4You did not finish loading.\nReloading to recover…');
+      reloadOnce('timeout');
+    }, 3500);
+
+    try {
+      // If a SW update is mid-flight, "controllerchange" can fix weird cold-start states.
+      if ('serviceWorker' in navigator && navigator.serviceWorker) {
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          reloadOnce('sw-controllerchange');
+        });
+        try {
+          const reg = await navigator.serviceWorker.getRegistration();
+          if (reg?.waiting) {
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          }
+        } catch (_) {
+          // ignore
+        }
+      }
+
+      if (bootOverlayReload) {
+        bootOverlayReload.addEventListener('click', () => reloadOnce('button'));
+      }
+
+      await import('./main.js');
+      clearTimeout(bootTimer);
+    } catch (e) {
+      clearTimeout(bootTimer);
+      const details = e && (e.stack || e.message) ? String(e.stack || e.message) : String(e);
+      showBootError(`Reflex4You failed to start.\n\n${details}\n\nTap to reload.`);
+      // Make the “tap -> white screen” become “tap -> recover”.
+      document.addEventListener(
+        'pointerdown',
+        () => reloadOnce('tap'),
+        { once: true, capture: true },
+      );
+      reloadOnce('import-failed');
+    }
+  })();
+</script>
 
 </body>
 </html>
