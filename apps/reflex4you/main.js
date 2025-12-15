@@ -44,9 +44,8 @@ const RESUME_RELOAD_KEY = `reflex4you:resumeReloaded:v${APP_VERSION}`;
 const LAST_HIDDEN_AT_KEY = `reflex4you:lastHiddenAtMs:v${APP_VERSION}`;
 // Empirically, some mobile PWAs end up in a broken/blank state after being backgrounded
 // long enough for the OS to suspend/kill GPU resources. Reloading on resume is the most
-// reliable recovery. The user reports the issue begins around 25s; use a slightly lower
-// threshold to be safe.
-const RESUME_RELOAD_THRESHOLD_MS = 22000;
+// reliable recovery. The user reports the issue begins around 20s.
+const RESUME_RELOAD_THRESHOLD_MS = 20000;
 
 if (versionPill) {
   versionPill.textContent = `v${APP_VERSION}`;
