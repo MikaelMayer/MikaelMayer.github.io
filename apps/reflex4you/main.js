@@ -38,7 +38,7 @@ const rootElement = typeof document !== 'undefined' ? document.documentElement :
 
 let fatalErrorActive = false;
 
-const APP_VERSION = 8;
+const APP_VERSION = 9;
 const CONTEXT_LOSS_RELOAD_KEY = `reflex4you:contextLossReloaded:v${APP_VERSION}`;
 
 if (versionPill) {
