@@ -55,7 +55,7 @@ async function bootstrap() {
 
   showError(null);
   const renderEl = $('formula-render');
-  renderFormulaToContainer(parsed.value, renderEl);
+  await renderFormulaToContainer(parsed.value, renderEl);
 }
 
 bootstrap().catch((err) => {

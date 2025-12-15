@@ -57,14 +57,18 @@ test('formula page renders sqrt(...) as sqrt (not exp/ln desugaring)', async ({ 
   await page.goto(`/formula.html?formula=${encodeURIComponent('sqrt(z)')}`);
   const render = page.locator('#formula-render');
   await expect(render).toBeVisible();
-  await expect(render).toContainText('√');
+  await expect(render.locator('svg')).toBeVisible();
+  await expect.poll(async () => await render.getAttribute('data-latex')).toContain('\\sqrt');
+  await expect.poll(async () => await render.getAttribute('data-latex')).not.toContain('\\exp');
+  await expect.poll(async () => await render.getAttribute('data-latex')).not.toContain('\\ln');
 });
 
 test('formula page renders heav(...) as a function name', async ({ page }) => {
   await page.goto(`/formula.html?formula=${encodeURIComponent('heav(z)')}`);
   const render = page.locator('#formula-render');
   await expect(render).toBeVisible();
-  await expect(render).toContainText('heav');
+  await expect(render.locator('svg')).toBeVisible();
+  await expect.poll(async () => await render.getAttribute('data-latex')).toContain('\\operatorname{heav}');
 });
 
 test('reflex4you updates formula query param after successful apply', async ({ page }) => {

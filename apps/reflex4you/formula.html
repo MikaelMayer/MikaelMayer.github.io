@@ -10,6 +10,15 @@
   <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png" />
   <link rel="apple-touch-icon" href="./icon-192.png" />
   <title>Reflex4You – Formula</title>
+  <!-- MathJax v3 (SVG output) -->
+  <script>
+    window.MathJax = {
+      startup: { typeset: false },
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+      svg: { fontCache: 'none' }, // self-contained-ish SVGs; nicer for copying/export
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
   <style>
     :root {
       color-scheme: dark;
@@ -126,105 +135,16 @@
       border: 1px solid rgba(255, 255, 255, 0.12);
       background: rgba(0, 0, 0, 0.28);
       overflow-x: auto;
-    }
-
-    /* “LaTeX-like” token styling */
-    .rf-root {
-      font-size: 28px;
-      line-height: 1.45;
-      letter-spacing: 0.01em;
-      font-variant-numeric: lining-nums tabular-nums;
-    }
-
-    .rf-italic {
-      font-family: "Times New Roman", Times, Georgia, serif;
-      font-style: italic;
       color: rgba(255, 255, 255, 0.92);
     }
 
-    .rf-fn,
-    .rf-keyword {
-      font-family: "Times New Roman", Times, Georgia, serif;
-      color: rgba(255, 255, 255, 0.86);
+    /* Ensure MathJax SVG scales with the card width */
+    #formula-render mjx-container {
+      display: block;
     }
-
-    /* Function names as upright operators (sin, ln, exp, ...) */
-    .rf-fn {
-      font-style: normal;
-      letter-spacing: 0.01em;
-    }
-
-    .rf-keyword {
-      font-style: normal;
-      font-variant: small-caps;
-      letter-spacing: 0.04em;
-      color: rgba(255, 255, 255, 0.72);
-    }
-
-    .rf-op {
-      color: rgba(255, 255, 255, 0.68);
-    }
-
-    .rf-paren,
-    .rf-delim {
-      color: rgba(255, 255, 255, 0.62);
-    }
-
-    .rf-sup {
-      font-size: 0.62em;
-      vertical-align: super;
-      margin-left: 1px;
-      color: rgba(255, 255, 255, 0.78);
-    }
-
-    .rf-sub {
-      font-size: 0.62em;
-      vertical-align: sub;
-      margin-left: 2px;
-      color: rgba(255, 255, 255, 0.72);
-    }
-
-    .rf-overline {
-      text-decoration: overline;
-      text-decoration-thickness: 2px;
-      text-decoration-color: rgba(255, 255, 255, 0.55);
-    }
-
-    /* Radical rendering */
-    .rf-sqrt {
-      display: inline-flex;
-      align-items: flex-start;
-    }
-    .rf-sqrt-symbol {
-      font-family: "Times New Roman", Times, Georgia, serif;
-      font-size: 1.05em;
-      line-height: 1;
-      margin-right: 2px;
-      position: relative;
-      top: 0.05em;
-      color: rgba(255, 255, 255, 0.86);
-    }
-    .rf-sqrt-index {
-      font-size: 0.52em;
-      position: absolute;
-      left: -0.55em;
-      top: -0.15em;
-      color: rgba(255, 255, 255, 0.72);
-    }
-    .rf-sqrt-radicand {
-      display: inline-block;
-      padding: 0.05em 0.08em 0 0.12em;
-      border-top: 2px solid rgba(255, 255, 255, 0.55);
-    }
-
-    .rf-finger {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size: 0.95em;
-      padding: 2px 8px;
-      border-radius: 999px;
-      border: 1px solid rgba(125, 211, 252, 0.25);
-      background: rgba(125, 211, 252, 0.08);
-      color: rgba(255, 255, 255, 0.86);
+    #formula-render svg {
+      max-width: 100%;
+      height: auto;
     }
 
     .source {
