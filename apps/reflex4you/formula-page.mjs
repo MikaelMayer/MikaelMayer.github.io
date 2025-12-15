@@ -36,13 +36,6 @@ function showError(message) {
   }
 }
 
-function setSourcePreview(source) {
-  const sourceEl = $('formula-source');
-  if (sourceEl) {
-    sourceEl.textContent = source;
-  }
-}
-
 function setLatexPreview(latex) {
   const latexEl = $('formula-latex');
   if (latexEl) {
@@ -68,7 +61,6 @@ async function renderFromSource(source, { updateUrl = false } = {}) {
     updateFormulaQueryParamImmediately(normalized);
   }
 
-  setSourcePreview(normalized);
   const parsed = parseFormulaInput(normalized);
   if (!parsed.ok) {
     showError(formatCaretIndicator(normalized, parsed));
