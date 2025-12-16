@@ -5,6 +5,7 @@ import {
   parseFormulaToAST,
 } from './arithmetic-parser.mjs';
 import { visitAst } from './ast-utils.mjs';
+import { formulaAstToLatex } from './formula-renderer.mjs';
 
 test('parses additive and multiplicative precedence', () => {
   const result = parseFormulaInput('1 + 2 * 3');
@@ -591,4 +592,26 @@ test('standalone iteration variables are rejected', () => {
   const result = parseFormulaInput('v + 1');
   assert.equal(result.ok, false);
   assert.match(result.message, /comp/i);
+});
+
+test('underscore-marked identifiers record highlight metadata and render as Huge letters (LEON)', () => {
+  const source = '_ln(_exp(_o(si_n, z*z)-3)-1)';
+  const result = parseFormulaInput(source);
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /\{\\Huge L\}/);
+  assert.match(latex, /\{\\Huge E\}/);
+  assert.match(latex, /\{\\Huge O\}/);
+  assert.match(latex, /\{\\Huge N\}/);
+  assert.ok(latex.indexOf('{\\Huge L}') < latex.indexOf('{\\Huge E}'));
+  assert.ok(latex.indexOf('{\\Huge E}') < latex.indexOf('{\\Huge O}'));
+  assert.ok(latex.indexOf('{\\Huge O}') < latex.indexOf('{\\Huge N}'));
+});
+
+test('comp(...) can clone floor(...) nodes (cloneAst supports Floor)', () => {
+  assert.doesNotThrow(() => {
+    const result = parseFormulaInput('comp(v+1, v, floor(z), 0)');
+    assert.equal(result.ok, true);
+    assert.equal(result.value.kind, 'Floor');
+  });
 });

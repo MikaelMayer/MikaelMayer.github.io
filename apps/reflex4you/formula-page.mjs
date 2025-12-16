@@ -1,6 +1,6 @@
 import { parseFormulaInput } from './arithmetic-parser.mjs';
 import { formatCaretIndicator } from './parse-error-format.mjs';
-import { renderFormulaToContainer, FORMULA_RENDERER_BUILD_ID } from './formula-renderer.mjs';
+import { renderFormulaToCanvas, FORMULA_RENDERER_BUILD_ID } from './formula-renderer.mjs';
 import {
   verifyCompressionSupport,
   readFormulaFromQuery,
@@ -36,9 +36,33 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 const DEFAULT_FORMULA_TEXT = 'z';
+const DEFAULT_CANVAS_BG_HEX = 'ffffff80';
 
 function $(id) {
   return document.getElementById(id);
+}
+
+function normalizeHex8(value) {
+  const raw = String(value || '').trim().replace(/^#/, '');
+  if (raw.length === 6 && /^[0-9a-fA-F]{6}$/.test(raw)) {
+    return `${raw}ff`.toLowerCase();
+  }
+  if (raw.length === 8 && /^[0-9a-fA-F]{8}$/.test(raw)) {
+    return raw.toLowerCase();
+  }
+  return null;
+}
+
+function readCanvasBackgroundHex() {
+  const el = $('bghex');
+  const parsed = normalizeHex8(el?.value);
+  return parsed || DEFAULT_CANVAS_BG_HEX;
+}
+
+function setDownloadEnabled(enabled) {
+  const btn = $('download-png');
+  if (!btn) return;
+  btn.disabled = !enabled;
 }
 
 function showError(message) {
@@ -50,13 +74,6 @@ function showError(message) {
   } else {
     errorEl.textContent = '';
     errorEl.style.display = 'none';
-  }
-}
-
-function setLatexPreview(latex) {
-  const latexEl = $('formula-latex');
-  if (latexEl) {
-    latexEl.textContent = latex || '';
   }
 }
 
@@ -75,11 +92,14 @@ function showStaleWarning(message) {
 function clearRender() {
   const renderEl = $('formula-render');
   if (renderEl) {
-    renderEl.textContent = '';
+    const ctx = renderEl.getContext?.('2d');
+    if (ctx) {
+      ctx.clearRect(0, 0, renderEl.width || 0, renderEl.height || 0);
+    }
     renderEl.removeAttribute('data-latex');
     renderEl.removeAttribute('data-renderer');
   }
-  setLatexPreview('');
+  setDownloadEnabled(false);
   showStaleWarning(null);
 }
 
@@ -129,10 +149,12 @@ async function renderFromSource(source, { updateUrl = false } = {}) {
 
   showError(null);
   const renderEl = $('formula-render');
-  await renderFormulaToContainer(parsed.value, renderEl);
+  await renderFormulaToCanvas(parsed.value, renderEl, {
+    backgroundHex: readCanvasBackgroundHex(),
+  });
   const latex = renderEl?.dataset?.latex || '';
-  setLatexPreview(latex);
   showStaleWarning(buildStaleDiagnostic({ latex, renderEl }));
+  setDownloadEnabled(true);
   return { ok: true };
 }
 
@@ -150,6 +172,47 @@ async function bootstrap() {
   const inputEl = $('formula-input');
   if (inputEl) {
     inputEl.value = source;
+  }
+
+  // Background controls.
+  const bgEl = $('bghex');
+  if (bgEl && !normalizeHex8(bgEl.value)) {
+    bgEl.value = DEFAULT_CANVAS_BG_HEX;
+  }
+  if (bgEl) {
+    bgEl.addEventListener('input', () => {
+      // Re-render without touching the URL; just affects the raster background.
+      const current = inputEl ? inputEl.value : source;
+      renderFromSource(current, { updateUrl: false }).catch(() => {});
+    });
+  }
+  document.querySelectorAll?.('button[data-bghex]')?.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const next = normalizeHex8(btn.getAttribute('data-bghex')) || DEFAULT_CANVAS_BG_HEX;
+      if (bgEl) bgEl.value = next;
+      const current = inputEl ? inputEl.value : source;
+      renderFromSource(current, { updateUrl: false }).catch(() => {});
+    });
+  });
+
+  // Download.
+  const downloadBtn = $('download-png');
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', () => {
+      const canvas = $('formula-render');
+      if (!canvas || typeof canvas.toDataURL !== 'function') return;
+      try {
+        const href = canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = href;
+        a.download = 'formula.png';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } catch (e) {
+        console.warn('Failed to download canvas PNG.', e);
+      }
+    });
   }
 
   await renderFromSource(source, { updateUrl: false });
