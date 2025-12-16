@@ -235,6 +235,56 @@
       outline: none;
     }
 
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin: 10px 0 12px;
+    }
+    .controls__field {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .controls__label {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+    }
+    .controls__input {
+      width: 120px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(0, 0, 0, 0.22);
+      color: rgba(255, 255, 255, 0.92);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      outline: none;
+    }
+    .controls__input:focus-visible {
+      border-color: rgba(125, 211, 252, 0.55);
+      box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.12);
+    }
+    .preset {
+      padding: 6px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(0, 0, 0, 0.18);
+      color: rgba(255, 255, 255, 0.86);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .preset:hover,
+    .preset:focus-visible {
+      border-color: rgba(255, 255, 255, 0.32);
+      outline: none;
+    }
+
     .build-info {
       margin: 0 0 12px;
       padding: 10px 12px;
@@ -276,6 +326,17 @@
         <pre id="formula-error" class="error" aria-live="polite"></pre>
         <p class="block-label">Preview (Canvas)</p>
         <p class="block-help">This is rasterized from MathJax’s SVG output and drawn onto a canvas.</p>
+        <div class="controls">
+          <div class="controls__field">
+            <span class="controls__label">Canvas background (RRGGBBAA)</span>
+            <input id="bghex" class="controls__input" type="text" value="ffffff80" spellcheck="false" inputmode="text" aria-label="Canvas background in RRGGBBAA hex" />
+            <button class="preset" type="button" data-bghex="ffffff80">white50</button>
+            <button class="preset" type="button" data-bghex="1e3a8aff">blue</button>
+            <button class="preset" type="button" data-bghex="000000ff">black</button>
+            <button class="preset" type="button" data-bghex="00000000">transparent</button>
+          </div>
+          <button id="download-png" class="btn" type="button" disabled>Download PNG</button>
+        </div>
         <div class="formula" aria-label="Rendered formula">
           <canvas id="formula-render" class="formula-canvas"></canvas>
         </div>

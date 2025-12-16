@@ -368,6 +368,27 @@ export function formulaAstToLatex(ast, options = {}) {
   return nodeToLatex(ast, 0, options);
 }
 
+function parseHex8Color(value) {
+  const raw = String(value || '').trim().replace(/^#/, '');
+  if (raw.length !== 8 && raw.length !== 6) {
+    return null;
+  }
+  const hex = raw.length === 6 ? `${raw}ff` : raw;
+  if (!/^[0-9a-fA-F]{8}$/.test(hex)) {
+    return null;
+  }
+  const r = Number.parseInt(hex.slice(0, 2), 16);
+  const g = Number.parseInt(hex.slice(2, 4), 16);
+  const b = Number.parseInt(hex.slice(4, 6), 16);
+  const a = Number.parseInt(hex.slice(6, 8), 16) / 255;
+  return { r, g, b, a };
+}
+
+function resolveCanvasBackground(options = {}) {
+  const candidate = options.backgroundHex ?? options.background ?? options.canvasBackground ?? null;
+  return parseHex8Color(candidate) ?? parseHex8Color('ffffff80');
+}
+
 function resizeCanvasToDisplaySize(canvas) {
   const dpr = (typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1;
   const cssWidth = canvas?.clientWidth || canvas?.width || 0;
@@ -400,12 +421,13 @@ export async function renderLatexToCanvas(latex, canvas, options = {}) {
   const ctx = canvas.getContext?.('2d');
   if (!ctx) return;
 
+  const bg = resolveCanvasBackground(options);
   const win = typeof window !== 'undefined' ? window : null;
   const ready = await waitForMathJaxStartup(win);
   if (!ready || typeof win.MathJax?.tex2svg !== 'function') {
     const { width, height } = resizeCanvasToDisplaySize(canvas);
     ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = '#1e3a8a';
+    ctx.fillStyle = `rgba(${bg.r},${bg.g},${bg.b},${bg.a})`;
     ctx.fillRect(0, 0, width, height);
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
     ctx.font = '16px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
@@ -439,7 +461,7 @@ export async function renderLatexToCanvas(latex, canvas, options = {}) {
 
     const { width, height } = resizeCanvasToDisplaySize(canvas);
     ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = '#1e3a8a';
+    ctx.fillStyle = `rgba(${bg.r},${bg.g},${bg.b},${bg.a})`;
     ctx.fillRect(0, 0, width, height);
 
     const size = getSvgViewBoxSize(svg) || { width: img.width || 1, height: img.height || 1 };
@@ -456,6 +478,8 @@ export async function renderLatexToCanvas(latex, canvas, options = {}) {
     ctx.fillStyle = 'rgba(255,255,255,0.18)';
     ctx.fillRect(Math.max(0, dx - 10), Math.max(0, dy - 10), Math.min(width, drawW + 20), Math.min(height, drawH + 20));
 
+    // Ensure the SVG is drawn solid on top.
+    ctx.globalAlpha = 1;
     ctx.drawImage(img, dx, dy, drawW, drawH);
   } finally {
     URL.revokeObjectURL(url);
