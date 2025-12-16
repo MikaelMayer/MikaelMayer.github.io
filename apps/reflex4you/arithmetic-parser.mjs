@@ -55,17 +55,54 @@ const MAX_DIRECT_POWER_EXPONENT = 10;
 let currentConstantEvaluationContext = null;
 
 const IDENTIFIER_CHAR = /[A-Za-z0-9_]/;
+const IDENTIFIER_LETTER_CHAR = /[A-Za-z]/;
 const NUMBER_REGEX = /[+-]?(?:\d+\.\d+|\d+|\.\d+)(?:[eE][+-]?\d+)?/y;
 const SQRT3_OVER_2 = Math.sqrt(3) / 2;
 const ITERATION_VARIABLE_NAME = 'v';
 const IDENTIFIER_REGEX = /[A-Za-z_][A-Za-z0-9_]*/y;
 
+function normalizeIdentifierWithHighlights(raw) {
+  const source = String(raw || '');
+  const highlights = [];
+  let normalized = '';
+  let highlightNext = false;
+
+  for (let i = 0; i < source.length; i += 1) {
+    const ch = source[i];
+    if (ch === '_' && i + 1 < source.length && IDENTIFIER_LETTER_CHAR.test(source[i + 1])) {
+      highlightNext = true;
+      continue;
+    }
+    if (highlightNext && IDENTIFIER_LETTER_CHAR.test(ch)) {
+      highlights.push({ index: normalized.length, letter: ch });
+      highlightNext = false;
+    } else {
+      highlightNext = false;
+    }
+    normalized += ch;
+  }
+
+  return {
+    name: normalized,
+    highlights,
+  };
+}
+
+function attachIdentifierMeta(node, meta) {
+  if (!node || typeof node !== 'object' || !meta || !Array.isArray(meta.highlights) || meta.highlights.length === 0) {
+    return node;
+  }
+  node.__identifierMeta = { highlights: meta.highlights.map((h) => ({ index: h.index, letter: h.letter })) };
+  return node;
+}
+
 function createPlaceholderVar(name) {
   return { kind: 'PlaceholderVar', name };
 }
 
-function createIdentifier(name) {
-  return { kind: 'Identifier', name };
+function createIdentifier(name, meta = null) {
+  const node = { kind: 'Identifier', name };
+  return attachIdentifierMeta(node, meta);
 }
 
 function withSpan(node, span) {
@@ -181,28 +218,78 @@ function wsRegex(regex, options = {}) {
 }
 
 function keywordLiteral(text, options = {}) {
-  const literal = wsLiteral(text, options);
+  const wsCtor = options.wsCtor ?? `WS:${text}`;
+  const ctor = options.ctor ?? `Keyword(${text})`;
+  const caseSensitive = options.caseSensitive ?? true;
+  const expected = caseSensitive ? String(text) : String(text).toLowerCase();
+
   return createParser(`Keyword(${text})`, (input) => {
-    const result = literal.runNormalized(input);
-    if (!result.ok) {
-      return result;
+    const wsResult = WS({ ctor: wsCtor }).runNormalized(input);
+    if (!wsResult.ok) {
+      return wsResult;
     }
-    const nextChar = result.next.peek();
+
+    let cursor = wsResult.next;
+    const highlights = [];
+    let normalizedIndex = 0;
+
+    for (let i = 0; i < expected.length; i += 1) {
+      const want = expected[i];
+      let ch = cursor.peek();
+
+      if (ch === '_' && cursor.peek(1) != null) {
+        const candidate = cursor.peek(1);
+        const normalizedCandidate = caseSensitive ? candidate : candidate.toLowerCase();
+        if (normalizedCandidate === want && IDENTIFIER_LETTER_CHAR.test(candidate)) {
+          highlights.push({ index: normalizedIndex, letter: candidate });
+          cursor = cursor.advance(1);
+          ch = cursor.peek();
+        }
+      }
+
+      if (ch == null) {
+        return new ParseFailure({
+          ctor,
+          message: `Expected ${text}`,
+          severity: ParseSeverity.recoverable,
+          expected: text,
+          span: input.createSpan(0, input.length - cursor.length),
+          input: input,
+        });
+      }
+
+      const normalized = caseSensitive ? ch : ch.toLowerCase();
+      if (normalized !== want) {
+        return new ParseFailure({
+          ctor,
+          message: `Expected ${text}`,
+          severity: ParseSeverity.recoverable,
+          expected: text,
+          span: input.createSpan(0, input.length - cursor.length),
+          input: input,
+        });
+      }
+
+      cursor = cursor.advance(1);
+      normalizedIndex += 1;
+    }
+
+    const nextChar = cursor.peek();
     if (nextChar && IDENTIFIER_CHAR.test(nextChar)) {
       return new ParseFailure({
-        ctor: `Keyword(${text})`,
+        ctor,
         message: `Expected ${text}`,
         severity: ParseSeverity.recoverable,
         expected: text,
-        span: result.span,
-        input: result.span.input,
+        span: spanBetween(input, cursor),
+        input: input,
       });
     }
     return new ParseSuccess({
-      ctor: `Keyword(${text})`,
-      value: result.value,
-      span: result.span,
-      next: result.next,
+      ctor,
+      value: { text: String(text), highlights },
+      span: spanBetween(input, cursor),
+      next: cursor,
     });
   });
 }
@@ -333,9 +420,10 @@ const identifierReferenceParser = createParser('Identifier', (input) => {
   if (!identifier.ok) {
     return identifier;
   }
+  const normalized = normalizeIdentifierWithHighlights(identifier.value);
   return new ParseSuccess({
     ctor: 'Identifier',
-    value: withSpan(createIdentifier(identifier.value), identifier.span),
+    value: withSpan(createIdentifier(normalized.name, normalized), identifier.span),
     span: identifier.span,
     next: identifier.next,
   });
@@ -346,10 +434,11 @@ const bindingIdentifierParser = createParser('BindingIdentifier', (input) => {
   if (!identifier.ok) {
     return identifier;
   }
-  if (RESERVED_BINDING_NAMES.has(identifier.value) || isFingerLabel(identifier.value)) {
+  const normalized = normalizeIdentifierWithHighlights(identifier.value);
+  if (RESERVED_BINDING_NAMES.has(normalized.name) || isFingerLabel(normalized.name)) {
     return new ParseFailure({
       ctor: 'BindingIdentifier',
-      message: `"${identifier.value}" is a reserved identifier and cannot be bound with set`,
+      message: `"${normalized.name}" is a reserved identifier and cannot be bound with set`,
       severity: ParseSeverity.error,
       expected: 'non-reserved identifier',
       span: identifier.span,
@@ -358,18 +447,28 @@ const bindingIdentifierParser = createParser('BindingIdentifier', (input) => {
   }
   return new ParseSuccess({
     ctor: 'BindingIdentifier',
-    value: identifier.value,
+    value: normalized.name,
     span: identifier.span,
     next: identifier.next,
   });
 });
 
 const primitiveParser = Choice([
-  keywordLiteral('x', { ctor: 'VarX' }).Map((_, result) => withSyntax(withSpan(VarX(), result.span), 'x')),
-  keywordLiteral('y', { ctor: 'VarY' }).Map((_, result) => withSyntax(withSpan(VarY(), result.span), 'y')),
-  keywordLiteral('real', { ctor: 'VarReal' }).Map((_, result) => withSyntax(withSpan(VarX(), result.span), 'real')),
-  keywordLiteral('imag', { ctor: 'VarImag' }).Map((_, result) => withSyntax(withSpan(VarY(), result.span), 'imag')),
-  keywordLiteral('z', { ctor: 'VarZ' }).Map((_, result) => withSpan(VarZ(), result.span)),
+  keywordLiteral('x', { ctor: 'VarX' }).Map((token, result) =>
+    attachIdentifierMeta(withSyntax(withSpan(VarX(), result.span), token.text), token),
+  ),
+  keywordLiteral('y', { ctor: 'VarY' }).Map((token, result) =>
+    attachIdentifierMeta(withSyntax(withSpan(VarY(), result.span), token.text), token),
+  ),
+  keywordLiteral('real', { ctor: 'VarReal' }).Map((token, result) =>
+    attachIdentifierMeta(withSyntax(withSpan(VarX(), result.span), token.text), token),
+  ),
+  keywordLiteral('imag', { ctor: 'VarImag' }).Map((token, result) =>
+    attachIdentifierMeta(withSyntax(withSpan(VarY(), result.span), token.text), token),
+  ),
+  keywordLiteral('z', { ctor: 'VarZ' }).Map((token, result) =>
+    attachIdentifierMeta(withSpan(VarZ(), result.span), token),
+  ),
   fingerLiteralParser,
   iterationVariableLiteral,
   identifierReferenceParser,
@@ -389,7 +488,7 @@ const groupedParser = Sequence([
 }).Map((expr, result) => withSpan(expr, result.span));
 
 const explicitComposeParser = Sequence([
-  wsLiteral('o', { ctor: 'ComposeKeyword' }),
+  keywordLiteral('o', { ctor: 'ComposeKeyword' }),
   wsLiteral('(', { ctor: 'ComposeOpen' }),
   expressionRef,
   wsLiteral(',', { ctor: 'ComposeComma' }),
@@ -397,11 +496,13 @@ const explicitComposeParser = Sequence([
   wsLiteral(')', { ctor: 'ComposeClose' }),
 ], {
   ctor: 'ExplicitCompose',
-  projector: (values) => ({ first: values[2], second: values[4] }),
-}).Map(({ first, second }, result) => withSpan(Compose(first, second), result.span));
+  projector: (values) => ({ meta: values[0], first: values[2], second: values[4] }),
+}).Map(({ meta, first, second }, result) =>
+  attachIdentifierMeta(withSpan(Compose(first, second), result.span), meta),
+);
 
 const explicitRepeatComposeParser = createParser('ExplicitRepeatCompose', (input) => {
-  const keyword = wsLiteral('oo', { ctor: 'RepeatComposeKeyword' }).runNormalized(input);
+  const keyword = keywordLiteral('oo', { ctor: 'RepeatComposeKeyword' }).runNormalized(input);
   if (!keyword.ok) {
     return keyword;
   }
@@ -432,7 +533,7 @@ const explicitRepeatComposeParser = createParser('ExplicitRepeatCompose', (input
   const span = spanBetween(input, close.next);
   return new ParseSuccess({
     ctor: 'ExplicitRepeatCompose',
-    value: withSpan(oo(fnResult.value, validatedCount), span),
+    value: attachIdentifierMeta(withSpan(oo(fnResult.value, validatedCount), span), keyword.value),
     span,
     next: close.next,
   });
@@ -525,8 +626,8 @@ function createUnaryFunctionParser(name, factory) {
     wsLiteral(')', { ctor: `${name}Close` }),
   ], {
     ctor: `${name}Call`,
-    projector: (values) => values[2],
-  }).Map((expr, result) => withSpan(factory(expr), result.span));
+    projector: (values) => ({ meta: values[0], expr: values[2] }),
+  }).Map(({ meta, expr }, result) => attachIdentifierMeta(withSpan(factory(expr), result.span), meta));
 }
 
 function createUnaryFunctionParsers(names, factory) {
@@ -569,7 +670,7 @@ const lnParser = createParser('LnCall', (input) => {
   const span = spanBetween(input, close.next);
   return new ParseSuccess({
     ctor: 'LnCall',
-    value: withSpan(Ln(valueResult.value, branchNode), span),
+    value: attachIdentifierMeta(withSpan(Ln(valueResult.value, branchNode), span), keyword.value),
     span,
     next: close.next,
   });
@@ -608,7 +709,7 @@ const sqrtParser = createParser('SqrtCall', (input) => {
   const span = spanBetween(input, close.next);
   return new ParseSuccess({
     ctor: 'SqrtCall',
-    value: createSqrtExpression(valueResult.value, branchNode, span),
+    value: attachIdentifierMeta(createSqrtExpression(valueResult.value, branchNode, span), keyword.value),
     span,
     next: close.next,
   });
@@ -633,8 +734,8 @@ const elementaryFunctionParser = Choice([
 
 const builtinFunctionLiteralParser = Choice(
   BUILTIN_FUNCTION_DEFINITIONS.map(({ name, factory }) =>
-    keywordLiteral(name, { ctor: `${name}FunctionLiteral` }).Map((_, result) =>
-      createBuiltinFunctionLiteral(name, factory, result.span),
+    keywordLiteral(name, { ctor: `${name}FunctionLiteral` }).Map((token, result) =>
+      attachIdentifierMeta(createBuiltinFunctionLiteral(name, factory, result.span), token),
     ),
   ),
   { ctor: 'BuiltinFunctionLiteral' },

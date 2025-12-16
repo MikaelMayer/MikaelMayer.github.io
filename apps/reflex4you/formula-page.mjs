@@ -1,6 +1,6 @@
 import { parseFormulaInput } from './arithmetic-parser.mjs';
 import { formatCaretIndicator } from './parse-error-format.mjs';
-import { renderFormulaToContainer, FORMULA_RENDERER_BUILD_ID } from './formula-renderer.mjs';
+import { renderFormulaToCanvas, FORMULA_RENDERER_BUILD_ID } from './formula-renderer.mjs';
 import {
   verifyCompressionSupport,
   readFormulaFromQuery,
@@ -53,13 +53,6 @@ function showError(message) {
   }
 }
 
-function setLatexPreview(latex) {
-  const latexEl = $('formula-latex');
-  if (latexEl) {
-    latexEl.textContent = latex || '';
-  }
-}
-
 function showStaleWarning(message) {
   const el = $('stale-warning');
   if (!el) return;
@@ -75,11 +68,13 @@ function showStaleWarning(message) {
 function clearRender() {
   const renderEl = $('formula-render');
   if (renderEl) {
-    renderEl.textContent = '';
+    const ctx = renderEl.getContext?.('2d');
+    if (ctx) {
+      ctx.clearRect(0, 0, renderEl.width || 0, renderEl.height || 0);
+    }
     renderEl.removeAttribute('data-latex');
     renderEl.removeAttribute('data-renderer');
   }
-  setLatexPreview('');
   showStaleWarning(null);
 }
 
@@ -129,9 +124,8 @@ async function renderFromSource(source, { updateUrl = false } = {}) {
 
   showError(null);
   const renderEl = $('formula-render');
-  await renderFormulaToContainer(parsed.value, renderEl);
+  await renderFormulaToCanvas(parsed.value, renderEl);
   const latex = renderEl?.dataset?.latex || '';
-  setLatexPreview(latex);
   showStaleWarning(buildStaleDiagnostic({ latex, renderEl }));
   return { ok: true };
 }
