@@ -1093,6 +1093,7 @@ function substitutePlaceholder(node, placeholder, replacement) {
     case 'Acos':
     case 'Abs':
     case 'Abs2':
+    case 'Floor':
     case 'Conjugate':
       return { ...node, value: substitutePlaceholder(node.value, placeholder, replacement) };
     case 'Ln': {
@@ -1194,6 +1195,7 @@ function cloneAst(node) {
     case 'Acos':
     case 'Abs':
     case 'Abs2':
+    case 'Floor':
     case 'Conjugate':
       return { ...node, value: cloneAst(node.value) };
     case 'Ln':
@@ -1292,6 +1294,7 @@ function substituteIdentifierWithClone(node, targetName, replacement) {
     case 'Acos':
     case 'Abs':
     case 'Abs2':
+    case 'Floor':
     case 'Conjugate':
       return { ...node, value: substituteIdentifierWithClone(node.value, targetName, replacement) };
     case 'Ln': {
@@ -1389,6 +1392,7 @@ function findFirstPlaceholderNode(ast) {
       case 'Ln':
       case 'Abs':
       case 'Abs2':
+      case 'Floor':
       case 'Conjugate':
         stack.push(node.value);
         if (node.kind === 'Ln' && node.branch) {
@@ -1464,6 +1468,7 @@ function findFirstLetBinding(ast) {
       case 'Ln':
       case 'Abs':
       case 'Abs2':
+      case 'Floor':
       case 'Conjugate':
         stack.push(node.value);
         if (node.kind === 'Ln' && node.branch) {

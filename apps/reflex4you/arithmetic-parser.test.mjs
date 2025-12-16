@@ -607,3 +607,11 @@ test('underscore-marked identifiers record highlight metadata and render as Huge
   assert.ok(latex.indexOf('{\\Huge E}') < latex.indexOf('{\\Huge O}'));
   assert.ok(latex.indexOf('{\\Huge O}') < latex.indexOf('{\\Huge N}'));
 });
+
+test('comp(...) can clone floor(...) nodes (cloneAst supports Floor)', () => {
+  assert.doesNotThrow(() => {
+    const result = parseFormulaInput('comp(v+1, v, floor(z), 0)');
+    assert.equal(result.ok, true);
+    assert.equal(result.value.kind, 'Floor');
+  });
+});
