@@ -58,10 +58,18 @@ async function matchFromNamedCaches(request) {
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches
-      .open(PRECACHE_NAME)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
-      .then(() => self.skipWaiting()),
+    (async () => {
+      // IMPORTANT: during SW install, `cache.addAll([...])` will use the browser's
+      // normal HTTP cache. That can accidentally "re-precache" an older JS module
+      // even after a hard reload, which then looks like a stale/mismatched deploy.
+      //
+      // Force a revalidation/reload so the precache reflects what's currently
+      // served by the host (and avoid sticky stale JS warnings).
+      const cache = await caches.open(PRECACHE_NAME);
+      const requests = PRECACHE_URLS.map((url) => new Request(url, { cache: 'reload' }));
+      await cache.addAll(requests);
+      await self.skipWaiting();
+    })(),
   );
 });
 

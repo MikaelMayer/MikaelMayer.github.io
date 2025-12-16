@@ -2,8 +2,10 @@
 const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({
-  testDir: '.',
-  testMatch: /^(tests|apps\/reflex4you\/tests)\/.*\.spec\.js$/,
+  // Root suite: only the top-level web app tests (DelayCam, etc.).
+  // Reflex4You has its own Playwright config under `apps/reflex4you/`.
+  testDir: './tests',
+  testMatch: ['**/*.spec.js'],
   timeout: 60000,
   retries: 0,
   use: {
