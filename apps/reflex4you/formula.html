@@ -316,6 +316,7 @@
     // Non-module diagnostics so it still runs even if module caching is stale.
     (function () {
       function $(id) { return document.getElementById(id); }
+      const startedAt = Date.now();
 
       function setText(id, text) {
         const el = $(id);
@@ -356,6 +357,8 @@
         const latex = render && render.dataset ? (render.dataset.latex || '') : '';
 
         const latestBuild = await probeLatestBuildId(`./formula-renderer.mjs?probe=${Date.now()}`);
+        const controller = navigator?.serviceWorker?.controller?.scriptURL || '';
+        const isControlled = Boolean(controller);
 
         const lines = [
           getControllerInfo(),
@@ -367,10 +370,13 @@
         ];
         setText('build-info', lines.join('\n'));
 
-        const looksOld =
-          (typeof latex === 'string' && (latex.includes('\\cdot') || latex.includes('\\left(\\left') || latex.includes('\\right)\\right'))) ||
-          (!runningBuild) ||
-          (latestBuild && runningBuild && latestBuild !== runningBuild);
+        // Avoid false positives: on slow/blocked third-party loads, the renderer
+        // may not have populated dataset fields yet. Only warn once we have
+        // evidence of a mismatch, or (when controlled by a SW) a prolonged
+        // failure to initialize.
+        const mismatch = Boolean(latestBuild && runningBuild && latestBuild !== runningBuild);
+        const missingTooLong = !runningBuild && (Date.now() - startedAt) > 2500;
+        const looksOld = mismatch || (isControlled && missingTooLong);
 
         if (looksOld) {
           show('stale-warning', true);
@@ -381,21 +387,26 @@
               'WARNING: This page appears to be running stale/mismatched cached JS.',
               'If you are on a PR preview, cache collisions across deployments are common.',
               '',
+              mismatch ? `Detected: renderer build mismatch (${runningBuild || 'missing'} != ${latestBuild || 'unknown'}).` : 'Detected: renderer did not initialize (build id missing).',
+              isControlled ? `Controller: ${controller}` : 'Controller: none (not controlled)',
+              '',
               'Try: hard reload, or Application → Service Workers → Unregister; then reload.',
             ].join('\n'),
           );
 
-          // Auto-heal once per tab: if we detect staleness, try clearing SW+caches
-          // automatically so users don't have to click a button.
-          try {
-            const key = 'reflex4you:autoFixTried';
-            if (!sessionStorage.getItem(key)) {
-              sessionStorage.setItem(key, String(Date.now()));
-              // Defer so the warning is visible briefly.
-              window.setTimeout(() => fixCacheNow(), 250);
+          // Auto-heal once per tab, but only when we have a *confirmed mismatch*.
+          // (Avoid reload loops when the page is simply still initializing.)
+          if (mismatch) {
+            try {
+              const key = 'reflex4you:autoFixTried';
+              if (!sessionStorage.getItem(key)) {
+                sessionStorage.setItem(key, String(Date.now()));
+                // Defer so the warning is visible briefly.
+                window.setTimeout(() => fixCacheNow(), 250);
+              }
+            } catch (_) {
+              // ignore storage failures; user can still click the button
             }
-          } catch (_) {
-            // ignore storage failures; user can still click the button
           }
         } else {
           show('stale-warning', false);
@@ -409,12 +420,13 @@
         try {
           if (navigator?.serviceWorker?.getRegistrations) {
             const regs = await navigator.serviceWorker.getRegistrations();
-            const here = String(location.href || '');
-            const scopePrefix = here.slice(0, here.lastIndexOf('/') + 1);
+            const scopePrefix = String(new URL('./', location.href));
+            const pathPrefix = String(location.pathname || '').replace(/[^/]*$/, ''); // "/.../reflex4you/"
             for (const reg of regs) {
-              if (reg?.scope && String(reg.scope).startsWith(scopePrefix)) {
+              const scope = reg?.scope ? String(reg.scope) : '';
+              if (scope && (scope.startsWith(scopePrefix) || (pathPrefix && scope.includes(pathPrefix)))) {
                 const ok = await reg.unregister();
-                logs.push(`unregister ${reg.scope}: ${ok ? 'ok' : 'failed'}`);
+                logs.push(`unregister ${scope}: ${ok ? 'ok' : 'failed'}`);
               }
             }
           }
