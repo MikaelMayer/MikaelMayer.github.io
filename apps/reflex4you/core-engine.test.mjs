@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { parseFormulaInput } from './arithmetic-parser.mjs';
+import { formulaAstToLatex } from './formula-renderer.mjs';
 import {
   evaluateFormulaSource,
   defaultFormulaSource,
@@ -75,6 +77,31 @@ test('fragment generator embeds node functions and top entry', () => {
   assert.match(fragment, /return node\d+\(z\);/);
   // Guard against rare GPU/driver divide-by-zero on strictly negative reals.
   assert.match(fragment, /if\s*\(re < 0\.0 && denRaw <= COLOR_MIN_DEN\)/);
+});
+
+test('buildFragmentSourceFromAST preserves set-binding identity when cloning/materializing', () => {
+  const parsed = parseFormulaInput('set a = 1 in a + a');
+  assert.equal(parsed.ok, true);
+  const fragment = buildFragmentSourceFromAST(parsed.value);
+  assert.match(fragment, /vec2 set_binding_slot_\d+;/);
+  assert.doesNotMatch(fragment, /set_binding_slot_undefined/);
+});
+
+test('buildFragmentSourceFromAST does not mutate repeat-composition (ComposeMultiple) nodes', () => {
+  const parsed = parseFormulaInput('sin $$ 40');
+  assert.equal(parsed.ok, true);
+  const ast = parsed.value;
+  assert.equal(ast.kind, 'ComposeMultiple');
+
+  const latexBefore = formulaAstToLatex(ast);
+  assert.match(latexBefore, /\\circ 40/);
+
+  // Building a shader should materialize internally, without mutating `ast`.
+  buildFragmentSourceFromAST(ast);
+
+  assert.equal(ast.kind, 'ComposeMultiple');
+  const latexAfter = formulaAstToLatex(ast);
+  assert.equal(latexAfter, latexBefore);
 });
 
 test('Pow nodes emit exponentiation by squaring and allow negatives', () => {

@@ -1,5 +1,7 @@
 // Core engine for Reflex4You: AST helpers, GLSL generation, and renderer
 
+import { cloneAst } from './ast-utils.mjs';
+
 // =========================
 // AST constructors
 // =========================
@@ -296,7 +298,11 @@ function analyzeFingerUniformCounts(ast) {
 }
 
 function materializeComposeMultiples(ast) {
-  let root = ast;
+  // IMPORTANT: materialization is for shader code generation only. It must not
+  // mutate the original AST, because the UI formula display should keep
+  // `ComposeMultiple` compact (e.g. render as "^{\\circ 40}" instead of 40 chained
+  // compositions).
+  let root = cloneAst(ast, { preserveBindings: true });
   function visit(node, parent, key) {
     if (!node || typeof node !== "object") {
       return;
@@ -1576,7 +1582,9 @@ export class ReflexCore {
   }
 
   setFormulaAST(ast) {
-    this.formulaAST = materializeComposeMultiples(ast);
+    // Keep the original AST for display/export. Shader generation will
+    // materialize `ComposeMultiple` on-demand without mutating this AST.
+    this.formulaAST = ast;
     this.rebuildProgram();
     this.render();
   }
