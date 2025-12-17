@@ -2,7 +2,7 @@
 // Produces a LaTeX string from the Reflex4You AST and renders it via MathJax.tex2svg.
 
 // Bump this when changing renderer logic so users can verify cached assets.
-export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2025-12-16.1';
+export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2025-12-17.1';
 
 const DEFAULT_MATHJAX_LOAD_TIMEOUT_MS = 9000;
 
@@ -153,6 +153,18 @@ function fingerSlotToLatex(slot) {
   return `\\mathrm{${escapeLatexIdentifier(family)}}_{${escapeLatexIdentifier(idx)}}`;
 }
 
+function resolveFingerValue(slot, options = {}) {
+  const map = options && typeof options === 'object' ? options.fingerValues : null;
+  if (!map) return null;
+  const key = String(slot || '');
+  const v = map instanceof Map ? map.get(key) : map[key];
+  if (!v) return null;
+  const re = typeof v.re === 'number' ? v.re : (typeof v.x === 'number' ? v.x : null);
+  const im = typeof v.im === 'number' ? v.im : (typeof v.y === 'number' ? v.y : null);
+  if (!Number.isFinite(re) || !Number.isFinite(im)) return null;
+  return { re, im };
+}
+
 function functionCallLatex(name, args, options) {
   const renderedArgs = (args || []).map((arg) => nodeToLatex(arg, 0, options));
   const fn = String(name || '?');
@@ -211,6 +223,12 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
     case 'SetRef':
       return latexIdentifierWithMetadata(node.name || '?', identifierHighlights(node));
     case 'FingerOffset':
+      if (options && options.inlineFingerConstants) {
+        const resolved = resolveFingerValue(node.slot, options);
+        if (resolved) {
+          return constToLatex(resolved);
+        }
+      }
       return fingerSlotToLatex(node.slot);
 
     case 'Pow': {
@@ -389,8 +407,9 @@ function resolveCanvasBackground(options = {}) {
   return parseHex8Color(candidate) ?? parseHex8Color('ffffff80');
 }
 
-function resizeCanvasToDisplaySize(canvas) {
-  const dpr = (typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1;
+function resizeCanvasToDisplaySize(canvas, options = {}) {
+  const forced = options && typeof options === 'object' ? options.dpr : null;
+  const dpr = (Number.isFinite(forced) && forced > 0 ? forced : ((typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1));
   const cssWidth = canvas?.clientWidth || canvas?.width || 0;
   const cssHeight = canvas?.clientHeight || canvas?.height || 0;
   const w = Math.max(1, Math.floor(cssWidth * dpr));
@@ -422,10 +441,11 @@ export async function renderLatexToCanvas(latex, canvas, options = {}) {
   if (!ctx) return;
 
   const bg = resolveCanvasBackground(options);
+  const drawInsetBackground = options?.drawInsetBackground !== false;
   const win = typeof window !== 'undefined' ? window : null;
   const ready = await waitForMathJaxStartup(win);
   if (!ready || typeof win.MathJax?.tex2svg !== 'function') {
-    const { width, height } = resizeCanvasToDisplaySize(canvas);
+    const { width, height } = resizeCanvasToDisplaySize(canvas, options);
     ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = `rgba(${bg.r},${bg.g},${bg.b},${bg.a})`;
     ctx.fillRect(0, 0, width, height);
@@ -459,7 +479,7 @@ export async function renderLatexToCanvas(latex, canvas, options = {}) {
     img.src = url;
     await loaded;
 
-    const { width, height } = resizeCanvasToDisplaySize(canvas);
+    const { width, height } = resizeCanvasToDisplaySize(canvas, options);
     ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = `rgba(${bg.r},${bg.g},${bg.b},${bg.a})`;
     ctx.fillRect(0, 0, width, height);
@@ -474,9 +494,11 @@ export async function renderLatexToCanvas(latex, canvas, options = {}) {
     const dx = (width - drawW) / 2;
     const dy = (height - drawH) / 2;
 
-    // Slight translucent white behind the formula.
-    ctx.fillStyle = 'rgba(255,255,255,0.18)';
-    ctx.fillRect(Math.max(0, dx - 10), Math.max(0, dy - 10), Math.min(width, drawW + 20), Math.min(height, drawH + 20));
+    if (drawInsetBackground) {
+      // Slight translucent white behind the formula (useful for preview pages).
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      ctx.fillRect(Math.max(0, dx - 10), Math.max(0, dy - 10), Math.min(width, drawW + 20), Math.min(height, drawH + 20));
+    }
 
     // Ensure the SVG is drawn solid on top.
     ctx.globalAlpha = 1;

@@ -5,10 +5,11 @@ import {
 } from './core-engine.mjs';
 import {
   defaultImageExportPresets,
+  canvasToPngBlob,
   downloadBlob,
   promptImageExportSize,
-  renderOffscreenCanvasToPngBlob,
 } from './image-export.mjs';
+import { formulaAstToLatex, renderLatexToCanvas } from './formula-renderer.mjs';
 import { visitAst } from './ast-utils.mjs';
 import { parseFormulaInput } from './arithmetic-parser.mjs';
 import { formatCaretIndicator } from './parse-error-format.mjs';
@@ -38,7 +39,7 @@ const rootElement = typeof document !== 'undefined' ? document.documentElement :
 
 let fatalErrorActive = false;
 
-const APP_VERSION = 12;
+const APP_VERSION = 13;
 const CONTEXT_LOSS_RELOAD_KEY = `reflex4you:contextLossReloaded:v${APP_VERSION}`;
 const RESUME_RELOAD_KEY = `reflex4you:resumeReloaded:v${APP_VERSION}`;
 const LAST_HIDDEN_AT_KEY = `reflex4you:lastHiddenAtMs:v${APP_VERSION}`;
@@ -1909,6 +1910,10 @@ async function saveCanvasImage() {
     title: 'Export image (PNG)',
     presets,
     defaultSize: defaultSize || undefined,
+    includeFormulaOverlayOption: {
+      label: 'Overlay formula on bottom half (with translucent white background)',
+      defaultChecked: false,
+    },
   });
   if (!requested) {
     return;
@@ -1923,37 +1928,203 @@ async function saveCanvasImage() {
     'W2',
   ]);
 
-  const blob = await renderOffscreenCanvasToPngBlob({
-    width: requested.width,
-    height: requested.height,
-    render: async (exportCanvas) => {
-      // Build a one-shot renderer that ignores DPR/client sizing and renders at exact pixel dimensions.
-      const exportCore = new ReflexCore(exportCanvas, reflexCore.getFormulaAST(), {
-        autoRender: false,
-        installEventListeners: false,
-      });
-
-      try {
-        // Match the current finger state.
-        for (const label of activeLabels) {
-          if (!isFingerLabel(label)) continue;
-          const v = reflexCore.getFingerValue(label);
-          exportCore.setFingerValue(label, v.x, v.y, { triggerRender: false });
-        }
-
-        exportCore.renderToPixelSize(requested.width, requested.height);
-        if (exportCore.gl && typeof exportCore.gl.finish === 'function') {
-          exportCore.gl.finish();
-        }
-      } finally {
-        exportCore.dispose?.();
+  async function ensureMathJaxLoadedForExport() {
+    const win = typeof window !== 'undefined' ? window : null;
+    if (!win) return false;
+    try {
+      if (win.MathJax?.startup?.promise) {
+        await win.MathJax.startup.promise;
+        return true;
       }
-    },
+      if (typeof win.MathJax?.tex2svg === 'function') {
+        return true;
+      }
+    } catch (_) {
+      // ignore; renderer will fall back to plain text
+    }
+
+    // Install MathJax if not present (matches formula.html).
+    try {
+      if (!win.MathJax) {
+        win.MathJax = {
+          startup: { typeset: false },
+          tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+          svg: { fontCache: 'none' },
+        };
+      }
+      const existing = document.querySelector?.('script[data-mathjax="tex-svg"]');
+      if (existing) {
+        // Wait for any in-flight load.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      } else {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js';
+        script.async = true;
+        script.defer = true;
+        script.dataset.mathjax = 'tex-svg';
+        const loaded = new Promise((resolve, reject) => {
+          script.onload = () => resolve(true);
+          script.onerror = (e) => reject(e);
+        });
+        (document.head || document.body).appendChild(script);
+        await loaded;
+      }
+      if (win.MathJax?.startup?.promise) {
+        await win.MathJax.startup.promise;
+      }
+      return typeof win.MathJax?.tex2svg === 'function';
+    } catch (e) {
+      console.warn('Failed to load MathJax for export; falling back.', e);
+      return false;
+    }
+  }
+
+  const exportCanvas = document.createElement('canvas');
+  exportCanvas.width = requested.width;
+  exportCanvas.height = requested.height;
+  exportCanvas.style.position = 'fixed';
+  exportCanvas.style.left = '-10000px';
+  exportCanvas.style.top = '-10000px';
+  exportCanvas.style.width = `${requested.width}px`;
+  exportCanvas.style.height = `${requested.height}px`;
+  exportCanvas.style.pointerEvents = 'none';
+  document.body.appendChild(exportCanvas);
+
+  let blob = null;
+  const includeFormulaOverlay = Boolean(requested.includeFormulaOverlay);
+  const fingerValues = {};
+  for (const label of activeLabels) {
+    if (!isFingerLabel(label)) continue;
+    const v = reflexCore.getFingerValue(label);
+    fingerValues[label] = { x: v.x, y: v.y };
+  }
+
+  const exportCore = new ReflexCore(exportCanvas, reflexCore.getFormulaAST(), {
+    autoRender: false,
+    installEventListeners: false,
   });
+
+  function computeNonTransparentBounds(canvasEl) {
+    const ctx = canvasEl?.getContext?.('2d');
+    if (!ctx) return null;
+    const w = canvasEl.width || 0;
+    const h = canvasEl.height || 0;
+    if (w <= 0 || h <= 0) return null;
+    let data;
+    try {
+      data = ctx.getImageData(0, 0, w, h).data;
+    } catch (_) {
+      return null;
+    }
+    let minX = w;
+    let minY = h;
+    let maxX = -1;
+    let maxY = -1;
+    // Scan alpha channel only.
+    for (let y = 0; y < h; y += 1) {
+      const row = y * w * 4;
+      for (let x = 0; x < w; x += 1) {
+        const a = data[row + x * 4 + 3];
+        if (a > 0) {
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (x > maxX) maxX = x;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (maxX < minX || maxY < minY) {
+      return null;
+    }
+    return { minX, minY, maxX, maxY, width: maxX - minX + 1, height: maxY - minY + 1 };
+  }
+
+  try {
+    // Match the current finger state.
+    for (const label of activeLabels) {
+      if (!isFingerLabel(label)) continue;
+      const v = reflexCore.getFingerValue(label);
+      exportCore.setFingerValue(label, v.x, v.y, { triggerRender: false });
+    }
+
+    exportCore.renderToPixelSize(requested.width, requested.height);
+    if (exportCore.gl && typeof exportCore.gl.finish === 'function') {
+      exportCore.gl.finish();
+    }
+
+    if (!includeFormulaOverlay) {
+      blob = await canvasToPngBlob(exportCanvas);
+    } else {
+      // Composite to a 2D canvas so we can draw a formula overlay.
+      const composite = document.createElement('canvas');
+      composite.width = requested.width;
+      composite.height = requested.height;
+      const ctx = composite.getContext('2d');
+      if (!ctx) {
+        blob = await canvasToPngBlob(exportCanvas);
+      } else {
+        ctx.drawImage(exportCanvas, 0, 0);
+
+        // Render formula to an offscreen canvas and draw it near the bottom
+        // with margins; only the formula's own padded background is translucent.
+        await ensureMathJaxLoadedForExport();
+        const latex = formulaAstToLatex(reflexCore.getFormulaAST(), {
+          inlineFingerConstants: true,
+          fingerValues,
+        });
+        const marginX = Math.max(16, Math.round(requested.width * 0.03));
+        const marginBottom = Math.max(16, Math.round(requested.height * 0.03));
+        const pad = Math.max(14, Math.round(Math.min(requested.width, requested.height) * 0.02));
+
+        const formulaW = Math.max(1, requested.width - marginX * 2);
+        // Keep scanning manageable for big exports while still giving the formula room.
+        const formulaH = Math.max(1, Math.min(Math.round(requested.height * 0.28), 900));
+
+        const formulaCanvas = document.createElement('canvas');
+        formulaCanvas.width = formulaW;
+        formulaCanvas.height = formulaH;
+        await renderLatexToCanvas(latex, formulaCanvas, {
+          backgroundHex: '00000000', // transparent; background already drawn on composite
+          dpr: 1, // exact pixels for export
+          drawInsetBackground: false,
+        });
+
+        const bounds = computeNonTransparentBounds(formulaCanvas);
+        const drawX = marginX;
+        const drawY = Math.max(0, requested.height - marginBottom - formulaH);
+
+        if (bounds) {
+          const rectX = Math.max(0, drawX + bounds.minX - pad);
+          const rectY = Math.max(0, drawY + bounds.minY - pad);
+          const rectW = Math.min(requested.width - rectX, bounds.width + pad * 2);
+          const rectH = Math.min(requested.height - rectY, bounds.height + pad * 2);
+          ctx.fillStyle = 'rgba(255,255,255,0.5)';
+          ctx.fillRect(rectX, rectY, rectW, rectH);
+        } else {
+          // If we can't detect bounds (e.g. CORS/taint), fall back to a conservative box.
+          ctx.fillStyle = 'rgba(255,255,255,0.5)';
+          ctx.fillRect(drawX, drawY, formulaW, formulaH);
+        }
+
+        ctx.drawImage(formulaCanvas, drawX, drawY, formulaW, formulaH);
+
+        blob = await canvasToPngBlob(composite);
+      }
+    }
+  } finally {
+    exportCore.dispose?.();
+    try {
+      exportCanvas.remove();
+    } catch (_) {
+      // ignore
+    }
+  }
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const filename = `reflex4you-${requested.width}x${requested.height}-${stamp}.png`;
-  downloadBlob(blob, filename);
+  if (blob) {
+    downloadBlob(blob, filename);
+  }
 }
 
 async function ensureCanvasSnapshotReady() {
@@ -1999,7 +2170,7 @@ function triggerImageDownload(url, filename, shouldRevoke) {
 
 if ('serviceWorker' in navigator) {
   // Version the SW script URL so updates can't get stuck behind a cached SW script.
-  const SW_URL = './service-worker.js?sw=12.0';
+  const SW_URL = './service-worker.js?sw=13.0';
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(SW_URL).then((registration) => {
       // Auto-activate updated workers so cache/version bumps take effect quickly.

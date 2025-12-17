@@ -30,6 +30,7 @@ export async function promptImageExportSize({
   title = 'Export image',
   presets = defaultImageExportPresets(),
   defaultSize = null,
+  includeFormulaOverlayOption = null,
 } = {}) {
   // Prefer a proper <dialog> UI when available; fall back to prompt().
   if (typeof document === 'undefined') {
@@ -43,7 +44,21 @@ export async function promptImageExportSize({
       suggested,
     );
     if (raw == null) return null;
-    return parseSizeText(raw);
+    const size = parseSizeText(raw);
+    if (!size) return null;
+    let includeFormulaOverlay = false;
+    if (includeFormulaOverlayOption) {
+      try {
+        const label =
+          typeof includeFormulaOverlayOption === 'object' && includeFormulaOverlayOption?.label
+            ? String(includeFormulaOverlayOption.label)
+            : 'Overlay formula near bottom?';
+        includeFormulaOverlay = window.confirm(label);
+      } catch (_) {
+        includeFormulaOverlay = false;
+      }
+    }
+    return { ...size, includeFormulaOverlay };
   };
 
   const supportsDialog = typeof HTMLDialogElement !== 'undefined' && typeof document.createElement('dialog').showModal === 'function';
@@ -142,6 +157,45 @@ export async function promptImageExportSize({
   hint.style.marginBottom = '10px';
   hint.textContent = 'Tip: you can type “4050x5100”, “3840×2160”, or add “px”.';
 
+  let includeFormulaOverlayCheckbox = null;
+  let includeFormulaOverlayRow = null;
+  if (includeFormulaOverlayOption) {
+    // Use a <label> wrapper so taps toggle reliably on mobile Safari.
+    const row2 = document.createElement('label');
+    row2.style.display = 'flex';
+    row2.style.alignItems = 'center';
+    row2.style.gap = '10px';
+    row2.style.marginBottom = '10px';
+    row2.style.cursor = 'pointer';
+    row2.style.userSelect = 'none';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = `export-include-formula-overlay-${Math.random().toString(16).slice(2)}`;
+    checkbox.style.width = '18px';
+    checkbox.style.height = '18px';
+    checkbox.style.margin = '0';
+    checkbox.style.cursor = 'pointer';
+    // Use a visible accent color on dark backgrounds (white-on-white can look unchecked).
+    checkbox.style.accentColor = 'rgba(125,211,252,0.95)'; // ~tailwind sky-300
+    checkbox.checked = Boolean(
+      typeof includeFormulaOverlayOption === 'object' && includeFormulaOverlayOption?.defaultChecked,
+    );
+
+    const labelText = document.createElement('span');
+    labelText.style.fontSize = '13px';
+    labelText.style.opacity = '0.92';
+    labelText.textContent =
+      typeof includeFormulaOverlayOption === 'object' && includeFormulaOverlayOption?.label
+        ? String(includeFormulaOverlayOption.label)
+        : 'Overlay formula near bottom';
+
+    row2.appendChild(checkbox);
+    row2.appendChild(labelText);
+    includeFormulaOverlayCheckbox = checkbox;
+    includeFormulaOverlayRow = row2;
+  }
+
   const error = document.createElement('div');
   error.style.fontSize = '12px';
   error.style.color = '#ffb4b4';
@@ -179,6 +233,9 @@ export async function promptImageExportSize({
   actions.appendChild(okBtn);
 
   form.appendChild(row);
+  if (includeFormulaOverlayRow) {
+    form.appendChild(includeFormulaOverlayRow);
+  }
   form.appendChild(hint);
   form.appendChild(error);
   form.appendChild(actions);
@@ -245,7 +302,13 @@ export async function promptImageExportSize({
             resolve(null);
             return;
           }
-          resolve(validate());
+          const size = validate();
+          if (!size) {
+            resolve(null);
+            return;
+          }
+          const includeFormulaOverlay = includeFormulaOverlayCheckbox ? Boolean(includeFormulaOverlayCheckbox.checked) : false;
+          resolve({ ...size, includeFormulaOverlay });
         },
         { once: true },
       );
