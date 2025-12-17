@@ -160,11 +160,14 @@ export async function promptImageExportSize({
   let includeFormulaOverlayCheckbox = null;
   let includeFormulaOverlayRow = null;
   if (includeFormulaOverlayOption) {
-    const row2 = document.createElement('div');
+    // Use a <label> wrapper so taps toggle reliably on mobile Safari.
+    const row2 = document.createElement('label');
     row2.style.display = 'flex';
     row2.style.alignItems = 'center';
     row2.style.gap = '10px';
     row2.style.marginBottom = '10px';
+    row2.style.cursor = 'pointer';
+    row2.style.userSelect = 'none';
 
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
@@ -179,18 +182,16 @@ export async function promptImageExportSize({
       typeof includeFormulaOverlayOption === 'object' && includeFormulaOverlayOption?.defaultChecked,
     );
 
-    const label = document.createElement('label');
-    label.htmlFor = checkbox.id;
-    label.style.fontSize = '13px';
-    label.style.opacity = '0.92';
-    label.style.cursor = 'pointer';
-    label.textContent =
+    const labelText = document.createElement('span');
+    labelText.style.fontSize = '13px';
+    labelText.style.opacity = '0.92';
+    labelText.textContent =
       typeof includeFormulaOverlayOption === 'object' && includeFormulaOverlayOption?.label
         ? String(includeFormulaOverlayOption.label)
         : 'Overlay formula near bottom';
 
     row2.appendChild(checkbox);
-    row2.appendChild(label);
+    row2.appendChild(labelText);
     includeFormulaOverlayCheckbox = checkbox;
     includeFormulaOverlayRow = row2;
   }
