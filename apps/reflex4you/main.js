@@ -5,10 +5,11 @@ import {
 } from './core-engine.mjs';
 import {
   defaultImageExportPresets,
+  canvasToPngBlob,
   downloadBlob,
   promptImageExportSize,
-  renderOffscreenCanvasToPngBlob,
 } from './image-export.mjs';
+import { formulaAstToLatex, renderLatexToCanvas } from './formula-renderer.mjs';
 import { visitAst } from './ast-utils.mjs';
 import { parseFormulaInput } from './arithmetic-parser.mjs';
 import { formatCaretIndicator } from './parse-error-format.mjs';
@@ -1909,6 +1910,10 @@ async function saveCanvasImage() {
     title: 'Export image (PNG)',
     presets,
     defaultSize: defaultSize || undefined,
+    includeFormulaOverlayOption: {
+      label: 'Overlay formula on bottom half (with translucent white background)',
+      defaultChecked: false,
+    },
   });
   if (!requested) {
     return;
@@ -1923,37 +1928,147 @@ async function saveCanvasImage() {
     'W2',
   ]);
 
-  const blob = await renderOffscreenCanvasToPngBlob({
-    width: requested.width,
-    height: requested.height,
-    render: async (exportCanvas) => {
-      // Build a one-shot renderer that ignores DPR/client sizing and renders at exact pixel dimensions.
-      const exportCore = new ReflexCore(exportCanvas, reflexCore.getFormulaAST(), {
-        autoRender: false,
-        installEventListeners: false,
-      });
-
-      try {
-        // Match the current finger state.
-        for (const label of activeLabels) {
-          if (!isFingerLabel(label)) continue;
-          const v = reflexCore.getFingerValue(label);
-          exportCore.setFingerValue(label, v.x, v.y, { triggerRender: false });
-        }
-
-        exportCore.renderToPixelSize(requested.width, requested.height);
-        if (exportCore.gl && typeof exportCore.gl.finish === 'function') {
-          exportCore.gl.finish();
-        }
-      } finally {
-        exportCore.dispose?.();
+  async function ensureMathJaxLoadedForExport() {
+    const win = typeof window !== 'undefined' ? window : null;
+    if (!win) return false;
+    try {
+      if (win.MathJax?.startup?.promise) {
+        await win.MathJax.startup.promise;
+        return true;
       }
-    },
+      if (typeof win.MathJax?.tex2svg === 'function') {
+        return true;
+      }
+    } catch (_) {
+      // ignore; renderer will fall back to plain text
+    }
+
+    // Install MathJax if not present (matches formula.html).
+    try {
+      if (!win.MathJax) {
+        win.MathJax = {
+          startup: { typeset: false },
+          tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+          svg: { fontCache: 'none' },
+        };
+      }
+      const existing = document.querySelector?.('script[data-mathjax="tex-svg"]');
+      if (existing) {
+        // Wait for any in-flight load.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      } else {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js';
+        script.async = true;
+        script.defer = true;
+        script.dataset.mathjax = 'tex-svg';
+        const loaded = new Promise((resolve, reject) => {
+          script.onload = () => resolve(true);
+          script.onerror = (e) => reject(e);
+        });
+        (document.head || document.body).appendChild(script);
+        await loaded;
+      }
+      if (win.MathJax?.startup?.promise) {
+        await win.MathJax.startup.promise;
+      }
+      return typeof win.MathJax?.tex2svg === 'function';
+    } catch (e) {
+      console.warn('Failed to load MathJax for export; falling back.', e);
+      return false;
+    }
+  }
+
+  const exportCanvas = document.createElement('canvas');
+  exportCanvas.width = requested.width;
+  exportCanvas.height = requested.height;
+  exportCanvas.style.position = 'fixed';
+  exportCanvas.style.left = '-10000px';
+  exportCanvas.style.top = '-10000px';
+  exportCanvas.style.width = `${requested.width}px`;
+  exportCanvas.style.height = `${requested.height}px`;
+  exportCanvas.style.pointerEvents = 'none';
+  document.body.appendChild(exportCanvas);
+
+  let blob = null;
+  const includeFormulaOverlay = Boolean(requested.includeFormulaOverlay);
+  const fingerValues = {};
+  for (const label of activeLabels) {
+    if (!isFingerLabel(label)) continue;
+    const v = reflexCore.getFingerValue(label);
+    fingerValues[label] = { x: v.x, y: v.y };
+  }
+
+  const exportCore = new ReflexCore(exportCanvas, reflexCore.getFormulaAST(), {
+    autoRender: false,
+    installEventListeners: false,
   });
+
+  try {
+    // Match the current finger state.
+    for (const label of activeLabels) {
+      if (!isFingerLabel(label)) continue;
+      const v = reflexCore.getFingerValue(label);
+      exportCore.setFingerValue(label, v.x, v.y, { triggerRender: false });
+    }
+
+    exportCore.renderToPixelSize(requested.width, requested.height);
+    if (exportCore.gl && typeof exportCore.gl.finish === 'function') {
+      exportCore.gl.finish();
+    }
+
+    if (!includeFormulaOverlay) {
+      blob = await canvasToPngBlob(exportCanvas);
+    } else {
+      // Composite to a 2D canvas so we can draw a formula overlay.
+      const composite = document.createElement('canvas');
+      composite.width = requested.width;
+      composite.height = requested.height;
+      const ctx = composite.getContext('2d');
+      if (!ctx) {
+        blob = await canvasToPngBlob(exportCanvas);
+      } else {
+        ctx.drawImage(exportCanvas, 0, 0);
+
+        const topHeight = Math.floor(requested.height / 2);
+        const bottomHeight = requested.height - topHeight;
+
+        // Bottom-half translucent white background.
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.fillRect(0, topHeight, requested.width, bottomHeight);
+
+        // Render formula to an offscreen canvas and draw it into the bottom half.
+        await ensureMathJaxLoadedForExport();
+        const latex = formulaAstToLatex(reflexCore.getFormulaAST(), {
+          inlineFingerConstants: true,
+          fingerValues,
+        });
+        const formulaCanvas = document.createElement('canvas');
+        formulaCanvas.width = requested.width;
+        formulaCanvas.height = Math.max(1, bottomHeight);
+        await renderLatexToCanvas(latex, formulaCanvas, {
+          backgroundHex: '00000000', // transparent; background already drawn on composite
+          dpr: 1, // exact pixels for export
+        });
+        ctx.drawImage(formulaCanvas, 0, topHeight, requested.width, bottomHeight);
+
+        blob = await canvasToPngBlob(composite);
+      }
+    }
+  } finally {
+    exportCore.dispose?.();
+    try {
+      exportCanvas.remove();
+    } catch (_) {
+      // ignore
+    }
+  }
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const filename = `reflex4you-${requested.width}x${requested.height}-${stamp}.png`;
-  downloadBlob(blob, filename);
+  if (blob) {
+    downloadBlob(blob, filename);
+  }
 }
 
 async function ensureCanvasSnapshotReady() {
