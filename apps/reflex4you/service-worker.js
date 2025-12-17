@@ -7,7 +7,7 @@
 // PR previews under `/pr-preview/...`). If we use a single global cache name, different
 // deployments can overwrite each other and serve stale/mismatched assets.
 // Include the service worker registration scope in cache keys to isolate deployments.
-const CACHE_MINOR = '12.1';
+const CACHE_MINOR = '13.0';
 const SCOPE =
   typeof self !== 'undefined' && self.registration && typeof self.registration.scope === 'string'
     ? self.registration.scope
