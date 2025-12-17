@@ -1,5 +1,7 @@
 // Core engine for Reflex4You: AST helpers, GLSL generation, and renderer
 
+import { cloneAst } from './ast-utils.mjs';
+
 // =========================
 // AST constructors
 // =========================
@@ -295,110 +297,12 @@ function analyzeFingerUniformCounts(ast) {
   };
 }
 
-function cloneAstForMaterialization(node, bindingClones = new Map()) {
-  if (!node || typeof node !== "object") {
-    return node;
-  }
-
-  // Preserve any metadata fields (e.g. spans, syntax labels, function literals)
-  // by copying the object, then recursively cloning children by kind.
-  switch (node.kind) {
-    case "Pow":
-      return { ...node, base: cloneAstForMaterialization(node.base, bindingClones) };
-    case "Exp":
-    case "Sin":
-    case "Cos":
-    case "Tan":
-    case "Atan":
-    case "Asin":
-    case "Acos":
-    case "Abs":
-    case "Abs2":
-    case "Floor":
-    case "Conjugate":
-      return { ...node, value: cloneAstForMaterialization(node.value, bindingClones) };
-    case "Ln":
-      return {
-        ...node,
-        value: cloneAstForMaterialization(node.value, bindingClones),
-        branch: node.branch ? cloneAstForMaterialization(node.branch, bindingClones) : null,
-      };
-    case "Sub":
-    case "Mul":
-    case "Op":
-    case "Add":
-    case "Div":
-    case "LessThan":
-    case "GreaterThan":
-    case "LessThanOrEqual":
-    case "GreaterThanOrEqual":
-    case "Equal":
-    case "LogicalAnd":
-    case "LogicalOr":
-      return {
-        ...node,
-        left: cloneAstForMaterialization(node.left, bindingClones),
-        right: cloneAstForMaterialization(node.right, bindingClones),
-      };
-    case "If":
-      return {
-        ...node,
-        condition: cloneAstForMaterialization(node.condition, bindingClones),
-        thenBranch: cloneAstForMaterialization(node.thenBranch, bindingClones),
-        elseBranch: cloneAstForMaterialization(node.elseBranch, bindingClones),
-      };
-    case "Compose":
-      return {
-        ...node,
-        f: cloneAstForMaterialization(node.f, bindingClones),
-        g: cloneAstForMaterialization(node.g, bindingClones),
-      };
-    case "ComposeMultiple":
-      return {
-        ...node,
-        base: cloneAstForMaterialization(node.base, bindingClones),
-        countExpression: node.countExpression ? cloneAstForMaterialization(node.countExpression, bindingClones) : null,
-      };
-    case "RepeatComposePlaceholder":
-      return {
-        ...node,
-        base: cloneAstForMaterialization(node.base, bindingClones),
-        countExpression: node.countExpression ? cloneAstForMaterialization(node.countExpression, bindingClones) : null,
-      };
-    case "SetBinding":
-      // Set bindings are referenced by identity from SetRef nodes. Preserve the
-      // binding graph by cloning the binding node first, registering it, then
-      // cloning its children.
-      if (bindingClones.has(node)) {
-        return bindingClones.get(node);
-      }
-      {
-        const cloned = { ...node, value: null, body: null };
-        bindingClones.set(node, cloned);
-        cloned.value = cloneAstForMaterialization(node.value, bindingClones);
-        cloned.body = cloneAstForMaterialization(node.body, bindingClones);
-        return cloned;
-      }
-    case "SetRef": {
-      const binding = node.binding && bindingClones.has(node.binding) ? bindingClones.get(node.binding) : node.binding;
-      return { ...node, binding };
-    }
-    case "Var":
-    case "VarX":
-    case "VarY":
-    case "FingerOffset":
-    case "Const":
-    default:
-      return { ...node };
-  }
-}
-
 function materializeComposeMultiples(ast) {
   // IMPORTANT: materialization is for shader code generation only. It must not
   // mutate the original AST, because the UI formula display should keep
   // `ComposeMultiple` compact (e.g. render as "^{\\circ 40}" instead of 40 chained
   // compositions).
-  let root = cloneAstForMaterialization(ast);
+  let root = cloneAst(ast, { preserveBindings: true });
   function visit(node, parent, key) {
     if (!node || typeof node !== "object") {
       return;

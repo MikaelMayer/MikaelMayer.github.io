@@ -10,7 +10,7 @@ export function visitAst(root, visitor) {
       continue;
     }
     visitor(node, { parent, key });
-    const children = getChildEntries(node);
+    const children = childEntries(node);
     for (let i = children.length - 1; i >= 0; i -= 1) {
       const [childKey, childNode] = children[i];
       if (!childNode) continue;
@@ -19,7 +19,9 @@ export function visitAst(root, visitor) {
   }
 }
 
-function getChildEntries(node) {
+// Single source of truth for the Reflex4You AST shape.
+// Any logic that traverses/clones/transforms the AST should route through this.
+export function childEntries(node) {
   switch (node.kind) {
     case 'Pow':
       return [['base', node.base]];
@@ -99,6 +101,49 @@ function getChildEntries(node) {
     case 'FingerOffset':
       return [];
     default:
-      return [];
+      // Be strict: if a new node kind is added, we want tests to fail loudly
+      // until this schema is updated (prevents missed traversal updates).
+      throw new Error(`Unknown AST kind in childEntries: ${node.kind}`);
   }
+}
+
+export function cloneAst(root, { preserveBindings = true } = {}) {
+  if (!root || typeof root !== 'object') {
+    return root;
+  }
+
+  // `SetRef` nodes refer to a `SetBinding` by object identity. When cloning,
+  // preserve that graph by remapping references to the cloned binding node.
+  const bindingMap = preserveBindings ? new Map() : null;
+
+  function cloneNode(node) {
+    if (!node || typeof node !== 'object') {
+      return node;
+    }
+
+    if (preserveBindings && node.kind === 'SetBinding') {
+      if (bindingMap.has(node)) {
+        return bindingMap.get(node);
+      }
+      // Create the clone first (with empty children), then fill in children.
+      const cloned = { ...node, value: null, body: null };
+      bindingMap.set(node, cloned);
+      cloned.value = cloneNode(node.value);
+      cloned.body = cloneNode(node.body);
+      return cloned;
+    }
+
+    const cloned = { ...node };
+    const entries = childEntries(node);
+    for (const [key, child] of entries) {
+      cloned[key] = cloneNode(child);
+    }
+
+    if (preserveBindings && cloned.kind === 'SetRef' && cloned.binding && bindingMap.has(cloned.binding)) {
+      cloned.binding = bindingMap.get(cloned.binding);
+    }
+    return cloned;
+  }
+
+  return cloneNode(root);
 }
