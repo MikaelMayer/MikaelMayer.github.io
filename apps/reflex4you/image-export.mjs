@@ -173,7 +173,8 @@ export async function promptImageExportSize({
     checkbox.style.height = '18px';
     checkbox.style.margin = '0';
     checkbox.style.cursor = 'pointer';
-    checkbox.style.accentColor = 'rgba(255,255,255,0.8)';
+    // Use a visible accent color on dark backgrounds (white-on-white can look unchecked).
+    checkbox.style.accentColor = 'rgba(125,211,252,0.95)'; // ~tailwind sky-300
     checkbox.checked = Boolean(
       typeof includeFormulaOverlayOption === 'object' && includeFormulaOverlayOption?.defaultChecked,
     );
