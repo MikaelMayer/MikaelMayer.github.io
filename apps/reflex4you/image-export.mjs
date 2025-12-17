@@ -52,7 +52,7 @@ export async function promptImageExportSize({
         const label =
           typeof includeFormulaOverlayOption === 'object' && includeFormulaOverlayOption?.label
             ? String(includeFormulaOverlayOption.label)
-            : 'Overlay formula on bottom half?';
+            : 'Overlay formula near bottom?';
         includeFormulaOverlay = window.confirm(label);
       } catch (_) {
         includeFormulaOverlay = false;
@@ -183,7 +183,7 @@ export async function promptImageExportSize({
     label.textContent =
       typeof includeFormulaOverlayOption === 'object' && includeFormulaOverlayOption?.label
         ? String(includeFormulaOverlayOption.label)
-        : 'Overlay formula on bottom half';
+        : 'Overlay formula near bottom';
 
     // Clicking the label toggles the checkbox.
     label.addEventListener('click', (event) => {

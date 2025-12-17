@@ -2004,6 +2004,41 @@ async function saveCanvasImage() {
     installEventListeners: false,
   });
 
+  function computeNonTransparentBounds(canvasEl) {
+    const ctx = canvasEl?.getContext?.('2d');
+    if (!ctx) return null;
+    const w = canvasEl.width || 0;
+    const h = canvasEl.height || 0;
+    if (w <= 0 || h <= 0) return null;
+    let data;
+    try {
+      data = ctx.getImageData(0, 0, w, h).data;
+    } catch (_) {
+      return null;
+    }
+    let minX = w;
+    let minY = h;
+    let maxX = -1;
+    let maxY = -1;
+    // Scan alpha channel only.
+    for (let y = 0; y < h; y += 1) {
+      const row = y * w * 4;
+      for (let x = 0; x < w; x += 1) {
+        const a = data[row + x * 4 + 3];
+        if (a > 0) {
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (x > maxX) maxX = x;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (maxX < minX || maxY < minY) {
+      return null;
+    }
+    return { minX, minY, maxX, maxY, width: maxX - minX + 1, height: maxY - minY + 1 };
+  }
+
   try {
     // Match the current finger state.
     for (const label of activeLabels) {
@@ -2030,27 +2065,48 @@ async function saveCanvasImage() {
       } else {
         ctx.drawImage(exportCanvas, 0, 0);
 
-        const topHeight = Math.floor(requested.height / 2);
-        const bottomHeight = requested.height - topHeight;
-
-        // Bottom-half translucent white background.
-        ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.fillRect(0, topHeight, requested.width, bottomHeight);
-
-        // Render formula to an offscreen canvas and draw it into the bottom half.
+        // Render formula to an offscreen canvas and draw it near the bottom
+        // with margins; only the formula's own padded background is translucent.
         await ensureMathJaxLoadedForExport();
         const latex = formulaAstToLatex(reflexCore.getFormulaAST(), {
           inlineFingerConstants: true,
           fingerValues,
         });
+        const marginX = Math.max(16, Math.round(requested.width * 0.03));
+        const marginBottom = Math.max(16, Math.round(requested.height * 0.03));
+        const pad = Math.max(14, Math.round(Math.min(requested.width, requested.height) * 0.02));
+
+        const formulaW = Math.max(1, requested.width - marginX * 2);
+        // Keep scanning manageable for big exports while still giving the formula room.
+        const formulaH = Math.max(1, Math.min(Math.round(requested.height * 0.28), 900));
+
         const formulaCanvas = document.createElement('canvas');
-        formulaCanvas.width = requested.width;
-        formulaCanvas.height = Math.max(1, bottomHeight);
+        formulaCanvas.width = formulaW;
+        formulaCanvas.height = formulaH;
         await renderLatexToCanvas(latex, formulaCanvas, {
           backgroundHex: '00000000', // transparent; background already drawn on composite
           dpr: 1, // exact pixels for export
+          drawInsetBackground: false,
         });
-        ctx.drawImage(formulaCanvas, 0, topHeight, requested.width, bottomHeight);
+
+        const bounds = computeNonTransparentBounds(formulaCanvas);
+        const drawX = marginX;
+        const drawY = Math.max(0, requested.height - marginBottom - formulaH);
+
+        if (bounds) {
+          const rectX = Math.max(0, drawX + bounds.minX - pad);
+          const rectY = Math.max(0, drawY + bounds.minY - pad);
+          const rectW = Math.min(requested.width - rectX, bounds.width + pad * 2);
+          const rectH = Math.min(requested.height - rectY, bounds.height + pad * 2);
+          ctx.fillStyle = 'rgba(255,255,255,0.5)';
+          ctx.fillRect(rectX, rectY, rectW, rectH);
+        } else {
+          // If we can't detect bounds (e.g. CORS/taint), fall back to a conservative box.
+          ctx.fillStyle = 'rgba(255,255,255,0.5)';
+          ctx.fillRect(drawX, drawY, formulaW, formulaH);
+        }
+
+        ctx.drawImage(formulaCanvas, drawX, drawY, formulaW, formulaH);
 
         blob = await canvasToPngBlob(composite);
       }

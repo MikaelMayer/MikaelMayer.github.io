@@ -441,6 +441,7 @@ export async function renderLatexToCanvas(latex, canvas, options = {}) {
   if (!ctx) return;
 
   const bg = resolveCanvasBackground(options);
+  const drawInsetBackground = options?.drawInsetBackground !== false;
   const win = typeof window !== 'undefined' ? window : null;
   const ready = await waitForMathJaxStartup(win);
   if (!ready || typeof win.MathJax?.tex2svg !== 'function') {
@@ -493,9 +494,11 @@ export async function renderLatexToCanvas(latex, canvas, options = {}) {
     const dx = (width - drawW) / 2;
     const dy = (height - drawH) / 2;
 
-    // Slight translucent white behind the formula.
-    ctx.fillStyle = 'rgba(255,255,255,0.18)';
-    ctx.fillRect(Math.max(0, dx - 10), Math.max(0, dy - 10), Math.min(width, drawW + 20), Math.min(height, drawH + 20));
+    if (drawInsetBackground) {
+      // Slight translucent white behind the formula (useful for preview pages).
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      ctx.fillRect(Math.max(0, dx - 10), Math.max(0, dy - 10), Math.min(width, drawW + 20), Math.min(height, drawH + 20));
+    }
 
     // Ensure the SVG is drawn solid on top.
     ctx.globalAlpha = 1;
