@@ -1,8 +1,10 @@
 // MathJax-based formula renderer (SVG output).
 // Produces a LaTeX string from the Reflex4You AST and renders it via MathJax.tex2svg.
 
+import { FINGER_DECIMAL_PLACES } from './core-engine.mjs';
+
 // Bump this when changing renderer logic so users can verify cached assets.
-export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2025-12-17.1';
+export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2025-12-17.3';
 
 const DEFAULT_MATHJAX_LOAD_TIMEOUT_MS = 9000;
 
@@ -38,12 +40,17 @@ function precedence(node) {
   }
 }
 
-function formatNumber(value) {
+function formatNumber(value, { decimalPlaces = FINGER_DECIMAL_PLACES, decimalSeparator = '.' } = {}) {
   if (!Number.isFinite(value)) return '?';
   const normalized = Object.is(value, -0) ? 0 : value;
   if (Number.isInteger(normalized)) return String(normalized);
-  const rounded = Math.round(normalized * 1000) / 1000;
-  return String(rounded).replace(/\.?0+$/, '');
+  const places = Math.max(0, Math.min(12, Number(decimalPlaces) || 0));
+  const factor = 10 ** places;
+  const rounded = Math.round(normalized * factor) / factor;
+  const fixed = rounded.toFixed(places).replace(/\.?0+$/, '');
+  return decimalSeparator === '.'
+    ? fixed
+    : fixed.replace('.', decimalSeparator);
 }
 
 function escapeLatexIdentifier(name) {
@@ -128,19 +135,33 @@ function maybeWrapLatex(node, latex, parentPrec, side, opKind) {
   return latex;
 }
 
-function constToLatex(node) {
+function constToLatex(node, options = {}) {
   const re = node.re;
   const im = node.im;
   if (!Number.isFinite(re) || !Number.isFinite(im)) return '?';
-  if (im === 0) return formatNumber(re);
+
+  const compactComplex = options?.compactComplexNumbers !== false;
+
+  if (im === 0) return formatNumber(re, options);
   const imagAbs = Math.abs(im);
-  const imagCoeff = imagAbs === 1 ? '' : formatNumber(imagAbs);
+  const imagCoeff = imagAbs === 1 ? '' : formatNumber(imagAbs, options);
   const imag = `${imagCoeff}${imagCoeff ? '\\,' : ''}i`;
   if (re === 0) {
     return im < 0 ? `-${imag}` : imag;
   }
+
   const sign = im >= 0 ? '+' : '-';
-  return `${formatNumber(re)} ${sign} ${imag}`;
+  const realLatex = formatNumber(re, options);
+  if (!compactComplex) {
+    return `${realLatex} ${sign} ${imag}`;
+  }
+
+  // Compact complex numbers to save horizontal space:
+  // Render as "wrapped text" (not a 2-column matrix): top line ends with ±,
+  // bottom line shows the imaginary term with i.
+  // Example: ( 0.1234+ )
+  //          ( 2.0000 i )
+  return `\\left(\\substack{${realLatex}\\,${sign}\\\\${imag}}\\right)`;
 }
 
 function fingerSlotToLatex(slot) {
@@ -212,7 +233,7 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
 
   switch (node.kind) {
     case 'Const':
-      return constToLatex(node);
+      return constToLatex(node, options);
     case 'Var':
       return latexIdentifierWithMetadata(node.name || 'z', identifierHighlights(node));
     case 'VarX':
@@ -226,7 +247,7 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
       if (options && options.inlineFingerConstants) {
         const resolved = resolveFingerValue(node.slot, options);
         if (resolved) {
-          return constToLatex(resolved);
+          return constToLatex(resolved, options);
         }
       }
       return fingerSlotToLatex(node.slot);
