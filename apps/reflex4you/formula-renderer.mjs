@@ -4,7 +4,7 @@
 import { FINGER_DECIMAL_PLACES } from './core-engine.mjs';
 
 // Bump this when changing renderer logic so users can verify cached assets.
-export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2025-12-17.2';
+export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2025-12-17.3';
 
 const DEFAULT_MATHJAX_LOAD_TIMEOUT_MS = 9000;
 
@@ -157,10 +157,11 @@ function constToLatex(node, options = {}) {
   }
 
   // Compact complex numbers to save horizontal space:
-  // Render as a 2-row array with (real ±) on top, (imag i) below.
-  // Example: ( 0.1234  + )
-  //          ( 2.0000 i   )
-  return `\\left(\\begin{array}{r c}${realLatex} & ${sign}\\\\${imag} & {}\\end{array}\\right)`;
+  // Render as "wrapped text" (not a 2-column matrix): top line ends with ±,
+  // bottom line shows the imaginary term with i.
+  // Example: ( 0.1234+ )
+  //          ( 2.0000 i )
+  return `\\left(\\substack{${realLatex}\\,${sign}\\\\${imag}}\\right)`;
 }
 
 function fingerSlotToLatex(slot) {
