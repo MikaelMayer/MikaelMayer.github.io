@@ -168,15 +168,18 @@ export async function promptImageExportSize({
 
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
+    checkbox.id = `export-include-formula-overlay-${Math.random().toString(16).slice(2)}`;
     checkbox.style.width = '18px';
     checkbox.style.height = '18px';
     checkbox.style.margin = '0';
+    checkbox.style.cursor = 'pointer';
     checkbox.style.accentColor = 'rgba(255,255,255,0.8)';
     checkbox.checked = Boolean(
       typeof includeFormulaOverlayOption === 'object' && includeFormulaOverlayOption?.defaultChecked,
     );
 
     const label = document.createElement('label');
+    label.htmlFor = checkbox.id;
     label.style.fontSize = '13px';
     label.style.opacity = '0.92';
     label.style.cursor = 'pointer';
@@ -184,12 +187,6 @@ export async function promptImageExportSize({
       typeof includeFormulaOverlayOption === 'object' && includeFormulaOverlayOption?.label
         ? String(includeFormulaOverlayOption.label)
         : 'Overlay formula near bottom';
-
-    // Clicking the label toggles the checkbox.
-    label.addEventListener('click', (event) => {
-      event.preventDefault();
-      checkbox.checked = !checkbox.checked;
-    });
 
     row2.appendChild(checkbox);
     row2.appendChild(label);
