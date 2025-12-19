@@ -7,7 +7,7 @@
 // PR previews under `/pr-preview/...`). If we use a single global cache name, different
 // deployments can overwrite each other and serve stale/mismatched assets.
 // Include the service worker registration scope in cache keys to isolate deployments.
-const CACHE_MINOR = '15.0';
+const CACHE_MINOR = '15.1';
 const SCOPE =
   typeof self !== 'undefined' && self.registration && typeof self.registration.scope === 'string'
     ? self.registration.scope
@@ -24,11 +24,14 @@ const PRECACHE_URLS = [
   './', // maps to index.html on many static hosts
   './index.html',
   './formula.html',
+  './explore.html',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
   './Screenshot_20251213-082055.png',
   './main.js',
+  './menu-ui.mjs',
+  './explore-page.mjs',
   './image-export.mjs',
   './core-engine.mjs',
   './ast-utils.mjs',
@@ -212,7 +215,11 @@ self.addEventListener('fetch', (event) => {
     (request.headers.get('accept') || '').includes('text/html');
 
   if (isNavigation) {
-    const fallbackUrl = url.pathname.endsWith('/formula.html') ? './formula.html' : './index.html';
+    const fallbackUrl = url.pathname.endsWith('/formula.html')
+      ? './formula.html'
+      : url.pathname.endsWith('/explore.html')
+        ? './explore.html'
+        : './index.html';
     event.respondWith(
       (async () => {
         try {
