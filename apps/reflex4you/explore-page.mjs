@@ -21,6 +21,10 @@ const TOP_FRACTION = 2 / 3;
 // Number of miniature choices (excluding refresh).
 const THUMB_COUNT = 7;
 
+// View transition timing: seconds per unit of RMS finger distance.
+// Example: distance 1 => 1 second when set to 1.
+const TRANSITION_SECONDS_PER_DISTANCE = 1;
+
 // Thumbnail distance bands (roughly increasing).
 // Note: THUMB_COUNT is 7; the last band is a pure random jump (no distance limit).
 // The user-requested list has 6 items, so we insert one extra "very far" band to
@@ -451,7 +455,7 @@ function setUiDisabled(disabled) {
   }
 }
 
-async function animateTopToFingers(targetFingers, { durationMs = 240 } = {}) {
+async function animateTopToFingers(targetFingers, { durationMs } = {}) {
   if (!topCore || !targetFingers) return;
 
   // Cancel any in-flight animation.
@@ -461,12 +465,21 @@ async function animateTopToFingers(targetFingers, { durationMs = 240 } = {}) {
 
   const from = readFingersFromCore(topCore, activeLabels);
   const to = targetFingers;
+  let resolvedDurationMs = durationMs;
+  if (!Number.isFinite(resolvedDurationMs)) {
+    const distance = rmsFingerDistance(from, to);
+    if (Number.isFinite(distance) && distance > 0) {
+      resolvedDurationMs = distance * TRANSITION_SECONDS_PER_DISTANCE * 1000;
+    } else {
+      resolvedDurationMs = 0;
+    }
+  }
   const start = performance.now();
 
   while (true) {
     if (token !== pendingTransitionToken) return; // cancelled
     const now = performance.now();
-    const t = durationMs <= 0 ? 1 : Math.min(1, (now - start) / durationMs);
+    const t = resolvedDurationMs <= 0 ? 1 : Math.min(1, (now - start) / resolvedDurationMs);
     const e = easeInOutCubic(t);
 
     for (const label of activeLabels) {
@@ -822,7 +835,7 @@ async function handleMenuAction(action) {
 async function bootstrap() {
   // Service worker (same behavior as other pages).
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    const SW_URL = './service-worker.js?sw=16.0';
+    const SW_URL = './service-worker.js?sw=17.0';
     window.addEventListener('load', () => {
       navigator.serviceWorker.register(SW_URL).then((registration) => {
         if (registration?.waiting) {
