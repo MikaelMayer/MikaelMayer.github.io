@@ -26,6 +26,7 @@ import {
 } from './formula-url.mjs';
 import { pruneFingerUrlParams } from './finger-url-prune.mjs';
 import { setupMenuDropdown } from './menu-ui.mjs';
+import { lerp } from './anim-utils.mjs';
 
 const canvas = document.getElementById('glcanvas');
 const formulaTextarea = document.getElementById('formula');
@@ -1643,10 +1644,6 @@ function applyAnimationStartValues(tracks) {
     suppressFingerQueryUpdates = false;
   }
   reflexCore.render();
-}
-
-function lerp(a, b, t) {
-  return a + (b - a) * t;
 }
 
 function lerpComplex(a, b, t) {

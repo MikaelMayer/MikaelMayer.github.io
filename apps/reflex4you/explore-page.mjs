@@ -9,6 +9,7 @@ import {
   replaceUrlSearch,
 } from './formula-url.mjs';
 import { setupMenuDropdown } from './menu-ui.mjs';
+import { easeInOutCubic, lerp, waitForNextFrame } from './anim-utils.mjs';
 
 // ---------------------------------------------------------------------------
 // Config
@@ -180,19 +181,6 @@ function showError(message) {
     errorDiv.textContent = '';
     errorDiv.style.display = 'none';
   }
-}
-
-function waitForNextFrame() {
-  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
-}
-
-function easeInOutCubic(t) {
-  const x = Math.max(0, Math.min(1, t));
-  return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
-}
-
-function lerp(a, b, t) {
-  return a + (b - a) * t;
 }
 
 function rmsFingerDistance(baseFingers, otherFingers) {
