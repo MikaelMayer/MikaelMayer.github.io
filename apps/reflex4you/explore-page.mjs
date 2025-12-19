@@ -195,6 +195,31 @@ function lerp(a, b, t) {
   return a + (b - a) * t;
 }
 
+function rmsFingerDistance(baseFingers, otherFingers) {
+  let sumSq = 0;
+  let count = 0;
+  for (const label of activeLabels) {
+    const a = baseFingers?.[label];
+    const b = otherFingers?.[label];
+    if (!a || !b) continue;
+    const dx = (b.x ?? 0) - (a.x ?? 0);
+    const dy = (b.y ?? 0) - (a.y ?? 0);
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) continue;
+    sumSq += dx * dx + dy * dy;
+    count += 1;
+  }
+  if (!count) return 0;
+  return Math.sqrt(sumSq / count);
+}
+
+function shade01ForDistance(distance) {
+  // 0 -> black, 1 -> mid-gray, infinity -> white
+  const d = Number(distance);
+  if (!Number.isFinite(d)) return 1;
+  if (d <= 0) return 0;
+  return d / (1 + d);
+}
+
 // ---------------------------------------------------------------------------
 // Finger usage analysis (kept consistent with index.html behavior)
 // ---------------------------------------------------------------------------
@@ -523,6 +548,17 @@ async function renderThumbs(snapshot) {
     // Render via the shared WebGL thumb renderer, then blit into 2D canvas.
     const candidate = snapshot.candidates[i];
     if (candidate?.fingers) {
+      // Fill the surrounding padding with a grayscale indicating distance.
+      const isRandomJump = !!candidate?.band?.randomJump;
+      const dist = isRandomJump ? Infinity : rmsFingerDistance(snapshot.baseFingers, candidate.fingers);
+      const shade01 = isRandomJump ? 1 : shade01ForDistance(dist);
+      const g = Math.max(0, Math.min(255, Math.round(255 * shade01)));
+      try {
+        if (cell) cell.style.backgroundColor = `rgb(${g}, ${g}, ${g})`;
+      } catch (_) {
+        // ignore
+      }
+
       applyFingersToCore(thumbCore, candidate.fingers);
       thumbCore.renderToPixelSize(targetW, targetH);
       try {
@@ -532,6 +568,12 @@ async function renderThumbs(snapshot) {
       }
       ctx.clearRect(0, 0, targetW, targetH);
       ctx.drawImage(thumbWebglCanvas, 0, 0, targetW, targetH);
+    } else {
+      try {
+        if (cell) cell.style.backgroundColor = 'rgb(0, 0, 0)';
+      } catch (_) {
+        // ignore
+      }
     }
   }
 
@@ -792,7 +834,7 @@ async function handleMenuAction(action) {
 async function bootstrap() {
   // Service worker (same behavior as other pages).
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    const SW_URL = './service-worker.js?sw=15.1';
+    const SW_URL = './service-worker.js?sw=16.0';
     window.addEventListener('load', () => {
       navigator.serviceWorker.register(SW_URL).then((registration) => {
         if (registration?.waiting) {
