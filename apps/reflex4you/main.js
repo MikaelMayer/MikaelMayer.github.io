@@ -25,6 +25,7 @@ import {
   replaceUrlSearch,
 } from './formula-url.mjs';
 import { pruneFingerUrlParams } from './finger-url-prune.mjs';
+import { setupMenuDropdown } from './menu-ui.mjs';
 
 const canvas = document.getElementById('glcanvas');
 const formulaTextarea = document.getElementById('formula');
@@ -1472,62 +1473,7 @@ window.addEventListener('resize', () => {
   activeFingerState.allSlots.forEach((label) => updateFingerDotPosition(label));
 });
 
-setupMenuInteractions();
-
-function setupMenuInteractions() {
-  if (!menuButton || !menuDropdown) {
-    return;
-  }
-  setMenuOpen(false);
-  menuButton.addEventListener('click', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const nextState = !isMenuOpen();
-    setMenuOpen(nextState);
-    if (nextState) {
-      focusFirstMenuItem();
-    }
-  });
-  document.addEventListener('pointerdown', (event) => {
-    if (!menuDropdown.contains(event.target) && !menuButton.contains(event.target)) {
-      setMenuOpen(false);
-    }
-  });
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && isMenuOpen()) {
-      setMenuOpen(false);
-      menuButton.focus();
-    }
-  });
-  menuDropdown.addEventListener('click', (event) => {
-    const actionButton = event.target.closest('[data-menu-action]');
-    if (!actionButton) {
-      return;
-    }
-    handleMenuAction(actionButton.dataset.menuAction);
-    setMenuOpen(false);
-  });
-}
-
-function focusFirstMenuItem() {
-  const firstItem = menuDropdown?.querySelector('[data-menu-action]');
-  if (firstItem) {
-    firstItem.focus({ preventScroll: true });
-  }
-}
-
-function setMenuOpen(isOpen) {
-  if (!menuButton || !menuDropdown) {
-    return;
-  }
-  menuButton.setAttribute('aria-expanded', String(isOpen));
-  menuDropdown.classList.toggle('menu-dropdown--open', isOpen);
-  menuDropdown.setAttribute('aria-hidden', String(!isOpen));
-}
-
-function isMenuOpen() {
-  return Boolean(menuDropdown?.classList.contains('menu-dropdown--open'));
-}
+setupMenuDropdown({ menuButton, menuDropdown, onAction: handleMenuAction });
 
 function handleMenuAction(action) {
   switch (action) {
@@ -1535,6 +1481,9 @@ function handleMenuAction(action) {
       copyShareLinkToClipboard().catch((error) => {
         console.warn('Failed to copy share link.', error);
       });
+      break;
+    case 'open-explore':
+      window.location.href = `./explore.html${window.location.search || ''}`;
       break;
     case 'reset':
       confirmAndReset();
@@ -2201,7 +2150,7 @@ function triggerImageDownload(url, filename, shouldRevoke) {
 
 if ('serviceWorker' in navigator) {
   // Version the SW script URL so updates can't get stuck behind a cached SW script.
-  const SW_URL = './service-worker.js?sw=15.0';
+  const SW_URL = './service-worker.js?sw=15.1';
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(SW_URL).then((registration) => {
       // Auto-activate updated workers so cache/version bumps take effect quickly.
