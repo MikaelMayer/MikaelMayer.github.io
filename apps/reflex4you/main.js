@@ -24,6 +24,7 @@ import {
   updateFormulaQueryParamImmediately,
   replaceUrlSearch,
 } from './formula-url.mjs';
+import { pruneFingerUrlParams } from './finger-url-prune.mjs';
 
 const canvas = document.getElementById('glcanvas');
 const formulaTextarea = document.getElementById('formula');
@@ -1116,23 +1117,54 @@ function applyFingerState(state) {
     refreshFingerIndicator(label);
     updateFingerDotPosition(label);
   });
+
+  // Keep the URL in sync with the *current formula's* active finger set.
+  // When fingers disappear from the formula, we must remove both:
+  // - their value params (e.g. D2=...)
+  // - their animation params (e.g. D2A=...),
+  // otherwise stale intervals can later "revive" and unexpectedly animate.
+  const params = new URLSearchParams(window.location.search);
+  pruneFingerUrlParams(params, {
+    knownLabels: Array.from(knownFingerLabels),
+    activeLabels: activeFingerState.allSlots,
+    animationSuffix: ANIMATION_SUFFIX,
+    animationTimeParam: ANIMATION_TIME_PARAM,
+  });
+
+  // Reset per-finger serialized cache for any now-inactive labels.
   Array.from(knownFingerLabels).forEach((label) => {
     if (!activeFingerState.activeLabelSet.has(label)) {
-      clearFingerQueryParam(label);
+      fingerLastSerialized[label] = null;
       const dot = fingerDots.get(label);
       if (dot) {
         dot.classList.remove('visible');
       }
     }
   });
-  activeFingerState.allSlots.forEach((label) => {
+
+  // Write the active finger values into the query params in a single replaceState call.
+  for (const label of activeFingerState.allSlots) {
     const latest = latestOffsets[label];
     const serialized = formatComplexForQuery(latest.x, latest.y);
-    if (serialized !== fingerLastSerialized[label]) {
-      fingerLastSerialized[label] = serialized;
-      updateFingerQueryParam(label, latest.x, latest.y);
+    fingerLastSerialized[label] = serialized;
+    if (serialized) {
+      params.set(label, serialized);
+    } else {
+      params.delete(label);
     }
-  });
+  }
+  replaceUrlSearch(params);
+
+  // If URL-driven animations are currently playing, keep the running controller
+  // aligned with the now-active finger set (and stop if animations are no longer applicable).
+  if (animationController?.isPlaying()) {
+    const tracks = buildAnimationTracksFromQuery();
+    if (!tracks.size || isEditModeActive()) {
+      animationController.stop();
+    } else {
+      startAnimations(tracks);
+    }
+  }
 }
 
 function updateFingerDotPosition(label) {
@@ -1550,16 +1582,17 @@ async function buildShareUrl() {
   // Finger constants can change while URL updates are suppressed (e.g. during
   // animations). Build the share URL from the latest in-memory finger values
   // rather than relying on `window.location.search`.
-  const fingerLabels = activeFingerState?.allSlots?.length
-    ? activeFingerState.allSlots
-    : Array.from(knownFingerLabels);
-  if (activeFingerState?.activeLabelSet?.size) {
-    for (const label of knownFingerLabels) {
-      if (!activeFingerState.activeLabelSet.has(label)) {
-        params.delete(label);
-      }
-    }
-  }
+  const fingerLabels = activeFingerState?.allSlots?.length ? activeFingerState.allSlots : [];
+
+  // Prune stale finger values + animations from the share URL so recipients
+  // can't accidentally inherit animations for fingers that are not in the formula.
+  pruneFingerUrlParams(params, {
+    knownLabels: Array.from(knownFingerLabels),
+    activeLabels: fingerLabels,
+    animationSuffix: ANIMATION_SUFFIX,
+    animationTimeParam: ANIMATION_TIME_PARAM,
+  });
+
   for (const label of fingerLabels) {
     if (!isFingerLabel(label)) {
       continue;
@@ -1636,9 +1669,7 @@ async function copyShareLinkToClipboard() {
 
 function buildAnimationTracksFromQuery() {
   const tracks = new Map();
-  const candidates = activeFingerState?.allSlots?.length
-    ? activeFingerState.allSlots
-    : Array.from(knownFingerLabels);
+  const candidates = activeFingerState?.allSlots || [];
   for (const label of candidates) {
     const interval = readAnimationIntervalFromQuery(label);
     if (interval) {
