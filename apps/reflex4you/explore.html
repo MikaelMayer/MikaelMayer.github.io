@@ -234,9 +234,10 @@
     .thumb-button {
       appearance: none;
       border: 1px solid rgba(255, 255, 255, 0.18);
-      background: rgba(255, 255, 255, 0.03);
+      /* Background is set dynamically to show distance shading. */
+      background: #000;
       border-radius: 12px;
-      padding: 0;
+      padding: 6px;
       margin: 0;
       overflow: hidden;
       position: relative;
@@ -264,20 +265,7 @@
       width: 100%;
       height: 100%;
       display: block;
-    }
-
-    .thumb-badge {
-      position: absolute;
-      left: 8px;
-      top: 8px;
-      padding: 4px 8px;
-      border-radius: 999px;
-      background: rgba(0, 0, 0, 0.55);
-      border: 1px solid rgba(255, 255, 255, 0.22);
-      color: rgba(255, 255, 255, 0.9);
-      font-size: 12px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      pointer-events: none;
+      border-radius: 8px;
     }
 
     .refresh-button {
