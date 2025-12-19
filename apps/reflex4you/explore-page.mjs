@@ -20,13 +20,23 @@ const TOP_FRACTION = 2 / 3;
 // Number of miniature choices (excluding refresh).
 const THUMB_COUNT = 7;
 
-// Thumbnail distance bands:
-// 0: 0.01–0.1, 1: 0.1–0.2, ..., 6: 0.6–0.7
+// Thumbnail distance bands (roughly increasing).
+// Note: THUMB_COUNT is 7; the last band is a pure random jump (no distance limit).
+// The user-requested list has 6 items, so we insert one extra "very far" band to
+// keep 7 thumbnails while maintaining an increasing progression.
+const DISTANCE_BANDS = [
+  { min: 0.001, max: 0.2 },
+  { min: 0.2, max: 0.4 },
+  { min: 0.4, max: 0.7 },
+  { min: 0.7, max: 1.0 },
+  { min: 1.0, max: 2.0 },
+  { min: 2.0, max: 4.0 },
+  { randomJump: true },
+];
+
 function bandForIndex(i) {
   const idx = Math.max(0, Math.min(THUMB_COUNT - 1, Number(i) || 0));
-  const min = idx === 0 ? 0.01 : idx * 0.1;
-  const max = (idx + 1) * 0.1;
-  return { min, max };
+  return DISTANCE_BANDS[idx] || DISTANCE_BANDS[DISTANCE_BANDS.length - 1];
 }
 
 // ---------------------------------------------------------------------------
@@ -176,6 +186,15 @@ function waitForNextFrame() {
   return new Promise((resolve) => requestAnimationFrame(() => resolve()));
 }
 
+function easeInOutCubic(t) {
+  const x = Math.max(0, Math.min(1, t));
+  return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
 // ---------------------------------------------------------------------------
 // Finger usage analysis (kept consistent with index.html behavior)
 // ---------------------------------------------------------------------------
@@ -302,15 +321,24 @@ function proposeCandidate({ coreForClamp, baseFingers, labels, axisConstraints, 
   const candidate = {};
   for (const label of labels) {
     const base = baseFingers[label] || { x: 0, y: 0 };
-    const r = randomInRange(band.min, band.max);
-    const theta = Math.random() * Math.PI * 2;
-    let dx = r * Math.cos(theta);
-    let dy = r * Math.sin(theta);
     const axis = axisConstraints?.get?.(label) || null;
-    if (axis === 'x') dy = 0;
-    if (axis === 'y') dx = 0;
-    const unclamped = { x: base.x + dx, y: base.y + dy };
-    candidate[label] = clampToView(coreForClamp, unclamped.x, unclamped.y);
+    if (band?.randomJump) {
+      // Pure random jump (no distance limit): sample uniformly in view bounds.
+      let x = randomInRange(coreForClamp.viewXMin, coreForClamp.viewXMax);
+      let y = randomInRange(coreForClamp.viewYMin, coreForClamp.viewYMax);
+      if (axis === 'x') y = base.y;
+      if (axis === 'y') x = base.x;
+      candidate[label] = clampToView(coreForClamp, x, y);
+    } else {
+      const r = randomInRange(band.min, band.max);
+      const theta = Math.random() * Math.PI * 2;
+      let dx = r * Math.cos(theta);
+      let dy = r * Math.sin(theta);
+      if (axis === 'x') dy = 0;
+      if (axis === 'y') dx = 0;
+      const unclamped = { x: base.x + dx, y: base.y + dy };
+      candidate[label] = clampToView(coreForClamp, unclamped.x, unclamped.y);
+    }
   }
   const key = snapshotKey({ formulaSource: activeFormulaSource, fingers: candidate });
   if (avoidKeys?.has?.(key)) {
@@ -378,6 +406,9 @@ let activeLabels = [];
 let activeAxisConstraints = new Map();
 let activeFingerConfig = { fixedSlots: [], dynamicSlots: [], wSlots: [], axisConstraints: new Map() };
 
+let isTransitioning = false;
+let pendingTransitionToken = 0;
+
 function readFingersFromCore(core, labels) {
   const fingers = {};
   for (const label of labels) {
@@ -393,6 +424,58 @@ function applyFingersToCore(core, fingers) {
     if (!v) continue;
     core.setFingerValue(label, v.x, v.y, { triggerRender: false });
   }
+}
+
+function setUiDisabled(disabled) {
+  try {
+    if (undoButton) undoButton.disabled = disabled || historyPast.length < 2;
+    if (redoButton) redoButton.disabled = disabled || historyFuture.length === 0;
+    if (gridEl) gridEl.style.pointerEvents = disabled ? 'none' : '';
+    if (mainCanvas) mainCanvas.style.pointerEvents = disabled ? 'none' : '';
+    if (menuButton) menuButton.disabled = !!disabled;
+  } catch (_) {
+    // ignore
+  }
+}
+
+async function animateTopToFingers(targetFingers, { durationMs = 240 } = {}) {
+  if (!topCore || !targetFingers) return;
+
+  // Cancel any in-flight animation.
+  const token = ++pendingTransitionToken;
+  isTransitioning = true;
+  setUiDisabled(true);
+
+  const from = readFingersFromCore(topCore, activeLabels);
+  const to = targetFingers;
+  const start = performance.now();
+
+  while (true) {
+    if (token !== pendingTransitionToken) return; // cancelled
+    const now = performance.now();
+    const t = durationMs <= 0 ? 1 : Math.min(1, (now - start) / durationMs);
+    const e = easeInOutCubic(t);
+
+    for (const label of activeLabels) {
+      const a = from[label] || { x: 0, y: 0 };
+      const b = to[label] || a;
+      const x = lerp(a.x, b.x, e);
+      const y = lerp(a.y, b.y, e);
+      topCore.setFingerValue(label, x, y, { triggerRender: false });
+    }
+    topCore.render();
+    if (t >= 1) break;
+    await waitForNextFrame();
+  }
+
+  // Snap to exact target at the end (avoid drift).
+  applyFingersToCore(topCore, to);
+  topCore.render();
+  await waitForNextFrame();
+
+  if (token !== pendingTransitionToken) return;
+  isTransitioning = false;
+  setUiDisabled(false);
 }
 
 function updateUrlForBaseFingers(baseFingers) {
@@ -484,13 +567,7 @@ function ensureGridBuilt() {
     const canvas = document.createElement('canvas');
     canvas.className = 'thumb-canvas';
 
-    const badge = document.createElement('div');
-    badge.className = 'thumb-badge';
-    const band = bandForIndex(i);
-    badge.textContent = `${band.min.toFixed(2)}–${band.max.toFixed(1)}`;
-
     btn.appendChild(canvas);
-    btn.appendChild(badge);
     gridEl.appendChild(btn);
   }
 
@@ -523,16 +600,33 @@ function commitSnapshot(snapshot, { force = false } = {}) {
 
 function undo() {
   if (historyPast.length < 2) return;
+  const from = historyPast[historyPast.length - 1];
   const current = historyPast.pop();
   historyFuture.push(current);
-  renderAll().catch(() => {});
+  const target = historyPast[historyPast.length - 1];
+
+  (async () => {
+    if (!from || !target) return;
+    await animateTopToFingers(target.baseFingers);
+    await updateUrlForBaseFingers(target.baseFingers);
+    await renderThumbs(target);
+    updateUndoRedoButtons();
+  })().catch(() => {});
 }
 
 function redo() {
   if (!historyFuture.length) return;
+  const from = historyPast[historyPast.length - 1];
   const next = historyFuture.pop();
   historyPast.push(next);
-  renderAll().catch(() => {});
+
+  (async () => {
+    if (!from || !next) return;
+    await animateTopToFingers(next.baseFingers);
+    await updateUrlForBaseFingers(next.baseFingers);
+    await renderThumbs(next);
+    updateUndoRedoButtons();
+  })().catch(() => {});
 }
 
 async function handleRefresh() {
@@ -566,6 +660,7 @@ async function handleThumbClick(index) {
   if (!snap) return;
   const i = Number(index);
   if (!(i >= 0 && i < THUMB_COUNT)) return;
+  if (isTransitioning) return;
 
   // Maze backtrack: if we're at a node reached via undo and the user clicks the
   // highlighted choice, treat it as redo (restoring the previously visited child).
@@ -579,12 +674,21 @@ async function handleThumbClick(index) {
   if (!candidate?.fingers) return;
 
   snap.selectedIndex = i;
+  // Update highlight immediately (no re-render of thumbnails yet).
+  for (let j = 0; j < THUMB_COUNT; j++) {
+    const cell = gridEl?.querySelector?.(`[data-thumb-index="${j}"]`);
+    cell?.classList?.toggle?.('selected', i === j);
+  }
 
   const nextBaseFingers = candidate.fingers;
   const nextBaseKey = snapshotKey({ formulaSource: activeFormulaSource, fingers: nextBaseFingers });
+
+  // Animate the top pane to the chosen candidate first...
+  await animateTopToFingers(nextBaseFingers);
+
+  // ...then (only after) advance the maze node + regenerate thumbnails.
   const visitedTopKeys = collectVisitedTopKeys();
   visitedTopKeys.add(nextBaseKey);
-
   const nextCandidates = generateCandidates({
     coreForClamp: topCore,
     baseFingers: nextBaseFingers,
@@ -605,7 +709,8 @@ async function handleThumbClick(index) {
   commitSnapshot(nextSnap);
 
   await updateUrlForBaseFingers(nextBaseFingers);
-  await renderAll();
+  await renderThumbs(nextSnap);
+  updateUndoRedoButtons();
 }
 
 async function buildExploreUrl({ targetPath, baseFingers, includeEditParam }) {
