@@ -233,10 +233,11 @@
 
     .thumb-button {
       appearance: none;
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      background: #000;
+      border: 0;
+      background: transparent;
       border-radius: 12px;
-      padding: 6px;
+      /* Distance is represented as an inset inside the cell. */
+      padding: var(--thumb-inset, 0px);
       margin: 0;
       overflow: hidden;
       position: relative;
@@ -247,59 +248,18 @@
       justify-content: stretch;
       min-height: 0;
       min-width: 0;
-    }
-
-    /* Distance indicator (does NOT affect borders): subtle bar at bottom. */
-    .thumb-button[data-thumb-index]::before {
-      content: "";
-      position: absolute;
-      left: 10px;
-      right: 10px;
-      bottom: 10px;
-      height: 6px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.10);
-      box-shadow: 0 0 0 1px rgba(0,0,0,0.45) inset;
-      pointer-events: none;
-      z-index: 2;
-    }
-
-    .thumb-button[data-thumb-index]::after {
-      content: "";
-      position: absolute;
-      left: 10px;
-      right: 10px;
-      bottom: 10px;
-      height: 6px;
-      border-radius: 999px;
-      transform-origin: left center;
-      transform: scaleX(var(--dist01, 0));
-      background: rgba(125, 211, 252, 0.82); /* sky-ish */
-      box-shadow: 0 0 0 1px rgba(0,0,0,0.35) inset;
-      pointer-events: none;
-      z-index: 3;
-    }
-
-    .thumb-button[data-thumb-index].thumb-button--random::after {
-      /* Random jump: show a striped full bar (value forced to 1 in JS). */
-      background: repeating-linear-gradient(
-        90deg,
-        rgba(255,255,255,0.78) 0px,
-        rgba(255,255,255,0.78) 6px,
-        rgba(255,255,255,0.25) 6px,
-        rgba(255,255,255,0.25) 12px
-      );
+      transition: padding var(--thumb-pad-transition, 180ms) ease;
     }
 
     .thumb-button:focus-visible {
       outline: none;
-      border-color: rgba(125, 211, 252, 0.8);
       box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.16);
     }
 
     .thumb-button.selected {
-      border-color: rgba(158, 240, 255, 0.95);
-      box-shadow: 0 0 0 2px rgba(158, 240, 255, 0.18) inset;
+      box-shadow:
+        0 0 0 2px rgba(158, 240, 255, 0.92),
+        0 0 0 6px rgba(158, 240, 255, 0.10);
     }
 
     /* When a choice is clicked, hide all other choices immediately. */
