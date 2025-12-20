@@ -340,6 +340,12 @@ function proposeCandidate({ coreForClamp, baseFingers, labels, axisConstraints, 
   const candidate = {};
   for (const label of labels) {
     const base = baseFingers[label] || { x: 0, y: 0 };
+    // W* finger constants must never be modified by exploration mode.
+    // Keep them exactly as-is (no randomization, no clamping adjustments).
+    if (String(label).startsWith('W')) {
+      candidate[label] = { x: base.x, y: base.y };
+      continue;
+    }
     const axis = axisConstraints?.get?.(label) || null;
     if (band?.randomJump) {
       // Pure random jump (no distance limit): sample uniformly in view bounds.
