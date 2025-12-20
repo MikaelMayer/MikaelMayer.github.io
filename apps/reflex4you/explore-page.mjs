@@ -24,6 +24,8 @@ const THUMB_COUNT = 7;
 // View transition timing: seconds per unit of RMS finger distance.
 // Example: distance 1 => 1 second when set to 1.
 const TRANSITION_SECONDS_PER_DISTANCE = 1;
+// Small-distance transitions were often too fast to perceive; ensure a minimum.
+const MIN_TRANSITION_MS = 260;
 
 // Thumbnail distance bands (roughly increasing).
 // Note: THUMB_COUNT is 7; the last band is a pure random jump (no distance limit).
@@ -581,45 +583,51 @@ async function animateTopToFingers(targetFingers, { durationMs } = {}) {
   isTransitioning = true;
   pushUiFreeze();
 
-  const from = readFingersFromCore(topCore, activeLabels);
-  const to = targetFingers;
-  let resolvedDurationMs = durationMs;
-  if (!Number.isFinite(resolvedDurationMs)) {
-    const distance = rmsFingerDistance(from, to);
-    if (Number.isFinite(distance) && distance > 0) {
-      resolvedDurationMs = distance * TRANSITION_SECONDS_PER_DISTANCE * 1000;
-    } else {
-      resolvedDurationMs = 0;
+  try {
+    const from = readFingersFromCore(topCore, activeLabels);
+    const to = targetFingers;
+    let resolvedDurationMs = durationMs;
+    if (!Number.isFinite(resolvedDurationMs)) {
+      const distance = rmsFingerDistance(from, to);
+      if (Number.isFinite(distance) && distance > 0) {
+        resolvedDurationMs = distance * TRANSITION_SECONDS_PER_DISTANCE * 1000;
+        resolvedDurationMs = Math.max(MIN_TRANSITION_MS, resolvedDurationMs);
+      } else {
+        resolvedDurationMs = 0;
+      }
+    } else if (resolvedDurationMs > 0) {
+      resolvedDurationMs = Math.max(MIN_TRANSITION_MS, resolvedDurationMs);
     }
-  }
-  const start = performance.now();
+    const start = performance.now();
 
-  while (true) {
-    if (token !== pendingTransitionToken) return; // cancelled
-    const now = performance.now();
-    const t = resolvedDurationMs <= 0 ? 1 : Math.min(1, (now - start) / resolvedDurationMs);
-    const e = easeInOutCubic(t);
+    while (true) {
+      if (token !== pendingTransitionToken) return; // cancelled
+      const now = performance.now();
+      const t = resolvedDurationMs <= 0 ? 1 : Math.min(1, (now - start) / resolvedDurationMs);
+      const e = easeInOutCubic(t);
 
-    for (const label of activeLabels) {
-      const a = from[label] || { x: 0, y: 0 };
-      const b = to[label] || a;
-      const x = lerp(a.x, b.x, e);
-      const y = lerp(a.y, b.y, e);
-      topCore.setFingerValue(label, x, y, { triggerRender: false });
+      for (const label of activeLabels) {
+        const a = from[label] || { x: 0, y: 0 };
+        const b = to[label] || a;
+        const x = lerp(a.x, b.x, e);
+        const y = lerp(a.y, b.y, e);
+        topCore.setFingerValue(label, x, y, { triggerRender: false });
+      }
+      topCore.render();
+      if (t >= 1) break;
+      await waitForNextFrame();
     }
+
+    // Snap to exact target at the end (avoid drift).
+    applyFingersToCore(topCore, to);
     topCore.render();
-    if (t >= 1) break;
     await waitForNextFrame();
+
+    if (token !== pendingTransitionToken) return;
+  } finally {
+    isTransitioning = false;
+    popUiFreeze();
   }
-
-  // Snap to exact target at the end (avoid drift).
-  applyFingersToCore(topCore, to);
-  topCore.render();
-  await waitForNextFrame();
-
-  if (token !== pendingTransitionToken) return;
-  isTransitioning = false;
-  popUiFreeze();
 }
 
 function updateUrlForBaseFingers(baseFingers) {
