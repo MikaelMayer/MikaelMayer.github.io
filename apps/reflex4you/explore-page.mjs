@@ -426,6 +426,69 @@ let activeFingerConfig = { fixedSlots: [], dynamicSlots: [], wSlots: [], axisCon
 let isTransitioning = false;
 let pendingTransitionToken = 0;
 
+let uiFreezeDepth = 0;
+
+function setChoiceVisibilityMode(mode, { selectedIndex = null } = {}) {
+  if (!gridEl) return;
+  const showAll = mode === 'all';
+  for (const el of Array.from(gridEl.querySelectorAll('.thumb-button'))) {
+    const idxRaw = el?.dataset?.thumbIndex;
+    const isThumb = idxRaw != null;
+    const isSelected = isThumb && Number(idxRaw) === Number(selectedIndex);
+    const shouldHide = !showAll && !isSelected;
+    el.classList.toggle('thumb-button--hidden', shouldHide);
+    try {
+      el.setAttribute('aria-hidden', shouldHide ? 'true' : 'false');
+    } catch (_) {
+      // ignore
+    }
+  }
+  // Always hide refresh button in selected-only mode.
+  const refresh = gridEl.querySelector('#refresh-button');
+  if (refresh) {
+    const shouldHide = !showAll;
+    refresh.classList.toggle('thumb-button--hidden', shouldHide);
+    try {
+      refresh.setAttribute('aria-hidden', shouldHide ? 'true' : 'false');
+    } catch (_) {
+      // ignore
+    }
+  }
+}
+
+function pushUiFreeze() {
+  uiFreezeDepth += 1;
+  if (uiFreezeDepth === 1) {
+    try {
+      document.body?.classList?.add?.('ui-frozen');
+    } catch (_) {
+      // ignore
+    }
+    setUiDisabled(true);
+  }
+}
+
+function popUiFreeze() {
+  uiFreezeDepth = Math.max(0, uiFreezeDepth - 1);
+  if (uiFreezeDepth === 0) {
+    setUiDisabled(false);
+    try {
+      document.body?.classList?.remove?.('ui-frozen');
+    } catch (_) {
+      // ignore
+    }
+  }
+}
+
+async function withUiFrozen(fn) {
+  pushUiFreeze();
+  try {
+    return await fn();
+  } finally {
+    popUiFreeze();
+  }
+}
+
 function readFingersFromCore(core, labels) {
   const fingers = {};
   for (const label of labels) {
@@ -447,12 +510,67 @@ function setUiDisabled(disabled) {
   try {
     if (undoButton) undoButton.disabled = disabled || historyPast.length < 2;
     if (redoButton) redoButton.disabled = disabled || historyFuture.length === 0;
-    if (gridEl) gridEl.style.pointerEvents = disabled ? 'none' : '';
+    if (gridEl) {
+      gridEl.style.pointerEvents = disabled ? 'none' : '';
+      for (const btn of Array.from(gridEl.querySelectorAll('button'))) {
+        btn.disabled = !!disabled;
+      }
+    }
     if (mainCanvas) mainCanvas.style.pointerEvents = disabled ? 'none' : '';
     if (menuButton) menuButton.disabled = !!disabled;
+    if (menuDropdown) {
+      // If the dropdown is already open, also freeze its items.
+      menuDropdown.style.pointerEvents = disabled ? 'none' : '';
+      for (const item of Array.from(menuDropdown.querySelectorAll('button, [role="menuitem"]'))) {
+        if (typeof item.disabled === 'boolean') item.disabled = !!disabled;
+      }
+    }
   } catch (_) {
     // ignore
   }
+}
+
+function isCanvasLikelyUniform(ctx, width, height, { samples = 40 } = {}) {
+  if (!ctx || !width || !height) return false;
+  const w = Math.max(1, width | 0);
+  const h = Math.max(1, height | 0);
+  const n = Math.max(1, Math.floor(Number(samples) || 40));
+  let data = null;
+  try {
+    data = ctx.getImageData(0, 0, w, h).data;
+  } catch (_) {
+    return false;
+  }
+  if (!data || data.length < 4) return false;
+  const pick = () => {
+    const x = (Math.random() * w) | 0;
+    const y = (Math.random() * h) | 0;
+    const idx = (y * w + x) * 4;
+    return [data[idx], data[idx + 1], data[idx + 2], data[idx + 3]];
+  };
+  const first = pick();
+  for (let i = 1; i < n; i += 1) {
+    const p = pick();
+    if (p[0] !== first[0] || p[1] !== first[1] || p[2] !== first[2] || p[3] !== first[3]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function expandedBand(band, attempt, coreForClamp) {
+  if (!band || band.randomJump) return band;
+  const k = Math.max(1, Number(attempt) || 1);
+  const baseMin = Number(band.min);
+  const baseMax = Number(band.max);
+  const viewDiag = coreForClamp ? Math.hypot(coreForClamp.viewXSpan, coreForClamp.viewYSpan) : Infinity;
+  const cap = Number.isFinite(viewDiag) && viewDiag > 0 ? viewDiag * 1.5 : Infinity;
+  const factor = 1.7 ** k;
+  const nextMax = Math.min(baseMax * factor, cap);
+  return {
+    min: Number.isFinite(baseMin) ? baseMin : 0,
+    max: Number.isFinite(nextMax) ? nextMax : (Number.isFinite(baseMax) ? baseMax : 1),
+  };
 }
 
 async function animateTopToFingers(targetFingers, { durationMs } = {}) {
@@ -461,7 +579,7 @@ async function animateTopToFingers(targetFingers, { durationMs } = {}) {
   // Cancel any in-flight animation.
   const token = ++pendingTransitionToken;
   isTransitioning = true;
-  setUiDisabled(true);
+  pushUiFreeze();
 
   const from = readFingersFromCore(topCore, activeLabels);
   const to = targetFingers;
@@ -501,7 +619,7 @@ async function animateTopToFingers(targetFingers, { durationMs } = {}) {
 
   if (token !== pendingTransitionToken) return;
   isTransitioning = false;
-  setUiDisabled(false);
+  popUiFreeze();
 }
 
 function updateUrlForBaseFingers(baseFingers) {
@@ -547,28 +665,68 @@ async function renderThumbs(snapshot) {
     if (canvas.height !== targetH) canvas.height = targetH;
 
     // Render via the shared WebGL thumb renderer, then blit into 2D canvas.
-    const candidate = snapshot.candidates[i];
+    let candidate = snapshot.candidates[i];
     if (candidate?.fingers) {
-      // Fill the surrounding padding with a grayscale indicating distance.
-      const isRandomJump = !!candidate?.band?.randomJump;
-      const dist = isRandomJump ? Infinity : rmsFingerDistance(snapshot.baseFingers, candidate.fingers);
-      const shade01 = isRandomJump ? 1 : shade01ForDistance(dist);
-      const g = Math.max(0, Math.min(255, Math.round(255 * shade01)));
-      try {
-        if (cell) cell.style.backgroundColor = `rgb(${g}, ${g}, ${g})`;
-      } catch (_) {
-        // ignore
+      // If a thumb renders as a solid color (40 random pixels identical),
+      // reroll the candidate up to 5 times, widening the distance band each time.
+      const visitedTopKeys = collectVisitedTopKeys();
+      const avoidKeys = new Set(visitedTopKeys || []);
+      avoidKeys.add(snapshot.baseKey);
+      for (const c of snapshot.candidates || []) {
+        if (c?.key) avoidKeys.add(c.key);
       }
 
-      applyFingersToCore(thumbCore, candidate.fingers);
-      thumbCore.renderToPixelSize(targetW, targetH);
-      try {
-        thumbCore.gl?.finish?.();
-      } catch (_) {
-        // ignore
+      for (let reroll = 0; reroll < 5; reroll += 1) {
+        // Fill the surrounding padding with a grayscale indicating distance.
+        const isRandomJump = !!candidate?.band?.randomJump;
+        const dist = isRandomJump ? Infinity : rmsFingerDistance(snapshot.baseFingers, candidate.fingers);
+        const shade01 = isRandomJump ? 1 : shade01ForDistance(dist);
+        const g = Math.max(0, Math.min(255, Math.round(255 * shade01)));
+        try {
+          if (cell) cell.style.backgroundColor = `rgb(${g}, ${g}, ${g})`;
+        } catch (_) {
+          // ignore
+        }
+
+        applyFingersToCore(thumbCore, candidate.fingers);
+        thumbCore.renderToPixelSize(targetW, targetH);
+        try {
+          thumbCore.gl?.finish?.();
+        } catch (_) {
+          // ignore
+        }
+        ctx.clearRect(0, 0, targetW, targetH);
+        ctx.drawImage(thumbWebglCanvas, 0, 0, targetW, targetH);
+
+        const uniform = isCanvasLikelyUniform(ctx, targetW, targetH, { samples: 40 });
+        if (!uniform) break;
+
+        // Reroll candidate: expand the distance band each time so it converges.
+        const baseBand = candidate?.band || bandForIndex(i);
+        const nextBand = expandedBand(baseBand, reroll + 1, topCore);
+        let next = proposeCandidate({
+          coreForClamp: topCore,
+          baseFingers: snapshot.baseFingers,
+          labels: activeLabels,
+          axisConstraints: activeAxisConstraints,
+          band: nextBand,
+          avoidKeys,
+        });
+        if (!next) {
+          next = proposeCandidate({
+            coreForClamp: topCore,
+            baseFingers: snapshot.baseFingers,
+            labels: activeLabels,
+            axisConstraints: activeAxisConstraints,
+            band: nextBand,
+            avoidKeys: new Set(),
+          });
+        }
+        if (!next) break;
+        candidate = { ...next, band: { ...nextBand, randomJump: !!baseBand?.randomJump } };
+        snapshot.candidates[i] = candidate;
+        if (candidate.key) avoidKeys.add(candidate.key);
       }
-      ctx.clearRect(0, 0, targetW, targetH);
-      ctx.drawImage(thumbWebglCanvas, 0, 0, targetW, targetH);
     } else {
       try {
         if (cell) cell.style.backgroundColor = 'rgb(0, 0, 0)';
@@ -675,27 +833,30 @@ function redo() {
 async function handleRefresh() {
   const snap = currentSnapshot();
   if (!snap) return;
+  if (isTransitioning || uiFreezeDepth > 0) return;
 
-  const visitedTopKeys = collectVisitedTopKeys();
-  const kept = new Array(THUMB_COUNT).fill(null);
-  for (let i = 0; i < THUMB_COUNT; i++) {
-    const candidate = snap.candidates[i];
-    const isVisited = candidate?.key && visitedTopKeys.has(candidate.key);
-    const isSelected = snap.selectedIndex === i;
-    if (isVisited || isSelected) {
-      kept[i] = candidate;
+  await withUiFrozen(async () => {
+    const visitedTopKeys = collectVisitedTopKeys();
+    const kept = new Array(THUMB_COUNT).fill(null);
+    for (let i = 0; i < THUMB_COUNT; i++) {
+      const candidate = snap.candidates[i];
+      const isVisited = candidate?.key && visitedTopKeys.has(candidate.key);
+      const isSelected = snap.selectedIndex === i;
+      if (isVisited || isSelected) {
+        kept[i] = candidate;
+      }
     }
-  }
 
-  snap.candidates = generateCandidates({
-    coreForClamp: topCore,
-    baseFingers: snap.baseFingers,
-    labels: activeLabels,
-    axisConstraints: activeAxisConstraints,
-    visitedTopKeys,
-    keepCandidates: kept,
+    snap.candidates = generateCandidates({
+      coreForClamp: topCore,
+      baseFingers: snap.baseFingers,
+      labels: activeLabels,
+      axisConstraints: activeAxisConstraints,
+      visitedTopKeys,
+      keepCandidates: kept,
+    });
+    await renderThumbs(snap);
   });
-  await renderThumbs(snap);
 }
 
 async function handleThumbClick(index) {
@@ -703,7 +864,7 @@ async function handleThumbClick(index) {
   if (!snap) return;
   const i = Number(index);
   if (!(i >= 0 && i < THUMB_COUNT)) return;
-  if (isTransitioning) return;
+  if (isTransitioning || uiFreezeDepth > 0) return;
 
   // Maze backtrack: if we're at a node reached via undo and the user clicks the
   // highlighted choice, treat it as redo (restoring the previously visited child).
@@ -716,44 +877,50 @@ async function handleThumbClick(index) {
   const candidate = snap.candidates[i];
   if (!candidate?.fingers) return;
 
-  snap.selectedIndex = i;
-  // Update highlight immediately (no re-render of thumbnails yet).
-  for (let j = 0; j < THUMB_COUNT; j++) {
-    const cell = gridEl?.querySelector?.(`[data-thumb-index="${j}"]`);
-    cell?.classList?.toggle?.('selected', i === j);
-  }
+  await withUiFrozen(async () => {
+    snap.selectedIndex = i;
+    // Update highlight immediately (no re-render of thumbnails yet).
+    for (let j = 0; j < THUMB_COUNT; j++) {
+      const cell = gridEl?.querySelector?.(`[data-thumb-index="${j}"]`);
+      cell?.classList?.toggle?.('selected', i === j);
+    }
 
-  const nextBaseFingers = candidate.fingers;
-  const nextBaseKey = snapshotKey({ formulaSource: activeFormulaSource, fingers: nextBaseFingers });
+    // Immediately hide all other unclicked choices so it's obvious what was selected.
+    setChoiceVisibilityMode('selected-only', { selectedIndex: i });
 
-  // Animate the top pane to the chosen candidate first...
-  await animateTopToFingers(nextBaseFingers);
+    const nextBaseFingers = candidate.fingers;
+    const nextBaseKey = snapshotKey({ formulaSource: activeFormulaSource, fingers: nextBaseFingers });
 
-  // ...then (only after) advance the maze node + regenerate thumbnails.
-  const visitedTopKeys = collectVisitedTopKeys();
-  visitedTopKeys.add(nextBaseKey);
-  const nextCandidates = generateCandidates({
-    coreForClamp: topCore,
-    baseFingers: nextBaseFingers,
-    labels: activeLabels,
-    axisConstraints: activeAxisConstraints,
-    visitedTopKeys,
+    // Animate the top pane to the chosen candidate first...
+    await animateTopToFingers(nextBaseFingers);
+
+    // ...then (only after) advance the maze node + regenerate thumbnails.
+    const visitedTopKeys = collectVisitedTopKeys();
+    visitedTopKeys.add(nextBaseKey);
+    const nextCandidates = generateCandidates({
+      coreForClamp: topCore,
+      baseFingers: nextBaseFingers,
+      labels: activeLabels,
+      axisConstraints: activeAxisConstraints,
+      visitedTopKeys,
+    });
+
+    const nextSnap = {
+      formulaSource: activeFormulaSource,
+      baseFingers: nextBaseFingers,
+      baseKey: nextBaseKey,
+      candidates: nextCandidates,
+      selectedIndex: null,
+    };
+
+    historyFuture.length = 0;
+    commitSnapshot(nextSnap);
+
+    await updateUrlForBaseFingers(nextBaseFingers);
+    await renderThumbs(nextSnap);
+    updateUndoRedoButtons();
+    setChoiceVisibilityMode('all');
   });
-
-  const nextSnap = {
-    formulaSource: activeFormulaSource,
-    baseFingers: nextBaseFingers,
-    baseKey: nextBaseKey,
-    candidates: nextCandidates,
-    selectedIndex: null,
-  };
-
-  historyFuture.length = 0;
-  commitSnapshot(nextSnap);
-
-  await updateUrlForBaseFingers(nextBaseFingers);
-  await renderThumbs(nextSnap);
-  updateUndoRedoButtons();
 }
 
 async function buildExploreUrl({ targetPath, baseFingers, includeEditParam }) {
