@@ -234,7 +234,6 @@
     .thumb-button {
       appearance: none;
       border: 1px solid rgba(255, 255, 255, 0.18);
-      /* Background is set dynamically to show distance shading. */
       background: #000;
       border-radius: 12px;
       padding: 6px;
@@ -248,6 +247,48 @@
       justify-content: stretch;
       min-height: 0;
       min-width: 0;
+    }
+
+    /* Distance indicator (does NOT affect borders): subtle bar at bottom. */
+    .thumb-button[data-thumb-index]::before {
+      content: "";
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      bottom: 10px;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.10);
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.45) inset;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .thumb-button[data-thumb-index]::after {
+      content: "";
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      bottom: 10px;
+      height: 6px;
+      border-radius: 999px;
+      transform-origin: left center;
+      transform: scaleX(var(--dist01, 0));
+      background: rgba(125, 211, 252, 0.82); /* sky-ish */
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.35) inset;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .thumb-button[data-thumb-index].thumb-button--random::after {
+      /* Random jump: show a striped full bar (value forced to 1 in JS). */
+      background: repeating-linear-gradient(
+        90deg,
+        rgba(255,255,255,0.78) 0px,
+        rgba(255,255,255,0.78) 6px,
+        rgba(255,255,255,0.25) 6px,
+        rgba(255,255,255,0.25) 12px
+      );
     }
 
     .thumb-button:focus-visible {
@@ -282,6 +323,8 @@
       height: 100%;
       display: block;
       border-radius: 8px;
+      position: relative;
+      z-index: 1;
     }
 
     .refresh-button {

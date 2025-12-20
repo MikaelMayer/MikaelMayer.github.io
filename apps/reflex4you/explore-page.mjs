@@ -695,13 +695,14 @@ async function renderThumbs(snapshot) {
       }
 
       for (let reroll = 0; reroll < 5; reroll += 1) {
-        // Fill the surrounding padding with a grayscale indicating distance.
         const isRandomJump = !!candidate?.band?.randomJump;
         const dist = isRandomJump ? Infinity : rmsFingerDistance(snapshot.baseFingers, candidate.fingers);
         const shade01 = isRandomJump ? 1 : shade01ForDistance(dist);
-        const g = Math.max(0, Math.min(255, Math.round(255 * shade01)));
         try {
-          if (cell) cell.style.backgroundColor = `rgb(${g}, ${g}, ${g})`;
+          if (cell) {
+            cell.style.setProperty('--dist01', String(Math.max(0, Math.min(1, shade01))));
+            cell.classList.toggle('thumb-button--random', isRandomJump);
+          }
         } catch (_) {
           // ignore
         }
@@ -747,7 +748,10 @@ async function renderThumbs(snapshot) {
       }
     } else {
       try {
-        if (cell) cell.style.backgroundColor = 'rgb(0, 0, 0)';
+        if (cell) {
+          cell.style.setProperty('--dist01', '0');
+          cell.classList.remove('thumb-button--random');
+        }
       } catch (_) {
         // ignore
       }
