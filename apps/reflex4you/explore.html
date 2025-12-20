@@ -233,11 +233,11 @@
 
     .thumb-button {
       appearance: none;
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      /* Background is set dynamically to show distance shading. */
-      background: #000;
+      border: 0;
+      background: transparent;
       border-radius: 12px;
-      padding: 6px;
+      /* Distance is represented as an inset inside the cell. */
+      padding: var(--thumb-inset, 0px);
       margin: 0;
       overflow: hidden;
       position: relative;
@@ -252,13 +252,29 @@
 
     .thumb-button:focus-visible {
       outline: none;
-      border-color: rgba(125, 211, 252, 0.8);
       box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.16);
     }
 
     .thumb-button.selected {
-      border-color: rgba(158, 240, 255, 0.95);
-      box-shadow: 0 0 0 2px rgba(158, 240, 255, 0.18) inset;
+      box-shadow:
+        0 0 0 2px rgba(158, 240, 255, 0.92),
+        0 0 0 6px rgba(158, 240, 255, 0.10);
+    }
+
+    /* When a choice is clicked, hide all other choices immediately. */
+    .thumb-button.thumb-button--hidden {
+      opacity: 0;
+      transform: scale(0.98);
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    /* Global "frozen" mode: avoid hover/active feedback while disabled. */
+    body.ui-frozen .thumb-button,
+    body.ui-frozen .icon-button,
+    body.ui-frozen #menu-button,
+    body.ui-frozen .menu-dropdown__item {
+      cursor: default !important;
     }
 
     .thumb-canvas {
@@ -266,6 +282,8 @@
       height: 100%;
       display: block;
       border-radius: 8px;
+      position: relative;
+      z-index: 1;
     }
 
     .refresh-button {
