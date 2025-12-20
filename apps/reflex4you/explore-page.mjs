@@ -220,16 +220,6 @@ function insetPxForDistance(distance) {
   return Math.max(0, Math.min(20, Math.round(px)));
 }
 
-function transitionDurationMsForFingers(from, to, { overrideMs = null } = {}) {
-  if (Number.isFinite(overrideMs)) {
-    const ms = Number(overrideMs);
-    return ms > 0 ? Math.max(MIN_TRANSITION_MS, ms) : 0;
-  }
-  const distance = rmsFingerDistance(from, to);
-  if (!Number.isFinite(distance) || distance <= 0) return 0;
-  return Math.max(MIN_TRANSITION_MS, distance * TRANSITION_SECONDS_PER_DISTANCE * 1000);
-}
-
 // ---------------------------------------------------------------------------
 // Finger usage analysis (kept consistent with index.html behavior)
 // ---------------------------------------------------------------------------
@@ -717,7 +707,6 @@ async function renderThumbs(snapshot) {
           if (cell) {
             const insetPx = isRandomJump ? 20 : insetPxForDistance(dist);
             cell.style.setProperty('--thumb-inset', `${insetPx}px`);
-            cell.style.removeProperty('--thumb-pad-transition');
           }
         } catch (_) {
           // ignore
@@ -766,7 +755,6 @@ async function renderThumbs(snapshot) {
       try {
         if (cell) {
           cell.style.setProperty('--thumb-inset', '0px');
-          cell.style.removeProperty('--thumb-pad-transition');
         }
       } catch (_) {
         // ignore
@@ -928,21 +916,6 @@ async function handleThumbClick(index) {
 
     const nextBaseFingers = candidate.fingers;
     const nextBaseKey = snapshotKey({ formulaSource: activeFormulaSource, fingers: nextBaseFingers });
-
-    // Animate the selected thumb "zooming in" by shrinking its inset to zero
-    // over the same duration as the top transition.
-    const selectedCell = gridEl?.querySelector?.(`[data-thumb-index="${i}"]`);
-    if (selectedCell && topCore) {
-      const from = readFingersFromCore(topCore, activeLabels);
-      const to = nextBaseFingers;
-      const durationMs = transitionDurationMsForFingers(from, to);
-      try {
-        selectedCell.style.setProperty('--thumb-pad-transition', `${Math.round(durationMs)}ms`);
-        selectedCell.style.setProperty('--thumb-inset', '0px');
-      } catch (_) {
-        // ignore
-      }
-    }
 
     // Animate the top pane to the chosen candidate first...
     await animateTopToFingers(nextBaseFingers);
