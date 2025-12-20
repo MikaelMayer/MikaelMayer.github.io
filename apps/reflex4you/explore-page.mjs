@@ -538,11 +538,12 @@ function setUiDisabled(disabled) {
   }
 }
 
-function isCanvasLikelyUniform(ctx, width, height, { samples = 40 } = {}) {
+function isCanvasLikelyUniform(ctx, width, height, { samples = 40, threshold = 3 } = {}) {
   if (!ctx || !width || !height) return false;
   const w = Math.max(1, width | 0);
   const h = Math.max(1, height | 0);
   const n = Math.max(1, Math.floor(Number(samples) || 40));
+  const thr = Math.max(0, Math.floor(Number(threshold) || 0));
   let data = null;
   try {
     data = ctx.getImageData(0, 0, w, h).data;
@@ -559,9 +560,12 @@ function isCanvasLikelyUniform(ctx, width, height, { samples = 40 } = {}) {
   const first = pick();
   for (let i = 1; i < n; i += 1) {
     const p = pick();
-    if (p[0] !== first[0] || p[1] !== first[1] || p[2] !== first[2] || p[3] !== first[3]) {
-      return false;
-    }
+    if (
+      Math.abs(p[0] - first[0]) > thr ||
+      Math.abs(p[1] - first[1]) > thr ||
+      Math.abs(p[2] - first[2]) > thr ||
+      Math.abs(p[3] - first[3]) > thr
+    ) return false;
   }
   return true;
 }
@@ -712,7 +716,7 @@ async function renderThumbs(snapshot) {
         ctx.clearRect(0, 0, targetW, targetH);
         ctx.drawImage(thumbWebglCanvas, 0, 0, targetW, targetH);
 
-        const uniform = isCanvasLikelyUniform(ctx, targetW, targetH, { samples: 40 });
+        const uniform = isCanvasLikelyUniform(ctx, targetW, targetH, { samples: 40, threshold: 3 });
         if (!uniform) break;
 
         // Reroll candidate: expand the distance band each time so it converges.
