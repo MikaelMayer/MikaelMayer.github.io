@@ -1886,8 +1886,6 @@ async function saveCanvasImage() {
     const screenW = clampExportPx(cssW * dpr);
     const screenH = clampExportPx(cssH * dpr);
     if (!screenW || !screenH) return [];
-    const screen2xW = clampExportPx(screenW * 2);
-    const screen2xH = clampExportPx(screenH * 2);
     const presets = [
       {
         key: 'screen',
@@ -1896,12 +1894,15 @@ async function saveCanvasImage() {
         height: screenH,
       },
     ];
-    if (screen2xW && screen2xH && (screen2xW !== screenW || screen2xH !== screenH)) {
+    // "HD" mode: supersample at 2×, then downscale for better antialiasing.
+    const canSupersample2x = screenW * 2 <= 20000 && screenH * 2 <= 20000;
+    if (canSupersample2x) {
       presets.push({
-        key: 'screen-2x',
-        label: `2× Screen (${screen2xW}×${screen2xH} px)`,
-        width: screen2xW,
-        height: screen2xH,
+        key: 'screen-hd',
+        label: `HD (2× AA) (${screenW}×${screenH} px)`,
+        width: screenW,
+        height: screenH,
+        renderScale: 2,
       });
     }
     return presets;
@@ -1927,6 +1928,7 @@ async function saveCanvasImage() {
     title: 'Export image (PNG)',
     presets,
     defaultSize: defaultSize || undefined,
+    defaultPresetKey: 'screen-hd',
     includeFormulaOverlayOption: {
       label: 'Overlay formula on bottom half (with translucent white background)',
         defaultChecked: true,
@@ -1996,16 +1998,31 @@ async function saveCanvasImage() {
     }
   }
 
-  const exportCanvas = document.createElement('canvas');
-  exportCanvas.width = requested.width;
-  exportCanvas.height = requested.height;
-  exportCanvas.style.position = 'fixed';
-  exportCanvas.style.left = '-10000px';
-  exportCanvas.style.top = '-10000px';
-  exportCanvas.style.width = `${requested.width}px`;
-  exportCanvas.style.height = `${requested.height}px`;
-  exportCanvas.style.pointerEvents = 'none';
-  document.body.appendChild(exportCanvas);
+  const outputWidth = requested.width;
+  const outputHeight = requested.height;
+  let renderScale = requested && requested.renderScale === 2 ? 2 : 1;
+  if (
+    !Number.isFinite(outputWidth * renderScale) ||
+    !Number.isFinite(outputHeight * renderScale) ||
+    outputWidth * renderScale > 20000 ||
+    outputHeight * renderScale > 20000
+  ) {
+    renderScale = 1;
+  }
+
+  const renderWidth = outputWidth * renderScale;
+  const renderHeight = outputHeight * renderScale;
+
+  const renderCanvas = document.createElement('canvas');
+  renderCanvas.width = renderWidth;
+  renderCanvas.height = renderHeight;
+  renderCanvas.style.position = 'fixed';
+  renderCanvas.style.left = '-10000px';
+  renderCanvas.style.top = '-10000px';
+  renderCanvas.style.width = `${renderWidth}px`;
+  renderCanvas.style.height = `${renderHeight}px`;
+  renderCanvas.style.pointerEvents = 'none';
+  document.body.appendChild(renderCanvas);
 
   let blob = null;
   const includeFormulaOverlay = Boolean(requested.includeFormulaOverlay);
@@ -2016,7 +2033,7 @@ async function saveCanvasImage() {
     fingerValues[label] = { x: v.x, y: v.y };
   }
 
-  const exportCore = new ReflexCore(exportCanvas, reflexCore.getFormulaAST(), {
+  const exportCore = new ReflexCore(renderCanvas, reflexCore.getFormulaAST(), {
     autoRender: false,
     installEventListeners: false,
   });
@@ -2064,66 +2081,76 @@ async function saveCanvasImage() {
       exportCore.setFingerValue(label, v.x, v.y, { triggerRender: false });
     }
 
-    exportCore.renderToPixelSize(requested.width, requested.height);
+    exportCore.renderToPixelSize(renderWidth, renderHeight);
     if (exportCore.gl && typeof exportCore.gl.finish === 'function') {
       exportCore.gl.finish();
     }
 
-    if (!includeFormulaOverlay) {
-      blob = await canvasToPngBlob(exportCanvas);
+    if (!includeFormulaOverlay && renderScale === 1) {
+      blob = await canvasToPngBlob(renderCanvas);
     } else {
-      // Composite to a 2D canvas so we can draw a formula overlay.
+      // Composite to a 2D canvas so we can downscale (HD AA) and/or draw a formula overlay.
       const composite = document.createElement('canvas');
-      composite.width = requested.width;
-      composite.height = requested.height;
+      composite.width = outputWidth;
+      composite.height = outputHeight;
       const ctx = composite.getContext('2d');
       if (!ctx) {
-        blob = await canvasToPngBlob(exportCanvas);
+        blob = await canvasToPngBlob(renderCanvas);
       } else {
-        ctx.drawImage(exportCanvas, 0, 0);
-
-        // Render formula to an offscreen canvas and draw it near the bottom
-        // with margins; only the formula's own padded background is translucent.
-        await ensureMathJaxLoadedForExport();
-        const latex = formulaAstToLatex(reflexCore.getFormulaAST(), {
-          inlineFingerConstants: true,
-          fingerValues,
-        });
-        const marginX = Math.max(16, Math.round(requested.width * 0.03));
-        const marginBottom = Math.max(16, Math.round(requested.height * 0.03));
-        const pad = Math.max(14, Math.round(Math.min(requested.width, requested.height) * 0.02));
-
-        const formulaW = Math.max(1, requested.width - marginX * 2);
-        // Keep scanning manageable for big exports while still giving the formula room.
-        const formulaH = Math.max(1, Math.min(Math.round(requested.height * 0.28), 900));
-
-        const formulaCanvas = document.createElement('canvas');
-        formulaCanvas.width = formulaW;
-        formulaCanvas.height = formulaH;
-        await renderLatexToCanvas(latex, formulaCanvas, {
-          backgroundHex: '00000000', // transparent; background already drawn on composite
-          dpr: 1, // exact pixels for export
-          drawInsetBackground: false,
-        });
-
-        const bounds = computeNonTransparentBounds(formulaCanvas);
-        const drawX = marginX;
-        const drawY = Math.max(0, requested.height - marginBottom - formulaH);
-
-        if (bounds) {
-          const rectX = Math.max(0, drawX + bounds.minX - pad);
-          const rectY = Math.max(0, drawY + bounds.minY - pad);
-          const rectW = Math.min(requested.width - rectX, bounds.width + pad * 2);
-          const rectH = Math.min(requested.height - rectY, bounds.height + pad * 2);
-          ctx.fillStyle = 'rgba(255,255,255,0.5)';
-          ctx.fillRect(rectX, rectY, rectW, rectH);
-        } else {
-          // If we can't detect bounds (e.g. CORS/taint), fall back to a conservative box.
-          ctx.fillStyle = 'rgba(255,255,255,0.5)';
-          ctx.fillRect(drawX, drawY, formulaW, formulaH);
+        try {
+          ctx.imageSmoothingEnabled = true;
+          if (typeof ctx.imageSmoothingQuality === 'string') {
+            ctx.imageSmoothingQuality = 'high';
+          }
+        } catch (_) {
+          // ignore
         }
+        ctx.drawImage(renderCanvas, 0, 0, outputWidth, outputHeight);
 
-        ctx.drawImage(formulaCanvas, drawX, drawY, formulaW, formulaH);
+        if (includeFormulaOverlay) {
+          // Render formula to an offscreen canvas and draw it near the bottom
+          // with margins; only the formula's own padded background is translucent.
+          await ensureMathJaxLoadedForExport();
+          const latex = formulaAstToLatex(reflexCore.getFormulaAST(), {
+            inlineFingerConstants: true,
+            fingerValues,
+          });
+          const marginX = Math.max(16, Math.round(outputWidth * 0.03));
+          const marginBottom = Math.max(16, Math.round(outputHeight * 0.03));
+          const pad = Math.max(14, Math.round(Math.min(outputWidth, outputHeight) * 0.02));
+
+          const formulaW = Math.max(1, outputWidth - marginX * 2);
+          // Keep scanning manageable for big exports while still giving the formula room.
+          const formulaH = Math.max(1, Math.min(Math.round(outputHeight * 0.28), 900));
+
+          const formulaCanvas = document.createElement('canvas');
+          formulaCanvas.width = formulaW;
+          formulaCanvas.height = formulaH;
+          await renderLatexToCanvas(latex, formulaCanvas, {
+            backgroundHex: '00000000', // transparent; background already drawn on composite
+            dpr: 1, // exact pixels for export
+            drawInsetBackground: false,
+          });
+
+          const bounds = computeNonTransparentBounds(formulaCanvas);
+          const drawX = marginX;
+          const drawY = Math.max(0, outputHeight - marginBottom - formulaH);
+
+          if (bounds) {
+            const rectX = Math.max(0, drawX + bounds.minX - pad);
+            const rectY = Math.max(0, drawY + bounds.minY - pad);
+            const rectW = Math.min(outputWidth - rectX, bounds.width + pad * 2);
+            const rectH = Math.min(outputHeight - rectY, bounds.height + pad * 2);
+            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+            ctx.fillRect(rectX, rectY, rectW, rectH);
+          } else {
+            // If we can't detect bounds (e.g. CORS/taint), fall back to a conservative box.
+            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+            ctx.fillRect(drawX, drawY, formulaW, formulaH);
+          }
+
+          ctx.drawImage(formulaCanvas, drawX, drawY, formulaW, formulaH);
+        }
 
         blob = await canvasToPngBlob(composite);
       }
@@ -2131,7 +2158,7 @@ async function saveCanvasImage() {
   } finally {
     exportCore.dispose?.();
     try {
-      exportCanvas.remove();
+      renderCanvas.remove();
     } catch (_) {
       // ignore
     }

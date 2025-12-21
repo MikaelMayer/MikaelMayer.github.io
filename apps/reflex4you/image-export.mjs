@@ -31,6 +31,7 @@ export async function promptImageExportSize({
   presets = defaultImageExportPresets(),
   defaultSize = null,
   includeFormulaOverlayOption = null,
+  defaultPresetKey = null,
 } = {}) {
   // Prefer a proper <dialog> UI when available; fall back to prompt().
   if (typeof document === 'undefined') {
@@ -58,7 +59,7 @@ export async function promptImageExportSize({
         includeFormulaOverlay = false;
       }
     }
-    return { ...size, includeFormulaOverlay };
+    return { ...size, includeFormulaOverlay, renderScale: 1 };
   };
 
   const supportsDialog = typeof HTMLDialogElement !== 'undefined' && typeof document.createElement('dialog').showModal === 'function';
@@ -119,6 +120,9 @@ export async function promptImageExportSize({
     opt.textContent = p.label || `${p.width}×${p.height}px`;
     opt.dataset.width = String(p.width);
     opt.dataset.height = String(p.height);
+    if (p && p.renderScale != null) {
+      opt.dataset.renderScale = String(p.renderScale);
+    }
     presetSelect.appendChild(opt);
   });
 
@@ -243,9 +247,22 @@ export async function promptImageExportSize({
   dialog.appendChild(heading);
   dialog.appendChild(form);
 
-  const initial = defaultSize || (presets[0] ? { width: presets[0].width, height: presets[0].height } : { width: 1920, height: 1080 });
+  const presetKeyFor = (p) => (p && (p.key || `${p.width}x${p.height}`)) || null;
+  const preferredPreset = defaultPresetKey
+    ? presets.find((p) => presetKeyFor(p) === defaultPresetKey) || null
+    : null;
+  const initial = preferredPreset
+    ? { width: preferredPreset.width, height: preferredPreset.height }
+    : (defaultSize || (presets[0] ? { width: presets[0].width, height: presets[0].height } : { width: 1920, height: 1080 }));
+
   sizeInput.value = `${initial.width}x${initial.height}`;
-  presetSelect.value = '__custom__';
+
+  let currentRenderScale = 1;
+  if (preferredPreset) {
+    presetSelect.value = presetKeyFor(preferredPreset) || '__custom__';
+  } else {
+    presetSelect.value = '__custom__';
+  }
 
   function syncFromPreset() {
     const selected = presetSelect.selectedOptions[0];
@@ -255,6 +272,8 @@ export async function promptImageExportSize({
     if (w && h) {
       sizeInput.value = `${w}x${h}`;
     }
+    const rs = selected.dataset.renderScale ? Number(selected.dataset.renderScale) : 1;
+    currentRenderScale = rs === 2 ? 2 : 1;
   }
 
   function validate() {
@@ -275,8 +294,13 @@ export async function promptImageExportSize({
   });
   sizeInput.addEventListener('input', () => {
     presetSelect.value = '__custom__';
+    currentRenderScale = 1;
     validate();
   });
+
+  if (preferredPreset) {
+    syncFromPreset();
+  }
 
   cancelBtn.addEventListener('click', () => {
     try {
@@ -308,7 +332,7 @@ export async function promptImageExportSize({
             return;
           }
           const includeFormulaOverlay = includeFormulaOverlayCheckbox ? Boolean(includeFormulaOverlayCheckbox.checked) : false;
-          resolve({ ...size, includeFormulaOverlay });
+          resolve({ ...size, includeFormulaOverlay, renderScale: currentRenderScale });
         },
         { once: true },
       );
