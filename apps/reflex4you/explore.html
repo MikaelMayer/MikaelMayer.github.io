@@ -357,7 +357,12 @@
     </div>
   </div>
 
-  <script type="module" src="./explore-page.mjs"></script>
+  <script type="module">
+    // Cache-bust module import in PR previews (HTML updates sooner than JS sometimes).
+    const HTML_BUILD_ID = '__REFLEX_BUILD_ID__';
+    window.__reflexHtmlBuildId = HTML_BUILD_ID;
+    import(`./explore-page.mjs?build=${encodeURIComponent(HTML_BUILD_ID)}`);
+  </script>
 </body>
 </html>
 

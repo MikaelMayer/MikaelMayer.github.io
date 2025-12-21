@@ -7,7 +7,7 @@
 // PR previews under `/pr-preview/...`). If we use a single global cache name, different
 // deployments can overwrite each other and serve stale/mismatched assets.
 // Include the service worker registration scope in cache keys to isolate deployments.
-const CACHE_MINOR = '19.3';
+const CACHE_MINOR = '20.1';
 const SCOPE =
   typeof self !== 'undefined' && self.registration && typeof self.registration.scope === 'string'
     ? self.registration.scope
@@ -238,6 +238,19 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache-first for same-origin static assets (JS/ESM, images, manifest, etc).
+  const path = (url.pathname || '').toLowerCase();
+  const isJsModule =
+    request.destination === 'script' ||
+    path.endsWith('.js') ||
+    path.endsWith('.mjs');
+
+  // For code assets, prefer network-first so PR previews update quickly even if a
+  // previous service worker version is still controlling the scope.
+  if (isJsModule) {
+    event.respondWith(networkFirst(request, { timeoutMs: 1500 }));
+    return;
+  }
+
+  // Cache-first for non-code static assets (images, icons, etc).
   event.respondWith(cacheFirst(request));
 });

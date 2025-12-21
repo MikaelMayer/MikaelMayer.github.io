@@ -344,7 +344,12 @@
     </div>
   </div>
 
-  <script type="module" src="./formula-page.mjs"></script>
+  <script type="module">
+    // Cache-bust module import in PR previews (HTML updates sooner than JS sometimes).
+    const HTML_BUILD_ID = '__REFLEX_BUILD_ID__';
+    window.__reflexHtmlBuildId = HTML_BUILD_ID;
+    import(`./formula-page.mjs?build=${encodeURIComponent(HTML_BUILD_ID)}`);
+  </script>
   <script>
     // Non-module diagnostics so it still runs even if module caching is stale.
     (function () {

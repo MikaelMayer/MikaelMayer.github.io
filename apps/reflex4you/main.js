@@ -42,7 +42,7 @@ const rootElement = typeof document !== 'undefined' ? document.documentElement :
 
 let fatalErrorActive = false;
 
-const APP_VERSION = 19;
+const APP_VERSION = 20;
 const CONTEXT_LOSS_RELOAD_KEY = `reflex4you:contextLossReloaded:v${APP_VERSION}`;
 const RESUME_RELOAD_KEY = `reflex4you:resumeReloaded:v${APP_VERSION}`;
 const LAST_HIDDEN_AT_KEY = `reflex4you:lastHiddenAtMs:v${APP_VERSION}`;
@@ -56,8 +56,14 @@ if (versionPill) {
   versionPill.setAttribute('data-version', String(APP_VERSION));
 }
 
+// Expose a JS build marker to help debug HTML/JS cache mismatches (PR previews).
+if (typeof window !== 'undefined') {
+  window.__reflexJsBuildId = `js-v${APP_VERSION}`;
+}
+
 const EDIT_PARAM = 'edit';
 const ANIMATION_TIME_PARAM = 't';
+const SOLOS_PARAM = 'solos';
 
 const DEFAULT_ANIMATION_SECONDS = 5;
 
@@ -115,12 +121,28 @@ function sortFingerLabels(labels) {
     });
 }
 
-const fingerIndicators = new Map();
 const fingerDots = new Map();
 const fingerLastSerialized = {};
 const latestOffsets = {};
 const knownFingerLabels = new Set();
 const fingerUnsubscribers = new Map();
+
+let fingerSoloButton = null;
+let fingerSoloDropdown = null;
+let fingerSoloList = null;
+let fingerSoloHint = null;
+
+// When solos are non-empty, only those labels can capture pointers.
+// Solos are stored in the URL as `solos=F1,D2,...` (comma separated).
+let soloLabelSet = new Set();
+
+// Used to display live values while dragging and keep them visible after release.
+let currentGestureTouchedLabels = new Set();
+let pinnedDisplayLabels = [];
+
+// Auto-solo newly introduced constants only after the initial page load.
+// Otherwise a reload would treat all constants as "new" and incorrectly expand solos.
+let hasAppliedFingerStateOnce = false;
 
 function ensureFingerState(label) {
   if (!isFingerLabel(label)) {
@@ -221,6 +243,309 @@ function createEmptyFingerState() {
   };
 }
 
+function parseSolosParam(raw) {
+  if (!raw) return new Set();
+  const normalized = String(raw).trim();
+  if (!normalized) return new Set();
+  const parts = normalized
+    .split(',')
+    .map((part) => String(part || '').trim())
+    .filter(Boolean);
+  const set = new Set();
+  for (const label of parts) {
+    if (isFingerLabel(label)) {
+      set.add(label);
+    }
+  }
+  return set;
+}
+
+function serializeSolosParam(labels) {
+  const list = sortFingerLabels(Array.from(labels || []).filter((l) => isFingerLabel(l)));
+  return list.length ? list.join(',') : null;
+}
+
+function updateSolosQueryParam(nextSet) {
+  const params = new URLSearchParams(window.location.search);
+  const serialized = serializeSolosParam(nextSet);
+  if (!serialized) {
+    params.delete(SOLOS_PARAM);
+  } else {
+    params.set(SOLOS_PARAM, serialized);
+  }
+  replaceUrlSearch(params);
+}
+
+function ensureFingerSoloUI() {
+  if (!fingerIndicatorStack) {
+    return;
+  }
+  if (fingerSoloButton && fingerSoloDropdown && fingerSoloList) {
+    return;
+  }
+
+  fingerIndicatorStack.innerHTML = '';
+
+  const anchor = document.createElement('div');
+  anchor.id = 'finger-solo-anchor';
+
+  const button = document.createElement('button');
+  button.id = 'finger-solo-button';
+  button.type = 'button';
+  button.setAttribute('aria-haspopup', 'dialog');
+  button.setAttribute('aria-expanded', 'false');
+  button.setAttribute('aria-controls', 'finger-solo-dropdown');
+  button.title = 'Select which constants can capture';
+
+  const dropdown = document.createElement('div');
+  dropdown.id = 'finger-solo-dropdown';
+  dropdown.setAttribute('role', 'dialog');
+  dropdown.setAttribute('aria-label', 'Finger constant selection');
+  dropdown.dataset.open = 'false';
+
+  const header = document.createElement('div');
+  header.className = 'finger-solo-dropdown__title';
+  header.textContent = 'Solo selection';
+
+  const hint = document.createElement('div');
+  hint.className = 'finger-solo-dropdown__hint';
+  hint.textContent = 'Uncheck all for unrestricted. In solo mode, only checked constants can capture.';
+
+  const list = document.createElement('div');
+  list.className = 'finger-solo-list';
+
+  dropdown.appendChild(header);
+  dropdown.appendChild(hint);
+  dropdown.appendChild(list);
+
+  anchor.appendChild(button);
+  anchor.appendChild(dropdown);
+  fingerIndicatorStack.appendChild(anchor);
+
+  function setOpen(isOpen) {
+    dropdown.dataset.open = isOpen ? 'true' : 'false';
+    button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  }
+
+  button.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const open = dropdown.dataset.open === 'true';
+    setOpen(!open);
+  });
+
+  document.addEventListener('pointerdown', (event) => {
+    if (!dropdown.contains(event.target) && !button.contains(event.target)) {
+      setOpen(false);
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      setOpen(false);
+    }
+  });
+
+  fingerSoloButton = button;
+  fingerSoloDropdown = dropdown;
+  fingerSoloList = list;
+  fingerSoloHint = hint;
+}
+
+function getSoloModeEnabled() {
+  return soloLabelSet.size > 0;
+}
+
+function updateFingerSoloButtonText() {
+  if (!fingerSoloButton) {
+    return;
+  }
+  const soloMode = getSoloModeEnabled();
+  fingerSoloButton.dataset.soloMode = soloMode ? 'true' : 'false';
+
+  // Prefer showing live values for the current drag; otherwise keep the last gesture's.
+  const activeDragged = getActiveDraggedLabels();
+  const displayLabels = activeDragged.length ? activeDragged : pinnedDisplayLabels;
+  const filtered = displayLabels.filter((label) => activeFingerState.activeLabelSet.has(label));
+
+  if (!filtered.length) {
+    if (!soloMode) {
+      fingerSoloButton.textContent = 'Unrestricted';
+    } else {
+      const serialized = serializeSolosParam(soloLabelSet);
+      fingerSoloButton.textContent = serialized ? `Solo: ${serialized}` : 'Solo';
+    }
+    return;
+  }
+
+  const lines = filtered.map((label) => {
+    const latest = latestOffsets[label] ?? reflexCore?.getFingerValue(label) ?? defaultFingerOffset(label);
+    return formatComplexForDisplay(label, latest.x, latest.y);
+  });
+  fingerSoloButton.textContent = lines.join('\n');
+}
+
+function getActiveDraggedLabels() {
+  const core = reflexCore;
+  if (!core || !core.pointerStates) {
+    return [];
+  }
+  const labels = new Set();
+  for (const state of core.pointerStates.values()) {
+    if (state?.role === 'finger' && state?.slot && isFingerLabel(state.slot)) {
+      labels.add(state.slot);
+    }
+    if (state?.role === 'w') {
+      // W gestures can move W1/W2 even though pointer state doesn't carry a slot.
+      // If W slots are active, show them while a W gesture is in progress.
+      (activeFingerState?.wSlots || []).forEach((slot) => {
+        if (isFingerLabel(slot)) labels.add(slot);
+      });
+    }
+  }
+  return sortFingerLabels(Array.from(labels));
+}
+
+function rebuildFingerSoloList() {
+  if (!fingerSoloList) {
+    return;
+  }
+  fingerSoloList.innerHTML = '';
+
+  const activeLabels = sortFingerLabels(Array.from(activeFingerState.activeLabelSet));
+  if (!activeLabels.length) {
+    const empty = document.createElement('div');
+    empty.className = 'finger-solo-dropdown__hint';
+    empty.textContent = 'No finger constants in this formula.';
+    fingerSoloList.appendChild(empty);
+    return;
+  }
+
+  const soloMode = getSoloModeEnabled();
+  if (fingerSoloHint) {
+    fingerSoloHint.textContent = soloMode
+      ? 'Solo mode: only checked constants can capture. Uncheck all for unrestricted.'
+      : 'Unrestricted: all constants can capture. Check any to enter solo mode.';
+  }
+
+  for (const label of activeLabels) {
+    const row = document.createElement('div');
+    row.className = 'finger-solo-row';
+    row.dataset.finger = label;
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'finger-solo-row__checkbox';
+    checkbox.checked = soloLabelSet.has(label);
+    checkbox.setAttribute('aria-label', `Solo ${label}`);
+
+    const labelEl = document.createElement('div');
+    labelEl.className = 'finger-solo-row__label';
+    labelEl.textContent = label;
+
+    const edit = document.createElement('button');
+    edit.type = 'button';
+    edit.className = 'finger-solo-row__edit';
+    edit.title = `Set ${label} value`;
+    edit.setAttribute('aria-label', `Set ${label} value`);
+    edit.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 20h9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+      </svg>
+    `;
+
+    checkbox.addEventListener('change', (event) => {
+      event.stopPropagation();
+      const next = new Set(soloLabelSet);
+      if (checkbox.checked) {
+        next.add(label);
+      } else {
+        next.delete(label);
+      }
+      soloLabelSet = next;
+      // Keep only labels that are actually in the current formula.
+      soloLabelSet = new Set(Array.from(soloLabelSet).filter((l) => activeFingerState.activeLabelSet.has(l)));
+      updateSolosQueryParam(soloLabelSet);
+      applySoloFilterToRenderer();
+      rebuildFingerSoloList();
+      updateFingerSoloButtonText();
+    });
+
+    edit.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      promptFingerValue(label);
+      updateFingerSoloButtonText();
+    });
+
+    row.appendChild(checkbox);
+    row.appendChild(labelEl);
+    row.appendChild(edit);
+    fingerSoloList.appendChild(row);
+  }
+}
+
+function applySoloFilterToRenderer() {
+  if (!reflexCore) {
+    return;
+  }
+  const soloMode = getSoloModeEnabled();
+  const allowed = soloMode ? new Set(soloLabelSet) : null;
+
+  function filterSlots(list) {
+    const arr = Array.isArray(list) ? list : [];
+    if (!allowed) return arr.slice();
+    return arr.filter((label) => allowed.has(label));
+  }
+
+  const axisConstraints = activeFingerState.axisConstraints instanceof Map
+    ? new Map(activeFingerState.axisConstraints)
+    : new Map();
+
+  // When soloing, restrict pointer capture, but do NOT change the URL-active label set.
+  const fixedSlots = filterSlots(activeFingerState.fixedSlots);
+  const dynamicSlots = filterSlots(activeFingerState.dynamicSlots);
+  const wSlots = filterSlots(activeFingerState.wSlots);
+
+  // Also update which dots are shown: only capturable labels when in solo mode.
+  const visibleSet = new Set(soloMode ? [...fixedSlots, ...dynamicSlots, ...wSlots] : activeFingerState.allSlots);
+  syncFingerDots(visibleSet, { soloMode });
+
+  reflexCore.setActiveFingerConfig({
+    fixedSlots,
+    dynamicSlots,
+    wSlots,
+    axisConstraints,
+  });
+}
+
+function syncFingerDots(visibleLabelSet, { soloMode } = {}) {
+  const visibleIterable = visibleLabelSet == null ? [] : Array.from(visibleLabelSet);
+  const visible = new Set(visibleIterable.filter((l) => isFingerLabel(l)));
+  if (fingerOverlay) {
+    fingerOverlay.style.display = visible.size ? 'block' : 'none';
+  }
+
+  for (const [label, dot] of fingerDots.entries()) {
+    if (!visible.has(label)) {
+      dot.remove();
+      fingerDots.delete(label);
+    }
+  }
+
+  for (const label of visible) {
+    const dot = ensureFingerDot(label);
+    if (dot) {
+      dot.dataset.soloMode = soloMode ? 'true' : 'false';
+    }
+  }
+
+  for (const label of visible) {
+    updateFingerDotPosition(label);
+  }
+}
+
 function updateViewportInsets() {
   if (typeof window === 'undefined' || !rootElement) {
     return;
@@ -257,14 +582,8 @@ setupViewportInsetListeners();
 
 function refreshFingerIndicator(label) {
   ensureFingerState(label);
-  const indicator = fingerIndicators.get(label);
-  if (!indicator) {
-    return;
-  }
-  const latest = latestOffsets[label];
-  indicator.textContent = formatComplexForDisplay(label, latest.x, latest.y);
-  const isActive = activeFingerState.activeLabelSet.has(label);
-  indicator.style.display = isActive ? '' : 'none';
+  // Old per-finger chips are replaced by a single solo control button.
+  updateFingerSoloButtonText();
 }
 
 const DEFAULT_FORMULA_TEXT = 'z';
@@ -686,19 +1005,8 @@ function revealViewerModeUIOnce() {
 }
 
 function ensureFingerIndicator(label) {
-  if (fingerIndicators.has(label)) {
-    return fingerIndicators.get(label);
-  }
-  ensureFingerState(label);
-  const meta = getFingerMeta(label);
-  const indicator = document.createElement('button');
-  indicator.type = 'button';
-  indicator.className = `finger-indicator finger-indicator--${meta.type}`;
-  indicator.dataset.finger = label;
-  indicator.title = `Click to edit ${label}`;
-  indicator.addEventListener('click', () => promptFingerValue(label));
-  fingerIndicators.set(label, indicator);
-  return indicator;
+  // Deprecated: per-finger indicators are no longer rendered.
+  return null;
 }
 
 function ensureFingerDot(label) {
@@ -816,6 +1124,9 @@ function handleFingerValueChange(label, offset) {
   latestOffsets[label] = { x: offset.x, y: offset.y };
   refreshFingerIndicator(label);
   updateFingerDotPosition(label);
+  if (activePointerIds.size > 0 && activeFingerState.activeLabelSet.has(label)) {
+    currentGestureTouchedLabels.add(label);
+  }
   if (!suppressFingerQueryUpdates && activeFingerState.activeLabelSet.has(label)) {
     const serialized = formatComplexForQuery(offset.x, offset.y);
     if (serialized !== fingerLastSerialized[label]) {
@@ -841,6 +1152,11 @@ function showError(msg) {
     return;
   }
   errorDiv.removeAttribute('data-error-severity');
+  try {
+    errorDiv.innerHTML = '';
+  } catch (_) {
+    // ignore
+  }
   errorDiv.textContent = msg;
   errorDiv.style.display = 'block';
 }
@@ -848,7 +1164,62 @@ function showError(msg) {
 function showFatalError(msg) {
   fatalErrorActive = true;
   errorDiv.setAttribute('data-error-severity', 'fatal');
-  errorDiv.textContent = msg;
+  try {
+    errorDiv.innerHTML = '';
+  } catch (_) {
+    // ignore
+  }
+
+  const content = document.createElement('div');
+  content.textContent = String(msg || '');
+
+  const actions = document.createElement('div');
+  actions.className = 'error-actions';
+
+  const copyButton = document.createElement('button');
+  copyButton.type = 'button';
+  copyButton.textContent = 'Copy';
+  copyButton.title = 'Copy error details';
+
+  async function copyText(text) {
+    const value = String(text || '');
+    const clipboard = navigator?.clipboard;
+    if (clipboard && typeof clipboard.writeText === 'function') {
+      await clipboard.writeText(value);
+      return true;
+    }
+    return false;
+  }
+
+  copyButton.addEventListener('click', async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const original = copyButton.textContent;
+    try {
+      const ok = await copyText(msg);
+      if (!ok) {
+        // Fallback for older browsers / insecure contexts.
+        window.prompt('Copy this error:', String(msg || ''));
+      }
+      copyButton.textContent = 'Copied';
+      window.setTimeout(() => {
+        if (copyButton.textContent === 'Copied') {
+          copyButton.textContent = original;
+        }
+      }, 1200);
+    } catch (e) {
+      console.warn('Failed to copy error text.', e);
+      try {
+        window.prompt('Copy this error:', String(msg || ''));
+      } catch (_) {
+        // ignore
+      }
+    }
+  });
+
+  actions.appendChild(copyButton);
+  errorDiv.appendChild(content);
+  errorDiv.appendChild(actions);
   errorDiv.style.display = 'block';
 }
 
@@ -858,7 +1229,11 @@ function clearError() {
   }
   errorDiv.removeAttribute('data-error-severity');
   errorDiv.style.display = 'none';
-  errorDiv.textContent = '';
+  try {
+    errorDiv.innerHTML = '';
+  } catch (_) {
+    errorDiv.textContent = '';
+  }
 }
 
 function handleRendererInitializationFailure(error) {
@@ -1066,31 +1441,12 @@ function syncFingerUI() {
   if (fingerIndicatorStack) {
     fingerIndicatorStack.style.display = activeLabels.length ? 'flex' : 'none';
   }
-  if (fingerOverlay) {
-    fingerOverlay.style.display = activeLabels.length ? 'block' : 'none';
-  }
-  for (const [label, indicator] of fingerIndicators.entries()) {
-    if (!activeLabels.includes(label)) {
-      indicator.remove();
-      fingerIndicators.delete(label);
-    }
-  }
-  for (const [label, dot] of fingerDots.entries()) {
-    if (!activeLabels.includes(label)) {
-      dot.remove();
-      fingerDots.delete(label);
-    }
-  }
-  activeLabels.forEach((label) => {
-    const indicator = ensureFingerIndicator(label);
-    if (fingerIndicatorStack) {
-      fingerIndicatorStack.appendChild(indicator);
-    }
-    ensureFingerDot(label);
-  });
 }
 
 function applyFingerState(state) {
+  const previousActiveLabelSet =
+    activeFingerState?.activeLabelSet instanceof Set ? new Set(activeFingerState.activeLabelSet) : new Set();
+
   const axisConstraints = state.axisConstraints instanceof Map ? state.axisConstraints : new Map();
   const allSlots = [
     ...(state.fixedSlots || []),
@@ -1107,18 +1463,40 @@ function applyFingerState(state) {
     allSlots,
     activeLabelSet: new Set(allSlots),
   };
-  reflexCore?.setActiveFingerConfig({
-    fixedSlots: activeFingerState.fixedSlots,
-    dynamicSlots: activeFingerState.dynamicSlots,
-    wSlots: activeFingerState.wSlots,
-    axisConstraints: activeFingerState.axisConstraints,
-  });
+
+  // Read solos from the URL and normalize to current active labels.
+  const paramsForSolos = new URLSearchParams(window.location.search);
+  const parsedSolos = parseSolosParam(paramsForSolos.get(SOLOS_PARAM));
+  soloLabelSet = new Set(Array.from(parsedSolos).filter((l) => activeFingerState.activeLabelSet.has(l)));
+
+  let solosChanged = serializeSolosParam(parsedSolos) !== serializeSolosParam(soloLabelSet);
+
+  // If already in solo mode, auto-solo *newly introduced* finger constants.
+  // Do this only after the first apply, otherwise reloads would incorrectly
+  // expand solos to include everything.
+  if (hasAppliedFingerStateOnce && soloLabelSet.size > 0) {
+    for (const label of activeFingerState.activeLabelSet) {
+      if (!previousActiveLabelSet.has(label) && !soloLabelSet.has(label)) {
+        soloLabelSet.add(label);
+        solosChanged = true;
+      }
+    }
+  }
+
+  // Keep URL canonical (drop inactive solos / persist auto-solo additions).
+  if (solosChanged) {
+    updateSolosQueryParam(soloLabelSet);
+  }
+
+  ensureFingerSoloUI();
+  rebuildFingerSoloList();
+
   ensureFingerSubscriptions(activeFingerState.allSlots);
   syncFingerUI();
-  activeFingerState.allSlots.forEach((label) => {
-    refreshFingerIndicator(label);
-    updateFingerDotPosition(label);
-  });
+
+  // Apply capture restrictions (and dot visibility) based on solos.
+  applySoloFilterToRenderer();
+  updateFingerSoloButtonText();
 
   // Keep the URL in sync with the *current formula's* active finger set.
   // When fingers disappear from the formula, we must remove both:
@@ -1167,6 +1545,8 @@ function applyFingerState(state) {
       startAnimations(tracks);
     }
   }
+
+  hasAppliedFingerStateOnce = true;
 }
 
 function updateFingerDotPosition(label) {
@@ -1296,10 +1676,19 @@ async function bootstrapReflexApplication() {
   // Track active pointers so we can snapshot only when all fingers are released.
   if (canvas && typeof window !== 'undefined') {
     canvas.addEventListener('pointerdown', (event) => {
+      if (activePointerIds.size === 0) {
+        currentGestureTouchedLabels = new Set();
+      }
       activePointerIds.add(event.pointerId);
+      updateFingerSoloButtonText();
     });
     const handlePointerEndForHistory = (event) => {
       activePointerIds.delete(event.pointerId);
+      if (activePointerIds.size === 0) {
+        pinnedDisplayLabels = sortFingerLabels(Array.from(currentGestureTouchedLabels));
+        currentGestureTouchedLabels = new Set();
+      }
+      updateFingerSoloButtonText();
       if (activePointerIds.size === 0) {
         scheduleCommitHistorySnapshot();
       }
@@ -1340,7 +1729,44 @@ if (typeof window !== 'undefined') {
 }
 bootstrapPromise.catch((error) => {
   console.error('Failed to bootstrap Reflex4You.', error);
-  showFatalError('Unable to initialize Reflex4You.');
+  const details =
+    error && (error.stack || error.message)
+      ? String(error.stack || error.message)
+      : String(error || 'Unknown error');
+
+  const htmlBuild = typeof window !== 'undefined' ? window.__reflexHtmlBuildId : null;
+  const jsBuild = typeof window !== 'undefined' ? window.__reflexJsBuildId : null;
+  const controller = navigator?.serviceWorker?.controller?.scriptURL || 'none';
+
+  const guidance = [
+    'Unable to initialize Reflex4You.',
+    '',
+    `Build markers: html=${htmlBuild || 'unknown'} js=${jsBuild || 'unknown'}`,
+    `SW controller: ${controller}`,
+    '',
+    details,
+    '',
+    'Recovery tips:',
+    '- Hard reload (or open in a private window).',
+    '- If installed as a PWA: uninstall/reinstall or clear the site data.',
+  ].join('\n');
+  showFatalError(guidance);
+
+  // One-time cache-busting reload: helps recover from stale SW/cached modules.
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage && window.location) {
+      const key = `reflex4you:initReloaded:v${APP_VERSION}`;
+      const already = Boolean(window.sessionStorage.getItem(key));
+      if (!already) {
+        window.sessionStorage.setItem(key, String(Date.now()));
+        const url = new URL(window.location.href);
+        url.searchParams.set('initfix', String(Date.now()));
+        window.location.replace(url.toString());
+      }
+    }
+  } catch (_) {
+    // ignore reload failures
+  }
 });
 
 if (typeof window !== 'undefined') {
@@ -1542,6 +1968,17 @@ async function buildShareUrl() {
     animationSuffix: ANIMATION_SUFFIX,
     animationTimeParam: ANIMATION_TIME_PARAM,
   });
+
+  // Keep solo selection in the share URL, but prune it to active labels.
+  // This makes it possible to share links like "solo only W1,W2".
+  const activeSet = new Set((fingerLabels || []).filter((label) => isFingerLabel(label)));
+  const solos = new Set(Array.from(soloLabelSet || []).filter((label) => activeSet.has(label)));
+  const solosSerialized = serializeSolosParam(solos);
+  if (solosSerialized) {
+    params.set(SOLOS_PARAM, solosSerialized);
+  } else {
+    params.delete(SOLOS_PARAM);
+  }
 
   for (const label of fingerLabels) {
     if (!isFingerLabel(label)) {
@@ -2222,7 +2659,7 @@ function triggerImageDownload(url, filename, shouldRevoke) {
 
 if ('serviceWorker' in navigator) {
   // Version the SW script URL so updates can't get stuck behind a cached SW script.
-  const SW_URL = './service-worker.js?sw=19.3';
+  const SW_URL = './service-worker.js?sw=20.1';
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(SW_URL).then((registration) => {
       // Auto-activate updated workers so cache/version bumps take effect quickly.

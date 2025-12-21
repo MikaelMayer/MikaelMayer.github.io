@@ -90,6 +90,39 @@
       z-index: 20;
     }
 
+    #error[data-error-severity="fatal"] {
+      pointer-events: auto;
+      user-select: text;
+      overflow: auto;
+    }
+
+    #error .error-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    #error .error-actions button {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.92);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 13px;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    #error .error-actions button:hover,
+    #error .error-actions button:focus-visible {
+      border-color: rgba(255, 255, 255, 0.4);
+      background: rgba(255, 255, 255, 0.12);
+      outline: none;
+    }
+
     /* Formula panel: overlay above rendering, semi-transparent */
     #formula-panel {
       position: fixed;
@@ -134,12 +167,23 @@
       flex-direction: column;
       gap: 8px;
       z-index: 30;
+      pointer-events: auto;
     }
 
-    .finger-indicator {
-      padding: 6px 12px;
+    #finger-solo-anchor {
+      position: relative;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    #finger-solo-button {
+      max-width: min(78vw, 520px);
+      padding: 8px 12px;
       border: 1px solid rgba(255, 255, 255, 0.4);
-      border-radius: 6px;
+      border-radius: 10px;
       background: rgba(0, 0, 0, 0.65);
       color: #fefefe;
       font-size: 14px;
@@ -148,25 +192,130 @@
       user-select: none;
       transition: background 0.15s ease, border-color 0.15s ease;
       text-align: left;
+      white-space: pre;
+      line-height: 1.35;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      touch-action: manipulation;
     }
 
-    .finger-indicator:hover,
-    .finger-indicator:focus-visible {
+    #finger-solo-button:hover,
+    #finger-solo-button:focus-visible {
       background: rgba(0, 0, 0, 0.8);
       border-color: rgba(255, 255, 255, 0.7);
       outline: none;
     }
 
-    .finger-indicator--fixed {
-      border-color: rgba(114, 176, 255, 0.7);
+    #finger-solo-button[data-solo-mode="true"] {
+      border-style: dashed;
+      border-color: rgba(255, 255, 255, 0.75);
     }
 
-    .finger-indicator--dynamic {
-      border-color: rgba(255, 179, 71, 0.7);
+    #finger-solo-dropdown {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      background: rgba(0, 0, 0, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 10px;
+      min-width: 240px;
+      max-width: min(86vw, 520px);
+      padding: 10px 10px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      opacity: 0;
+      transform: translateY(-6px);
+      pointer-events: none;
+      visibility: hidden;
+      transition: opacity 0.12s ease, transform 0.12s ease;
     }
 
-    .finger-indicator--w {
-      border-color: rgba(183, 136, 255, 0.7);
+    #finger-solo-dropdown[data-open="true"] {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+      visibility: visible;
+    }
+
+    .finger-solo-dropdown__title {
+      color: rgba(255, 255, 255, 0.88);
+      font-size: 13px;
+      letter-spacing: 0.02em;
+      display: flex;
+      gap: 10px;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+
+    .finger-solo-dropdown__hint {
+      color: rgba(255, 255, 255, 0.55);
+      font-size: 12px;
+      letter-spacing: 0.01em;
+    }
+
+    .finger-solo-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: min(48vh, 360px);
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .finger-solo-row {
+      display: grid;
+      grid-template-columns: 22px 1fr 34px;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 6px;
+      border-radius: 8px;
+    }
+
+    .finger-solo-row:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .finger-solo-row__label {
+      color: rgba(255, 255, 255, 0.92);
+      font-size: 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      letter-spacing: 0.02em;
+    }
+
+    .finger-solo-row__checkbox {
+      width: 18px;
+      height: 18px;
+      accent-color: #9ef0ff;
+    }
+
+    .finger-solo-row__edit {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.92);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      touch-action: manipulation;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .finger-solo-row__edit:hover,
+    .finger-solo-row__edit:focus-visible {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.38);
+      outline: none;
+    }
+
+    .finger-solo-row__edit svg {
+      width: 16px;
+      height: 16px;
+      display: block;
     }
 
     #finger-overlay {
@@ -211,6 +360,11 @@
     .finger-dot--w {
       border-color: rgba(183, 136, 255, 0.9);
       background: rgba(183, 136, 255, 0.3);
+    }
+
+    .finger-dot[data-solo-mode="true"] {
+      border-style: dashed;
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
     }
 
     #menu-container {
@@ -578,7 +732,7 @@
       </div>
     </div>
   </div>
-  <div id="app-version-pill" aria-live="polite" aria-label="Reflex4You version">v19</div>
+  <div id="app-version-pill" aria-live="polite" aria-label="Reflex4You version">v20</div>
 </div>
 
 <div id="error"></div>
@@ -600,6 +754,7 @@
 <script type="module">
   // Boot via dynamic import so we can catch failures (instead of a blank white screen).
   (async function () {
+    const HTML_BUILD_ID = '__REFLEX_BUILD_ID__';
     const error = document.getElementById('error');
     const bootOverlay = document.getElementById('boot-overlay');
     const bootOverlayMessage = document.getElementById('boot-overlay-message');
@@ -607,15 +762,16 @@
     const key = 'reflex4you:bootReloadedOnce';
 
     function showBootError(msg) {
+      const withBuild = `${msg}\n\nHTML build: ${HTML_BUILD_ID}`;
       try {
         if (bootOverlay) bootOverlay.style.display = 'block';
-        if (bootOverlayMessage) bootOverlayMessage.textContent = String(msg || '');
+        if (bootOverlayMessage) bootOverlayMessage.textContent = String(withBuild || '');
       } catch (_) {
         // ignore
       }
       if (!error) return;
       error.setAttribute('data-error-severity', 'fatal');
-      error.textContent = msg;
+      error.textContent = withBuild;
       error.style.display = 'block';
     }
 
@@ -664,7 +820,10 @@
         bootOverlayReload.addEventListener('click', () => reloadOnce('button'));
       }
 
-      await import('./main.js');
+      // IMPORTANT: PR previews often update HTML faster than JS due to browser/SW caching.
+      // Cache-bust the module URL using a per-deploy build id injected by CI.
+      window.__reflexHtmlBuildId = HTML_BUILD_ID;
+      await import(`./main.js?build=${encodeURIComponent(HTML_BUILD_ID)}`);
       clearTimeout(bootTimer);
     } catch (e) {
       clearTimeout(bootTimer);

@@ -73,6 +73,7 @@ test('formula page does not double-parenthesize factors for multiplication', asy
   await page.goto(`/formula.html?formula=${encodeURIComponent('(z-D1)*(z-D2)')}`);
   const render = page.locator('#formula-render');
   await expect(render).toBeVisible();
+  await expect.poll(async () => await render.getAttribute('data-latex')).not.toBeNull();
   const latex = await render.getAttribute('data-latex');
   expect(latex).not.toContain('\\left(\\left(');
   expect(latex).not.toContain('\\right)\\right)');
@@ -220,12 +221,16 @@ test('shows D1 indicator when dynamic finger only appears inside set binding', a
   await page.goto(targetUrl);
   await waitForReflexReady(page);
 
-  const d1Indicator = page.locator('[data-finger="D1"]');
-  await expect(d1Indicator).toBeVisible();
-  await expect(d1Indicator).toHaveText(/D1 =/);
+  const soloButton = page.locator('#finger-solo-button');
+  await expect(soloButton).toBeVisible();
+  await expect(soloButton).toHaveText(/Unrestricted/);
 
-  const fIndicators = page.locator('[data-finger^="F"]');
-  await expect(fIndicators).toHaveCount(0);
+  await soloButton.click();
+  const d1Row = page.locator('.finger-solo-row[data-finger="D1"]');
+  await expect(d1Row).toBeVisible();
+
+  const fRows = page.locator('.finger-solo-row[data-finger^="F"]');
+  await expect(fRows).toHaveCount(0);
 });
 
 test('shows F1 indicator when fixed finger only appears inside set binding', async ({ page }) => {
@@ -236,12 +241,16 @@ test('shows F1 indicator when fixed finger only appears inside set binding', asy
   await page.goto(targetUrl);
   await waitForReflexReady(page);
 
-  const f1Indicator = page.locator('[data-finger="F1"]');
-  await expect(f1Indicator).toBeVisible();
-  await expect(f1Indicator).toHaveText(/F1 =/);
+  const soloButton = page.locator('#finger-solo-button');
+  await expect(soloButton).toBeVisible();
+  await expect(soloButton).toHaveText(/Unrestricted/);
 
-  const dIndicators = page.locator('[data-finger^="D"]');
-  await expect(dIndicators).toHaveCount(0);
+  await soloButton.click();
+  const f1Row = page.locator('.finger-solo-row[data-finger="F1"]');
+  await expect(f1Row).toBeVisible();
+
+  const dRows = page.locator('.finger-solo-row[data-finger^="D"]');
+  await expect(dRows).toHaveCount(0);
 });
 
 test('opens the burger menu dropdown when clicked', async ({ page }) => {
@@ -254,6 +263,50 @@ test('opens the burger menu dropdown when clicked', async ({ page }) => {
   await page.click('#menu-button');
 
   await expect(dropdown).toBeVisible();
+});
+
+test('solo selection persists across reload without expanding', async ({ page }) => {
+  const supportsCompression = await detectCompressionCapability(page);
+  const source = 'z + D1 + W1 + W2';
+  const targetUrl = supportsCompression
+    ? `/index.html?formulab64=${encodeURIComponent(encodeFormulaToFormulab64(source))}&edit=true`
+    : `/index.html?formula=${encodeURIComponent(source)}&edit=true`;
+
+  await page.goto(targetUrl);
+  await waitForReflexReady(page);
+
+  const soloButton = page.locator('#finger-solo-button');
+  await expect(soloButton).toBeVisible();
+  await soloButton.click();
+
+  const w1 = page.locator('.finger-solo-row[data-finger="W1"] input[type="checkbox"]');
+  const w2 = page.locator('.finger-solo-row[data-finger="W2"] input[type="checkbox"]');
+  const d1 = page.locator('.finger-solo-row[data-finger="D1"] input[type="checkbox"]');
+
+  await expect(w1).toBeVisible();
+  await expect(w2).toBeVisible();
+  await expect(d1).toBeVisible();
+
+  // Solo only W1/W2.
+  await w1.check();
+  await w2.check();
+  await d1.uncheck();
+
+  await expect.poll(async () => {
+    const href = await page.evaluate(() => window.location.href);
+    const url = new URL(href);
+    return url.searchParams.get('solos');
+  }).toBe('W1,W2');
+
+  // Reload and ensure solos do not expand.
+  const href = await page.evaluate(() => window.location.href);
+  await page.goto(href);
+  await waitForReflexReady(page);
+
+  await page.locator('#finger-solo-button').click();
+  await expect(w1).toBeChecked();
+  await expect(w2).toBeChecked();
+  await expect(d1).not.toBeChecked();
 });
 
 test('menu can copy a share link for the current reflex', async ({ page }) => {
