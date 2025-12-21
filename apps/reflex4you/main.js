@@ -426,14 +426,16 @@ function buildInlineFingerValueEditor(label) {
   const okBtn = document.createElement('button');
   okBtn.type = 'button';
   okBtn.className = 'finger-solo-row__value-action';
-  okBtn.textContent = 'OK';
+  okBtn.textContent = '✓';
   okBtn.setAttribute('aria-label', `Apply ${label} value`);
+  okBtn.title = 'Apply';
 
   const cancelBtn = document.createElement('button');
   cancelBtn.type = 'button';
   cancelBtn.className = 'finger-solo-row__value-action finger-solo-row__value-action--cancel';
-  cancelBtn.textContent = 'Cancel';
+  cancelBtn.textContent = '✕';
   cancelBtn.setAttribute('aria-label', `Cancel editing ${label} value`);
+  cancelBtn.title = 'Cancel';
 
   function refresh() {
     const formatted = formatFingerValueForEditor(label);

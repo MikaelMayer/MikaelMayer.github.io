@@ -325,14 +325,14 @@
 
     .finger-solo-row__value-input {
       flex: 1 1 auto;
-      min-width: 0;
+      min-width: 18ch; /* roomier editor so full value is visible */
       text-align: right;
-      padding: 6px 8px;
+      padding: 8px 10px;
       border-radius: 8px;
       border: 1px solid rgba(255, 255, 255, 0.30);
       background: rgba(0, 0, 0, 0.65);
       color: rgba(255, 255, 255, 0.88);
-      font-size: 14px;
+      font-size: 16px; /* avoid iOS zoom + improve readability */
       line-height: 1.2;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       letter-spacing: 0.02em;
@@ -346,12 +346,15 @@
     }
 
     .finger-solo-row__value-action {
-      padding: 6px 10px;
+      width: 36px;
+      height: 34px;
+      padding: 0;
       border-radius: 8px;
       border: 1px solid rgba(255, 255, 255, 0.22);
       background: rgba(255, 255, 255, 0.06);
       color: rgba(255, 255, 255, 0.92);
-      font-size: 12px;
+      font-size: 16px;
+      line-height: 1;
       letter-spacing: 0.01em;
       cursor: pointer;
       touch-action: manipulation;
