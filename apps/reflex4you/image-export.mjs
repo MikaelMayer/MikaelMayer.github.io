@@ -220,14 +220,20 @@ export async function promptImageExportSize({
     const scales =
       typeof includeSupersampleOption === 'object' && Array.isArray(includeSupersampleOption?.scales)
         ? includeSupersampleOption.scales
-        : [2, 3, 4];
-    const normalized = Array.from(new Set(scales.map((x) => Number(x)).filter((x) => x === 2 || x === 3 || x === 4))).sort();
-    const effective = normalized.length ? normalized : [2, 3, 4];
+        : [1, 2, 3, 4];
+    const normalized = Array.from(
+      new Set(
+        scales
+          .map((x) => Number(x))
+          .filter((x) => x === 1 || x === 2 || x === 3 || x === 4),
+      ),
+    ).sort();
+    const effective = normalized.length ? normalized : [1, 2, 3, 4];
 
     for (const s of effective) {
       const opt = document.createElement('option');
       opt.value = String(s);
-      opt.textContent = `${s}×`;
+      opt.textContent = s === 1 ? 'None' : `${s}×`;
       select.appendChild(opt);
     }
 
@@ -235,7 +241,11 @@ export async function promptImageExportSize({
       typeof includeSupersampleOption === 'object' && Number(includeSupersampleOption?.defaultScale)
         ? Number(includeSupersampleOption.defaultScale)
         : 4;
-    select.value = defaultScale === 2 ? '2' : defaultScale === 3 ? '3' : '4';
+    select.value =
+      defaultScale === 1 ? '1'
+        : defaultScale === 2 ? '2'
+          : defaultScale === 3 ? '3'
+            : '4';
 
     rowSs.appendChild(left);
     rowSs.appendChild(select);

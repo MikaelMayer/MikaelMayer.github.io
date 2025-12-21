@@ -1919,7 +1919,7 @@ async function saveCanvasImage() {
     defaultPresetKey: 'screen',
     includeSupersampleOption: {
       label: 'Supersampling (antialiasing)',
-      scales: [2, 3, 4],
+      scales: [1, 2, 3, 4],
       defaultScale: 4,
     },
     includeFormulaOverlayOption: {
