@@ -1969,6 +1969,17 @@ async function buildShareUrl() {
     animationTimeParam: ANIMATION_TIME_PARAM,
   });
 
+  // Keep solo selection in the share URL, but prune it to active labels.
+  // This makes it possible to share links like "solo only W1,W2".
+  const activeSet = new Set((fingerLabels || []).filter((label) => isFingerLabel(label)));
+  const solos = new Set(Array.from(soloLabelSet || []).filter((label) => activeSet.has(label)));
+  const solosSerialized = serializeSolosParam(solos);
+  if (solosSerialized) {
+    params.set(SOLOS_PARAM, solosSerialized);
+  } else {
+    params.delete(SOLOS_PARAM);
+  }
+
   for (const label of fingerLabels) {
     if (!isFingerLabel(label)) {
       continue;
