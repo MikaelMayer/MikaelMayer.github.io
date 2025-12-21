@@ -309,7 +309,7 @@ function ensureFingerSoloUI() {
 
   const hint = document.createElement('div');
   hint.className = 'finger-solo-dropdown__hint';
-  hint.textContent = 'Uncheck all for unrestricted. In solo mode, only checked constants can capture.';
+  hint.textContent = 'Choose which constants can capture. In solo mode, only checked constants can capture.';
 
   const list = document.createElement('div');
   list.className = 'finger-solo-list';
@@ -370,7 +370,7 @@ function updateFingerSoloButtonText() {
 
   if (!filtered.length) {
     if (!soloMode) {
-      fingerSoloButton.textContent = 'Unrestricted';
+      fingerSoloButton.textContent = 'Constants...';
     } else {
       const serialized = serializeSolosParam(soloLabelSet);
       fingerSoloButton.textContent = serialized ? `Solo: ${serialized}` : 'Solo';
@@ -424,8 +424,8 @@ function rebuildFingerSoloList() {
   const soloMode = getSoloModeEnabled();
   if (fingerSoloHint) {
     fingerSoloHint.textContent = soloMode
-      ? 'Solo mode: only checked constants can capture. Uncheck all for unrestricted.'
-      : 'Unrestricted: all constants can capture. Check any to enter solo mode.';
+      ? 'Solo mode: only checked constants can capture. Uncheck all to allow all constants.'
+      : 'All constants can capture. Check any to enter solo mode.';
   }
 
   for (const label of activeLabels) {

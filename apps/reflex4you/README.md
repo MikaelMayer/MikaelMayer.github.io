@@ -90,7 +90,7 @@ Tips:
 When a formula has many finger constants, you can restrict which ones can “catch” your finger by selecting **solos**. This is stored in the URL:
 
 - `solos=D1,D2` (comma-separated labels)
-- If `solos` is absent or empty, Reflex4You is in **unrestricted** mode (all constants can capture).
+- If `solos` is absent or empty, Reflex4You allows **all constants** to capture.
 
 ## Sharing on-demand videos (URL animations)
 
