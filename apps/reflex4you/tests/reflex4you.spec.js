@@ -73,6 +73,7 @@ test('formula page does not double-parenthesize factors for multiplication', asy
   await page.goto(`/formula.html?formula=${encodeURIComponent('(z-D1)*(z-D2)')}`);
   const render = page.locator('#formula-render');
   await expect(render).toBeVisible();
+  await expect.poll(async () => await render.getAttribute('data-latex')).not.toBeNull();
   const latex = await render.getAttribute('data-latex');
   expect(latex).not.toContain('\\left(\\left(');
   expect(latex).not.toContain('\\right)\\right)');

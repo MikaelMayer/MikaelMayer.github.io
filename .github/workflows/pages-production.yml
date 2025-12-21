@@ -23,6 +23,12 @@ jobs:
       # This repo is a static site (HTML/JS/CSS). If you later add a build step,
       # insert it here and set `folder:` below to your build output directory.
 
+      - name: Inject build id into Reflex4You HTML (cache-bust JS)
+        run: |
+          node -e "const fs=require('fs'); const build=process.env.BUILD_ID; const files=['apps/reflex4you/index.html','apps/reflex4you/formula.html','apps/reflex4you/explore.html']; for (const f of files){ const s=fs.readFileSync(f,'utf8'); fs.writeFileSync(f, s.replace(/__REFLEX_BUILD_ID__/g, build)); }"
+        env:
+          BUILD_ID: master-${{ github.sha }}
+
       - name: Deploy to gh-pages
         uses: JamesIves/github-pages-deploy-action@v4
         with:

@@ -182,6 +182,11 @@ Use `npx playwright test --project=chromium` if you only want to debug Chromium,
     - [ ] `apps/reflex4you/main.js` (`service-worker.js?sw=…`)
     - [ ] `apps/reflex4you/formula-page.mjs` (`service-worker.js?sw=…`)
 - [ ] **Update any hardcoded UI version fallback**: `apps/reflex4you/index.html` (`#app-version-pill` initial text) so it matches the current major.
+- [ ] **PR preview cache-busting** (recommended): ensure `__REFLEX_BUILD_ID__` placeholders exist in:
+  - [ ] `apps/reflex4you/index.html`
+  - [ ] `apps/reflex4you/formula.html`
+  - [ ] `apps/reflex4you/explore.html`
+  (CI injects the commit SHA so HTML can cache-bust JS module imports.)
 - [ ] **If you changed any boot-critical files**, ensure they’re precached:
   - [ ] Verify `PRECACHE_URLS` in `apps/reflex4you/service-worker.js` includes any new/renamed modules/assets (viewer + formula page).
 - [ ] **Run tests**:

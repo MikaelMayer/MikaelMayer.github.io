@@ -238,6 +238,19 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache-first for same-origin static assets (JS/ESM, images, manifest, etc).
+  const path = (url.pathname || '').toLowerCase();
+  const isJsModule =
+    request.destination === 'script' ||
+    path.endsWith('.js') ||
+    path.endsWith('.mjs');
+
+  // For code assets, prefer network-first so PR previews update quickly even if a
+  // previous service worker version is still controlling the scope.
+  if (isJsModule) {
+    event.respondWith(networkFirst(request, { timeoutMs: 1500 }));
+    return;
+  }
+
+  // Cache-first for non-code static assets (images, icons, etc).
   event.respondWith(cacheFirst(request));
 });

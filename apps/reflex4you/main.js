@@ -56,6 +56,11 @@ if (versionPill) {
   versionPill.setAttribute('data-version', String(APP_VERSION));
 }
 
+// Expose a JS build marker to help debug HTML/JS cache mismatches (PR previews).
+if (typeof window !== 'undefined') {
+  window.__reflexJsBuildId = `js-v${APP_VERSION}`;
+}
+
 const EDIT_PARAM = 'edit';
 const ANIMATION_TIME_PARAM = 't';
 const SOLOS_PARAM = 'solos';
@@ -1715,8 +1720,15 @@ bootstrapPromise.catch((error) => {
       ? String(error.stack || error.message)
       : String(error || 'Unknown error');
 
+  const htmlBuild = typeof window !== 'undefined' ? window.__reflexHtmlBuildId : null;
+  const jsBuild = typeof window !== 'undefined' ? window.__reflexJsBuildId : null;
+  const controller = navigator?.serviceWorker?.controller?.scriptURL || 'none';
+
   const guidance = [
     'Unable to initialize Reflex4You.',
+    '',
+    `Build markers: html=${htmlBuild || 'unknown'} js=${jsBuild || 'unknown'}`,
+    `SW controller: ${controller}`,
     '',
     details,
     '',

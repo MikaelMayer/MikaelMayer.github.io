@@ -754,6 +754,7 @@
 <script type="module">
   // Boot via dynamic import so we can catch failures (instead of a blank white screen).
   (async function () {
+    const HTML_BUILD_ID = '__REFLEX_BUILD_ID__';
     const error = document.getElementById('error');
     const bootOverlay = document.getElementById('boot-overlay');
     const bootOverlayMessage = document.getElementById('boot-overlay-message');
@@ -761,15 +762,16 @@
     const key = 'reflex4you:bootReloadedOnce';
 
     function showBootError(msg) {
+      const withBuild = `${msg}\n\nHTML build: ${HTML_BUILD_ID}`;
       try {
         if (bootOverlay) bootOverlay.style.display = 'block';
-        if (bootOverlayMessage) bootOverlayMessage.textContent = String(msg || '');
+        if (bootOverlayMessage) bootOverlayMessage.textContent = String(withBuild || '');
       } catch (_) {
         // ignore
       }
       if (!error) return;
       error.setAttribute('data-error-severity', 'fatal');
-      error.textContent = msg;
+      error.textContent = withBuild;
       error.style.display = 'block';
     }
 
@@ -818,7 +820,10 @@
         bootOverlayReload.addEventListener('click', () => reloadOnce('button'));
       }
 
-      await import('./main.js');
+      // IMPORTANT: PR previews often update HTML faster than JS due to browser/SW caching.
+      // Cache-bust the module URL using a per-deploy build id injected by CI.
+      window.__reflexHtmlBuildId = HTML_BUILD_ID;
+      await import(`./main.js?build=${encodeURIComponent(HTML_BUILD_ID)}`);
       clearTimeout(bootTimer);
     } catch (e) {
       clearTimeout(bootTimer);
