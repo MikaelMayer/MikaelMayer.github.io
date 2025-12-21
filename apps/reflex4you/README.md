@@ -85,6 +85,13 @@ Tips:
 - Use `W1`/`W2` whenever you want freeform navigation without moving your handles onto the area of interest.
 - To reset a handle, click its value chip and type `0` (or any new complex literal). The formula itself is preserved across reloads because it lives in the URL.
 
+### Solo selection (`solos=...`)
+
+When a formula has many finger constants, you can restrict which ones can “catch” your finger by selecting **solos**. This is stored in the URL:
+
+- `solos=D1,D2` (comma-separated labels)
+- If `solos` is absent or empty, Reflex4You is in **unrestricted** mode (all constants can capture).
+
 ## Sharing on-demand videos (URL animations)
 
 Reflex4You links can optionally include **time-based animations** for finger constants. This is intended for sharing “on-demand videos”: open the link and the parameters animate automatically.

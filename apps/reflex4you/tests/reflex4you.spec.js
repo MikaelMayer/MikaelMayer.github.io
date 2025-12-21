@@ -220,12 +220,16 @@ test('shows D1 indicator when dynamic finger only appears inside set binding', a
   await page.goto(targetUrl);
   await waitForReflexReady(page);
 
-  const d1Indicator = page.locator('[data-finger="D1"]');
-  await expect(d1Indicator).toBeVisible();
-  await expect(d1Indicator).toHaveText(/D1 =/);
+  const soloButton = page.locator('#finger-solo-button');
+  await expect(soloButton).toBeVisible();
+  await expect(soloButton).toHaveText(/Unrestricted/);
 
-  const fIndicators = page.locator('[data-finger^="F"]');
-  await expect(fIndicators).toHaveCount(0);
+  await soloButton.click();
+  const d1Row = page.locator('.finger-solo-row[data-finger="D1"]');
+  await expect(d1Row).toBeVisible();
+
+  const fRows = page.locator('.finger-solo-row[data-finger^="F"]');
+  await expect(fRows).toHaveCount(0);
 });
 
 test('shows F1 indicator when fixed finger only appears inside set binding', async ({ page }) => {
@@ -236,12 +240,16 @@ test('shows F1 indicator when fixed finger only appears inside set binding', asy
   await page.goto(targetUrl);
   await waitForReflexReady(page);
 
-  const f1Indicator = page.locator('[data-finger="F1"]');
-  await expect(f1Indicator).toBeVisible();
-  await expect(f1Indicator).toHaveText(/F1 =/);
+  const soloButton = page.locator('#finger-solo-button');
+  await expect(soloButton).toBeVisible();
+  await expect(soloButton).toHaveText(/Unrestricted/);
 
-  const dIndicators = page.locator('[data-finger^="D"]');
-  await expect(dIndicators).toHaveCount(0);
+  await soloButton.click();
+  const f1Row = page.locator('.finger-solo-row[data-finger="F1"]');
+  await expect(f1Row).toBeVisible();
+
+  const dRows = page.locator('.finger-solo-row[data-finger^="D"]');
+  await expect(dRows).toHaveCount(0);
 });
 
 test('opens the burger menu dropdown when clicked', async ({ page }) => {
