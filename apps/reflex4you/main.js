@@ -140,6 +140,10 @@ let soloLabelSet = new Set();
 let currentGestureTouchedLabels = new Set();
 let pinnedDisplayLabels = [];
 
+// Auto-solo newly introduced constants only after the initial page load.
+// Otherwise a reload would treat all constants as "new" and incorrectly expand solos.
+let hasAppliedFingerStateOnce = false;
+
 function ensureFingerState(label) {
   if (!isFingerLabel(label)) {
     return;
@@ -1440,6 +1444,9 @@ function syncFingerUI() {
 }
 
 function applyFingerState(state) {
+  const previousActiveLabelSet =
+    activeFingerState?.activeLabelSet instanceof Set ? new Set(activeFingerState.activeLabelSet) : new Set();
+
   const axisConstraints = state.axisConstraints instanceof Map ? state.axisConstraints : new Map();
   const allSlots = [
     ...(state.fixedSlots || []),
@@ -1459,21 +1466,26 @@ function applyFingerState(state) {
 
   // Read solos from the URL and normalize to current active labels.
   const paramsForSolos = new URLSearchParams(window.location.search);
-  soloLabelSet = parseSolosParam(paramsForSolos.get(SOLOS_PARAM));
-  soloLabelSet = new Set(Array.from(soloLabelSet).filter((l) => activeFingerState.activeLabelSet.has(l)));
+  const parsedSolos = parseSolosParam(paramsForSolos.get(SOLOS_PARAM));
+  soloLabelSet = new Set(Array.from(parsedSolos).filter((l) => activeFingerState.activeLabelSet.has(l)));
 
-  // If already in solo mode, auto-solo any newly-added finger constants.
-  if (soloLabelSet.size > 0) {
-    let changed = false;
+  let solosChanged = serializeSolosParam(parsedSolos) !== serializeSolosParam(soloLabelSet);
+
+  // If already in solo mode, auto-solo *newly introduced* finger constants.
+  // Do this only after the first apply, otherwise reloads would incorrectly
+  // expand solos to include everything.
+  if (hasAppliedFingerStateOnce && soloLabelSet.size > 0) {
     for (const label of activeFingerState.activeLabelSet) {
-      if (!soloLabelSet.has(label)) {
+      if (!previousActiveLabelSet.has(label) && !soloLabelSet.has(label)) {
         soloLabelSet.add(label);
-        changed = true;
+        solosChanged = true;
       }
     }
-    if (changed) {
-      updateSolosQueryParam(soloLabelSet);
-    }
+  }
+
+  // Keep URL canonical (drop inactive solos / persist auto-solo additions).
+  if (solosChanged) {
+    updateSolosQueryParam(soloLabelSet);
   }
 
   ensureFingerSoloUI();
@@ -1533,6 +1545,8 @@ function applyFingerState(state) {
       startAnimations(tracks);
     }
   }
+
+  hasAppliedFingerStateOnce = true;
 }
 
 function updateFingerDotPosition(label) {

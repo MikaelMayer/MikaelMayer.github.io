@@ -265,6 +265,50 @@ test('opens the burger menu dropdown when clicked', async ({ page }) => {
   await expect(dropdown).toBeVisible();
 });
 
+test('solo selection persists across reload without expanding', async ({ page }) => {
+  const supportsCompression = await detectCompressionCapability(page);
+  const source = 'z + D1 + W1 + W2';
+  const targetUrl = supportsCompression
+    ? `/index.html?formulab64=${encodeURIComponent(encodeFormulaToFormulab64(source))}&edit=true`
+    : `/index.html?formula=${encodeURIComponent(source)}&edit=true`;
+
+  await page.goto(targetUrl);
+  await waitForReflexReady(page);
+
+  const soloButton = page.locator('#finger-solo-button');
+  await expect(soloButton).toBeVisible();
+  await soloButton.click();
+
+  const w1 = page.locator('.finger-solo-row[data-finger="W1"] input[type="checkbox"]');
+  const w2 = page.locator('.finger-solo-row[data-finger="W2"] input[type="checkbox"]');
+  const d1 = page.locator('.finger-solo-row[data-finger="D1"] input[type="checkbox"]');
+
+  await expect(w1).toBeVisible();
+  await expect(w2).toBeVisible();
+  await expect(d1).toBeVisible();
+
+  // Solo only W1/W2.
+  await w1.check();
+  await w2.check();
+  await d1.uncheck();
+
+  await expect.poll(async () => {
+    const href = await page.evaluate(() => window.location.href);
+    const url = new URL(href);
+    return url.searchParams.get('solos');
+  }).toBe('W1,W2');
+
+  // Reload and ensure solos do not expand.
+  const href = await page.evaluate(() => window.location.href);
+  await page.goto(href);
+  await waitForReflexReady(page);
+
+  await page.locator('#finger-solo-button').click();
+  await expect(w1).toBeChecked();
+  await expect(w2).toBeChecked();
+  await expect(d1).not.toBeChecked();
+});
+
 test('menu can copy a share link for the current reflex', async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'clipboard', {
