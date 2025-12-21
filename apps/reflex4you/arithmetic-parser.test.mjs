@@ -6,6 +6,7 @@ import {
 } from './arithmetic-parser.mjs';
 import { visitAst } from './ast-utils.mjs';
 import { formulaAstToLatex } from './formula-renderer.mjs';
+import { buildFragmentSourceFromAST } from './core-engine.mjs';
 
 test('parses additive and multiplicative precedence', () => {
   const result = parseFormulaInput('1 + 2 * 3');
@@ -364,6 +365,13 @@ test('parses abs() calls as unary functions', () => {
   assert.equal(result.value.value.kind, 'Var');
 });
 
+test('parses modulus() as a synonym of abs()', () => {
+  const result = parseFormulaInput('modulus(z)');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Abs');
+  assert.equal(result.value.value.kind, 'Var');
+});
+
 test('parses floor() calls as unary functions', () => {
   const result = parseFormulaInput('floor(z)');
   assert.equal(result.ok, true);
@@ -380,6 +388,14 @@ test('parses abs2() calls as unary functions', () => {
 
 test('allows built-in functions to be referenced as values', () => {
   const result = parseFormulaInput('abs $ z');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Compose');
+  assert.equal(result.value.f.kind, 'Abs');
+  assert.equal(result.value.g.kind, 'Var');
+});
+
+test('allows modulus to be referenced as a built-in function value', () => {
+  const result = parseFormulaInput('modulus $ z');
   assert.equal(result.ok, true);
   assert.equal(result.value.kind, 'Compose');
   assert.equal(result.value.f.kind, 'Abs');
@@ -468,9 +484,14 @@ test('user-defined functions support call syntax f(z)', () => {
   const result = parseFormulaInput('let f = z + 1 in f(z)');
   assert.equal(result.ok, true);
   const ast = result.value;
-  assert.equal(ast.kind, 'Compose');
-  assert.equal(ast.f.kind, 'Add');
-  assert.equal(ast.g.kind, 'Var');
+  assert.equal(ast.kind, 'LetBinding');
+  assert.equal(ast.name, 'f');
+  assert.equal(ast.value.kind, 'Add');
+  assert.equal(ast.body.kind, 'Compose');
+  assert.equal(ast.body.g.kind, 'Var');
+  assert.equal(ast.body.f.kind, 'Identifier');
+  assert.equal(ast.body.f.name, 'f');
+  assert.equal(Boolean(ast.body.f.__letBinding), true);
 });
 
 test('missing "in" after let binding does not backtrack', () => {
@@ -517,13 +538,33 @@ test('referencing undefined variables is rejected', () => {
   assert.match(result.message, /unknown variable/i);
 });
 
-test('top-level let inlines its right-hand side in the body', () => {
+test('top-level let is preserved for rendering and lowered for GPU compilation', () => {
   const result = parseFormulaInput('let f = z + 1 in f $ f');
   assert.equal(result.ok, true);
   const ast = result.value;
-  assert.equal(ast.kind, 'Compose');
-  assert.equal(ast.f.kind, 'Add');
-  assert.equal(ast.g.kind, 'Add');
+  assert.equal(ast.kind, 'LetBinding');
+  const latex = formulaAstToLatex(ast);
+  assert.match(latex, /\\mathrm\{let\}/);
+  // GPU compilation must still succeed.
+  assert.doesNotThrow(() => {
+    const fragment = buildFragmentSourceFromAST(ast);
+    assert.match(fragment, /vec2 node\d+\(vec2 z\)/);
+  });
+});
+
+test('let m = abs in m does not render as just abs', () => {
+  const result = parseFormulaInput('let m = abs in m');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /\\mathrm\{let\}\\;m/);
+  assert.match(latex, /&m\\end\{aligned\}/);
+});
+
+test('_i renders as a Huge letter while keeping imaginary-unit semantics', () => {
+  const result = parseFormulaInput('_i');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /\{\\Huge I\}/);
 });
 
 test('nested let bindings are rejected', () => {

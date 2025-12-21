@@ -394,6 +394,118 @@ function materializeComposeMultiples(ast) {
   return root;
 }
 
+function prepareAstForGpu(ast) {
+  // Lower top-level let-bindings for GPU compilation only.
+  // Key goals:
+  // - Preserve the original AST for rendering/export (so `let ... in ...` remains visible).
+  // - Avoid "inlining" by cloning per reference: a `let`-bound function should compile as a shared subtree.
+  // - Keep `SetBinding` semantics intact (SetRef slots are preserved via cloneAst's preserveBindings).
+  if (!ast || typeof ast !== 'object') {
+    return ast;
+  }
+  const root = cloneAst(ast, { preserveBindings: true });
+  const letStack = [];
+
+  function lookupLet(name) {
+    for (let i = letStack.length - 1; i >= 0; i -= 1) {
+      if (letStack[i].name === name) {
+        return letStack[i].value;
+      }
+    }
+    return null;
+  }
+
+  function lower(node) {
+    if (!node || typeof node !== 'object') {
+      return node;
+    }
+    switch (node.kind) {
+      case 'LetBinding': {
+        const valueLowered = lower(node.value);
+        letStack.push({ name: node.name, value: valueLowered });
+        const bodyLowered = lower(node.body);
+        letStack.pop();
+        return bodyLowered;
+      }
+      case 'Identifier': {
+        const resolved = lookupLet(node.name);
+        if (!resolved) {
+          throw new Error(`Unresolved identifier during GPU lowering: ${node.name}`);
+        }
+        return resolved;
+      }
+      case 'SetBinding':
+        // Preserve object identity so SetRef(binding) pointers remain valid.
+        node.value = lower(node.value);
+        node.body = lower(node.body);
+        return node;
+      case 'Pow':
+        return { ...node, base: lower(node.base) };
+      case 'Exp':
+      case 'Sin':
+      case 'Cos':
+      case 'Tan':
+      case 'Atan':
+      case 'Asin':
+      case 'Acos':
+      case 'Abs':
+      case 'Abs2':
+      case 'Floor':
+      case 'Conjugate':
+        return { ...node, value: lower(node.value) };
+      case 'Ln':
+        return { ...node, value: lower(node.value), branch: node.branch ? lower(node.branch) : null };
+      case 'Sub':
+      case 'Mul':
+      case 'Op':
+      case 'Add':
+      case 'Div':
+      case 'LessThan':
+      case 'GreaterThan':
+      case 'LessThanOrEqual':
+      case 'GreaterThanOrEqual':
+      case 'Equal':
+      case 'LogicalAnd':
+      case 'LogicalOr':
+        return { ...node, left: lower(node.left), right: lower(node.right) };
+      case 'Compose':
+        return { ...node, f: lower(node.f), g: lower(node.g) };
+      case 'ComposeMultiple':
+        return {
+          ...node,
+          base: lower(node.base),
+          countExpression: node.countExpression ? lower(node.countExpression) : null,
+        };
+      case 'If':
+        return {
+          ...node,
+          condition: lower(node.condition),
+          thenBranch: lower(node.thenBranch),
+          elseBranch: lower(node.elseBranch),
+        };
+      case 'RepeatComposePlaceholder':
+        return {
+          ...node,
+          base: lower(node.base),
+          countExpression: lower(node.countExpression),
+        };
+      case 'SetRef':
+      case 'Var':
+      case 'VarX':
+      case 'VarY':
+      case 'FingerOffset':
+      case 'Const':
+      case 'PlaceholderVar':
+        return node;
+      default:
+        // If new node kinds are added, update this lowering function.
+        throw new Error(`Unknown AST node kind in prepareAstForGpu: ${node.kind}`);
+    }
+  }
+
+  return lower(root);
+}
+
 export function SetBindingNode(name, value, body) {
   return { kind: "SetBinding", name, value, body };
 }
@@ -1323,7 +1435,8 @@ void main() {
 }`;
 
 export function buildFragmentSourceFromAST(ast) {
-  const preparedAst = materializeComposeMultiples(ast);
+  const lowered = prepareAstForGpu(ast);
+  const preparedAst = materializeComposeMultiples(lowered);
   const uniformCounts = analyzeFingerUniformCounts(preparedAst);
   const { funcs, topName } = buildNodeFunctionsAndTop(preparedAst);
   return fragmentTemplate
@@ -1408,7 +1521,9 @@ export class ReflexCore {
     this._visibilityListener = null;
     this._pageShowListener = null;
 
+    // Keep the original AST for display/export, but compile a lowered version for the GPU.
     this.formulaAST = initialAST;
+    this._gpuAST = prepareAstForGpu(initialAST);
 
     this.rebuildProgram();
     if (autoRender) {
@@ -1582,9 +1697,10 @@ export class ReflexCore {
   }
 
   setFormulaAST(ast) {
-    // Keep the original AST for display/export. Shader generation will
-    // materialize `ComposeMultiple` on-demand without mutating this AST.
+    // Keep the original AST for display/export. Shader generation will lower
+    // `LetBinding` and materialize `ComposeMultiple` on-demand without mutating it.
     this.formulaAST = ast;
+    this._gpuAST = prepareAstForGpu(ast);
     this.rebuildProgram();
     this.render();
   }
@@ -1800,7 +1916,7 @@ export class ReflexCore {
   }
 
   rebuildProgram() {
-    const uniformCounts = analyzeFingerUniformCounts(this.formulaAST);
+    const uniformCounts = analyzeFingerUniformCounts(this._gpuAST);
     this.fixedUniformCount = uniformCounts.fixedCount;
     this.dynamicUniformCount = uniformCounts.dynamicCount;
     this.wUniformCount = uniformCounts.wCount;
@@ -1813,7 +1929,7 @@ export class ReflexCore {
     // Fill buffers from current fingerValues (defaults to 0, with W1 defaulting to 1+0i).
     this.hydrateUniformBuffersFromFingerValues();
 
-    const fragmentSource = buildFragmentSourceFromAST(this.formulaAST);
+    const fragmentSource = buildFragmentSourceFromAST(this._gpuAST);
     this.lastFragmentSource = fragmentSource;
     const newProgram = this.createProgram(vertexSource, fragmentSource);
     this.program = newProgram;

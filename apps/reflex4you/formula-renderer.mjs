@@ -4,7 +4,7 @@
 import { FINGER_DECIMAL_PLACES } from './core-engine.mjs';
 
 // Bump this when changing renderer logic so users can verify cached assets.
-export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2025-12-17.3';
+export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2025-12-21.1';
 
 const DEFAULT_MATHJAX_LOAD_TIMEOUT_MS = 9000;
 
@@ -186,7 +186,7 @@ function resolveFingerValue(slot, options = {}) {
   return { re, im };
 }
 
-function functionCallLatex(name, args, options) {
+function functionCallLatex(name, args, options, metaHighlights = null) {
   const renderedArgs = (args || []).map((arg) => nodeToLatex(arg, 0, options));
   const fn = String(name || '?');
 
@@ -221,18 +221,32 @@ function functionCallLatex(name, args, options) {
   }
 
   // Generic function call.
-  return `\\operatorname{${escapeLatexIdentifier(fn)}}\\left(${renderedArgs.join(', ')}\\right)`;
+  const opName =
+    Array.isArray(metaHighlights) && metaHighlights.length
+      ? operatorNameWithMetadata(fn, metaHighlights)
+      : `\\operatorname{${escapeLatexIdentifier(fn)}}`;
+  return `${opName}\\left(${renderedArgs.join(', ')}\\right)`;
 }
 
 function nodeToLatex(node, parentPrec = 0, options = {}) {
   if (!node || typeof node !== 'object') return '?';
 
   if (node.__syntheticCall && typeof node.__syntheticCall.name === 'string') {
-    return functionCallLatex(node.__syntheticCall.name, node.__syntheticCall.args, options);
+    return functionCallLatex(
+      node.__syntheticCall.name,
+      node.__syntheticCall.args,
+      options,
+      identifierHighlights(node),
+    );
   }
 
   switch (node.kind) {
     case 'Const':
+      if (identifierHighlights(node).length && node.re === 0 && (node.im === 1 || node.im === -1)) {
+        const letter = String(identifierHighlights(node)[0]?.letter || 'i')[0] || 'i';
+        const rendered = `{\\Huge ${escapeLatexTextChar(letter.toUpperCase())}}`;
+        return node.im < 0 ? `-${rendered}` : rendered;
+      }
       return constToLatex(node, options);
     case 'Var':
       return latexIdentifierWithMetadata(node.name || 'z', identifierHighlights(node));
@@ -379,11 +393,22 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
       return `\\operatorname{if}\\left(${cond}, ${thenBranch}, ${elseBranch}\\right)`;
     }
 
-    case 'SetBinding': {
+    case 'LetBinding': {
+      // `let` should normally be top-level (rendered in program style),
+      // but keep a readable fallback if it appears nested.
       const name = escapeLatexIdentifier(node.name || '?');
       const value = nodeToLatex(node.value, 0, options);
       const body = nodeToLatex(node.body, 0, options);
-      return `\\mathrm{set}\\;${name} = ${value}\\;\\mathrm{in}\\;${body}`;
+      return `\\left(\\begin{aligned}\\mathrm{let}\\;${name} &= ${value}\\\\&${body}\\end{aligned}\\right)`;
+    }
+
+    case 'SetBinding': {
+      // Top-level formatting is handled in `formulaAstToLatex` (program-style layout).
+      // Keep a readable inline fallback for nested occurrences.
+      const name = escapeLatexIdentifier(node.name || '?');
+      const value = nodeToLatex(node.value, 0, options);
+      const body = nodeToLatex(node.body, 0, options);
+      return `\\left(\\begin{aligned}\\mathrm{set}\\;${name} &= ${value}\\\\&${body}\\end{aligned}\\right)`;
     }
 
     default:
@@ -403,8 +428,31 @@ async function waitForMathJaxStartup(win, { timeoutMs = DEFAULT_MATHJAX_LOAD_TIM
   return Boolean(win?.MathJax?.tex2svg);
 }
 
+function programStyleLatex(ast, options = {}) {
+  const bindings = [];
+  let cursor = ast;
+  while (cursor && typeof cursor === 'object' && (cursor.kind === 'LetBinding' || cursor.kind === 'SetBinding')) {
+    bindings.push(cursor);
+    cursor = cursor.body;
+  }
+  if (!bindings.length) {
+    return nodeToLatex(ast, 0, options);
+  }
+  const lines = [];
+  lines.push('\\begin{aligned}');
+  for (const binding of bindings) {
+    const kw = binding.kind === 'LetBinding' ? '\\mathrm{let}' : '\\mathrm{set}';
+    const name = escapeLatexIdentifier(binding.name || '?');
+    const value = nodeToLatex(binding.value, 0, options);
+    lines.push(`${kw}\\;${name} &= ${value}\\\\`);
+  }
+  lines.push(`&${nodeToLatex(cursor, 0, options)}`);
+  lines.push('\\end{aligned}');
+  return lines.join('');
+}
+
 export function formulaAstToLatex(ast, options = {}) {
-  return nodeToLatex(ast, 0, options);
+  return programStyleLatex(ast, options);
 }
 
 function parseHex8Color(value) {
