@@ -446,19 +446,18 @@ function buildInlineFingerValueEditor(label) {
   function setEditing(nextEditing) {
     wrap.dataset.editing = nextEditing ? 'true' : 'false';
     display.style.display = nextEditing ? 'none' : '';
-    editor.style.display = nextEditing ? '' : 'none';
+    // Important: CSS default is `display: none`, so `''` would keep it hidden.
+    editor.style.display = nextEditing ? 'flex' : 'none';
     if (nextEditing) {
       input.value = formatFingerValueForEditor(label);
       input.setCustomValidity('');
-      // Defer focus to ensure it's in DOM + visible.
-      queueMicrotask(() => {
-        try {
-          input.focus({ preventScroll: true });
-          input.select();
-        } catch (_) {
-          // ignore
-        }
-      });
+      // Focus synchronously (mobile browsers may block async focus/keyboard).
+      try {
+        input.focus({ preventScroll: true });
+        input.select();
+      } catch (_) {
+        // ignore
+      }
     }
   }
 
@@ -2843,7 +2842,7 @@ function triggerImageDownload(url, filename, shouldRevoke) {
 
 if ('serviceWorker' in navigator) {
   // Version the SW script URL so updates can't get stuck behind a cached SW script.
-  const SW_URL = './service-worker.js?sw=20.1';
+  const SW_URL = './service-worker.js?sw=20.2';
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(SW_URL).then((registration) => {
       // Auto-activate updated workers so cache/version bumps take effect quickly.

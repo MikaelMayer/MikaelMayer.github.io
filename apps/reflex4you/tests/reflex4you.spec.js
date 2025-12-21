@@ -309,6 +309,26 @@ test('solo selection persists across reload without expanding', async ({ page })
   await expect(d1).not.toBeChecked();
 });
 
+test('parameter value opens inline editor in dropdown', async ({ page }) => {
+  const supportsCompression = await detectCompressionCapability(page);
+  const source = 'z + D1 + W1 + W2';
+  const targetUrl = supportsCompression
+    ? `/index.html?formulab64=${encodeURIComponent(encodeFormulaToFormulab64(source))}&edit=true`
+    : `/index.html?formula=${encodeURIComponent(source)}&edit=true`;
+
+  await page.goto(targetUrl);
+  await waitForReflexReady(page);
+
+  await page.locator('#finger-solo-button').click();
+
+  const valueChip = page.locator('.finger-solo-row[data-finger="D1"] .finger-solo-row__value');
+  await expect(valueChip).toBeVisible();
+  await valueChip.click();
+
+  const input = page.locator('.finger-solo-row[data-finger="D1"] .finger-solo-row__value-input');
+  await expect(input).toBeVisible();
+});
+
 test('menu can copy a share link for the current reflex', async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'clipboard', {
