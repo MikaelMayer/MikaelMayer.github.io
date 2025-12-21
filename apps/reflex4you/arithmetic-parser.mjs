@@ -641,7 +641,22 @@ function createUnaryFunctionParser(name, factory) {
   ], {
     ctor: `${name}Call`,
     projector: (values) => ({ meta: values[0], expr: values[2] }),
-  }).Map(({ meta, expr }, result) => attachIdentifierMeta(withSpan(factory(expr), result.span), meta));
+  }).Map(({ meta, expr }, result) => {
+    const node = withSpan(factory(expr), result.span);
+    const withMeta = attachIdentifierMeta(node, meta);
+    // For abs/modulus we render as |z| by default, but if the user added underscore
+    // highlights (e.g. `_abs(z)` / `_modulus(z)`), preserve call syntax so the
+    // function name can be rendered (with Huge highlighted letters).
+    if (
+      (name === 'abs' || name === 'modulus') &&
+      meta &&
+      Array.isArray(meta.highlights) &&
+      meta.highlights.length
+    ) {
+      withMeta.__syntheticCall = { name, args: [expr] };
+    }
+    return withMeta;
+  });
 }
 
 function createUnaryFunctionParsers(names, factory) {

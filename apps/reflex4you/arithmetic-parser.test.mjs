@@ -567,6 +567,24 @@ test('_i renders as a Huge letter while keeping imaginary-unit semantics', () =>
   assert.match(latex, /\{\\Huge I\}/);
 });
 
+test('_abs(z) renders as a function call (not |z|) so the highlighted name shows', () => {
+  const result = parseFormulaInput('_abs(z)');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /\{\\Huge A\}/);
+  assert.match(latex, /\\operatorname\{/);
+  assert.match(latex, /\\left\(/);
+});
+
+test('_modulus(z) renders as a function call (not |z|) so the highlighted name shows', () => {
+  const result = parseFormulaInput('_modulus(z)');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /\{\\Huge M\}/);
+  assert.match(latex, /\\operatorname\{/);
+  assert.match(latex, /\\left\(/);
+});
+
 test('nested let bindings are rejected', () => {
   const result = parseFormulaInput('set a = let f = z in f in a');
   assert.equal(result.ok, false);
