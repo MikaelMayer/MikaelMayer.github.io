@@ -265,7 +265,7 @@
 
     .finger-solo-row {
       display: grid;
-      grid-template-columns: 22px 1fr 34px;
+      grid-template-columns: 22px auto 1fr;
       align-items: center;
       gap: 10px;
       padding: 6px 6px;
@@ -273,7 +273,7 @@
     }
 
     .finger-solo-row--single {
-      grid-template-columns: 1fr 34px;
+      grid-template-columns: auto 1fr;
     }
 
     .finger-solo-row:hover {
@@ -285,6 +285,88 @@
       font-size: 14px;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       letter-spacing: 0.02em;
+    }
+
+    .finger-solo-row__value-wrap {
+      display: flex;
+      justify-content: flex-end;
+      min-width: 0;
+    }
+
+    .finger-solo-row__value {
+      width: 100%;
+      min-width: 0;
+      text-align: right;
+      padding: 6px 8px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(255, 255, 255, 0.03);
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 14px;
+      line-height: 1.2;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+    }
+
+    .finger-solo-row__value:hover,
+    .finger-solo-row__value:focus-visible {
+      border-color: rgba(255, 255, 255, 0.30);
+      background: rgba(255, 255, 255, 0.06);
+      outline: none;
+    }
+
+    .finger-solo-row__value-editor {
+      width: 100%;
+      display: none; /* toggled via inline styles */
+      gap: 6px;
+      align-items: center;
+    }
+
+    .finger-solo-row__value-input {
+      flex: 1 1 auto;
+      min-width: 0;
+      text-align: right;
+      padding: 6px 8px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.30);
+      background: rgba(0, 0, 0, 0.65);
+      color: rgba(255, 255, 255, 0.88);
+      font-size: 14px;
+      line-height: 1.2;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      letter-spacing: 0.02em;
+      outline: none;
+    }
+
+    .finger-solo-row__value-actions {
+      display: flex;
+      gap: 6px;
+      flex: 0 0 auto;
+    }
+
+    .finger-solo-row__value-action {
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.92);
+      font-size: 12px;
+      letter-spacing: 0.01em;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .finger-solo-row__value-action--cancel {
+      background: rgba(255, 255, 255, 0.03);
+      color: rgba(255, 255, 255, 0.70);
+    }
+
+    .finger-solo-row__value-action:hover,
+    .finger-solo-row__value-action:focus-visible {
+      border-color: rgba(255, 255, 255, 0.38);
+      background: rgba(255, 255, 255, 0.10);
+      outline: none;
     }
 
     .finger-solo-row__checkbox {

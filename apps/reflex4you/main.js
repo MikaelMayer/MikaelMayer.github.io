@@ -131,6 +131,7 @@ let fingerSoloButton = null;
 let fingerSoloDropdown = null;
 let fingerSoloList = null;
 let fingerSoloHint = null;
+let fingerSoloValueRefreshers = [];
 
 // When solos are non-empty, only those labels can capture pointers.
 // Solos are stored in the URL as `solos=F1,D2,...` (comma separated).
@@ -309,7 +310,7 @@ function ensureFingerSoloUI() {
 
   const hint = document.createElement('div');
   hint.className = 'finger-solo-dropdown__hint';
-  hint.textContent = 'Fingers can move all parameters. Click a value to edit. Check any to enable solo mode.';
+  hint.textContent = 'Fingers can move all parameters. Tap a value to edit. Check any to enable solo mode.';
 
   const list = document.createElement('div');
   list.className = 'finger-solo-list';
@@ -361,6 +362,23 @@ function getSoloModeEnabled() {
   return soloLabelSet.size > 0 && activeCount > 1;
 }
 
+function isFingerSoloDropdownOpen() {
+  return fingerSoloDropdown?.dataset?.open === 'true';
+}
+
+function refreshFingerSoloValueDisplays() {
+  if (!isFingerSoloDropdownOpen()) {
+    return;
+  }
+  for (const refresh of fingerSoloValueRefreshers) {
+    try {
+      refresh();
+    } catch (_) {
+      // ignore
+    }
+  }
+}
+
 function formatFingerValueForEditor(label) {
   const latest = reflexCore?.getFingerValue?.(label) ?? latestOffsets?.[label] ?? defaultFingerOffset(label);
   return formatComplexForQuery(latest.x, latest.y) || '0+0i';
@@ -391,6 +409,9 @@ function buildInlineFingerValueEditor(label) {
   display.setAttribute('aria-label', `Edit ${label} value`);
   display.title = 'Click to edit';
 
+  const editor = document.createElement('div');
+  editor.className = 'finger-solo-row__value-editor';
+
   const input = document.createElement('input');
   input.type = 'text';
   input.className = 'finger-solo-row__value-input';
@@ -398,6 +419,21 @@ function buildInlineFingerValueEditor(label) {
   input.autocapitalize = 'off';
   input.autocomplete = 'off';
   input.inputMode = 'text';
+
+  const actions = document.createElement('div');
+  actions.className = 'finger-solo-row__value-actions';
+
+  const okBtn = document.createElement('button');
+  okBtn.type = 'button';
+  okBtn.className = 'finger-solo-row__value-action';
+  okBtn.textContent = 'OK';
+  okBtn.setAttribute('aria-label', `Apply ${label} value`);
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.className = 'finger-solo-row__value-action finger-solo-row__value-action--cancel';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.setAttribute('aria-label', `Cancel editing ${label} value`);
 
   function refresh() {
     const formatted = formatFingerValueForEditor(label);
@@ -410,7 +446,7 @@ function buildInlineFingerValueEditor(label) {
   function setEditing(nextEditing) {
     wrap.dataset.editing = nextEditing ? 'true' : 'false';
     display.style.display = nextEditing ? 'none' : '';
-    input.style.display = nextEditing ? '' : 'none';
+    editor.style.display = nextEditing ? '' : 'none';
     if (nextEditing) {
       input.value = formatFingerValueForEditor(label);
       input.setCustomValidity('');
@@ -467,13 +503,24 @@ function buildInlineFingerValueEditor(label) {
     }
   });
 
-  input.addEventListener('blur', () => {
-    // Save on blur (common mobile UX), but keep editing if invalid.
+  okBtn.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
     commit();
   });
 
+  cancelBtn.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    cancel();
+  });
+
   wrap.appendChild(display);
-  wrap.appendChild(input);
+  actions.appendChild(okBtn);
+  actions.appendChild(cancelBtn);
+  editor.appendChild(input);
+  editor.appendChild(actions);
+  wrap.appendChild(editor);
   setEditing(false);
   refresh();
   return { element: wrap, refresh };
@@ -506,6 +553,9 @@ function updateFingerSoloButtonText() {
     return formatComplexForDisplay(label, latest.x, latest.y);
   });
   fingerSoloButton.textContent = lines.join('\n');
+
+  // Keep the dropdown values in sync while open (without rebuilding DOM).
+  refreshFingerSoloValueDisplays();
 }
 
 function getActiveDraggedLabels() {
@@ -534,6 +584,7 @@ function rebuildFingerSoloList() {
     return;
   }
   fingerSoloList.innerHTML = '';
+  fingerSoloValueRefreshers = [];
 
   const activeLabels = sortFingerLabels(Array.from(activeFingerState.activeLabelSet));
   if (!activeLabels.length) {
@@ -562,6 +613,7 @@ function rebuildFingerSoloList() {
     labelEl.textContent = label;
 
     const valueEditor = buildInlineFingerValueEditor(label);
+    fingerSoloValueRefreshers.push(valueEditor.refresh);
 
     row.appendChild(labelEl);
     row.appendChild(valueEditor.element);
@@ -573,7 +625,7 @@ function rebuildFingerSoloList() {
   if (fingerSoloHint) {
     fingerSoloHint.textContent = soloMode
       ? 'Solo mode: fingers move only checked parameters. Uncheck all so fingers can move all parameters.'
-      : 'Fingers can move all parameters. Click a value to edit. Check any to enable solo mode.';
+      : 'Fingers can move all parameters. Tap a value to edit. Check any to enable solo mode.';
   }
 
   for (const label of activeLabels) {
@@ -592,6 +644,7 @@ function rebuildFingerSoloList() {
     labelEl.textContent = label;
 
     const valueEditor = buildInlineFingerValueEditor(label);
+    fingerSoloValueRefreshers.push(valueEditor.refresh);
 
     checkbox.addEventListener('change', (event) => {
       event.stopPropagation();
