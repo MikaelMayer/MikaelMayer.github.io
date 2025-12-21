@@ -223,7 +223,7 @@ test('shows D1 indicator when dynamic finger only appears inside set binding', a
 
   const soloButton = page.locator('#finger-solo-button');
   await expect(soloButton).toBeVisible();
-  await expect(soloButton).toHaveText(/Constants\.\.\./);
+  await expect(soloButton).toHaveText(/Parameters\.\.\./);
 
   await soloButton.click();
   const d1Row = page.locator('.finger-solo-row[data-finger="D1"]');
@@ -243,7 +243,7 @@ test('shows F1 indicator when fixed finger only appears inside set binding', asy
 
   const soloButton = page.locator('#finger-solo-button');
   await expect(soloButton).toBeVisible();
-  await expect(soloButton).toHaveText(/Constants\.\.\./);
+  await expect(soloButton).toHaveText(/Parameters\.\.\./);
 
   await soloButton.click();
   const f1Row = page.locator('.finger-solo-row[data-finger="F1"]');

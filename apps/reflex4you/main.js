@@ -295,21 +295,21 @@ function ensureFingerSoloUI() {
   button.setAttribute('aria-haspopup', 'dialog');
   button.setAttribute('aria-expanded', 'false');
   button.setAttribute('aria-controls', 'finger-solo-dropdown');
-  button.title = 'Select which constants can capture';
+  button.title = 'Select which parameters your fingers can move';
 
   const dropdown = document.createElement('div');
   dropdown.id = 'finger-solo-dropdown';
   dropdown.setAttribute('role', 'dialog');
-  dropdown.setAttribute('aria-label', 'Finger constant selection');
+  dropdown.setAttribute('aria-label', 'Parameter selection');
   dropdown.dataset.open = 'false';
 
   const header = document.createElement('div');
   header.className = 'finger-solo-dropdown__title';
-  header.textContent = 'Solo selection';
+  header.textContent = 'Parameters';
 
   const hint = document.createElement('div');
   hint.className = 'finger-solo-dropdown__hint';
-  hint.textContent = 'Choose which constants can capture. In solo mode, only checked constants can capture.';
+  hint.textContent = 'Fingers can move all parameters. Check any to enable solo mode.';
 
   const list = document.createElement('div');
   list.className = 'finger-solo-list';
@@ -353,7 +353,8 @@ function ensureFingerSoloUI() {
 }
 
 function getSoloModeEnabled() {
-  return soloLabelSet.size > 0;
+  const activeCount = activeFingerState?.activeLabelSet?.size ?? 0;
+  return soloLabelSet.size > 0 && activeCount > 1;
 }
 
 function updateFingerSoloButtonText() {
@@ -370,7 +371,7 @@ function updateFingerSoloButtonText() {
 
   if (!filtered.length) {
     if (!soloMode) {
-      fingerSoloButton.textContent = 'Constants...';
+      fingerSoloButton.textContent = 'Parameters...';
     } else {
       const serialized = serializeSolosParam(soloLabelSet);
       fingerSoloButton.textContent = serialized ? `Solo: ${serialized}` : 'Solo';
@@ -416,16 +417,58 @@ function rebuildFingerSoloList() {
   if (!activeLabels.length) {
     const empty = document.createElement('div');
     empty.className = 'finger-solo-dropdown__hint';
-    empty.textContent = 'No finger constants in this formula.';
+    empty.textContent = 'No parameters in this formula.';
     fingerSoloList.appendChild(empty);
+    if (fingerSoloHint) {
+      fingerSoloHint.textContent = 'No parameters to edit.';
+    }
+    return;
+  }
+
+  if (activeLabels.length === 1) {
+    if (fingerSoloHint) {
+      fingerSoloHint.textContent = 'Tap the pencil to edit this parameter.';
+    }
+
+    const label = activeLabels[0];
+    const row = document.createElement('div');
+    row.className = 'finger-solo-row finger-solo-row--single';
+    row.dataset.finger = label;
+
+    const labelEl = document.createElement('div');
+    labelEl.className = 'finger-solo-row__label';
+    labelEl.textContent = label;
+
+    const edit = document.createElement('button');
+    edit.type = 'button';
+    edit.className = 'finger-solo-row__edit';
+    edit.title = `Set ${label} value`;
+    edit.setAttribute('aria-label', `Set ${label} value`);
+    edit.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 20h9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+      </svg>
+    `;
+
+    edit.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      promptFingerValue(label);
+      updateFingerSoloButtonText();
+    });
+
+    row.appendChild(labelEl);
+    row.appendChild(edit);
+    fingerSoloList.appendChild(row);
     return;
   }
 
   const soloMode = getSoloModeEnabled();
   if (fingerSoloHint) {
     fingerSoloHint.textContent = soloMode
-      ? 'Solo mode: only checked constants can capture. Uncheck all to allow all constants.'
-      : 'All constants can capture. Check any to enter solo mode.';
+      ? 'Solo mode: fingers move only checked parameters. Uncheck all so fingers can move all parameters.'
+      : 'Fingers can move all parameters. Check any to enable solo mode.';
   }
 
   for (const label of activeLabels) {
