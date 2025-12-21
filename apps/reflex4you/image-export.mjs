@@ -31,7 +31,7 @@ export async function promptImageExportSize({
   presets = defaultImageExportPresets(),
   defaultSize = null,
   includeFormulaOverlayOption = null,
-  includeHdOption = null,
+  includeSupersampleOption = null,
   defaultPresetKey = null,
 } = {}) {
   // Prefer a proper <dialog> UI when available; fall back to prompt().
@@ -49,13 +49,19 @@ export async function promptImageExportSize({
     const size = parseSizeText(raw);
     if (!size) return null;
     let renderScale = 1;
-    if (includeHdOption) {
+    if (includeSupersampleOption) {
       try {
         const label =
-          typeof includeHdOption === 'object' && includeHdOption?.label
-            ? String(includeHdOption.label)
-            : 'Enable HD (2× AA) supersampling?';
-        renderScale = window.confirm(label) ? 2 : 1;
+          typeof includeSupersampleOption === 'object' && includeSupersampleOption?.label
+            ? String(includeSupersampleOption.label)
+            : 'Supersampling scale (2/3/4):';
+        const defaultScale =
+          typeof includeSupersampleOption === 'object' && Number(includeSupersampleOption?.defaultScale)
+            ? Number(includeSupersampleOption.defaultScale)
+            : 4;
+        const rawScale = window.prompt(label, String(defaultScale));
+        const n = rawScale == null ? defaultScale : Number(String(rawScale).trim());
+        renderScale = n === 4 ? 4 : n === 3 ? 3 : n === 2 ? 2 : 1;
       } catch (_) {
         renderScale = 1;
       }
@@ -171,42 +177,70 @@ export async function promptImageExportSize({
   hint.style.marginBottom = '10px';
   hint.textContent = 'Tip: you can type “4050x5100”, “3840×2160”, or add “px”.';
 
-  let hdCheckbox = null;
-  let hdRow = null;
-  if (includeHdOption) {
+  let supersampleSelect = null;
+  let supersampleRow = null;
+  if (includeSupersampleOption) {
     // Use a <label> wrapper so taps toggle reliably on mobile Safari.
-    const rowHd = document.createElement('label');
-    rowHd.style.display = 'flex';
-    rowHd.style.alignItems = 'center';
-    rowHd.style.gap = '10px';
-    rowHd.style.marginBottom = '10px';
-    rowHd.style.cursor = 'pointer';
-    rowHd.style.userSelect = 'none';
+    const rowSs = document.createElement('div');
+    rowSs.style.display = 'flex';
+    rowSs.style.alignItems = 'center';
+    rowSs.style.justifyContent = 'space-between';
+    rowSs.style.gap = '10px';
+    rowSs.style.marginBottom = '10px';
 
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.id = `export-hd-supersample-${Math.random().toString(16).slice(2)}`;
-    checkbox.style.width = '18px';
-    checkbox.style.height = '18px';
-    checkbox.style.margin = '0';
-    checkbox.style.cursor = 'pointer';
-    checkbox.style.accentColor = 'rgba(125,211,252,0.95)'; // ~tailwind sky-300
-    checkbox.checked = Boolean(
-      typeof includeHdOption === 'object' && includeHdOption?.defaultChecked,
-    );
+    const left = document.createElement('div');
+    left.style.display = 'flex';
+    left.style.flexDirection = 'column';
+    left.style.gap = '2px';
 
-    const labelText = document.createElement('span');
-    labelText.style.fontSize = '13px';
-    labelText.style.opacity = '0.92';
-    labelText.textContent =
-      typeof includeHdOption === 'object' && includeHdOption?.label
-        ? String(includeHdOption.label)
-        : 'HD (2× AA) — render at 2× then downscale';
+    const titleEl = document.createElement('div');
+    titleEl.style.fontSize = '13px';
+    titleEl.style.opacity = '0.92';
+    titleEl.textContent =
+      typeof includeSupersampleOption === 'object' && includeSupersampleOption?.label
+        ? String(includeSupersampleOption.label)
+        : 'Supersampling (antialiasing)';
 
-    rowHd.appendChild(checkbox);
-    rowHd.appendChild(labelText);
-    hdCheckbox = checkbox;
-    hdRow = rowHd;
+    const subtitleEl = document.createElement('div');
+    subtitleEl.style.fontSize = '12px';
+    subtitleEl.style.opacity = '0.7';
+    subtitleEl.textContent = 'Render larger, then downscale.';
+
+    left.appendChild(titleEl);
+    left.appendChild(subtitleEl);
+
+    const select = document.createElement('select');
+    select.style.height = '34px';
+    select.style.borderRadius = '8px';
+    select.style.border = '1px solid rgba(255,255,255,0.25)';
+    select.style.background = 'rgba(10,10,10,0.85)';
+    select.style.color = 'inherit';
+    select.style.padding = '0 10px';
+
+    const scales =
+      typeof includeSupersampleOption === 'object' && Array.isArray(includeSupersampleOption?.scales)
+        ? includeSupersampleOption.scales
+        : [2, 3, 4];
+    const normalized = Array.from(new Set(scales.map((x) => Number(x)).filter((x) => x === 2 || x === 3 || x === 4))).sort();
+    const effective = normalized.length ? normalized : [2, 3, 4];
+
+    for (const s of effective) {
+      const opt = document.createElement('option');
+      opt.value = String(s);
+      opt.textContent = `${s}×`;
+      select.appendChild(opt);
+    }
+
+    const defaultScale =
+      typeof includeSupersampleOption === 'object' && Number(includeSupersampleOption?.defaultScale)
+        ? Number(includeSupersampleOption.defaultScale)
+        : 4;
+    select.value = defaultScale === 2 ? '2' : defaultScale === 3 ? '3' : '4';
+
+    rowSs.appendChild(left);
+    rowSs.appendChild(select);
+    supersampleSelect = select;
+    supersampleRow = rowSs;
   }
 
   let includeFormulaOverlayCheckbox = null;
@@ -285,8 +319,8 @@ export async function promptImageExportSize({
   actions.appendChild(okBtn);
 
   form.appendChild(row);
-  if (hdRow) {
-    form.appendChild(hdRow);
+  if (supersampleRow) {
+    form.appendChild(supersampleRow);
   }
   if (includeFormulaOverlayRow) {
     form.appendChild(includeFormulaOverlayRow);
@@ -378,7 +412,9 @@ export async function promptImageExportSize({
             resolve(null);
             return;
           }
-          const renderScale = hdCheckbox ? (hdCheckbox.checked ? 2 : 1) : 1;
+          const renderScale = supersampleSelect
+            ? (supersampleSelect.value === '2' ? 2 : supersampleSelect.value === '3' ? 3 : supersampleSelect.value === '4' ? 4 : 1)
+            : 1;
           const includeFormulaOverlay = includeFormulaOverlayCheckbox ? Boolean(includeFormulaOverlayCheckbox.checked) : false;
           resolve({ ...size, includeFormulaOverlay, renderScale });
         },

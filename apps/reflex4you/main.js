@@ -1917,9 +1917,10 @@ async function saveCanvasImage() {
     presets,
     defaultSize: defaultSize || undefined,
     defaultPresetKey: 'screen',
-    includeHdOption: {
-      label: 'HD (2× AA) — render at 2× then downscale for smoother edges',
-      defaultChecked: true,
+    includeSupersampleOption: {
+      label: 'Supersampling (antialiasing)',
+      scales: [2, 3, 4],
+      defaultScale: 4,
     },
     includeFormulaOverlayOption: {
       label: 'Overlay formula on bottom half (with translucent white background)',
@@ -1992,14 +1993,20 @@ async function saveCanvasImage() {
 
   const outputWidth = requested.width;
   const outputHeight = requested.height;
-  let renderScale = requested && requested.renderScale === 2 ? 2 : 1;
-  if (
-    !Number.isFinite(outputWidth * renderScale) ||
-    !Number.isFinite(outputHeight * renderScale) ||
-    outputWidth * renderScale > 20000 ||
-    outputHeight * renderScale > 20000
-  ) {
+  let renderScale =
+    requested && (requested.renderScale === 4 || requested.renderScale === 3 || requested.renderScale === 2)
+      ? requested.renderScale
+      : 1;
+  // Keep within export limits; if requested scale is too large, fall back to the largest allowed scale.
+  if (!Number.isFinite(outputWidth) || !Number.isFinite(outputHeight) || outputWidth <= 0 || outputHeight <= 0) {
     renderScale = 1;
+  } else {
+    const maxW = Math.floor(20000 / outputWidth);
+    const maxH = Math.floor(20000 / outputHeight);
+    const maxScale = Math.max(1, Math.min(maxW, maxH));
+    if (renderScale > maxScale) {
+      renderScale = maxScale >= 4 ? 4 : maxScale >= 3 ? 3 : maxScale >= 2 ? 2 : 1;
+    }
   }
 
   const renderWidth = outputWidth * renderScale;
