@@ -763,9 +763,22 @@ const elementaryFunctionParser = Choice([
 
 const builtinFunctionLiteralParser = Choice(
   BUILTIN_FUNCTION_DEFINITIONS.map(({ name, factory }) =>
-    keywordLiteral(name, { ctor: `${name}FunctionLiteral` }).Map((token, result) =>
-      attachIdentifierMeta(createBuiltinFunctionLiteral(name, factory, result.span), token),
-    ),
+    keywordLiteral(name, { ctor: `${name}FunctionLiteral` }).Map((token, result) => {
+      const node = createBuiltinFunctionLiteral(name, factory, result.span);
+      const withMeta = attachIdentifierMeta(node, token);
+      // For abs/modulus literals, default rendering is |z| (Abs node). If the user used
+      // underscore highlighting (e.g. `_modulus`), preserve call syntax so the
+      // highlighted function name can be rendered.
+      if (
+        (name === 'abs' || name === 'modulus') &&
+        token &&
+        Array.isArray(token.highlights) &&
+        token.highlights.length
+      ) {
+        withMeta.__syntheticCall = { name, args: [withSpan(VarZ(), result.span)] };
+      }
+      return withMeta;
+    }),
   ),
   { ctor: 'BuiltinFunctionLiteral' },
 );

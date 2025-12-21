@@ -585,6 +585,16 @@ test('_modulus(z) renders as a function call (not |z|) so the highlighted name s
   assert.match(latex, /\\left\(/);
 });
 
+test('_modulus (function literal) renders as a function call so the highlighted name shows', () => {
+  const result = parseFormulaInput('_modulus');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /\{\\Huge M\}/);
+  assert.match(latex, /\\operatorname\{/);
+  // Should render as a call on z for display (same semantics).
+  assert.match(latex, /\\left\(z\\right\)/);
+});
+
 test('nested let bindings are rejected', () => {
   const result = parseFormulaInput('set a = let f = z in f in a');
   assert.equal(result.ok, false);
