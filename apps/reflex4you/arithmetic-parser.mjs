@@ -174,6 +174,7 @@ const BUILTIN_FUNCTION_DEFINITIONS = [
   { name: 'ln', factory: (value) => Ln(value, null) },
   { name: 'sqrt', factory: (value) => createSqrtExpression(value, null) },
   { name: 'abs', factory: Abs },
+  { name: 'modulus', factory: Abs },
   { name: 'abs2', factory: Abs2 },
   { name: 'conj', factory: Conjugate },
   { name: 'floor', factory: Floor },
@@ -299,6 +300,8 @@ const numberToken = wsRegex(NUMBER_REGEX, {
   transform: (match) => Number(match[0]),
 });
 
+// Allow underscore-highlighting on the imaginary unit so `_i` renders as a huge letter,
+// while still keeping the semantics of the imaginary unit constant.
 const imagUnit = keywordLiteral('i', { ctor: 'ImagUnit', caseSensitive: false });
 const tightImagUnit = Literal('i', { ctor: 'ImagUnitTight', caseSensitive: false });
 
@@ -314,11 +317,18 @@ const numberLiteral = numberToken.Map((value, result) => withSpan(Const(value, 0
 const imagFromNumber = numberToken.i_(tightImagUnit, { ctor: 'NumericImag' })
   .Map((magnitude, result) => withSpan(Const(0, magnitude), result.span));
 
-const unitImagLiteral = optionalSign.i_(imagUnit, { ctor: 'UnitImag' })
-  .Map((sign, result) => withSpan(Const(0, sign), result.span));
+const unitImagLiteral = Sequence([
+  optionalSign,
+  imagUnit,
+], {
+  ctor: 'UnitImag',
+  projector: (values) => ({ sign: values[0], meta: values[1] }),
+}).Map(({ sign, meta }, result) =>
+  attachIdentifierMeta(withSpan(Const(0, sign), result.span), meta),
+);
 
 const jLiteral = keywordLiteral('j', { ctor: 'ConstJ', caseSensitive: false })
-  .Map((_, result) => withSpan(Const(-0.5, SQRT3_OVER_2), result.span));
+  .Map((token, result) => attachIdentifierMeta(withSpan(Const(-0.5, SQRT3_OVER_2), result.span), token));
 
 const literalParser = Choice([
   imagFromNumber,
@@ -388,6 +398,7 @@ const RESERVED_BINDING_NAMES = new Set([
   'ln',
   'sqrt',
   'abs',
+  'modulus',
   'abs2',
   'floor',
   'conj',
@@ -497,9 +508,12 @@ const explicitComposeParser = Sequence([
 ], {
   ctor: 'ExplicitCompose',
   projector: (values) => ({ meta: values[0], first: values[2], second: values[4] }),
-}).Map(({ meta, first, second }, result) =>
-  attachIdentifierMeta(withSpan(Compose(first, second), result.span), meta),
-);
+}).Map(({ meta, first, second }, result) => {
+  const node = withSpan(Compose(first, second), result.span);
+  // Preserve the explicit call syntax for rendering (so `_o(f,g)` can show a huge "O").
+  node.__syntheticCall = { name: 'o', args: [first, second] };
+  return attachIdentifierMeta(node, meta);
+});
 
 const explicitRepeatComposeParser = createParser('ExplicitRepeatCompose', (input) => {
   const keyword = keywordLiteral('oo', { ctor: 'RepeatComposeKeyword' }).runNormalized(input);
@@ -627,7 +641,22 @@ function createUnaryFunctionParser(name, factory) {
   ], {
     ctor: `${name}Call`,
     projector: (values) => ({ meta: values[0], expr: values[2] }),
-  }).Map(({ meta, expr }, result) => attachIdentifierMeta(withSpan(factory(expr), result.span), meta));
+  }).Map(({ meta, expr }, result) => {
+    const node = withSpan(factory(expr), result.span);
+    const withMeta = attachIdentifierMeta(node, meta);
+    // For abs/modulus we render as |z| by default, but if the user added underscore
+    // highlights (e.g. `_abs(z)` / `_modulus(z)`), preserve call syntax so the
+    // function name can be rendered (with Huge highlighted letters).
+    if (
+      (name === 'abs' || name === 'modulus') &&
+      meta &&
+      Array.isArray(meta.highlights) &&
+      meta.highlights.length
+    ) {
+      withMeta.__syntheticCall = { name, args: [expr] };
+    }
+    return withMeta;
+  });
 }
 
 function createUnaryFunctionParsers(names, factory) {
@@ -725,7 +754,7 @@ const elementaryFunctionParser = Choice([
   ...createUnaryFunctionParsers(['acos', 'arccos'], Acos),
   lnParser,
   sqrtParser,
-  ...createUnaryFunctionParsers(['abs'], Abs),
+  ...createUnaryFunctionParsers(['abs', 'modulus'], Abs),
   ...createUnaryFunctionParsers(['abs2'], Abs2),
   ...createUnaryFunctionParsers(['floor'], Floor),
   ...createUnaryFunctionParsers(['conj'], Conjugate),
@@ -734,9 +763,22 @@ const elementaryFunctionParser = Choice([
 
 const builtinFunctionLiteralParser = Choice(
   BUILTIN_FUNCTION_DEFINITIONS.map(({ name, factory }) =>
-    keywordLiteral(name, { ctor: `${name}FunctionLiteral` }).Map((token, result) =>
-      attachIdentifierMeta(createBuiltinFunctionLiteral(name, factory, result.span), token),
-    ),
+    keywordLiteral(name, { ctor: `${name}FunctionLiteral` }).Map((token, result) => {
+      const node = createBuiltinFunctionLiteral(name, factory, result.span);
+      const withMeta = attachIdentifierMeta(node, token);
+      // For abs/modulus literals, default rendering is |z| (Abs node). If the user used
+      // underscore highlighting (e.g. `_modulus`), preserve call syntax so the
+      // highlighted function name can be rendered.
+      if (
+        (name === 'abs' || name === 'modulus') &&
+        token &&
+        Array.isArray(token.highlights) &&
+        token.highlights.length
+      ) {
+        withMeta.__syntheticCall = { name, args: [withSpan(VarZ(), result.span)] };
+      }
+      return withMeta;
+    }),
   ),
   { ctor: 'BuiltinFunctionLiteral' },
 );
@@ -1543,50 +1585,72 @@ function eliminateTopLevelLets(ast, input) {
 }
 
 function resolveSetReferences(ast, input) {
-  const env = [];
+  const setEnv = [];
+  const letEnv = [];
+
+  function findLetBindingForName(name) {
+    for (let i = letEnv.length - 1; i >= 0; i -= 1) {
+      if (letEnv[i].name === name) {
+        return letEnv[i];
+      }
+    }
+    return null;
+  }
+
   function visit(node) {
     if (!node || typeof node !== 'object') {
       return null;
     }
     switch (node.kind) {
+      case 'LetBinding': {
+        // `let name = value in body`
+        // - `name` is in scope only for `body`
+        // - nested `let` is handled by a separate top-level validation step; still traverse.
+        const valueErr = visit(node.value);
+        if (valueErr) {
+          return valueErr;
+        }
+        letEnv.push(node);
+        const bodyErr = visit(node.body);
+        letEnv.pop();
+        return bodyErr;
+      }
       case 'SetBinding': {
         const valueErr = visit(node.value);
         if (valueErr) {
           return valueErr;
         }
-        env.push(node);
+        setEnv.push(node);
         const bodyErr = visit(node.body);
-        env.pop();
+        setEnv.pop();
         return bodyErr;
       }
       case 'Identifier': {
-        const binding = findBindingForName(env, node.name);
-        if (!binding) {
-          const span = node.span ?? input.createSpan(0, 0);
-          return new ParseFailure({
-            ctor: 'Identifier',
-            message: `Unknown variable "${node.name}". Introduce it with "set ${node.name} = value in ..."`,
-            severity: ParseSeverity.error,
-            expected: 'set binding',
-            span,
-            input: span.input || input,
-          });
+        const binding = findBindingForName(setEnv, node.name);
+        if (binding) {
+          const resolved = SetRef(node.name, binding);
+          resolved.span = node.span;
+          resolved.input = node.input;
+          Object.assign(node, resolved);
+          return null;
         }
-        const resolved = SetRef(node.name, binding);
-        resolved.span = node.span;
-        resolved.input = node.input;
-        Object.assign(node, resolved);
-        return null;
-      }
-      case 'LetBinding':
+        const letBinding = findLetBindingForName(node.name);
+        if (letBinding) {
+          // Keep the identifier node (so the renderer can still show the name),
+          // but tag it so GPU lowering can resolve it later.
+          node.__letBinding = letBinding;
+          return null;
+        }
+        const span = node.span ?? input.createSpan(0, 0);
         return new ParseFailure({
-          ctor: 'LetBinding',
-          message: 'let bindings are only allowed at the top level',
+          ctor: 'Identifier',
+          message: `Unknown variable "${node.name}". Introduce it with "set ${node.name} = value in ..."`,
           severity: ParseSeverity.error,
-          expected: 'top-level let',
-          span: node.span ?? input.createSpan(0, 0),
-          input: (node.span && node.span.input) || input,
+          expected: 'set binding',
+          span,
+          input: span.input || input,
         });
+      }
       case 'Const':
       case 'Var':
       case 'VarX':
@@ -1597,27 +1661,28 @@ function resolveSetReferences(ast, input) {
         return null;
       case 'Pow':
         return visit(node.base);
-    case 'Exp':
-    case 'Sin':
-    case 'Cos':
-    case 'Tan':
-    case 'Atan':
-    case 'Asin':
-    case 'Acos':
-    case 'Abs':
-    case 'Abs2':
-    case 'Conjugate':
-      return visit(node.value);
-    case 'Ln': {
-      const valueErr = visit(node.value);
-      if (valueErr) {
-        return valueErr;
+      case 'Exp':
+      case 'Sin':
+      case 'Cos':
+      case 'Tan':
+      case 'Atan':
+      case 'Asin':
+      case 'Acos':
+      case 'Abs':
+      case 'Abs2':
+      case 'Conjugate':
+      case 'Floor':
+        return visit(node.value);
+      case 'Ln': {
+        const valueErr = visit(node.value);
+        if (valueErr) {
+          return valueErr;
+        }
+        if (node.branch) {
+          return visit(node.branch);
+        }
+        return null;
       }
-      if (node.branch) {
-        return visit(node.branch);
-      }
-      return null;
-    }
       case 'Sub':
       case 'Mul':
       case 'Op':
@@ -1627,9 +1692,9 @@ function resolveSetReferences(ast, input) {
       case 'GreaterThan':
       case 'LessThanOrEqual':
       case 'GreaterThanOrEqual':
-    case 'Equal':
-    case 'LogicalAnd':
-    case 'LogicalOr': {
+      case 'Equal':
+      case 'LogicalAnd':
+      case 'LogicalOr': {
         const leftErr = visit(node.left);
         if (leftErr) {
           return leftErr;
@@ -1679,6 +1744,40 @@ function resolveSetReferences(ast, input) {
     }
   }
   return visit(ast);
+}
+
+function validateLetBindingsTopLevelOnly(ast, input) {
+  // Allow a chain of `LetBinding` at the root: let ... in let ... in <expr>.
+  // Disallow `LetBinding` anywhere else (inside value expressions, set bodies, etc).
+  let cursor = ast;
+  while (cursor && typeof cursor === 'object' && cursor.kind === 'LetBinding') {
+    const nested = findFirstLetBinding(cursor.value);
+    if (nested) {
+      const span = nested.span ?? input.createSpan(0, 0);
+      return new ParseFailure({
+        ctor: 'LetBinding',
+        message: 'let bindings are only allowed at the top level',
+        severity: ParseSeverity.error,
+        expected: 'top-level let',
+        span,
+        input: span.input || input,
+      });
+    }
+    cursor = cursor.body;
+  }
+  const nested = findFirstLetBinding(cursor);
+  if (nested) {
+    const span = nested.span ?? input.createSpan(0, 0);
+    return new ParseFailure({
+      ctor: 'LetBinding',
+      message: 'let bindings are only allowed at the top level',
+      severity: ParseSeverity.error,
+      expected: 'top-level let',
+      span,
+      input: span.input || input,
+    });
+  }
+  return null;
 }
 
 function findBindingForName(env, name) {
@@ -2724,15 +2823,15 @@ export function parseFormulaInput(input, options = {}) {
       input: remainder,
     });
   }
-  const letReduced = eliminateTopLevelLets(parsed.value, normalized);
-  if (letReduced instanceof ParseFailure) {
-    return letReduced;
+  const letValidationError = validateLetBindingsTopLevelOnly(parsed.value, normalized);
+  if (letValidationError instanceof ParseFailure) {
+    return letValidationError;
   }
-  const resolveError = resolveSetReferences(letReduced, normalized);
+  const resolveError = resolveSetReferences(parsed.value, normalized);
   if (resolveError instanceof ParseFailure) {
     return resolveError;
   }
-  const repeatResolved = resolveRepeatPlaceholders(letReduced, parseOptions, normalized);
+  const repeatResolved = resolveRepeatPlaceholders(parsed.value, parseOptions, normalized);
   if (repeatResolved instanceof ParseFailure) {
     return repeatResolved;
   }

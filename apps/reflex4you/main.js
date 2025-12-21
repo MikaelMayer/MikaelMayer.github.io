@@ -42,7 +42,7 @@ const rootElement = typeof document !== 'undefined' ? document.documentElement :
 
 let fatalErrorActive = false;
 
-const APP_VERSION = 18;
+const APP_VERSION = 19;
 const CONTEXT_LOSS_RELOAD_KEY = `reflex4you:contextLossReloaded:v${APP_VERSION}`;
 const RESUME_RELOAD_KEY = `reflex4you:resumeReloaded:v${APP_VERSION}`;
 const LAST_HIDDEN_AT_KEY = `reflex4you:lastHiddenAtMs:v${APP_VERSION}`;
@@ -1889,7 +1889,7 @@ async function saveCanvasImage() {
     defaultSize: defaultSize || undefined,
     includeFormulaOverlayOption: {
       label: 'Overlay formula on bottom half (with translucent white background)',
-      defaultChecked: false,
+        defaultChecked: true,
     },
   });
   if (!requested) {
@@ -2147,7 +2147,7 @@ function triggerImageDownload(url, filename, shouldRevoke) {
 
 if ('serviceWorker' in navigator) {
   // Version the SW script URL so updates can't get stuck behind a cached SW script.
-  const SW_URL = './service-worker.js?sw=18.1';
+  const SW_URL = './service-worker.js?sw=19.3';
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(SW_URL).then((registration) => {
       // Auto-activate updated workers so cache/version bumps take effect quickly.
