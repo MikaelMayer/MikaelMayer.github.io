@@ -31,6 +31,8 @@ export async function promptImageExportSize({
   presets = defaultImageExportPresets(),
   defaultSize = null,
   includeFormulaOverlayOption = null,
+  includeSupersampleOption = null,
+  defaultPresetKey = null,
 } = {}) {
   // Prefer a proper <dialog> UI when available; fall back to prompt().
   if (typeof document === 'undefined') {
@@ -46,6 +48,24 @@ export async function promptImageExportSize({
     if (raw == null) return null;
     const size = parseSizeText(raw);
     if (!size) return null;
+    let renderScale = 1;
+    if (includeSupersampleOption) {
+      try {
+        const label =
+          typeof includeSupersampleOption === 'object' && includeSupersampleOption?.label
+            ? String(includeSupersampleOption.label)
+            : 'Supersampling scale (2/3/4):';
+        const defaultScale =
+          typeof includeSupersampleOption === 'object' && Number(includeSupersampleOption?.defaultScale)
+            ? Number(includeSupersampleOption.defaultScale)
+            : 4;
+        const rawScale = window.prompt(label, String(defaultScale));
+        const n = rawScale == null ? defaultScale : Number(String(rawScale).trim());
+        renderScale = n === 4 ? 4 : n === 3 ? 3 : n === 2 ? 2 : 1;
+      } catch (_) {
+        renderScale = 1;
+      }
+    }
     let includeFormulaOverlay = false;
     if (includeFormulaOverlayOption) {
       try {
@@ -58,7 +78,7 @@ export async function promptImageExportSize({
         includeFormulaOverlay = false;
       }
     }
-    return { ...size, includeFormulaOverlay };
+    return { ...size, includeFormulaOverlay, renderScale };
   };
 
   const supportsDialog = typeof HTMLDialogElement !== 'undefined' && typeof document.createElement('dialog').showModal === 'function';
@@ -157,6 +177,82 @@ export async function promptImageExportSize({
   hint.style.marginBottom = '10px';
   hint.textContent = 'Tip: you can type “4050x5100”, “3840×2160”, or add “px”.';
 
+  let supersampleSelect = null;
+  let supersampleRow = null;
+  if (includeSupersampleOption) {
+    // Use a <label> wrapper so taps toggle reliably on mobile Safari.
+    const rowSs = document.createElement('div');
+    rowSs.style.display = 'flex';
+    rowSs.style.alignItems = 'center';
+    rowSs.style.justifyContent = 'space-between';
+    rowSs.style.gap = '10px';
+    rowSs.style.marginBottom = '10px';
+
+    const left = document.createElement('div');
+    left.style.display = 'flex';
+    left.style.flexDirection = 'column';
+    left.style.gap = '2px';
+
+    const titleEl = document.createElement('div');
+    titleEl.style.fontSize = '13px';
+    titleEl.style.opacity = '0.92';
+    titleEl.textContent =
+      typeof includeSupersampleOption === 'object' && includeSupersampleOption?.label
+        ? String(includeSupersampleOption.label)
+        : 'Supersampling (antialiasing)';
+
+    const subtitleEl = document.createElement('div');
+    subtitleEl.style.fontSize = '12px';
+    subtitleEl.style.opacity = '0.7';
+    subtitleEl.textContent = 'Render larger, then downscale.';
+
+    left.appendChild(titleEl);
+    left.appendChild(subtitleEl);
+
+    const select = document.createElement('select');
+    select.style.height = '34px';
+    select.style.borderRadius = '8px';
+    select.style.border = '1px solid rgba(255,255,255,0.25)';
+    select.style.background = 'rgba(10,10,10,0.85)';
+    select.style.color = 'inherit';
+    select.style.padding = '0 10px';
+
+    const scales =
+      typeof includeSupersampleOption === 'object' && Array.isArray(includeSupersampleOption?.scales)
+        ? includeSupersampleOption.scales
+        : [1, 2, 3, 4];
+    const normalized = Array.from(
+      new Set(
+        scales
+          .map((x) => Number(x))
+          .filter((x) => x === 1 || x === 2 || x === 3 || x === 4),
+      ),
+    ).sort();
+    const effective = normalized.length ? normalized : [1, 2, 3, 4];
+
+    for (const s of effective) {
+      const opt = document.createElement('option');
+      opt.value = String(s);
+      opt.textContent = s === 1 ? 'None' : `${s}×`;
+      select.appendChild(opt);
+    }
+
+    const defaultScale =
+      typeof includeSupersampleOption === 'object' && Number(includeSupersampleOption?.defaultScale)
+        ? Number(includeSupersampleOption.defaultScale)
+        : 4;
+    select.value =
+      defaultScale === 1 ? '1'
+        : defaultScale === 2 ? '2'
+          : defaultScale === 3 ? '3'
+            : '4';
+
+    rowSs.appendChild(left);
+    rowSs.appendChild(select);
+    supersampleSelect = select;
+    supersampleRow = rowSs;
+  }
+
   let includeFormulaOverlayCheckbox = null;
   let includeFormulaOverlayRow = null;
   if (includeFormulaOverlayOption) {
@@ -233,6 +329,9 @@ export async function promptImageExportSize({
   actions.appendChild(okBtn);
 
   form.appendChild(row);
+  if (supersampleRow) {
+    form.appendChild(supersampleRow);
+  }
   if (includeFormulaOverlayRow) {
     form.appendChild(includeFormulaOverlayRow);
   }
@@ -243,9 +342,21 @@ export async function promptImageExportSize({
   dialog.appendChild(heading);
   dialog.appendChild(form);
 
-  const initial = defaultSize || (presets[0] ? { width: presets[0].width, height: presets[0].height } : { width: 1920, height: 1080 });
+  const presetKeyFor = (p) => (p && (p.key || `${p.width}x${p.height}`)) || null;
+  const preferredPreset = defaultPresetKey
+    ? presets.find((p) => presetKeyFor(p) === defaultPresetKey) || null
+    : null;
+  const initial = preferredPreset
+    ? { width: preferredPreset.width, height: preferredPreset.height }
+    : (defaultSize || (presets[0] ? { width: presets[0].width, height: presets[0].height } : { width: 1920, height: 1080 }));
+
   sizeInput.value = `${initial.width}x${initial.height}`;
-  presetSelect.value = '__custom__';
+
+  if (preferredPreset) {
+    presetSelect.value = presetKeyFor(preferredPreset) || '__custom__';
+  } else {
+    presetSelect.value = '__custom__';
+  }
 
   function syncFromPreset() {
     const selected = presetSelect.selectedOptions[0];
@@ -278,6 +389,10 @@ export async function promptImageExportSize({
     validate();
   });
 
+  if (preferredPreset) {
+    syncFromPreset();
+  }
+
   cancelBtn.addEventListener('click', () => {
     try {
       dialog.close('cancel');
@@ -307,8 +422,11 @@ export async function promptImageExportSize({
             resolve(null);
             return;
           }
+          const renderScale = supersampleSelect
+            ? (supersampleSelect.value === '2' ? 2 : supersampleSelect.value === '3' ? 3 : supersampleSelect.value === '4' ? 4 : 1)
+            : 1;
           const includeFormulaOverlay = includeFormulaOverlayCheckbox ? Boolean(includeFormulaOverlayCheckbox.checked) : false;
-          resolve({ ...size, includeFormulaOverlay });
+          resolve({ ...size, includeFormulaOverlay, renderScale });
         },
         { once: true },
       );
