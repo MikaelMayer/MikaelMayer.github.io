@@ -90,6 +90,39 @@
       z-index: 20;
     }
 
+    #error[data-error-severity="fatal"] {
+      pointer-events: auto;
+      user-select: text;
+      overflow: auto;
+    }
+
+    #error .error-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    #error .error-actions button {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.92);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 13px;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    #error .error-actions button:hover,
+    #error .error-actions button:focus-visible {
+      border-color: rgba(255, 255, 255, 0.4);
+      background: rgba(255, 255, 255, 0.12);
+      outline: none;
+    }
+
     /* Formula panel: overlay above rendering, semi-transparent */
     #formula-panel {
       position: fixed;

@@ -1142,6 +1142,11 @@ function showError(msg) {
     return;
   }
   errorDiv.removeAttribute('data-error-severity');
+  try {
+    errorDiv.innerHTML = '';
+  } catch (_) {
+    // ignore
+  }
   errorDiv.textContent = msg;
   errorDiv.style.display = 'block';
 }
@@ -1149,7 +1154,62 @@ function showError(msg) {
 function showFatalError(msg) {
   fatalErrorActive = true;
   errorDiv.setAttribute('data-error-severity', 'fatal');
-  errorDiv.textContent = msg;
+  try {
+    errorDiv.innerHTML = '';
+  } catch (_) {
+    // ignore
+  }
+
+  const content = document.createElement('div');
+  content.textContent = String(msg || '');
+
+  const actions = document.createElement('div');
+  actions.className = 'error-actions';
+
+  const copyButton = document.createElement('button');
+  copyButton.type = 'button';
+  copyButton.textContent = 'Copy';
+  copyButton.title = 'Copy error details';
+
+  async function copyText(text) {
+    const value = String(text || '');
+    const clipboard = navigator?.clipboard;
+    if (clipboard && typeof clipboard.writeText === 'function') {
+      await clipboard.writeText(value);
+      return true;
+    }
+    return false;
+  }
+
+  copyButton.addEventListener('click', async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const original = copyButton.textContent;
+    try {
+      const ok = await copyText(msg);
+      if (!ok) {
+        // Fallback for older browsers / insecure contexts.
+        window.prompt('Copy this error:', String(msg || ''));
+      }
+      copyButton.textContent = 'Copied';
+      window.setTimeout(() => {
+        if (copyButton.textContent === 'Copied') {
+          copyButton.textContent = original;
+        }
+      }, 1200);
+    } catch (e) {
+      console.warn('Failed to copy error text.', e);
+      try {
+        window.prompt('Copy this error:', String(msg || ''));
+      } catch (_) {
+        // ignore
+      }
+    }
+  });
+
+  actions.appendChild(copyButton);
+  errorDiv.appendChild(content);
+  errorDiv.appendChild(actions);
   errorDiv.style.display = 'block';
 }
 
@@ -1159,7 +1219,11 @@ function clearError() {
   }
   errorDiv.removeAttribute('data-error-severity');
   errorDiv.style.display = 'none';
-  errorDiv.textContent = '';
+  try {
+    errorDiv.innerHTML = '';
+  } catch (_) {
+    errorDiv.textContent = '';
+  }
 }
 
 function handleRendererInitializationFailure(error) {
