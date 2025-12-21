@@ -1645,7 +1645,37 @@ if (typeof window !== 'undefined') {
 }
 bootstrapPromise.catch((error) => {
   console.error('Failed to bootstrap Reflex4You.', error);
-  showFatalError('Unable to initialize Reflex4You.');
+  const details =
+    error && (error.stack || error.message)
+      ? String(error.stack || error.message)
+      : String(error || 'Unknown error');
+
+  const guidance = [
+    'Unable to initialize Reflex4You.',
+    '',
+    details,
+    '',
+    'Recovery tips:',
+    '- Hard reload (or open in a private window).',
+    '- If installed as a PWA: uninstall/reinstall or clear the site data.',
+  ].join('\n');
+  showFatalError(guidance);
+
+  // One-time cache-busting reload: helps recover from stale SW/cached modules.
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage && window.location) {
+      const key = `reflex4you:initReloaded:v${APP_VERSION}`;
+      const already = Boolean(window.sessionStorage.getItem(key));
+      if (!already) {
+        window.sessionStorage.setItem(key, String(Date.now()));
+        const url = new URL(window.location.href);
+        url.searchParams.set('initfix', String(Date.now()));
+        window.location.replace(url.toString());
+      }
+    }
+  } catch (_) {
+    // ignore reload failures
+  }
 });
 
 if (typeof window !== 'undefined') {
