@@ -1868,6 +1868,45 @@ async function saveCanvasImage() {
     return;
   }
 
+  function clampExportPx(value) {
+    const n = Math.round(Number(value));
+    if (!Number.isFinite(n)) return null;
+    return Math.max(1, Math.min(20000, n));
+  }
+
+  function screenExportPresets() {
+    if (typeof window === 'undefined') return [];
+    const viewport = window.visualViewport;
+    const cssW = Number(viewport?.width ?? window.innerWidth);
+    const cssH = Number(viewport?.height ?? window.innerHeight);
+    const dpr = Number(window.devicePixelRatio) || 1;
+    if (!Number.isFinite(cssW) || !Number.isFinite(cssH) || cssW <= 0 || cssH <= 0) {
+      return [];
+    }
+    const screenW = clampExportPx(cssW * dpr);
+    const screenH = clampExportPx(cssH * dpr);
+    if (!screenW || !screenH) return [];
+    const screen2xW = clampExportPx(screenW * 2);
+    const screen2xH = clampExportPx(screenH * 2);
+    const presets = [
+      {
+        key: 'screen',
+        label: `Screen (${screenW}×${screenH} px)`,
+        width: screenW,
+        height: screenH,
+      },
+    ];
+    if (screen2xW && screen2xH && (screen2xW !== screenW || screen2xH !== screenH)) {
+      presets.push({
+        key: 'screen-2x',
+        label: `2× Screen (${screen2xW}×${screen2xH} px)`,
+        width: screen2xW,
+        height: screen2xH,
+      });
+    }
+    return presets;
+  }
+
   const defaultSize = canvas.width && canvas.height ? { width: canvas.width, height: canvas.height } : null;
   const presets = [
     ...(defaultSize
@@ -1880,6 +1919,7 @@ async function saveCanvasImage() {
         },
       ]
       : []),
+    ...screenExportPresets(),
     ...defaultImageExportPresets(),
   ];
 
