@@ -512,7 +512,8 @@ function applySoloFilterToRenderer() {
 }
 
 function syncFingerDots(visibleLabelSet, { soloMode } = {}) {
-  const visible = new Set((visibleLabelSet || []).filter((l) => isFingerLabel(l)));
+  const visibleIterable = visibleLabelSet == null ? [] : Array.from(visibleLabelSet);
+  const visible = new Set(visibleIterable.filter((l) => isFingerLabel(l)));
   if (fingerOverlay) {
     fingerOverlay.style.display = visible.size ? 'block' : 'none';
   }
