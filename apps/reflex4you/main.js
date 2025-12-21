@@ -1931,7 +1931,11 @@ async function saveCanvasImage() {
     return;
   }
 
-  showTransientStatus('Rendering…', { timeoutMs: 4000 });
+  // We may clamp the requested supersampling scale below; show the effective value.
+  const requestedScale =
+    requested && (requested.renderScale === 4 || requested.renderScale === 3 || requested.renderScale === 2)
+      ? requested.renderScale
+      : 1;
 
   const activeLabels = new Set([
     ...Array.from(knownFingerLabels),
@@ -2008,6 +2012,10 @@ async function saveCanvasImage() {
       renderScale = maxScale >= 4 ? 4 : maxScale >= 3 ? 3 : maxScale >= 2 ? 2 : 1;
     }
   }
+
+  const clamped = requestedScale !== renderScale;
+  const status = renderScale > 1 ? `Rendering (SS ${renderScale}×)…` : 'Rendering…';
+  showTransientStatus(clamped ? `${status.replace(')…', `, clamped)…`)}` : status, { timeoutMs: 4000 });
 
   const renderWidth = outputWidth * renderScale;
   const renderHeight = outputHeight * renderScale;
@@ -2164,7 +2172,8 @@ async function saveCanvasImage() {
   }
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const filename = `reflex4you-${requested.width}x${requested.height}-${stamp}.png`;
+  const ssTag = renderScale > 1 ? `-ss${renderScale}x-r${renderWidth}x${renderHeight}` : '';
+  const filename = `reflex4you-${requested.width}x${requested.height}${ssTag}-${stamp}.png`;
   if (blob) {
     downloadBlob(blob, filename);
   }
