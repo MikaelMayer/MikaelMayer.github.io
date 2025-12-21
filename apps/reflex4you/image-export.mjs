@@ -31,6 +31,7 @@ export async function promptImageExportSize({
   presets = defaultImageExportPresets(),
   defaultSize = null,
   includeFormulaOverlayOption = null,
+  includeHdOption = null,
   defaultPresetKey = null,
 } = {}) {
   // Prefer a proper <dialog> UI when available; fall back to prompt().
@@ -47,6 +48,18 @@ export async function promptImageExportSize({
     if (raw == null) return null;
     const size = parseSizeText(raw);
     if (!size) return null;
+    let renderScale = 1;
+    if (includeHdOption) {
+      try {
+        const label =
+          typeof includeHdOption === 'object' && includeHdOption?.label
+            ? String(includeHdOption.label)
+            : 'Enable HD (2× AA) supersampling?';
+        renderScale = window.confirm(label) ? 2 : 1;
+      } catch (_) {
+        renderScale = 1;
+      }
+    }
     let includeFormulaOverlay = false;
     if (includeFormulaOverlayOption) {
       try {
@@ -59,7 +72,7 @@ export async function promptImageExportSize({
         includeFormulaOverlay = false;
       }
     }
-    return { ...size, includeFormulaOverlay, renderScale: 1 };
+    return { ...size, includeFormulaOverlay, renderScale };
   };
 
   const supportsDialog = typeof HTMLDialogElement !== 'undefined' && typeof document.createElement('dialog').showModal === 'function';
@@ -120,9 +133,6 @@ export async function promptImageExportSize({
     opt.textContent = p.label || `${p.width}×${p.height}px`;
     opt.dataset.width = String(p.width);
     opt.dataset.height = String(p.height);
-    if (p && p.renderScale != null) {
-      opt.dataset.renderScale = String(p.renderScale);
-    }
     presetSelect.appendChild(opt);
   });
 
@@ -160,6 +170,44 @@ export async function promptImageExportSize({
   hint.style.opacity = '0.75';
   hint.style.marginBottom = '10px';
   hint.textContent = 'Tip: you can type “4050x5100”, “3840×2160”, or add “px”.';
+
+  let hdCheckbox = null;
+  let hdRow = null;
+  if (includeHdOption) {
+    // Use a <label> wrapper so taps toggle reliably on mobile Safari.
+    const rowHd = document.createElement('label');
+    rowHd.style.display = 'flex';
+    rowHd.style.alignItems = 'center';
+    rowHd.style.gap = '10px';
+    rowHd.style.marginBottom = '10px';
+    rowHd.style.cursor = 'pointer';
+    rowHd.style.userSelect = 'none';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = `export-hd-supersample-${Math.random().toString(16).slice(2)}`;
+    checkbox.style.width = '18px';
+    checkbox.style.height = '18px';
+    checkbox.style.margin = '0';
+    checkbox.style.cursor = 'pointer';
+    checkbox.style.accentColor = 'rgba(125,211,252,0.95)'; // ~tailwind sky-300
+    checkbox.checked = Boolean(
+      typeof includeHdOption === 'object' && includeHdOption?.defaultChecked,
+    );
+
+    const labelText = document.createElement('span');
+    labelText.style.fontSize = '13px';
+    labelText.style.opacity = '0.92';
+    labelText.textContent =
+      typeof includeHdOption === 'object' && includeHdOption?.label
+        ? String(includeHdOption.label)
+        : 'HD (2× AA) — render at 2× then downscale';
+
+    rowHd.appendChild(checkbox);
+    rowHd.appendChild(labelText);
+    hdCheckbox = checkbox;
+    hdRow = rowHd;
+  }
 
   let includeFormulaOverlayCheckbox = null;
   let includeFormulaOverlayRow = null;
@@ -237,6 +285,9 @@ export async function promptImageExportSize({
   actions.appendChild(okBtn);
 
   form.appendChild(row);
+  if (hdRow) {
+    form.appendChild(hdRow);
+  }
   if (includeFormulaOverlayRow) {
     form.appendChild(includeFormulaOverlayRow);
   }
@@ -257,7 +308,6 @@ export async function promptImageExportSize({
 
   sizeInput.value = `${initial.width}x${initial.height}`;
 
-  let currentRenderScale = 1;
   if (preferredPreset) {
     presetSelect.value = presetKeyFor(preferredPreset) || '__custom__';
   } else {
@@ -272,8 +322,6 @@ export async function promptImageExportSize({
     if (w && h) {
       sizeInput.value = `${w}x${h}`;
     }
-    const rs = selected.dataset.renderScale ? Number(selected.dataset.renderScale) : 1;
-    currentRenderScale = rs === 2 ? 2 : 1;
   }
 
   function validate() {
@@ -294,7 +342,6 @@ export async function promptImageExportSize({
   });
   sizeInput.addEventListener('input', () => {
     presetSelect.value = '__custom__';
-    currentRenderScale = 1;
     validate();
   });
 
@@ -331,8 +378,9 @@ export async function promptImageExportSize({
             resolve(null);
             return;
           }
+          const renderScale = hdCheckbox ? (hdCheckbox.checked ? 2 : 1) : 1;
           const includeFormulaOverlay = includeFormulaOverlayCheckbox ? Boolean(includeFormulaOverlayCheckbox.checked) : false;
-          resolve({ ...size, includeFormulaOverlay, renderScale: currentRenderScale });
+          resolve({ ...size, includeFormulaOverlay, renderScale });
         },
         { once: true },
       );

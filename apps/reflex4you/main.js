@@ -1886,7 +1886,7 @@ async function saveCanvasImage() {
     const screenW = clampExportPx(cssW * dpr);
     const screenH = clampExportPx(cssH * dpr);
     if (!screenW || !screenH) return [];
-    const presets = [
+    return [
       {
         key: 'screen',
         label: `Screen (${screenW}×${screenH} px)`,
@@ -1894,18 +1894,6 @@ async function saveCanvasImage() {
         height: screenH,
       },
     ];
-    // "HD" mode: supersample at 2×, then downscale for better antialiasing.
-    const canSupersample2x = screenW * 2 <= 20000 && screenH * 2 <= 20000;
-    if (canSupersample2x) {
-      presets.push({
-        key: 'screen-hd',
-        label: `HD (2× AA) (${screenW}×${screenH} px)`,
-        width: screenW,
-        height: screenH,
-        renderScale: 2,
-      });
-    }
-    return presets;
   }
 
   const defaultSize = canvas.width && canvas.height ? { width: canvas.width, height: canvas.height } : null;
@@ -1928,7 +1916,11 @@ async function saveCanvasImage() {
     title: 'Export image (PNG)',
     presets,
     defaultSize: defaultSize || undefined,
-    defaultPresetKey: 'screen-hd',
+    defaultPresetKey: 'screen',
+    includeHdOption: {
+      label: 'HD (2× AA) — render at 2× then downscale for smoother edges',
+      defaultChecked: true,
+    },
     includeFormulaOverlayOption: {
       label: 'Overlay formula on bottom half (with translucent white background)',
         defaultChecked: true,
