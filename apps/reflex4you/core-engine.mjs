@@ -303,6 +303,37 @@ function materializeComposeMultiples(ast) {
   // `ComposeMultiple` compact (e.g. render as "^{\\circ 40}" instead of 40 chained
   // compositions).
   let root = cloneAst(ast, { preserveBindings: true });
+
+  function tryResolveStaticRepeatCount(expr) {
+    // Best-effort fallback for legacy/unresolved `RepeatComposePlaceholder`.
+    // Full resolution (including finger-dependent constant folding) is handled
+    // during parsing in arithmetic-parser.mjs; this is only to avoid silently
+    // dropping `$$ n` when `n` is a plain literal.
+    if (!expr || typeof expr !== 'object') {
+      return null;
+    }
+    if (expr.kind !== 'Const') {
+      return null;
+    }
+    const re = Number(expr.re);
+    const im = Number(expr.im);
+    if (!Number.isFinite(re) || !Number.isFinite(im)) {
+      return null;
+    }
+    // Require a real integer within a tiny tolerance.
+    if (Math.abs(im) > 1e-9) {
+      return null;
+    }
+    const rounded = Math.round(re);
+    if (Math.abs(re - rounded) > 1e-9) {
+      return null;
+    }
+    if (rounded < 0) {
+      return null;
+    }
+    return rounded;
+  }
+
   function visit(node, parent, key) {
     if (!node || typeof node !== "object") {
       return;
@@ -317,7 +348,17 @@ function materializeComposeMultiples(ast) {
       if (node.countExpression) {
         visit(node.countExpression, node, "countExpression");
       }
-      const replacement = node.base || VarZ();
+      const count = tryResolveStaticRepeatCount(node.countExpression);
+      let replacement;
+      if (count === null) {
+        replacement = node.base || VarZ();
+      } else if (count <= 0) {
+        replacement = VarZ();
+      } else if (count === 1) {
+        replacement = node.base || VarZ();
+      } else {
+        replacement = oo(node.base || VarZ(), count);
+      }
       if (node.span && replacement && typeof replacement === "object") {
         replacement.span = node.span;
         replacement.input = node.input;

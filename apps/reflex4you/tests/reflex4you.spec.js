@@ -454,3 +454,34 @@ test('dragging D1 stays continuous when formula uses $$', async ({ page }) => {
 
   await page.mouse.up();
 });
+
+test('let-bindings do not break $$ repeat composition in the compiled shader', async ({ page }) => {
+  await page.goto('/index.html');
+  await waitForReflexReady(page);
+
+  const hasRenderer = await page.evaluate(() => Boolean(window.__reflexCore));
+  test.skip(!hasRenderer, 'Renderer unavailable (no WebGL2 in this browser environment)');
+
+  const textarea = page.locator('#formula');
+  await expect(textarea).toBeVisible();
+
+  const formulas = [
+    'z^2 - D1 $$ 8',
+    'let g = z^2 - D1 in\n g $$ 8',
+    'let g = z in\n (z^2 - D1 $$ 8)',
+  ];
+
+  const countComposeReturns = (shader) => {
+    const matches = String(shader || '').match(/return\\s+node\\d+\\(node\\d+\\(z\\)\\);/g);
+    return matches ? matches.length : 0;
+  };
+
+  for (const src of formulas) {
+    await textarea.fill(src);
+    await expectNoRendererError(page);
+    await expect.poll(async () => {
+      const shader = await page.evaluate(() => window.__reflexCore.lastFragmentSource);
+      return countComposeReturns(shader);
+    }).toBe(7);
+  }
+});

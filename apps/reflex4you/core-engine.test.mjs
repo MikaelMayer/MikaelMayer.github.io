@@ -104,6 +104,20 @@ test('buildFragmentSourceFromAST does not mutate repeat-composition (ComposeMult
   assert.equal(latexAfter, latexBefore);
 });
 
+test('buildFragmentSourceFromAST does not silently drop legacy RepeatComposePlaceholder nodes', () => {
+  // This node kind should normally be resolved during parsing, but shader generation
+  // must not compile it as just the base when the count is a literal.
+  const legacy = {
+    kind: 'RepeatComposePlaceholder',
+    base: { kind: 'Var', name: 'z' },
+    countExpression: { kind: 'Const', re: 8, im: 0 },
+  };
+  const fragment = buildFragmentSourceFromAST(legacy);
+  const matches = fragment.match(/return\s+node\d+\(node\d+\(z\)\);/g) || [];
+  // oo(f, 8) produces 7 Compose wrappers in the materialized tree.
+  assert.equal(matches.length, 7);
+});
+
 test('Pow nodes emit exponentiation by squaring and allow negatives', () => {
   const ast = Pow(Const(1, 0), -3);
   const fragment = buildFragmentSourceFromAST(ast);
