@@ -307,6 +307,30 @@ function materializeComposeMultiples(ast) {
     if (!node || typeof node !== "object") {
       return;
     }
+    if (node.kind === "RepeatComposePlaceholder") {
+      // This is an intermediate parser node (used while resolving `$$` repeat
+      // counts). It should not reach GPU code generation, but handle it
+      // defensively to avoid crashes if it leaks through (e.g. older links).
+      if (node.base) {
+        visit(node.base, node, "base");
+      }
+      if (node.countExpression) {
+        visit(node.countExpression, node, "countExpression");
+      }
+      const replacement = node.base || VarZ();
+      if (node.span && replacement && typeof replacement === "object") {
+        replacement.span = node.span;
+        replacement.input = node.input;
+      }
+      if (parent && key) {
+        parent[key] = replacement;
+        visit(parent[key], parent, key);
+      } else {
+        root = replacement;
+        visit(root, null, null);
+      }
+      return;
+    }
     if (node.kind === "ComposeMultiple") {
       if (node.base) {
         visit(node.base, node, "base");
@@ -660,6 +684,22 @@ function assignNodeIds(ast) {
       assignNodeIds(ast.f);
       assignNodeIds(ast.g);
       return;
+    case "ComposeMultiple":
+      // Should have been materialized away before GLSL generation, but handle
+      // defensively so unexpected ASTs don't crash traversal.
+      assignNodeIds(ast.base);
+      if (ast.countExpression) {
+        assignNodeIds(ast.countExpression);
+      }
+      return;
+    case "RepeatComposePlaceholder":
+      // Intermediate node kind that should be resolved during parsing. Keep the
+      // traversal robust in case it leaks through.
+      assignNodeIds(ast.base);
+      if (ast.countExpression) {
+        assignNodeIds(ast.countExpression);
+      }
+      return;
     default:
       throw new Error("Unknown AST kind in assignNodeIds: " + ast.kind);
   }
@@ -718,6 +758,18 @@ function collectNodesPostOrder(ast, out) {
     case "Compose":
       collectNodesPostOrder(ast.f, out);
       collectNodesPostOrder(ast.g, out);
+      break;
+    case "ComposeMultiple":
+      collectNodesPostOrder(ast.base, out);
+      if (ast.countExpression) {
+        collectNodesPostOrder(ast.countExpression, out);
+      }
+      break;
+    case "RepeatComposePlaceholder":
+      collectNodesPostOrder(ast.base, out);
+      if (ast.countExpression) {
+        collectNodesPostOrder(ast.countExpression, out);
+      }
       break;
     case "Var":
     case "VarX":
@@ -1437,7 +1489,10 @@ void main() {
 export function buildFragmentSourceFromAST(ast) {
   const lowered = prepareAstForGpu(ast);
   const preparedAst = materializeComposeMultiples(lowered);
-  const uniformCounts = analyzeFingerUniformCounts(preparedAst);
+  // Compute uniform counts *before* materializing `ComposeMultiple`, because
+  // repeat count expressions can reference fingers and must reserve uniform
+  // slots even though the shader uses only the resolved repeat count.
+  const uniformCounts = analyzeFingerUniformCounts(lowered);
   const { funcs, topName } = buildNodeFunctionsAndTop(preparedAst);
   return fragmentTemplate
     .replace("/*FIXED_OFFSETS_COUNT*/", String(uniformCounts.fixedCount))
