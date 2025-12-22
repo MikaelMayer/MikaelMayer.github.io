@@ -175,13 +175,11 @@ Use `npx playwright test --project=chromium` if you only want to debug Chromium,
 
 ## Pre-merge checklist (Reflex4You)
 
-- [ ] **Bump the app major version**: update `APP_VERSION` in `apps/reflex4you/main.js`.
-- [ ] **Keep service-worker in sync with the major version**:
-  - [ ] Update `CACHE_MINOR` in `apps/reflex4you/service-worker.js` (should start with the same major, e.g. `12.x`).
-  - [ ] Update the SW registration cache-buster query in **both** places:
-    - [ ] `apps/reflex4you/main.js` (`service-worker.js?sw=…`)
-    - [ ] `apps/reflex4you/formula-page.mjs` (`service-worker.js?sw=…`)
-- [ ] **Update any hardcoded UI version fallback**: `apps/reflex4you/index.html` (`#app-version-pill` initial text) so it matches the current major.
+- [ ] **Version bump (one command)**: from the repo root, run one of:
+  - [ ] `npm run reflex4you:version -- major` (bumps `APP_VERSION` and resets SW/cache versions)
+  - [ ] `npm run reflex4you:version -- minor` (keeps `APP_VERSION`, bumps SW/cache versions)
+  - [ ] `npm run reflex4you:version -- set …` (explicit versions / revert)
+  See `apps/reflex4you/VERSIONING.md` for details and what files are touched.
 - [ ] **PR preview cache-busting** (recommended): ensure `__REFLEX_BUILD_ID__` placeholders exist in:
   - [ ] `apps/reflex4you/index.html`
   - [ ] `apps/reflex4you/formula.html`
