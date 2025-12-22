@@ -1850,6 +1850,16 @@ function resolveRepeatPlaceholders(ast, parseOptions, input) {
       return null;
     }
     switch (node.kind) {
+      case 'LetBinding': {
+        // `let` bindings can appear at the top level and may contain `$$` nodes
+        // in their bodies. We must traverse them so `RepeatComposePlaceholder`
+        // nodes are resolved into `ComposeMultiple` before GPU compilation.
+        const valueErr = visit(node.value, node, 'value');
+        if (valueErr) {
+          return valueErr;
+        }
+        return visit(node.body, node, 'body');
+      }
       case 'RepeatComposePlaceholder': {
         const baseErr = visit(node.base, node, 'base');
         if (baseErr) {
@@ -1896,6 +1906,7 @@ function resolveRepeatPlaceholders(ast, parseOptions, input) {
         return bodyErr;
       }
       case 'SetRef':
+      case 'Identifier':
       case 'Const':
       case 'Var':
       case 'VarX':

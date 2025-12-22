@@ -264,6 +264,17 @@ test('$$ postfix binds tighter than $', () => {
   assert.equal(result.value.f.resolvedCount, 2);
 });
 
+test('$$ resolves inside top-level let bindings', () => {
+  const result = parseFormulaInput('let g = z^2 - D1 in g $$ 8');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'LetBinding');
+  assert.equal(result.value.name, 'g');
+  assert.equal(result.value.body.kind, 'ComposeMultiple');
+  assert.equal(result.value.body.resolvedCount, 8);
+  assert.equal(result.value.body.base.kind, 'Identifier');
+  assert.equal(result.value.body.base.name, 'g');
+});
+
 test('$$ accepts zero counts as identity', () => {
   const result = parseFormulaInput('z $$ 0');
   assert.equal(result.ok, true);
