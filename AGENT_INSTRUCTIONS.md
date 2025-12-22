@@ -143,3 +143,15 @@ file:///workspace/preview.html
 ```
 https://mikaelmayer.github.io/preview.html
 ```
+
+## Reflex4You version bumping (maintenance)
+
+If you change `apps/reflex4you` and need to bump the app/cache/service-worker versions, use the one-command helper from the repo root:
+
+```bash
+npm run reflex4you:version -- major   # bump app major (APP_VERSION)
+npm run reflex4you:version -- minor   # cache/SW refresh without changing APP_VERSION
+npm run reflex4you:version -- set 20 --cache 20.1 --sw 20.2  # explicit / revert
+```
+
+Details: `apps/reflex4you/VERSIONING.md`.
