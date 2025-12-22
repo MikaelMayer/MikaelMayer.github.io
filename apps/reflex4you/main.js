@@ -131,6 +131,7 @@ let fingerSoloButton = null;
 let fingerSoloDropdown = null;
 let fingerSoloList = null;
 let fingerSoloHint = null;
+let fingerSoloValueRefreshers = [];
 
 // When solos are non-empty, only those labels can capture pointers.
 // Solos are stored in the URL as `solos=F1,D2,...` (comma separated).
@@ -295,21 +296,21 @@ function ensureFingerSoloUI() {
   button.setAttribute('aria-haspopup', 'dialog');
   button.setAttribute('aria-expanded', 'false');
   button.setAttribute('aria-controls', 'finger-solo-dropdown');
-  button.title = 'Select which constants can capture';
+  button.title = 'Select which parameters your fingers can move';
 
   const dropdown = document.createElement('div');
   dropdown.id = 'finger-solo-dropdown';
   dropdown.setAttribute('role', 'dialog');
-  dropdown.setAttribute('aria-label', 'Finger constant selection');
+  dropdown.setAttribute('aria-label', 'Parameter selection');
   dropdown.dataset.open = 'false';
 
   const header = document.createElement('div');
   header.className = 'finger-solo-dropdown__title';
-  header.textContent = 'Solo selection';
+  header.textContent = 'Parameters';
 
   const hint = document.createElement('div');
   hint.className = 'finger-solo-dropdown__hint';
-  hint.textContent = 'Uncheck all for unrestricted. In solo mode, only checked constants can capture.';
+  hint.textContent = 'Fingers can move all parameters. Tap a value to edit. Check any to enable solo mode.';
 
   const list = document.createElement('div');
   list.className = 'finger-solo-list';
@@ -325,6 +326,10 @@ function ensureFingerSoloUI() {
   function setOpen(isOpen) {
     dropdown.dataset.open = isOpen ? 'true' : 'false';
     button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    if (isOpen) {
+      // Values may have changed since the list was last built.
+      rebuildFingerSoloList();
+    }
   }
 
   button.addEventListener('click', (event) => {
@@ -353,7 +358,173 @@ function ensureFingerSoloUI() {
 }
 
 function getSoloModeEnabled() {
-  return soloLabelSet.size > 0;
+  const activeCount = activeFingerState?.activeLabelSet?.size ?? 0;
+  return soloLabelSet.size > 0 && activeCount > 1;
+}
+
+function isFingerSoloDropdownOpen() {
+  return fingerSoloDropdown?.dataset?.open === 'true';
+}
+
+function refreshFingerSoloValueDisplays() {
+  if (!isFingerSoloDropdownOpen()) {
+    return;
+  }
+  for (const refresh of fingerSoloValueRefreshers) {
+    try {
+      refresh();
+    } catch (_) {
+      // ignore
+    }
+  }
+}
+
+function formatFingerValueForEditor(label) {
+  const latest = reflexCore?.getFingerValue?.(label) ?? latestOffsets?.[label] ?? defaultFingerOffset(label);
+  return formatComplexForQuery(latest.x, latest.y) || '0+0i';
+}
+
+function applyFingerValueFromEditor(label, raw) {
+  const parsed = parseComplexString(raw);
+  if (!parsed) {
+    return { ok: false, message: 'Use "a+bi" or "real,imag".' };
+  }
+  if (!reflexCore) {
+    return { ok: false, message: 'Renderer unavailable.' };
+  }
+  reflexCore.setFingerValue(label, parsed.x, parsed.y);
+  if (activePointerIds.size === 0) {
+    scheduleCommitHistorySnapshot();
+  }
+  return { ok: true };
+}
+
+function buildInlineFingerValueEditor(label) {
+  const wrap = document.createElement('div');
+  wrap.className = 'finger-solo-row__value-wrap';
+
+  const display = document.createElement('button');
+  display.type = 'button';
+  display.className = 'finger-solo-row__value';
+  display.setAttribute('aria-label', `Edit ${label} value`);
+  display.title = 'Click to edit';
+
+  const editor = document.createElement('div');
+  editor.className = 'finger-solo-row__value-editor';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'finger-solo-row__value-input';
+  input.spellcheck = false;
+  input.autocapitalize = 'off';
+  input.autocomplete = 'off';
+  input.inputMode = 'text';
+
+  const actions = document.createElement('div');
+  actions.className = 'finger-solo-row__value-actions';
+
+  const okBtn = document.createElement('button');
+  okBtn.type = 'button';
+  okBtn.className = 'finger-solo-row__value-action';
+  okBtn.textContent = '✓';
+  okBtn.setAttribute('aria-label', `Apply ${label} value`);
+  okBtn.title = 'Apply';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.className = 'finger-solo-row__value-action finger-solo-row__value-action--cancel';
+  cancelBtn.textContent = '✕';
+  cancelBtn.setAttribute('aria-label', `Cancel editing ${label} value`);
+  cancelBtn.title = 'Cancel';
+
+  function refresh() {
+    const formatted = formatFingerValueForEditor(label);
+    display.textContent = formatted;
+    if (wrap.dataset.editing !== 'true') {
+      input.value = formatted;
+    }
+  }
+
+  function setEditing(nextEditing) {
+    wrap.dataset.editing = nextEditing ? 'true' : 'false';
+    display.style.display = nextEditing ? 'none' : '';
+    // Important: CSS default is `display: none`, so `''` would keep it hidden.
+    editor.style.display = nextEditing ? 'flex' : 'none';
+    if (nextEditing) {
+      input.value = formatFingerValueForEditor(label);
+      input.setCustomValidity('');
+      // Focus synchronously (mobile browsers may block async focus/keyboard).
+      try {
+        input.focus({ preventScroll: true });
+        input.select();
+      } catch (_) {
+        // ignore
+      }
+    }
+  }
+
+  function cancel() {
+    setEditing(false);
+    refresh();
+  }
+
+  function commit() {
+    const raw = String(input.value || '').trim();
+    const result = applyFingerValueFromEditor(label, raw);
+    if (!result.ok) {
+      input.setCustomValidity(result.message || 'Invalid value');
+      try {
+        input.reportValidity();
+      } catch (_) {
+        // ignore
+      }
+      return false;
+    }
+    setEditing(false);
+    refresh();
+    updateFingerSoloButtonText();
+    return true;
+  }
+
+  display.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setEditing(true);
+  });
+
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      event.stopPropagation();
+      commit();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      cancel();
+    }
+  });
+
+  okBtn.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    commit();
+  });
+
+  cancelBtn.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    cancel();
+  });
+
+  wrap.appendChild(display);
+  actions.appendChild(okBtn);
+  actions.appendChild(cancelBtn);
+  editor.appendChild(input);
+  editor.appendChild(actions);
+  wrap.appendChild(editor);
+  setEditing(false);
+  refresh();
+  return { element: wrap, refresh };
 }
 
 function updateFingerSoloButtonText() {
@@ -370,7 +541,7 @@ function updateFingerSoloButtonText() {
 
   if (!filtered.length) {
     if (!soloMode) {
-      fingerSoloButton.textContent = 'Unrestricted';
+      fingerSoloButton.textContent = 'Parameters...';
     } else {
       const serialized = serializeSolosParam(soloLabelSet);
       fingerSoloButton.textContent = serialized ? `Solo: ${serialized}` : 'Solo';
@@ -383,6 +554,9 @@ function updateFingerSoloButtonText() {
     return formatComplexForDisplay(label, latest.x, latest.y);
   });
   fingerSoloButton.textContent = lines.join('\n');
+
+  // Keep the dropdown values in sync while open (without rebuilding DOM).
+  refreshFingerSoloValueDisplays();
 }
 
 function getActiveDraggedLabels() {
@@ -411,21 +585,48 @@ function rebuildFingerSoloList() {
     return;
   }
   fingerSoloList.innerHTML = '';
+  fingerSoloValueRefreshers = [];
 
   const activeLabels = sortFingerLabels(Array.from(activeFingerState.activeLabelSet));
   if (!activeLabels.length) {
     const empty = document.createElement('div');
     empty.className = 'finger-solo-dropdown__hint';
-    empty.textContent = 'No finger constants in this formula.';
+    empty.textContent = 'No parameters in this formula.';
     fingerSoloList.appendChild(empty);
+    if (fingerSoloHint) {
+      fingerSoloHint.textContent = 'No parameters to edit.';
+    }
+    return;
+  }
+
+  if (activeLabels.length === 1) {
+    if (fingerSoloHint) {
+      fingerSoloHint.textContent = 'Click the value to edit this parameter.';
+    }
+
+    const label = activeLabels[0];
+    const row = document.createElement('div');
+    row.className = 'finger-solo-row finger-solo-row--single';
+    row.dataset.finger = label;
+
+    const labelEl = document.createElement('div');
+    labelEl.className = 'finger-solo-row__label';
+    labelEl.textContent = label;
+
+    const valueEditor = buildInlineFingerValueEditor(label);
+    fingerSoloValueRefreshers.push(valueEditor.refresh);
+
+    row.appendChild(labelEl);
+    row.appendChild(valueEditor.element);
+    fingerSoloList.appendChild(row);
     return;
   }
 
   const soloMode = getSoloModeEnabled();
   if (fingerSoloHint) {
     fingerSoloHint.textContent = soloMode
-      ? 'Solo mode: only checked constants can capture. Uncheck all for unrestricted.'
-      : 'Unrestricted: all constants can capture. Check any to enter solo mode.';
+      ? 'Solo mode: fingers move only checked parameters. Uncheck all so fingers can move all parameters.'
+      : 'Fingers can move all parameters. Tap a value to edit. Check any to enable solo mode.';
   }
 
   for (const label of activeLabels) {
@@ -443,17 +644,8 @@ function rebuildFingerSoloList() {
     labelEl.className = 'finger-solo-row__label';
     labelEl.textContent = label;
 
-    const edit = document.createElement('button');
-    edit.type = 'button';
-    edit.className = 'finger-solo-row__edit';
-    edit.title = `Set ${label} value`;
-    edit.setAttribute('aria-label', `Set ${label} value`);
-    edit.innerHTML = `
-      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M12 20h9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-      </svg>
-    `;
+    const valueEditor = buildInlineFingerValueEditor(label);
+    fingerSoloValueRefreshers.push(valueEditor.refresh);
 
     checkbox.addEventListener('change', (event) => {
       event.stopPropagation();
@@ -472,16 +664,9 @@ function rebuildFingerSoloList() {
       updateFingerSoloButtonText();
     });
 
-    edit.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      promptFingerValue(label);
-      updateFingerSoloButtonText();
-    });
-
     row.appendChild(checkbox);
     row.appendChild(labelEl);
-    row.appendChild(edit);
+    row.appendChild(valueEditor.element);
     fingerSoloList.appendChild(row);
   }
 }
@@ -2659,7 +2844,7 @@ function triggerImageDownload(url, filename, shouldRevoke) {
 
 if ('serviceWorker' in navigator) {
   // Version the SW script URL so updates can't get stuck behind a cached SW script.
-  const SW_URL = './service-worker.js?sw=20.1';
+  const SW_URL = './service-worker.js?sw=20.2';
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(SW_URL).then((registration) => {
       // Auto-activate updated workers so cache/version bumps take effect quickly.

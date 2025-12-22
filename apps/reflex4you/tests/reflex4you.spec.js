@@ -223,7 +223,7 @@ test('shows D1 indicator when dynamic finger only appears inside set binding', a
 
   const soloButton = page.locator('#finger-solo-button');
   await expect(soloButton).toBeVisible();
-  await expect(soloButton).toHaveText(/Unrestricted/);
+  await expect(soloButton).toHaveText(/Parameters\.\.\./);
 
   await soloButton.click();
   const d1Row = page.locator('.finger-solo-row[data-finger="D1"]');
@@ -243,7 +243,7 @@ test('shows F1 indicator when fixed finger only appears inside set binding', asy
 
   const soloButton = page.locator('#finger-solo-button');
   await expect(soloButton).toBeVisible();
-  await expect(soloButton).toHaveText(/Unrestricted/);
+  await expect(soloButton).toHaveText(/Parameters\.\.\./);
 
   await soloButton.click();
   const f1Row = page.locator('.finger-solo-row[data-finger="F1"]');
@@ -307,6 +307,26 @@ test('solo selection persists across reload without expanding', async ({ page })
   await expect(w1).toBeChecked();
   await expect(w2).toBeChecked();
   await expect(d1).not.toBeChecked();
+});
+
+test('parameter value opens inline editor in dropdown', async ({ page }) => {
+  const supportsCompression = await detectCompressionCapability(page);
+  const source = 'z + D1 + W1 + W2';
+  const targetUrl = supportsCompression
+    ? `/index.html?formulab64=${encodeURIComponent(encodeFormulaToFormulab64(source))}&edit=true`
+    : `/index.html?formula=${encodeURIComponent(source)}&edit=true`;
+
+  await page.goto(targetUrl);
+  await waitForReflexReady(page);
+
+  await page.locator('#finger-solo-button').click();
+
+  const valueChip = page.locator('.finger-solo-row[data-finger="D1"] .finger-solo-row__value');
+  await expect(valueChip).toBeVisible();
+  await valueChip.click();
+
+  const input = page.locator('.finger-solo-row[data-finger="D1"] .finger-solo-row__value-input');
+  await expect(input).toBeVisible();
 });
 
 test('menu can copy a share link for the current reflex', async ({ page }) => {
