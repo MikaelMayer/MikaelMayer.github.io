@@ -326,6 +326,8 @@
       gap: 6px;
       align-items: center;
       min-width: 0;
+      flex-direction: column; /* put ✓/✕ below the input */
+      align-items: stretch;
     }
 
     .finger-solo-row__value-input {
@@ -343,12 +345,14 @@
       letter-spacing: 0.02em;
       outline: none;
       box-sizing: border-box;
+      width: 100%;
     }
 
     .finger-solo-row__value-actions {
       display: flex;
       gap: 6px;
       flex: 0 0 auto;
+      justify-content: flex-end;
     }
 
     .finger-solo-row__value-action {
