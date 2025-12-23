@@ -2834,10 +2834,6 @@ export function parseFormulaInput(input, options = {}) {
       input: remainder,
     });
   }
-  const letValidationError = validateLetBindingsTopLevelOnly(parsed.value, normalized);
-  if (letValidationError instanceof ParseFailure) {
-    return letValidationError;
-  }
   const resolveError = resolveSetReferences(parsed.value, normalized);
   if (resolveError instanceof ParseFailure) {
     return resolveError;
