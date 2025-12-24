@@ -136,6 +136,7 @@ let fingerSoloFooter = null;
 let fingerSoloAnimStartButton = null;
 let fingerSoloAnimEndButton = null;
 let fingerSoloAnimDurationButton = null;
+let fingerSoloAnimGlobalToggleButton = null;
 
 // When solos are non-empty, only those labels can capture pointers.
 // Solos are stored in the URL as `solos=F1,D2,...` (comma separated).
@@ -240,6 +241,12 @@ let sessionEditMode = false;
 let previewLabelSet = new Set();
 let previewController = null;
 
+// Global animation track state (derived from URL intervals).
+let globalAllTrackLabelSet = new Set();
+let globalEffectiveTrackLabelSet = new Set();
+// Labels temporarily excluded from global playback (so they become draggable).
+let globalMutedLabelSet = new Set();
+
 function createEmptyFingerState() {
   return {
     mode: 'none',
@@ -329,6 +336,12 @@ function ensureFingerSoloUI() {
   const animRow = document.createElement('div');
   animRow.className = 'finger-solo-footer__row';
 
+  const globalToggle = document.createElement('button');
+  globalToggle.type = 'button';
+  globalToggle.className = 'finger-solo-footer__button';
+  globalToggle.textContent = '▶ Anim';
+  globalToggle.title = 'Play/pause all animations (for parameters with animation intervals)';
+
   const animStart = document.createElement('button');
   animStart.type = 'button';
   animStart.className = 'finger-solo-footer__button';
@@ -346,6 +359,12 @@ function ensureFingerSoloUI() {
   animTime.className = 'finger-solo-footer__button';
   animTime.textContent = 'Anim duration…';
   animTime.title = 'Set animation duration (seconds)';
+
+  globalToggle.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleGlobalAnimationPlayback();
+  });
 
   animStart.addEventListener('click', (event) => {
     event.preventDefault();
@@ -369,6 +388,7 @@ function ensureFingerSoloUI() {
     scheduleCommitHistorySnapshot();
   });
 
+  animRow.appendChild(globalToggle);
   animRow.appendChild(animStart);
   animRow.appendChild(animEnd);
   animRow.appendChild(animTime);
@@ -416,6 +436,7 @@ function ensureFingerSoloUI() {
   fingerSoloList = list;
   fingerSoloHint = hint;
   fingerSoloFooter = footer;
+  fingerSoloAnimGlobalToggleButton = globalToggle;
   fingerSoloAnimStartButton = animStart;
   fingerSoloAnimEndButton = animEnd;
   fingerSoloAnimDurationButton = animTime;
@@ -440,6 +461,21 @@ function refreshFingerSoloValueDisplays() {
     } catch (_) {
       // ignore
     }
+  }
+
+  // Keep footer controls in sync too.
+  try {
+    const { all } = buildEffectiveGlobalTracksFromQuery();
+    const animatedCount = all.size;
+    if (fingerSoloAnimGlobalToggleButton) {
+      // Show only when multiple parameters are animatable.
+      fingerSoloAnimGlobalToggleButton.style.display = animatedCount >= 2 ? '' : 'none';
+      const playing = Boolean(animationController?.isPlaying?.());
+      fingerSoloAnimGlobalToggleButton.textContent = playing ? '⏸ Anim' : '▶ Anim';
+      fingerSoloAnimGlobalToggleButton.setAttribute('aria-pressed', playing ? 'true' : 'false');
+    }
+  } catch (_) {
+    // ignore
   }
 }
 
@@ -583,7 +619,15 @@ function buildInlineFingerValueEditor(label) {
     animatedFields.style.display = animated ? 'flex' : 'none';
     currentActions.style.display = animated ? 'flex' : 'none';
     playBtn.disabled = !animated;
-    const playing = Boolean(previewLabelSet && previewLabelSet.has(label));
+    const globalPlayingThis =
+      Boolean(animated) &&
+      Boolean(animationController?.isPlaying?.()) &&
+      Boolean(globalEffectiveTrackLabelSet?.has?.(label));
+    const previewPlayingThis =
+      Boolean(animated) &&
+      Boolean(previewController?.isPlaying?.()) &&
+      Boolean(previewLabelSet && previewLabelSet.has(label));
+    const playing = globalPlayingThis || previewPlayingThis;
     playBtn.textContent = playing ? '⏸' : '▶';
     playBtn.setAttribute('aria-pressed', playing ? 'true' : 'false');
 
@@ -804,8 +848,17 @@ function buildInlineFingerValueEditor(label) {
     event.stopPropagation();
     const interval = readAnimationIntervalFromQuery(label);
     if (!interval) return;
-    const isPlaying = Boolean(previewLabelSet && previewLabelSet.has(label));
-    setPreviewLabelPlaying(label, !isPlaying);
+    // If a global URL animation controller exists, this toggles participation
+    // for this label (mute/unmute). Otherwise, it plays this label as a preview loop.
+    if (animationController || globalAllTrackLabelSet.has(label)) {
+      const currentlyActive = globalEffectiveTrackLabelSet.has(label);
+      setGlobalLabelMuted(label, currentlyActive);
+      refresh();
+      return;
+    }
+
+    const isPreviewPlaying = Boolean(previewController?.isPlaying?.() && previewLabelSet && previewLabelSet.has(label));
+    setPreviewLabelPlaying(label, !isPreviewPlaying);
     refresh();
   });
 
@@ -981,13 +1034,24 @@ function applySoloFilterToRenderer() {
   }
   const soloMode = getSoloModeEnabled();
   const allowed = soloMode ? new Set(soloLabelSet) : null;
-  const blocked = previewLabelSet && previewLabelSet.size ? new Set(previewLabelSet) : null;
+  const blocked = new Set();
+  if (previewController?.isPlaying?.()) {
+    for (const label of Array.from(previewLabelSet || [])) {
+      blocked.add(label);
+    }
+  }
+  if (animationController?.isPlaying?.()) {
+    for (const label of Array.from(globalEffectiveTrackLabelSet || [])) {
+      blocked.add(label);
+    }
+  }
+  const hasBlocked = blocked.size > 0;
 
   function filterSlots(list) {
     const arr = Array.isArray(list) ? list : [];
     return arr
       .filter((label) => (allowed ? allowed.has(label) : true))
-      .filter((label) => (blocked ? !blocked.has(label) : true));
+      .filter((label) => (hasBlocked ? !blocked.has(label) : true));
   }
 
   const axisConstraints = activeFingerState.axisConstraints instanceof Map
@@ -1994,6 +2058,17 @@ function applyFingerState(state) {
   ensureFingerSoloUI();
   rebuildFingerSoloList();
 
+  // Drop any preview/global mute labels that are no longer active in the formula.
+  previewLabelSet = new Set(Array.from(previewLabelSet || []).filter((l) => activeFingerState.activeLabelSet.has(l)));
+  globalMutedLabelSet = new Set(Array.from(globalMutedLabelSet || []).filter((l) => activeFingerState.activeLabelSet.has(l)));
+  // Recompute track label sets after pruning.
+  try {
+    const { all } = buildEffectiveGlobalTracksFromQuery();
+    recomputeGlobalTrackLabelSets(all);
+  } catch (_) {
+    // ignore
+  }
+
   ensureFingerSubscriptions(activeFingerState.allSlots);
   syncFingerUI();
 
@@ -2203,11 +2278,12 @@ async function bootstrapReflexApplication() {
 
   // Load any animation intervals from the URL and start animating (unless edit mode).
   if (reflexCore) {
-    const tracks = buildAnimationTracksFromQuery();
-    if (tracks.size) {
-      applyAnimationStartValues(tracks);
-      if (!editEnabled) {
-        startAnimations(tracks);
+    const { all, effective } = buildEffectiveGlobalTracksFromQuery();
+    if (all.size) {
+      // Start values always apply (so the UI matches the interval start when opening a share link).
+      applyAnimationStartValues(all);
+      if (!editEnabled && effective.size) {
+        startAnimations(effective);
       }
     }
   }
@@ -2559,6 +2635,25 @@ function buildAnimationTracksFromQuery() {
   return tracks;
 }
 
+function recomputeGlobalTrackLabelSets(tracksFromQuery) {
+  const all = new Set(Array.from(tracksFromQuery.keys()));
+  globalAllTrackLabelSet = all;
+  const effective = new Set(Array.from(all).filter((label) => !globalMutedLabelSet.has(label)));
+  globalEffectiveTrackLabelSet = effective;
+}
+
+function buildEffectiveGlobalTracksFromQuery() {
+  const all = buildAnimationTracksFromQuery();
+  recomputeGlobalTrackLabelSets(all);
+  const effective = new Map();
+  for (const [label, interval] of all.entries()) {
+    if (!globalMutedLabelSet.has(label)) {
+      effective.set(label, interval);
+    }
+  }
+  return { all, effective };
+}
+
 function applyAnimationStartValues(tracks) {
   if (!reflexCore) {
     return;
@@ -2587,18 +2682,23 @@ function startAnimations(tracks) {
   if (animationController) {
     animationController.stop();
   }
+  // Starting global playback implies "these tracks are active".
+  globalAllTrackLabelSet = new Set(Array.from(tracks.keys()));
+  globalEffectiveTrackLabelSet = new Set(Array.from(tracks.keys()));
   animationController = createAnimationController(reflexCore, tracks, animationSeconds);
   animationController.start();
+  applySoloFilterToRenderer();
 }
 
-function createAnimationController(core, tracks, secondsPerSegment) {
+function createAnimationController(core, tracks, secondsPerSegment, options = {}) {
+  const startPaused = Boolean(options.startPaused);
   const state = {
     core,
     tracks: new Map(tracks),
     secondsPerSegment: Math.max(0.001, Number(secondsPerSegment) || DEFAULT_ANIMATION_SECONDS),
     rafId: null,
-    playing: false,
-    paused: false,
+    playing: startPaused,
+    paused: startPaused,
     lastNowMs: 0,
     perTrack: new Map(),
   };
@@ -2653,7 +2753,7 @@ function createAnimationController(core, tracks, secondsPerSegment) {
 
   return {
     start() {
-      if (state.playing) {
+      if (state.playing && !state.paused) {
         return;
       }
       state.playing = true;
@@ -2677,6 +2777,9 @@ function createAnimationController(core, tracks, secondsPerSegment) {
     },
     isPlaying() {
       return state.playing && !state.paused;
+    },
+    isPaused() {
+      return state.playing && state.paused;
     },
   };
 }
@@ -2727,6 +2830,71 @@ function setPreviewLabelPlaying(label, shouldPlay) {
   if (tracks.size && reflexCore) {
     previewController = createAnimationController(reflexCore, tracks, animationSeconds);
     previewController.start();
+  }
+  applySoloFilterToRenderer();
+  refreshFingerSoloValueDisplays();
+  updateFingerSoloButtonText();
+}
+
+function setGlobalLabelMuted(label, muted) {
+  if (!isFingerLabel(label)) {
+    return;
+  }
+  const next = new Set(globalMutedLabelSet);
+  if (muted) {
+    next.add(label);
+  } else {
+    next.delete(label);
+  }
+  globalMutedLabelSet = next;
+
+  const wasPlaying = Boolean(animationController?.isPlaying?.());
+  const wasPaused = Boolean(animationController?.isPaused?.());
+
+  if (animationController) {
+    animationController.stop();
+    animationController = null;
+  }
+
+  const { effective } = buildEffectiveGlobalTracksFromQuery();
+  if (effective.size && reflexCore) {
+    animationController = createAnimationController(reflexCore, effective, animationSeconds, { startPaused: wasPaused });
+    if (wasPlaying) {
+      animationController.start();
+    }
+  }
+
+  applySoloFilterToRenderer();
+  refreshFingerSoloValueDisplays();
+  updateFingerSoloButtonText();
+}
+
+function toggleGlobalAnimationPlayback() {
+  const anyIntervals = buildAnimationTracksFromQuery();
+  recomputeGlobalTrackLabelSets(anyIntervals);
+
+  if (!reflexCore) {
+    return;
+  }
+
+  // If no controller exists, create one (honor muted labels).
+  if (!animationController) {
+    const { effective } = buildEffectiveGlobalTracksFromQuery();
+    if (!effective.size) {
+      return;
+    }
+    animationController = createAnimationController(reflexCore, effective, animationSeconds);
+    animationController.start();
+    applySoloFilterToRenderer();
+    refreshFingerSoloValueDisplays();
+    updateFingerSoloButtonText();
+    return;
+  }
+
+  if (animationController.isPlaying()) {
+    animationController.pause();
+  } else {
+    animationController.start();
   }
   applySoloFilterToRenderer();
   refreshFingerSoloValueDisplays();
@@ -2812,6 +2980,22 @@ function promptAndSetAnimationTime() {
   if (previewTracks.size && reflexCore) {
     previewController = createAnimationController(reflexCore, previewTracks, animationSeconds);
     previewController.start();
+  }
+
+  // If global controller exists (playing or paused), restart it to apply new duration.
+  if (animationController) {
+    const wasPlaying = Boolean(animationController.isPlaying());
+    const wasPaused = Boolean(animationController.isPaused());
+    animationController.stop();
+    animationController = null;
+    const { effective } = buildEffectiveGlobalTracksFromQuery();
+    if (effective.size && reflexCore) {
+      animationController = createAnimationController(reflexCore, effective, animationSeconds, { startPaused: wasPaused });
+      if (wasPlaying) {
+        animationController.start();
+      }
+    }
+    applySoloFilterToRenderer();
   }
 }
 
