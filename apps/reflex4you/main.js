@@ -1487,9 +1487,6 @@ function isEditModeActive() {
 function enterEditModeForSession() {
   sessionEditMode = true;
   revealViewerModeUIOnce();
-  if (animationController) {
-    animationController.stop();
-  }
 }
 
 function setViewerModeActive(active) {
@@ -2213,16 +2210,6 @@ async function bootstrapReflexApplication() {
         startAnimations(tracks);
       }
     }
-    // Tap anywhere while animations are playing switches into edit mode for this session.
-    document.addEventListener(
-      'pointerdown',
-      () => {
-        if (animationController?.isPlaying()) {
-          enterEditModeForSession();
-        }
-      },
-      { capture: true },
-    );
   }
 
   // Seed the undo stack with the initial ready state.
