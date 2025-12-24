@@ -606,10 +606,28 @@ test('_modulus (function literal) renders as a function call so the highlighted 
   assert.match(latex, /\\left\(z\\right\)/);
 });
 
-test('nested let bindings are rejected', () => {
-  const result = parseFormulaInput('set a = let f = z in f in a');
-  assert.equal(result.ok, false);
-  assert.match(result.message, /top level/i);
+test('nested let bindings are allowed (let lifting happens in GPU lowering)', () => {
+  const result = parseFormulaInput('set d = 3 in let f = d * z in f');
+  assert.equal(result.ok, true);
+  const ast = result.value;
+  assert.equal(ast.kind, 'SetBinding');
+  assert.equal(ast.name, 'd');
+  assert.equal(ast.value.kind, 'Const');
+  assert.equal(ast.value.re, 3);
+  assert.equal(ast.value.im, 0);
+  assert.equal(ast.body.kind, 'LetBinding');
+  assert.equal(ast.body.name, 'f');
+  assert.equal(ast.body.value.kind, 'Mul');
+  assert.equal(ast.body.value.left.kind, 'SetRef');
+  assert.strictEqual(ast.body.value.left.binding, ast);
+  assert.equal(ast.body.value.right.kind, 'Var');
+  assert.equal(ast.body.body.kind, 'Identifier');
+  assert.equal(ast.body.body.name, 'f');
+  // GPU compilation must still succeed.
+  assert.doesNotThrow(() => {
+    const fragment = buildFragmentSourceFromAST(ast);
+    assert.match(fragment, /vec2 node\d+\(vec2 z\)/);
+  });
 });
 
 test('top-level let can be followed by another let (sequential lets)', () => {
