@@ -346,13 +346,28 @@
       width: 100%;
     }
 
-    /* Colorful outline to indicate animation data. */
+    /* Colorful outline to indicate animation data (current value + chip). */
     .finger-solo-row__value[data-animated="true"],
-    .finger-solo-row__value-input[data-animated="true"] {
+    .finger-solo-row__value-input--current[data-animated="true"] {
       border: 1px solid transparent;
       background:
         linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.65)) padding-box,
         linear-gradient(120deg, rgba(158, 240, 255, 0.95), rgba(255, 179, 71, 0.95), rgba(183, 136, 255, 0.95)) border-box;
+    }
+
+    /* Start/end fields are *not* animated themselves: keep them distinct and subtler. */
+    .finger-solo-row__value-input--start[data-animated="true"] {
+      border: 1px solid transparent;
+      background:
+        linear-gradient(rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.62)) padding-box,
+        linear-gradient(120deg, rgba(158, 240, 255, 0.55), rgba(158, 240, 255, 0.25)) border-box;
+    }
+
+    .finger-solo-row__value-input--end[data-animated="true"] {
+      border: 1px solid transparent;
+      background:
+        linear-gradient(rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.62)) padding-box,
+        linear-gradient(120deg, rgba(255, 179, 71, 0.55), rgba(183, 136, 255, 0.30)) border-box;
     }
 
     .finger-solo-row__anim-actions {
