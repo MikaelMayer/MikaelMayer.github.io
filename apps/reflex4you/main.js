@@ -132,6 +132,10 @@ let fingerSoloDropdown = null;
 let fingerSoloList = null;
 let fingerSoloHint = null;
 let fingerSoloValueRefreshers = [];
+let fingerSoloFooter = null;
+let fingerSoloAnimStartButton = null;
+let fingerSoloAnimEndButton = null;
+let fingerSoloAnimDurationButton = null;
 
 // When solos are non-empty, only those labels can capture pointers.
 // Solos are stored in the URL as `solos=F1,D2,...` (comma separated).
@@ -232,6 +236,10 @@ let animationController = null;
 let animationDraftStart = null;
 let sessionEditMode = false;
 
+// Per-parameter animation preview (plays even in edit mode).
+let previewLabelSet = new Set();
+let previewController = null;
+
 function createEmptyFingerState() {
   return {
     mode: 'none',
@@ -281,7 +289,7 @@ function ensureFingerSoloUI() {
   if (!fingerIndicatorStack) {
     return;
   }
-  if (fingerSoloButton && fingerSoloDropdown && fingerSoloList) {
+  if (fingerSoloButton && fingerSoloDropdown && fingerSoloList && fingerSoloFooter) {
     return;
   }
 
@@ -315,9 +323,61 @@ function ensureFingerSoloUI() {
   const list = document.createElement('div');
   list.className = 'finger-solo-list';
 
+  const footer = document.createElement('div');
+  footer.className = 'finger-solo-footer';
+
+  const animRow = document.createElement('div');
+  animRow.className = 'finger-solo-footer__row';
+
+  const animStart = document.createElement('button');
+  animStart.type = 'button';
+  animStart.className = 'finger-solo-footer__button';
+  animStart.textContent = 'Set anim start';
+  animStart.title = 'Capture current values as animation start (for all active handles)';
+
+  const animEnd = document.createElement('button');
+  animEnd.type = 'button';
+  animEnd.className = 'finger-solo-footer__button';
+  animEnd.textContent = 'Set anim end';
+  animEnd.title = 'Write animation intervals using the current values as end (for all handles captured in “start”)';
+
+  const animTime = document.createElement('button');
+  animTime.type = 'button';
+  animTime.className = 'finger-solo-footer__button';
+  animTime.textContent = 'Anim duration…';
+  animTime.title = 'Set animation duration (seconds)';
+
+  animStart.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setAnimationStartFromCurrent();
+  });
+
+  animEnd.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    commitHistorySnapshot();
+    setAnimationEndFromCurrent();
+    scheduleCommitHistorySnapshot();
+  });
+
+  animTime.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    commitHistorySnapshot();
+    promptAndSetAnimationTime();
+    scheduleCommitHistorySnapshot();
+  });
+
+  animRow.appendChild(animStart);
+  animRow.appendChild(animEnd);
+  animRow.appendChild(animTime);
+  footer.appendChild(animRow);
+
   dropdown.appendChild(header);
   dropdown.appendChild(hint);
   dropdown.appendChild(list);
+  dropdown.appendChild(footer);
 
   anchor.appendChild(button);
   anchor.appendChild(dropdown);
@@ -355,6 +415,10 @@ function ensureFingerSoloUI() {
   fingerSoloDropdown = dropdown;
   fingerSoloList = list;
   fingerSoloHint = hint;
+  fingerSoloFooter = footer;
+  fingerSoloAnimStartButton = animStart;
+  fingerSoloAnimEndButton = animEnd;
+  fingerSoloAnimDurationButton = animTime;
 }
 
 function getSoloModeEnabled() {
@@ -393,9 +457,6 @@ function applyFingerValueFromEditor(label, raw) {
     return { ok: false, message: 'Renderer unavailable.' };
   }
   reflexCore.setFingerValue(label, parsed.x, parsed.y);
-  if (activePointerIds.size === 0) {
-    scheduleCommitHistorySnapshot();
-  }
   return { ok: true };
 }
 
@@ -412,37 +473,123 @@ function buildInlineFingerValueEditor(label) {
   const editor = document.createElement('div');
   editor.className = 'finger-solo-row__value-editor';
 
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.className = 'finger-solo-row__value-input';
-  input.spellcheck = false;
-  input.autocapitalize = 'off';
-  input.autocomplete = 'off';
-  input.inputMode = 'text';
+  function createValueInput({ ariaLabel, className }) {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = className;
+    input.spellcheck = false;
+    input.autocapitalize = 'off';
+    input.autocomplete = 'off';
+    input.inputMode = 'text';
+    input.setAttribute('aria-label', ariaLabel);
+    return input;
+  }
 
-  const actions = document.createElement('div');
-  actions.className = 'finger-solo-row__value-actions';
+  const currentInput = createValueInput({
+    ariaLabel: `Current value for ${label}`,
+    className: 'finger-solo-row__value-input finger-solo-row__value-input--current',
+  });
+  currentInput.placeholder = 'current';
 
-  const okBtn = document.createElement('button');
-  okBtn.type = 'button';
-  okBtn.className = 'finger-solo-row__value-action';
-  okBtn.textContent = '✓';
-  okBtn.setAttribute('aria-label', `Apply ${label} value`);
-  okBtn.title = 'Apply';
+  const animatedFields = document.createElement('div');
+  animatedFields.className = 'finger-solo-row__anim-fields';
 
-  const cancelBtn = document.createElement('button');
-  cancelBtn.type = 'button';
-  cancelBtn.className = 'finger-solo-row__value-action finger-solo-row__value-action--cancel';
-  cancelBtn.textContent = '✕';
-  cancelBtn.setAttribute('aria-label', `Cancel editing ${label} value`);
-  cancelBtn.title = 'Cancel';
+  const startInput = createValueInput({
+    ariaLabel: `Animation start value for ${label}`,
+    className: 'finger-solo-row__value-input finger-solo-row__value-input--start',
+  });
+  startInput.placeholder = 'start';
+  const endInput = createValueInput({
+    ariaLabel: `Animation end value for ${label}`,
+    className: 'finger-solo-row__value-input finger-solo-row__value-input--end',
+  });
+  endInput.placeholder = 'end';
+
+  const currentActions = document.createElement('div');
+  currentActions.className = 'finger-solo-row__anim-actions';
+
+  const applyStartBtn = document.createElement('button');
+  applyStartBtn.type = 'button';
+  applyStartBtn.className = 'finger-solo-row__anim-action';
+  applyStartBtn.textContent = '⏪';
+  applyStartBtn.title = 'Overwrite current value with start value';
+  applyStartBtn.setAttribute('aria-label', `Overwrite ${label} with start value`);
+
+  const applyEndBtn = document.createElement('button');
+  applyEndBtn.type = 'button';
+  applyEndBtn.className = 'finger-solo-row__anim-action';
+  applyEndBtn.textContent = '⏩';
+  applyEndBtn.title = 'Overwrite current value with end value';
+  applyEndBtn.setAttribute('aria-label', `Overwrite ${label} with end value`);
+
+  const recordStartBtn = document.createElement('button');
+  recordStartBtn.type = 'button';
+  recordStartBtn.className = 'finger-solo-row__anim-action';
+  recordStartBtn.textContent = '⏮';
+  recordStartBtn.title = 'Record current value as start value';
+  recordStartBtn.setAttribute('aria-label', `Record ${label} current value as start`);
+
+  const recordEndBtn = document.createElement('button');
+  recordEndBtn.type = 'button';
+  recordEndBtn.className = 'finger-solo-row__anim-action';
+  recordEndBtn.textContent = '⏭';
+  recordEndBtn.title = 'Record current value as end value';
+  recordEndBtn.setAttribute('aria-label', `Record ${label} current value as end`);
+
+  currentActions.appendChild(applyStartBtn);
+  currentActions.appendChild(applyEndBtn);
+  currentActions.appendChild(recordStartBtn);
+  currentActions.appendChild(recordEndBtn);
+
+  const animControls = document.createElement('div');
+  animControls.className = 'finger-solo-row__anim-controls';
+
+  const toggleAnimBtn = document.createElement('button');
+  toggleAnimBtn.type = 'button';
+  toggleAnimBtn.className = 'finger-solo-row__anim-toggle';
+  toggleAnimBtn.textContent = 'Animate';
+  toggleAnimBtn.title = 'Add or remove animation interval';
+
+  const playBtn = document.createElement('button');
+  playBtn.type = 'button';
+  playBtn.className = 'finger-solo-row__anim-play';
+  playBtn.textContent = '▶';
+  playBtn.title = 'Play this animation (loops); disables dragging this handle while playing';
+  playBtn.setAttribute('aria-pressed', 'false');
+
+  animControls.appendChild(toggleAnimBtn);
+  animControls.appendChild(playBtn);
 
   function refresh() {
     const formatted = formatFingerValueForEditor(label);
     display.textContent = formatted;
+    const interval = readAnimationIntervalFromQuery(label);
+    const animated = Boolean(interval && interval.start && interval.end);
+    display.dataset.animated = animated ? 'true' : 'false';
+    currentInput.dataset.animated = animated ? 'true' : 'false';
+    startInput.dataset.animated = animated ? 'true' : 'false';
+    endInput.dataset.animated = animated ? 'true' : 'false';
     if (wrap.dataset.editing !== 'true') {
-      input.value = formatted;
+      currentInput.value = formatted;
     }
+    // Sync animation fields when present (but don't stomp the user's in-progress edits).
+    if (animated) {
+      const startText = formatComplexForQuery(interval.start.x, interval.start.y) || '0+0i';
+      const endText = formatComplexForQuery(interval.end.x, interval.end.y) || '0+0i';
+      if (wrap.dataset.editing !== 'true' || document.activeElement !== startInput) startInput.value = startText;
+      if (wrap.dataset.editing !== 'true' || document.activeElement !== endInput) endInput.value = endText;
+    }
+
+    animatedFields.style.display = animated ? 'flex' : 'none';
+    currentActions.style.display = animated ? 'flex' : 'none';
+    playBtn.disabled = !animated;
+    const playing = Boolean(previewLabelSet && previewLabelSet.has(label));
+    playBtn.textContent = playing ? '⏸' : '▶';
+    playBtn.setAttribute('aria-pressed', playing ? 'true' : 'false');
+
+    // Update animate/remove button label.
+    toggleAnimBtn.textContent = animated ? 'Remove animation' : 'Animate';
+    toggleAnimBtn.dataset.mode = animated ? 'remove' : 'add';
   }
 
   function setEditing(nextEditing) {
@@ -451,38 +598,87 @@ function buildInlineFingerValueEditor(label) {
     // Important: CSS default is `display: none`, so `''` would keep it hidden.
     editor.style.display = nextEditing ? 'flex' : 'none';
     if (nextEditing) {
-      input.value = formatFingerValueForEditor(label);
-      input.setCustomValidity('');
+      currentInput.value = formatFingerValueForEditor(label);
+      currentInput.setCustomValidity('');
       // Focus synchronously (mobile browsers may block async focus/keyboard).
       try {
-        input.focus({ preventScroll: true });
-        input.select();
+        currentInput.focus({ preventScroll: true });
+        currentInput.select();
       } catch (_) {
         // ignore
       }
     }
   }
 
-  function cancel() {
-    setEditing(false);
-    refresh();
+  let didApplyDuringEdit = false;
+
+  function canonicalize(value) {
+    const parsed = parseComplexString(value);
+    if (!parsed) return null;
+    return formatComplexForQuery(parsed.x, parsed.y);
   }
 
-  function commit() {
-    const raw = String(input.value || '').trim();
-    const result = applyFingerValueFromEditor(label, raw);
-    if (!result.ok) {
-      input.setCustomValidity(result.message || 'Invalid value');
-      try {
-        input.reportValidity();
-      } catch (_) {
-        // ignore
-      }
-      return false;
+  function updateAnimatedButtonsEnabledState() {
+    const interval = readAnimationIntervalFromQuery(label);
+    if (!interval) {
+      applyStartBtn.disabled = true;
+      applyEndBtn.disabled = true;
+      recordStartBtn.disabled = true;
+      recordEndBtn.disabled = true;
+      return;
     }
+    const current = canonicalize(currentInput.value);
+    const start = canonicalize(startInput.value);
+    const end = canonicalize(endInput.value);
+    applyStartBtn.disabled = !(current && start && current !== start);
+    applyEndBtn.disabled = !(current && end && current !== end);
+    recordStartBtn.disabled = !(current && start && current !== start);
+    recordEndBtn.disabled = !(current && end && current !== end);
+  }
+
+  function closeAndCommitIfNeeded() {
     setEditing(false);
     refresh();
     updateFingerSoloButtonText();
+    if (didApplyDuringEdit && activePointerIds.size === 0) {
+      commitHistorySnapshot();
+    }
+    didApplyDuringEdit = false;
+  }
+
+  function applyCurrentValueFromInput() {
+    const raw = String(currentInput.value || '').trim();
+    const result = applyFingerValueFromEditor(label, raw);
+    if (!result.ok) {
+      currentInput.setCustomValidity(result.message || 'Invalid value');
+      return false;
+    }
+    currentInput.setCustomValidity('');
+    didApplyDuringEdit = true;
+    updateFingerSoloButtonText();
+    updateAnimatedButtonsEnabledState();
+    return true;
+  }
+
+  function writeAnimationIntervalFromInputs() {
+    const start = parseComplexString(startInput.value);
+    const end = parseComplexString(endInput.value);
+    if (!start || !end) {
+      return false;
+    }
+    const key = `${label}${ANIMATION_SUFFIX}`;
+    const serialized = serializeAnimationInterval({ start, end });
+    if (!serialized) {
+      return false;
+    }
+    updateSearchParam(key, serialized);
+    // If this parameter is preview-playing, restart it so it picks up the updated interval.
+    if (previewLabelSet && previewLabelSet.has(label)) {
+      setPreviewLabelPlaying(label, false);
+      setPreviewLabelPlaying(label, true);
+    }
+    refresh();
+    updateAnimatedButtonsEnabledState();
     return true;
   }
 
@@ -490,37 +686,145 @@ function buildInlineFingerValueEditor(label) {
     event.preventDefault();
     event.stopPropagation();
     setEditing(true);
+    refresh();
+    updateAnimatedButtonsEnabledState();
   });
 
-  input.addEventListener('keydown', (event) => {
+  // Live-update the handle as the user types a valid value.
+  currentInput.addEventListener('input', () => {
+    applyCurrentValueFromInput();
+  });
+
+  currentInput.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
       event.preventDefault();
       event.stopPropagation();
-      commit();
+      try {
+        currentInput.blur();
+      } catch (_) {}
     } else if (event.key === 'Escape') {
       event.preventDefault();
       event.stopPropagation();
-      cancel();
+      try {
+        currentInput.blur();
+      } catch (_) {}
     }
   });
 
-  okBtn.addEventListener('click', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    commit();
+  const onAnimFieldInput = () => {
+    // Only persist when both fields parse.
+    writeAnimationIntervalFromInputs();
+  };
+  startInput.addEventListener('input', onAnimFieldInput);
+  endInput.addEventListener('input', onAnimFieldInput);
+
+  startInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      try { startInput.blur(); } catch (_) {}
+    }
+  });
+  endInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      try { endInput.blur(); } catch (_) {}
+    }
   });
 
-  cancelBtn.addEventListener('click', (event) => {
+  applyStartBtn.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
-    cancel();
+    const start = canonicalize(startInput.value);
+    if (!start) return;
+    currentInput.value = start;
+    applyCurrentValueFromInput();
+  });
+
+  applyEndBtn.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const end = canonicalize(endInput.value);
+    if (!end) return;
+    currentInput.value = end;
+    applyCurrentValueFromInput();
+  });
+
+  recordStartBtn.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const current = canonicalize(currentInput.value);
+    if (!current) return;
+    startInput.value = current;
+    writeAnimationIntervalFromInputs();
+  });
+
+  recordEndBtn.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const current = canonicalize(currentInput.value);
+    if (!current) return;
+    endInput.value = current;
+    writeAnimationIntervalFromInputs();
+  });
+
+  toggleAnimBtn.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const interval = readAnimationIntervalFromQuery(label);
+    const animated = Boolean(interval && interval.start && interval.end);
+    const key = `${label}${ANIMATION_SUFFIX}`;
+    if (!animated) {
+      // Initialize start/end to the current value.
+      const current = parseComplexString(currentInput.value) || reflexCore?.getFingerValue?.(label);
+      if (!current || !Number.isFinite(current.x) || !Number.isFinite(current.y)) return;
+      const start = { x: current.x, y: current.y };
+      const end = { x: current.x, y: current.y };
+      const serialized = serializeAnimationInterval({ start, end });
+      if (serialized) {
+        updateSearchParam(key, serialized);
+        refresh();
+        updateAnimatedButtonsEnabledState();
+      }
+      return;
+    }
+    if (!window.confirm(`Remove animation for ${label}?`)) {
+      return;
+    }
+    // If it was preview-playing, stop it first.
+    setPreviewLabelPlaying(label, false);
+    updateSearchParam(key, null);
+    refresh();
+    updateAnimatedButtonsEnabledState();
+  });
+
+  playBtn.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const interval = readAnimationIntervalFromQuery(label);
+    if (!interval) return;
+    const isPlaying = Boolean(previewLabelSet && previewLabelSet.has(label));
+    setPreviewLabelPlaying(label, !isPlaying);
+    refresh();
+  });
+
+  // Close editor + push a single undo frame when focus leaves this control.
+  wrap.addEventListener('focusout', (event) => {
+    const next = event.relatedTarget;
+    if (next && wrap.contains(next)) {
+      return;
+    }
+    closeAndCommitIfNeeded();
   });
 
   wrap.appendChild(display);
-  actions.appendChild(okBtn);
-  actions.appendChild(cancelBtn);
-  editor.appendChild(input);
-  editor.appendChild(actions);
+  editor.appendChild(currentInput);
+  editor.appendChild(currentActions);
+  animatedFields.appendChild(startInput);
+  animatedFields.appendChild(endInput);
+  editor.appendChild(animatedFields);
+  editor.appendChild(animControls);
   wrap.appendChild(editor);
   setEditing(false);
   refresh();
@@ -677,11 +981,13 @@ function applySoloFilterToRenderer() {
   }
   const soloMode = getSoloModeEnabled();
   const allowed = soloMode ? new Set(soloLabelSet) : null;
+  const blocked = previewLabelSet && previewLabelSet.size ? new Set(previewLabelSet) : null;
 
   function filterSlots(list) {
     const arr = Array.isArray(list) ? list : [];
-    if (!allowed) return arr.slice();
-    return arr.filter((label) => allowed.has(label));
+    return arr
+      .filter((label) => (allowed ? allowed.has(label) : true))
+      .filter((label) => (blocked ? !blocked.has(label) : true));
   }
 
   const axisConstraints = activeFingerState.axisConstraints instanceof Map
@@ -1030,8 +1336,17 @@ function parseComplexString(raw) {
 
   if (normalized.endsWith('i')) {
     const core = normalized.slice(0, -1);
-    if (!core.length) {
-      return null;
+    // Support shorthand imaginary values:
+    // - "i"   -> 0+1i
+    // - "+i"  -> 0+1i
+    // - "-i"  -> 0-1i
+    // - "2i"  -> 0+2i
+    // - "-2i" -> 0-2i
+    if (!core.length || core === '+') {
+      return { x: 0, y: 1 };
+    }
+    if (core === '-') {
+      return { x: 0, y: -1 };
     }
     let splitIdx = -1;
     for (let i = core.length - 1; i > 0; i--) {
@@ -1048,6 +1363,12 @@ function parseComplexString(raw) {
       const im = Number(imagPart);
       if (Number.isFinite(re) && Number.isFinite(im)) {
         return { x: re, y: im };
+      }
+    } else {
+      // Pure imaginary magnitude like "2i" / "-0.5i".
+      const im = Number(core);
+      if (Number.isFinite(im)) {
+        return { x: 0, y: im };
       }
     }
   }
@@ -2373,6 +2694,58 @@ function createAnimationController(core, tracks, secondsPerSegment) {
   };
 }
 
+function buildPreviewTracksFromState() {
+  const tracks = new Map();
+  for (const label of Array.from(previewLabelSet || [])) {
+    const interval = readAnimationIntervalFromQuery(label);
+    if (interval) {
+      tracks.set(label, interval);
+    }
+  }
+  return tracks;
+}
+
+function stopPreviewAnimations() {
+  if (previewController) {
+    previewController.stop();
+  }
+  previewController = null;
+  previewLabelSet = new Set();
+  applySoloFilterToRenderer();
+  refreshFingerSoloValueDisplays();
+  updateFingerSoloButtonText();
+}
+
+function setPreviewLabelPlaying(label, shouldPlay) {
+  if (!isFingerLabel(label)) {
+    return;
+  }
+  const interval = readAnimationIntervalFromQuery(label);
+  if (!interval) {
+    return;
+  }
+  const next = new Set(previewLabelSet);
+  if (shouldPlay) {
+    next.add(label);
+  } else {
+    next.delete(label);
+  }
+  previewLabelSet = next;
+
+  if (previewController) {
+    previewController.stop();
+    previewController = null;
+  }
+  const tracks = buildPreviewTracksFromState();
+  if (tracks.size && reflexCore) {
+    previewController = createAnimationController(reflexCore, tracks, animationSeconds);
+    previewController.start();
+  }
+  applySoloFilterToRenderer();
+  refreshFingerSoloValueDisplays();
+  updateFingerSoloButtonText();
+}
+
 function setAnimationStartFromCurrent() {
   if (!reflexCore) {
     return;
@@ -2442,6 +2815,16 @@ function promptAndSetAnimationTime() {
   const tracks = buildAnimationTracksFromQuery();
   if (tracks.size && !isEditModeActive()) {
     startAnimations(tracks);
+  }
+  // Keep per-parameter preview playback in sync with the new duration.
+  if (previewController) {
+    previewController.stop();
+    previewController = null;
+  }
+  const previewTracks = buildPreviewTracksFromState();
+  if (previewTracks.size && reflexCore) {
+    previewController = createAnimationController(reflexCore, previewTracks, animationSeconds);
+    previewController.start();
   }
 }
 
