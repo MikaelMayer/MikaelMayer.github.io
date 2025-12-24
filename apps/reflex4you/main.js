@@ -2858,8 +2858,12 @@ function setGlobalLabelMuted(label, muted) {
 
   const { effective } = buildEffectiveGlobalTracksFromQuery();
   if (effective.size && reflexCore) {
-    animationController = createAnimationController(reflexCore, effective, animationSeconds, { startPaused: wasPaused });
-    if (wasPlaying) {
+    // If the user explicitly pressed ▶ on a parameter, they expect it to animate
+    // even if the global controller had previously been stopped (e.g. when all
+    // labels were muted). So when unmuting, always start playback.
+    const shouldStart = !muted || wasPlaying;
+    animationController = createAnimationController(reflexCore, effective, animationSeconds, { startPaused: !shouldStart && wasPaused });
+    if (shouldStart) {
       animationController.start();
     }
   }
