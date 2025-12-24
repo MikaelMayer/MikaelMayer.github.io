@@ -70,21 +70,22 @@
       display: none !important;
     }
 
-    /* Error overlay positioned beneath finger indicators */
+    /* Error overlay (scrollable, capped height) */
     #error {
       position: fixed;
       left: 12px;
       right: 12px;
-      top: calc(var(--safe-area-top) + var(--viewport-top-offset) + 104px);
+      top: calc(var(--safe-area-top) + var(--viewport-top-offset) + 12px);
       padding: 8px 12px;
       font-size: 13px;
       color: #ffb4b4;
       background: rgba(20, 0, 0, 0.9);
       box-sizing: border-box;
-      max-height: 40vh;
-      overflow: hidden;
+      /* Keep parse errors compact so they don't fight the keyboard + formula editor. */
+      max-height: 16vh;
+      overflow: auto;
       display: none;
-      pointer-events: none;
+      pointer-events: auto;
       font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       white-space: pre;
       z-index: 20;
@@ -94,6 +95,7 @@
       pointer-events: auto;
       user-select: text;
       overflow: auto;
+      max-height: 50vh;
     }
 
     #error .error-actions {
@@ -133,8 +135,12 @@
       color: #ddd;
       padding: 8px 10px calc(10px + var(--safe-area-bottom));
       box-sizing: border-box;
-      display: block;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
       pointer-events: auto;
+      /* Keep formula/parameter UI above the canvas finger handles. */
+      z-index: 35;
     }
 
     #formula {
@@ -142,7 +148,8 @@
       resize: none;
       border-radius: 4px;
       border: 1px solid #555;
-      background: rgba(10, 10, 10, 0.9);
+      /* Slightly transparent so the fractal still shows through. */
+      background: rgba(10, 10, 10, 0.58);
       color: #eee;
       font-family: monospace;
       font-size: 24px;
@@ -160,13 +167,9 @@
     }
 
     #finger-indicator-stack {
-      position: fixed;
-      top: calc(var(--safe-area-top) + var(--viewport-top-offset) + 12px);
-      left: 12px;
       display: none;
       flex-direction: column;
       gap: 8px;
-      z-index: 30;
       pointer-events: auto;
     }
 
@@ -212,7 +215,7 @@
 
     #finger-solo-dropdown {
       position: absolute;
-      top: calc(100% + 8px);
+      bottom: calc(100% + 8px);
       left: 0;
       background: rgba(0, 0, 0, 0.92);
       border: 1px solid rgba(255, 255, 255, 0.35);
@@ -326,7 +329,7 @@
       gap: 6px;
       align-items: center;
       min-width: 0;
-      flex-direction: column; /* put ✓/✕ below the input */
+      flex-direction: column;
       align-items: stretch;
     }
 
@@ -346,6 +349,160 @@
       outline: none;
       box-sizing: border-box;
       width: 100%;
+    }
+
+    /* Colorful outline to indicate animation data (current value + chip). */
+    .finger-solo-row__value[data-animated="true"],
+    .finger-solo-row__value-input--current[data-animated="true"] {
+      border: 1px solid transparent;
+      background:
+        linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.65)) padding-box,
+        linear-gradient(120deg, rgba(158, 240, 255, 0.95), rgba(255, 179, 71, 0.95), rgba(183, 136, 255, 0.95)) border-box;
+    }
+
+    /* Start/end fields are *not* animated themselves: keep them distinct and subtler. */
+    .finger-solo-row__value-input--start[data-animated="true"] {
+      border: 1px solid transparent;
+      background:
+        linear-gradient(rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.62)) padding-box,
+        linear-gradient(120deg, rgba(158, 240, 255, 0.55), rgba(158, 240, 255, 0.25)) border-box;
+    }
+
+    .finger-solo-row__value-input--end[data-animated="true"] {
+      border: 1px solid transparent;
+      background:
+        linear-gradient(rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.62)) padding-box,
+        linear-gradient(120deg, rgba(255, 179, 71, 0.55), rgba(183, 136, 255, 0.30)) border-box;
+    }
+
+    .finger-solo-row__anim-actions {
+      display: none;
+      gap: 6px;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+
+    .finger-solo-row__anim-action {
+      width: 40px;
+      height: 34px;
+      padding: 0;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.92);
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .finger-solo-row__anim-action:disabled {
+      opacity: 0.35;
+      cursor: default;
+      pointer-events: none;
+    }
+
+    .finger-solo-row__anim-action:hover,
+    .finger-solo-row__anim-action:focus-visible {
+      border-color: rgba(255, 255, 255, 0.38);
+      background: rgba(255, 255, 255, 0.10);
+      outline: none;
+    }
+
+    .finger-solo-row__anim-fields {
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .finger-solo-row__anim-controls {
+      display: flex;
+      gap: 8px;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .finger-solo-row__anim-toggle {
+      flex: 1 1 auto;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 13px;
+      cursor: pointer;
+      text-align: left;
+      touch-action: manipulation;
+    }
+
+    .finger-solo-row__anim-toggle:hover,
+    .finger-solo-row__anim-toggle:focus-visible {
+      border-color: rgba(255, 255, 255, 0.38);
+      background: rgba(255, 255, 255, 0.10);
+      outline: none;
+    }
+
+    .finger-solo-row__anim-play {
+      width: 44px;
+      height: 36px;
+      padding: 0;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.92);
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .finger-solo-row__anim-play[aria-pressed="true"] {
+      border-color: rgba(158, 240, 255, 0.75);
+      background: rgba(158, 240, 255, 0.10);
+    }
+
+    .finger-solo-row__anim-play:disabled {
+      opacity: 0.35;
+      cursor: default;
+      pointer-events: none;
+    }
+
+    .finger-solo-row__anim-play:hover,
+    .finger-solo-row__anim-play:focus-visible {
+      border-color: rgba(255, 255, 255, 0.38);
+      background: rgba(255, 255, 255, 0.10);
+      outline: none;
+    }
+
+    .finger-solo-footer {
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      padding-top: 10px;
+    }
+
+    .finger-solo-footer__row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .finger-solo-footer__button {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.9);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 13px;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .finger-solo-footer__button:hover,
+    .finger-solo-footer__button:focus-visible {
+      border-color: rgba(255, 255, 255, 0.38);
+      background: rgba(255, 255, 255, 0.10);
+      outline: none;
     }
 
     .finger-solo-row__value-actions {
@@ -693,7 +850,6 @@
   </style>
 </head>
 <body>
-<div id="finger-indicator-stack" aria-live="polite"></div>
 <canvas id="glcanvas"></canvas>
 
 <div id="finger-overlay" aria-hidden="true"></div>
@@ -791,30 +947,6 @@
         <button
           type="button"
           class="menu-dropdown__item"
-          data-menu-action="set-animation-start"
-          role="menuitem"
-        >
-          Set animation start
-        </button>
-        <button
-          type="button"
-          class="menu-dropdown__item"
-          data-menu-action="set-animation-end"
-          role="menuitem"
-        >
-          Set animation end
-        </button>
-        <button
-          type="button"
-          class="menu-dropdown__item"
-          data-menu-action="set-animation-time"
-          role="menuitem"
-        >
-          Set animation time
-        </button>
-        <button
-          type="button"
-          class="menu-dropdown__item"
           data-menu-action="save-image"
           role="menuitem"
         >
@@ -831,7 +963,7 @@
       </div>
     </div>
   </div>
-  <div id="app-version-pill" aria-live="polite" aria-label="Reflex4You version">v23</div>
+  <div id="app-version-pill" aria-live="polite" aria-label="Reflex4You version">v24</div>
 </div>
 
 <div id="error"></div>
@@ -848,6 +980,7 @@
 
 <div id="formula-panel">
   <textarea id="formula" spellcheck="false" aria-label="Formula"></textarea>
+  <div id="finger-indicator-stack" aria-live="polite"></div>
 </div>
 
 <script type="module">

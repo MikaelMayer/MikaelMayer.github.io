@@ -325,7 +325,7 @@ test('parameter value opens inline editor in dropdown', async ({ page }) => {
   await expect(valueChip).toBeVisible();
   await valueChip.click();
 
-  const input = page.locator('.finger-solo-row[data-finger="D1"] .finger-solo-row__value-input');
+  const input = page.locator('.finger-solo-row[data-finger="D1"] .finger-solo-row__value-input--current');
   await expect(input).toBeVisible();
 });
 
