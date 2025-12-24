@@ -81,7 +81,8 @@
       color: #ffb4b4;
       background: rgba(20, 0, 0, 0.9);
       box-sizing: border-box;
-      max-height: 50vh;
+      /* Keep parse errors compact so they don't fight the keyboard + formula editor. */
+      max-height: 16vh;
       overflow: auto;
       display: none;
       pointer-events: auto;
@@ -94,6 +95,7 @@
       pointer-events: auto;
       user-select: text;
       overflow: auto;
+      max-height: 50vh;
     }
 
     #error .error-actions {
