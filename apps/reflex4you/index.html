@@ -139,6 +139,8 @@
       flex-direction: column;
       gap: 10px;
       pointer-events: auto;
+      /* Keep formula/parameter UI above the canvas finger handles. */
+      z-index: 35;
     }
 
     #formula {
@@ -146,7 +148,8 @@
       resize: none;
       border-radius: 4px;
       border: 1px solid #555;
-      background: rgba(10, 10, 10, 0.9);
+      /* Slightly transparent so the fractal still shows through. */
+      background: rgba(10, 10, 10, 0.72);
       color: #eee;
       font-family: monospace;
       font-size: 24px;
