@@ -18,10 +18,10 @@ Reflex4You is an interactive complex-function explorer. Type a formula, drag the
 3. **Explore with gestures.** To inspect something Mandelbrot-like without moving handles onto the feature, use the workspace frame:
 
    ```
-   set c = (z - W1) / (W2 - W1) in (z^2 + c $$ 20) $ 0
+   set c = (z - W0) / (W1 - W0) in (z^2 + c $$ 20) $ 0
    ```
 
-   Here `W1`/`W2` follow your fingers: a single finger pans both values, while a two-finger gesture solves the similarity transform (pan, zoom, rotate) and applies it to the pair. `f $ g` means “compose with” (`f(g(z))`), and `f $$ n` repeats `f` exactly `n` times. Parentheses are optional, and the complete formula syntax is summarized below under **Formula Language**.
+   Here `W0`/`W1` follow your fingers: a single finger pans both values, while a two-finger gesture solves the similarity transform (pan, zoom, rotate) and applies it to the pair. `f $ g` means “compose with” (`f(g(z))`), and `f $$ n` repeats `f` exactly `n` times. Parentheses are optional, and the complete formula syntax is summarized below under **Formula Language**.
 
 4. **Dive into advanced physics-style demos.** Handles plus gesture control make it easy to model optical experiments. For instance, the following formula mimics both the Michelson interferometer and Young’s double-slit patterns:
 
@@ -51,7 +51,7 @@ Formulas can reference special complex constants that you edit directly on the c
 | --- | --- | --- |
 | `F1`, `F2`, `F3` | Fixed handles | Fingers are assigned in order (first touch → `F1`, etc.). |
 | `D1`, `D2`, `D3` | Dynamic handles | Touch the handle closest to the complex point you want to move. |
-| `W1`, `W2` | Workspace frame | Gestures update both values together. One finger pans; two fingers capture the full similarity transform (pan, zoom, rotate) so you can navigate like Google Maps. |
+| `W0`, `W1` (and `W2`) | Workspace frame | Gestures update both values together. One finger pans; two fingers capture the full similarity transform (pan, zoom, rotate) so you can navigate like Google Maps. `W0` is an alias for `W2` (the default zero point). |
 
 Rules of thumb:
 
@@ -64,7 +64,7 @@ Rules of thumb:
 The input accepts succinct expressions with complex arithmetic, composition, and built-in helpers:
 
 - **Variables:** `z`, `x`, `y`, `real`, `imag`.
-- **Finger tokens:** `F1`‑`F3`, `D1`‑`D3`, `W1`, `W2`.
+- **Finger tokens:** `F1`‑`F3`, `D1`‑`D3`, `W0`, `W1`, `W2` (`W0` is an alias for `W2`).
 - **Literals:** `1.25`, `-3.5`, `2+3i`, `0,1`, `i`, `-i`, `j` (for `-½ + √3/2 i`).
 - **Operators:** `+`, `-`, `*`, `/`, power (`^` with integer exponents), composition (`o(f, g)` or `f $ g`), repeated composition (`oo(f, n)` or `f $$ n`).
 - **Functions:** `exp`, `sin`, `cos`, `tan`, `atan`, `ln`, `sqrt`, `abs`/`modulus`, `floor`, `conj`, `heav`. `sqrt(z, k)` desugars to `exp(0.5 * ln(z, k))`, so the optional second argument shifts the log branch; `heav(x)` evaluates to `1` when `x > 0` and `0` otherwise.
@@ -74,7 +74,7 @@ The input accepts succinct expressions with complex arithmetic, composition, and
 Examples:
 
 ```text
-f $ ((z - W2) / (W1 - W2))    # pan/zoom/rotate via W gestures
+f $ ((z - W0) / (W1 - W0))    # pan/zoom/rotate via W gestures (W0 is the "zero" end)
 sin $ z - D1                  # manual handle for offsetting input
 set c = abs(z) in c / (1 + c) # temporary value
 if(real < 0, conj(z), z)      # axis-aware interaction
@@ -82,7 +82,7 @@ if(real < 0, conj(z), z)      # axis-aware interaction
 
 Tips:
 
-- Use `W1`/`W2` whenever you want freeform navigation without moving your handles onto the area of interest.
+- Use `W0`/`W1` (or `W1`/`W2`) whenever you want freeform navigation without moving your handles onto the area of interest.
 - To reset a handle, click its value chip and type `0` (or any new complex literal). The formula itself is preserved across reloads because it lives in the URL.
 
 ### Solo selection (`solos=...`)

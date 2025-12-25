@@ -337,13 +337,13 @@ const literalParser = Choice([
   jLiteral,
 ], { ctor: 'Literal' });
 
-const FINGER_LABEL_REGEX = /(?:[FD][1-9]\d*|W[12])/y;
+const FINGER_LABEL_REGEX = /(?:[FD][1-9]\d*|W[012])/y;
 
 function isFingerLabel(label) {
   if (!label || typeof label !== 'string') {
     return false;
   }
-  if (label === 'W1' || label === 'W2') {
+  if (label === 'W0' || label === 'W1' || label === 'W2') {
     return true;
   }
   return /^[FD][1-9]\d*$/.test(label);

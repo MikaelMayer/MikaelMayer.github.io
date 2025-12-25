@@ -158,6 +158,13 @@ test('W fingers read from the W offset array', () => {
   assert.match(fragment, /return u_wOffsets\[1\];/);
 });
 
+test('W0 is an alias for W2 in the shader uniform mapping', () => {
+  const ast = FingerOffset('W0');
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /uniform vec2 u_wOffsets\[2\]/);
+  assert.match(fragment, /return u_wOffsets\[1\];/);
+});
+
 test('VarX and VarY nodes project components', () => {
   const ast = Add(VarX(), VarY());
   const fragment = buildFragmentSourceFromAST(ast);

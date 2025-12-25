@@ -70,8 +70,8 @@ try {
 // Utilities (URL + finger parsing)
 // ---------------------------------------------------------------------------
 
-const FINGER_LABEL_REGEX = /^(?:[FD][1-9]\d*|W[12])$/;
-const W_FINGER_ORDER = ['W1', 'W2'];
+const FINGER_LABEL_REGEX = /^(?:[FD][1-9]\d*|W[012])$/;
+const W_FINGER_ORDER = ['W0', 'W1', 'W2'];
 
 function isFingerLabel(label) {
   return typeof label === 'string' && FINGER_LABEL_REGEX.test(label);
@@ -87,8 +87,9 @@ function fingerFamily(label) {
 
 function fingerIndex(label) {
   if (!label) return -1;
-  if (label === 'W1') return 0;
-  if (label === 'W2') return 1;
+  if (label === 'W0') return 0;
+  if (label === 'W1') return 1;
+  if (label === 'W2') return 2;
   const match = /^([FD])([1-9]\d*)$/.exec(label);
   if (!match) return -1;
   return Number(match[2]) - 1;

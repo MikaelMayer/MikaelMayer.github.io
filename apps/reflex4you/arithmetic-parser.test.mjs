@@ -241,6 +241,16 @@ test('parses W finger primitives', () => {
   assert.equal(result.value.right.slot, 'W2');
 });
 
+test('parses W0 as a workspace finger primitive', () => {
+  const result = parseFormulaInput('W0 + W1');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Add');
+  assert.equal(result.value.left.kind, 'FingerOffset');
+  assert.equal(result.value.left.slot, 'W0');
+  assert.equal(result.value.right.kind, 'FingerOffset');
+  assert.equal(result.value.right.slot, 'W1');
+});
+
 test('parses function composition forms', () => {
   const result = parseFormulaInput('o(z, F1) $ (z + 1)');
   assert.equal(result.ok, true);

@@ -67,8 +67,8 @@ const SOLOS_PARAM = 'solos';
 
 const DEFAULT_ANIMATION_SECONDS = 5;
 
-const W_FINGER_ORDER = ['W1', 'W2'];
-const FINGER_LABEL_REGEX = /^(?:[FD][1-9]\d*|W[12])$/;
+const W_FINGER_ORDER = ['W0', 'W1', 'W2'];
+const FINGER_LABEL_REGEX = /^(?:[FD][1-9]\d*|W[012])$/;
 
 function isFingerLabel(label) {
   return typeof label === 'string' && FINGER_LABEL_REGEX.test(label);
@@ -84,8 +84,9 @@ function fingerFamily(label) {
 
 function fingerIndex(label) {
   if (!label) return -1;
-  if (label === 'W1') return 0;
-  if (label === 'W2') return 1;
+  if (label === 'W0') return 0;
+  if (label === 'W1') return 1;
+  if (label === 'W2') return 2;
   const match = /^([FD])([1-9]\d*)$/.exec(label);
   if (!match) return -1;
   return Number(match[2]) - 1;
@@ -195,7 +196,12 @@ function applyFingerValuesFromQuery(labels) {
       if (!isFingerLabel(label)) {
         return;
       }
-      const raw = params.get(label);
+      // W0 and W2 are aliases (W0 is the "zero" end). Accept either in share links.
+      let raw = params.get(label);
+      if ((label === 'W0' || label === 'W2') && (raw == null || raw === '')) {
+        const peer = label === 'W0' ? 'W2' : 'W0';
+        raw = params.get(peer);
+      }
       const parsed = parseComplexString(raw);
       if (parsed) {
         reflexCore.setFingerValue(label, parsed.x, parsed.y, { triggerRender: false });
@@ -1976,7 +1982,19 @@ function resolveAxisContext(parent, node) {
 function deriveFingerState(analysis) {
   const fixedSlots = sortFingerLabels(Array.from(analysis.usage.fixed));
   const dynamicSlots = sortFingerLabels(Array.from(analysis.usage.dynamic));
-  const wSlots = W_FINGER_ORDER.filter((label) => analysis.usage.w.has(label));
+  // W0 and W2 are aliases: keep only one for interaction/solo UI if both appear.
+  const rawWSlots = W_FINGER_ORDER.filter((label) => analysis.usage.w.has(label));
+  const wSlots = [];
+  let seenW0W2 = false;
+  rawWSlots.forEach((label) => {
+    if (label === 'W0' || label === 'W2') {
+      if (seenW0W2) return;
+      seenW0W2 = true;
+      wSlots.push(label);
+      return;
+    }
+    wSlots.push(label);
+  });
   if (fixedSlots.length && dynamicSlots.length) {
     return {
       mode: 'invalid',
