@@ -70,7 +70,7 @@ const DEFAULT_ANIMATION_SECONDS = 5;
 const ALL_W_FINGER_LABELS = ['W0', 'W1', 'W2'];
 const W_PAIR_ZERO = ['W0', 'W1'];
 const W_PAIR_LEGACY = ['W1', 'W2'];
-const FINGER_LABEL_REGEX = /^(?:[FD][1-9]\d*|W[012])$/;
+const FINGER_LABEL_REGEX = /^(?:[FD]\d+|W[012])$/;
 
 function isFingerLabel(label) {
   return typeof label === 'string' && FINGER_LABEL_REGEX.test(label);
@@ -89,9 +89,11 @@ function fingerIndex(label) {
   if (label === 'W0') return 0;
   if (label === 'W1') return 1;
   if (label === 'W2') return 2;
-  const match = /^([FD])([1-9]\d*)$/.exec(label);
+  const match = /^([FD])(\d+)$/.exec(label);
   if (!match) return -1;
-  return Number(match[2]) - 1;
+  const raw = Number(match[2]);
+  if (!Number.isInteger(raw) || raw < 0) return -1;
+  return raw === 0 ? 0 : raw - 1;
 }
 
 function defaultFingerOffset(label) {
@@ -2002,17 +2004,15 @@ function deriveFingerState(analysis) {
   const wSlots = usesW0
     ? W_PAIR_ZERO.slice()
     : W_PAIR_LEGACY.filter((label) => analysis.usage.w.has(label));
-  if (fixedSlots.length && dynamicSlots.length) {
-    return {
-      mode: 'invalid',
-      fixedSlots: [],
-      dynamicSlots: [],
-      wSlots: [],
-      axisConstraints: new Map(),
-      error: 'Formulas cannot mix F* fingers with D* fingers.',
-    };
-  }
-  const mode = fixedSlots.length ? 'fixed' : dynamicSlots.length ? 'dynamic' : 'none';
+  // Mixed fixed+dynamic is allowed. Interaction is resolved at runtime:
+  // the first non-W finger chooses whether to latch onto fixed or dynamic.
+  const mode = fixedSlots.length && dynamicSlots.length
+    ? 'mixed'
+    : fixedSlots.length
+      ? 'fixed'
+      : dynamicSlots.length
+        ? 'dynamic'
+        : 'none';
   const axisConstraints = new Map();
   [...fixedSlots, ...dynamicSlots, ...wSlots].forEach((label) => {
     if (analysis.axisConstraints.has(label)) {

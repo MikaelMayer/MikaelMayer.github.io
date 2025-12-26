@@ -49,13 +49,14 @@ Formulas can reference special complex constants that you edit directly on the c
 
 | Label family | Meaning | How to move |
 | --- | --- | --- |
-| `F1`, `F2`, `F3` | Fixed handles | Fingers are assigned in order (first touch → `F1`, etc.). |
-| `D1`, `D2`, `D3` | Dynamic handles | Touch the handle closest to the complex point you want to move. |
+| `F0`, `F1`, `F2`, `F3` | Fixed handles | Fingers are assigned in order (first touch → `F1`, etc.). (`F0` is supported as an alias of `F1`.) |
+| `D0`, `D1`, `D2`, `D3` | Dynamic handles | Touch the handle closest to the complex point you want to move. (`D0` is supported as an alias of `D1`.) |
 | `W0`, `W1` | Workspace frame | Gestures update both values together. One finger pans; two fingers capture the full similarity transform (pan, zoom, rotate) so you can navigate like Google Maps. |
 
 Rules of thumb:
 
-- A formula can use either the `F` family or the `D` family, plus the `W` pair. If both `F` and `D` appear, the UI refuses to activate the handles to avoid ambiguity.
+- A formula can use the `F` family and/or the `D` family, plus the `W` pair.
+  - If both `F` and `D` appear, Reflex4You uses a “first finger decides” rule: if your first touch starts closer to the first fixed handle (`F1`), the gesture assigns fingers to `F1`, `F2`, ... (then falls back to dynamic `D*` if you use more fingers); otherwise, it behaves like pure `D*` mode (closest-handle matching).
 - If a handle only appears inside an `x`/`real` projection, dragging is locked to the real axis (and similarly for `y`/`imag`). Use both axes anywhere in the formula to regain free movement.
 - URLs remember the current formula and each handle’s last position, so you can bookmark exact views.
 
@@ -64,7 +65,7 @@ Rules of thumb:
 The input accepts succinct expressions with complex arithmetic, composition, and built-in helpers:
 
 - **Variables:** `z`, `x`, `y`, `real`, `imag`.
-- **Finger tokens:** `F1`‑`F3`, `D1`‑`D3`, `W0`, `W1`.
+- **Finger tokens:** `F0`‑`F3`, `D0`‑`D3`, `W0`, `W1`.
 - **Literals:** `1.25`, `-3.5`, `2+3i`, `0,1`, `i`, `-i`, `j` (for `-½ + √3/2 i`).
 - **Operators:** `+`, `-`, `*`, `/`, power (`^` with integer exponents), composition (`o(f, g)` or `f $ g`), repeated composition (`oo(f, n)` or `f $$ n`).
 - **Functions:** `exp`, `sin`, `cos`, `tan`, `atan`, `ln`, `sqrt`, `abs`/`modulus`, `floor`, `conj`, `heav`. `sqrt(z, k)` desugars to `exp(0.5 * ln(z, k))`, so the optional second argument shifts the log branch; `heav(x)` evaluates to `1` when `x > 0` and `0` otherwise.
