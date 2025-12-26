@@ -11,6 +11,7 @@ import {
   Offset,
   Offset2,
   Add,
+  Div,
   Compose,
   Const,
   Pow,
@@ -32,10 +33,12 @@ import {
   LogicalAnd,
   LogicalOr,
   If,
+  IfNaN,
   Abs,
   Abs2,
   Floor,
   Conjugate,
+  IsNaN,
   buildFragmentSourceFromAST,
 } from './core-engine.mjs';
 
@@ -217,6 +220,14 @@ test('Conjugate nodes flip the imaginary component', () => {
   assert.match(fragment, /vec2\(inner\.x, -inner\.y\)/);
 });
 
+test('isnan() nodes emit the error predicate helper and boolean output', () => {
+  const ast = IsNaN(Div(Const(1, 0), Const(0, 0)));
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /float c_is_error\(vec2 z\)/);
+  assert.match(fragment, /c_is_error\(inner\)/);
+  assert.match(fragment, /return vec2\(flag, 0\.0\);/);
+});
+
 test('LessThan nodes compare real parts and emit boolean constants', () => {
   const ast = LessThan(Const(1, 0), Const(0, 0));
   const fragment = buildFragmentSourceFromAST(ast);
@@ -263,6 +274,15 @@ test('If nodes branch based on non-zero condition', () => {
   assert.match(fragment, /vec2 cond =/);
   assert.match(fragment, /bool selector =/);
   assert.match(fragment, /if \(selector\)/);
+});
+
+test('ifnan(value, fallback) evaluates value once and returns it when not error', () => {
+  const ast = IfNaN(Div(VarZ(), Const(0, 0)), Const(7, 0));
+  const fragment = buildFragmentSourceFromAST(ast);
+  // Compiles via local `inner` (avoids recomputing the value expression).
+  assert.match(fragment, /vec2 inner = node\d+\(z\);/);
+  assert.match(fragment, /float flag = c_is_error\(inner\);/);
+  assert.match(fragment, /return inner;/);
 });
 
 test('Abs nodes emit magnitude as real output', () => {

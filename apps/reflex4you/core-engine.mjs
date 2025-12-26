@@ -124,6 +124,14 @@ export function If(condition, thenBranch, elseBranch) {
   return { kind: "If", condition, thenBranch, elseBranch };
 }
 
+// IfNaN(value, fallback):
+// - evaluates `value` once
+// - if that value is an "error" (NaN/Inf/overflow sentinel), returns `fallback`
+// - otherwise returns the original `value`
+export function IfNaN(value, fallback) {
+  return { kind: "IfNaN", value, fallback };
+}
+
 export function Const(re, im) {
   return { kind: "Const", re, im };
 }
@@ -180,6 +188,12 @@ export function Conjugate(value) {
   return { kind: "Conjugate", value };
 }
 
+// Formula language: `isnan(expr)` -> returns 1+0i when `expr` is an error value, else 0+0i.
+// "Error" matches the renderer's handling: non-finite values or overflow-sentinel magnitude.
+export function IsNaN(value) {
+  return { kind: "IsNaN", value };
+}
+
 export function oo(f, n) {
   const count = Number(n);
   if (!Number.isInteger(count) || count < 1) {
@@ -225,6 +239,7 @@ function analyzeFingerUniformCounts(ast) {
       case "Abs2":
       case "Floor":
       case "Conjugate":
+      case "IsNaN":
         visit(node.value);
         return;
       case "Ln":
@@ -270,6 +285,10 @@ function analyzeFingerUniformCounts(ast) {
         visit(node.condition);
         visit(node.thenBranch);
         visit(node.elseBranch);
+        return;
+      case "IfNaN":
+        visit(node.value);
+        visit(node.fallback);
         return;
       case "Compose":
         visit(node.f);
@@ -415,6 +434,7 @@ function materializeComposeMultiples(ast) {
       case "Abs2":
       case "Floor":
       case "Conjugate":
+      case "IsNaN":
         visit(node.value, node, "value");
         return;
       case "Ln":
@@ -446,6 +466,10 @@ function materializeComposeMultiples(ast) {
         visit(node.condition, node, "condition");
         visit(node.thenBranch, node, "thenBranch");
         visit(node.elseBranch, node, "elseBranch");
+        return;
+      case "IfNaN":
+        visit(node.value, node, "value");
+        visit(node.fallback, node, "fallback");
         return;
       case "SetBinding":
         visit(node.value, node, "value");
@@ -517,6 +541,7 @@ function prepareAstForGpu(ast) {
       case 'Abs2':
       case 'Floor':
       case 'Conjugate':
+      case 'IsNaN':
         return { ...node, value: lower(node.value) };
       case 'Ln':
         return { ...node, value: lower(node.value), branch: node.branch ? lower(node.branch) : null };
@@ -548,6 +573,8 @@ function prepareAstForGpu(ast) {
           thenBranch: lower(node.thenBranch),
           elseBranch: lower(node.elseBranch),
         };
+      case 'IfNaN':
+        return { ...node, value: lower(node.value), fallback: lower(node.fallback) };
       case 'RepeatComposePlaceholder':
         return {
           ...node,
@@ -612,6 +639,7 @@ const formulaGlobals = Object.freeze({
   LogicalAnd,
   LogicalOr,
   If,
+  IfNaN,
   Const,
   Compose,
   Exp,
@@ -626,6 +654,7 @@ const formulaGlobals = Object.freeze({
   Abs2,
   Floor,
   Conjugate,
+  IsNaN,
   oo,
 });
 
@@ -687,6 +716,7 @@ function assignNodeIds(ast) {
     case "Abs2":
     case "Floor":
     case "Conjugate":
+    case "IsNaN":
       assignNodeIds(ast.value);
       return;
     case "Ln":
@@ -714,6 +744,10 @@ function assignNodeIds(ast) {
       assignNodeIds(ast.condition);
       assignNodeIds(ast.thenBranch);
       assignNodeIds(ast.elseBranch);
+      return;
+    case "IfNaN":
+      assignNodeIds(ast.value);
+      assignNodeIds(ast.fallback);
       return;
     case "SetBinding":
       assignNodeIds(ast.value);
@@ -762,6 +796,7 @@ function collectNodesPostOrder(ast, out) {
     case "Abs2":
     case "Floor":
     case "Conjugate":
+    case "IsNaN":
       collectNodesPostOrder(ast.value, out);
       break;
     case "Ln":
@@ -789,6 +824,10 @@ function collectNodesPostOrder(ast, out) {
       collectNodesPostOrder(ast.condition, out);
       collectNodesPostOrder(ast.thenBranch, out);
       collectNodesPostOrder(ast.elseBranch, out);
+      break;
+    case "IfNaN":
+      collectNodesPostOrder(ast.value, out);
+      collectNodesPostOrder(ast.fallback, out);
       break;
     case "SetBinding":
       collectNodesPostOrder(ast.value, out);
@@ -909,6 +948,16 @@ vec2 ${name}(vec2 z) {
 vec2 ${name}(vec2 z) {
     vec2 inner = ${valueName}(z);
     return vec2(inner.x, -inner.y);
+}`.trim();
+  }
+
+  if (ast.kind === "IsNaN") {
+    const valueName = functionName(ast.value);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 inner = ${valueName}(z);
+    float flag = c_is_error(inner);
+    return vec2(flag, 0.0);
 }`.trim();
   }
 
@@ -1218,6 +1267,20 @@ vec2 ${name}(vec2 z) {
 }`.trim();
   }
 
+  if (ast.kind === "IfNaN") {
+    const valueName = functionName(ast.value);
+    const fallbackName = functionName(ast.fallback);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 inner = ${valueName}(z);
+    float flag = c_is_error(inner);
+    if (flag > 0.5) {
+        return ${fallbackName}(z);
+    }
+    return inner;
+}`.trim();
+  }
+
   if (ast.kind === "Op") {
     const leftName = functionName(ast.left);
     const rightName = functionName(ast.right);
@@ -1426,6 +1489,16 @@ vec2 c_atan(vec2 z) {
   vec2 term2 = c_ln(one + iz);
   vec2 diff = term1 - term2;
   return c_mul(vec2(0.0, 0.5), diff);
+}
+
+// Reflex4You "error" predicate used by the 'isnan(...)' formula function.
+// Treat as error when:
+// - magnitude is above the overflow sentinel threshold, or
+// - magnitude is NaN / non-finite (covers NaN and Inf).
+float c_is_error(vec2 z) {
+  float m = length(z);
+  // For NaN, comparisons are false; !(m <= threshold) reliably detects NaN as well.
+  return (m > 1.0e10 || !(m <= 1.0e10)) ? 1.0 : 0.0;
 }
 
 /*NODE_FUNCS*/

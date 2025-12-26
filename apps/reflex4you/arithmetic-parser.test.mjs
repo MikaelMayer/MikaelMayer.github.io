@@ -397,6 +397,35 @@ test('parses abs2() calls as unary functions', () => {
   assert.equal(result.value.value.kind, 'Var');
 });
 
+test('parses isnan() calls as an error predicate', () => {
+  const result = parseFormulaInput('isnan(z)');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'IsNaN');
+  assert.equal(result.value.value.kind, 'Var');
+});
+
+test('parses ifnan(value, fallback) as a single-evaluation error guard', () => {
+  const result = parseFormulaInput('ifnan(z/0, 7)');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'IfNaN');
+  assert.equal(result.value.value.kind, 'Div');
+  assert.equal(result.value.fallback.kind, 'Const');
+});
+
+test('parses iferror as a synonym for ifnan', () => {
+  const result = parseFormulaInput('iferror(z/0, 7)');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'IfNaN');
+});
+
+test('allows isnan to be referenced as a built-in function value', () => {
+  const result = parseFormulaInput('isnan $ z');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Compose');
+  assert.equal(result.value.f.kind, 'IsNaN');
+  assert.equal(result.value.g.kind, 'Var');
+});
+
 test('allows built-in functions to be referenced as values', () => {
   const result = parseFormulaInput('abs $ z');
   assert.equal(result.ok, true);
