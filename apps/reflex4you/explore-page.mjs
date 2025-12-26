@@ -58,6 +58,8 @@ const redoButton = document.getElementById('redo-button');
 const menuButton = document.getElementById('menu-button');
 const menuDropdown = document.getElementById('menu-dropdown');
 
+const SOLOS_PARAM = 'solos';
+
 // Apply the top split fraction.
 try {
   const pct = Math.max(10, Math.min(90, Math.round(TOP_FRACTION * 100)));
@@ -111,6 +113,23 @@ function compareFingerLabels(a, b) {
 
 function sortedLabels(labels) {
   return (labels || []).filter(isFingerLabel).slice().sort(compareFingerLabels);
+}
+
+function parseSolosParam(raw) {
+  if (raw == null) return new Set();
+  const normalized = String(raw).trim();
+  if (!normalized) return new Set();
+  const parts = normalized
+    .split(',')
+    .map((part) => String(part || '').trim())
+    .filter(Boolean);
+  const set = new Set();
+  for (const label of parts) {
+    if (isFingerLabel(label)) {
+      set.add(label);
+    }
+  }
+  return set;
 }
 
 function parseComplexString(raw) {
@@ -449,6 +468,7 @@ let thumbWebglCanvas = null;
 let activeFormulaSource = 'z';
 let activeAst = createDefaultFormulaAST();
 let activeLabels = [];
+let allUsedLabels = [];
 let activeAxisConstraints = new Map();
 let activeFingerConfig = { fixedSlots: [], dynamicSlots: [], wSlots: [], axisConstraints: new Map() };
 
@@ -1093,6 +1113,8 @@ async function bootstrap() {
 
   // Seed finger values from query for parse-time desugaring (e.g. $$ counts).
   const params = new URLSearchParams(window.location.search);
+  const solosPresent = params.has(SOLOS_PARAM);
+  const soloLabelSet = solosPresent ? parseSolosParam(params.get(SOLOS_PARAM)) : new Set();
   const seededFingerValues = {};
   params.forEach((value, key) => {
     if (!isFingerLabel(key)) return;
@@ -1118,17 +1140,29 @@ async function bootstrap() {
     return;
   }
 
+  allUsedLabels = sortedLabels([
+    ...(fingerState.fixedSlots || []),
+    ...(fingerState.dynamicSlots || []),
+    ...(fingerState.wSlots || []),
+  ]);
+
+  const filterBySolos = (labels) => {
+    const arr = Array.isArray(labels) ? labels : [];
+    if (!solosPresent) return arr;
+    return arr.filter((l) => soloLabelSet.has(l));
+  };
+
   activeFingerConfig = {
-    fixedSlots: fingerState.fixedSlots,
-    dynamicSlots: fingerState.dynamicSlots,
-    wSlots: fingerState.wSlots,
+    fixedSlots: filterBySolos(fingerState.fixedSlots),
+    dynamicSlots: filterBySolos(fingerState.dynamicSlots),
+    wSlots: filterBySolos(fingerState.wSlots),
     axisConstraints: fingerState.axisConstraints,
   };
   activeAxisConstraints = fingerState.axisConstraints;
   activeLabels = sortedLabels([
-    ...(fingerState.fixedSlots || []),
-    ...(fingerState.dynamicSlots || []),
-    ...(fingerState.wSlots || []),
+    ...(activeFingerConfig.fixedSlots || []),
+    ...(activeFingerConfig.dynamicSlots || []),
+    ...(activeFingerConfig.wSlots || []),
   ]);
 
   // Initialize top renderer.
@@ -1136,7 +1170,7 @@ async function bootstrap() {
   topCore.setActiveFingerConfig(activeFingerConfig);
 
   // Apply query finger values to the renderer.
-  for (const label of activeLabels) {
+  for (const label of allUsedLabels) {
     const raw = params.get(label);
     const parsedValue = parseComplexString(raw);
     if (parsedValue) {
