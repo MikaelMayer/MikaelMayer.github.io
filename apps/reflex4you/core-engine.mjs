@@ -25,15 +25,16 @@ export function Pow(base, exponent) {
   return { kind: "Pow", base, exponent };
 }
 
-// Workspace frame labels. `W0` is supported as an alias for `W2` (the "zero" end),
-// so formulas can use `(z - W0) / (W1 - W0)` with the intuitive 0/1 defaults.
+// Workspace frame labels.
+// `W0` enables the intuitive default-normalization `(z - W0)/(W1 - W0)` with W0=0 and W1=1.
 const W_FINGER_LABELS = Object.freeze(["W0", "W1", "W2"]);
 
 function parseFingerLabel(label) {
   if (!label || typeof label !== "string") {
     return null;
   }
-  // W0 is an alias for W2 (index 1 in the W uniform array).
+  // W0 is the "zero" end of the workspace pair (W0/W1).
+  // It shares the same uniform slot index as W2, but is NOT kept in sync with W2.
   if (label === "W0") {
     return { family: "w", index: 1 };
   }
@@ -1601,7 +1602,6 @@ export class ReflexCore {
     this.dynamicOffsetsDirty = true;
     this.wOffsetsDirty = true;
 
-    // Keep W0/W2 aligned from the start (W0 is an alias of W2).
     this.setFingerValue('W0', 0, 0, { triggerRender: false });
     this.setFingerValue('W1', 1, 0, { triggerRender: false });
     this.setFingerValue('W2', 0, 0, { triggerRender: false });
@@ -1853,13 +1853,7 @@ export class ReflexCore {
 
   getFingerValue(label) {
     const slot = validateFingerLabel(label);
-    // Keep W0 and W2 as exact aliases. Prefer an explicit stored value if present.
-    let value = this.fingerValues.get(slot);
-    if (!value && (slot === 'W0' || slot === 'W2')) {
-      const peer = slot === 'W0' ? 'W2' : 'W0';
-      value = this.fingerValues.get(peer);
-    }
-    value = value || this.defaultFingerValue(slot);
+    const value = this.fingerValues.get(slot) || this.defaultFingerValue(slot);
     return { x: value.x, y: value.y };
   }
 
@@ -1880,23 +1874,11 @@ export class ReflexCore {
     if (!Number.isFinite(qx) || !Number.isFinite(qy)) {
       return;
     }
-    // W0 and W2 are aliases: setting either should update both (and notify both).
-    const aliasSlots = slot === 'W0' || slot === 'W2' ? ['W0', 'W2'] : [slot];
-    // If all alias slots already match, do nothing.
-    let anyChanged = false;
-    for (const key of aliasSlots) {
-      const current = this.fingerValues.get(key);
-      if (!current || current.x !== qx || current.y !== qy) {
-        anyChanged = true;
-        break;
-      }
-    }
-    if (!anyChanged) {
+    const current = this.fingerValues.get(slot);
+    if (current && current.x === qx && current.y === qy) {
       return;
     }
-    for (const key of aliasSlots) {
-      this.fingerValues.set(key, { x: qx, y: qy });
-    }
+    this.fingerValues.set(slot, { x: qx, y: qy });
     const index = fingerIndexFromLabel(slot);
     const family = fingerFamilyFromLabel(slot);
     if (family === "fixed") {
@@ -1920,8 +1902,7 @@ export class ReflexCore {
         this.wOffsetsDirty = true;
       }
     }
-    // Notify all affected labels (important for W0/W2 aliasing).
-    aliasSlots.forEach((key) => this.notifyFingerChange(key));
+    this.notifyFingerChange(slot);
     if (triggerRender) {
       this.render();
     }
@@ -2091,7 +2072,12 @@ export class ReflexCore {
     }
     // Workspace offsets
     for (let i = 0; i < this.wUniformCount; i += 1) {
-      const label = `W${i + 1}`;
+      // We always expose only 2 W uniforms (`W1` and `W2`) to the shader.
+      // When interacting with the W0/W1 pair, we map W0 onto the W2 slot.
+      let label = `W${i + 1}`;
+      if (label === 'W2' && this.activeWSlots?.includes?.('W0')) {
+        label = 'W0';
+      }
       const value = this.fingerValues.get(label) || this.defaultFingerValue(label);
       this.wOffsetsBuffer[i * 2] = value.x;
       this.wOffsetsBuffer[i * 2 + 1] = value.y;

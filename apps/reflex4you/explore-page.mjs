@@ -71,7 +71,9 @@ try {
 // ---------------------------------------------------------------------------
 
 const FINGER_LABEL_REGEX = /^(?:[FD][1-9]\d*|W[012])$/;
-const W_FINGER_ORDER = ['W0', 'W1', 'W2'];
+const ALL_W_FINGER_LABELS = ['W0', 'W1', 'W2'];
+const W_PAIR_ZERO = ['W0', 'W1'];
+const W_PAIR_LEGACY = ['W1', 'W2'];
 
 function isFingerLabel(label) {
   return typeof label === 'string' && FINGER_LABEL_REGEX.test(label);
@@ -274,7 +276,21 @@ function analyzeFingerUsage(ast) {
 function deriveFingerState(analysis) {
   const fixedSlots = sortedLabels(Array.from(analysis.usage.fixed));
   const dynamicSlots = sortedLabels(Array.from(analysis.usage.dynamic));
-  const wSlots = W_FINGER_ORDER.filter((label) => analysis.usage.w.has(label));
+  const usesW0 = analysis.usage.w.has('W0');
+  const usesW2 = analysis.usage.w.has('W2');
+  if (usesW0 && usesW2) {
+    return {
+      mode: 'invalid',
+      fixedSlots: [],
+      dynamicSlots: [],
+      wSlots: [],
+      axisConstraints: new Map(),
+      error: 'Formulas cannot mix W0 with W2. Use W0/W1 or W1/W2.',
+    };
+  }
+  const wSlots = usesW0
+    ? W_PAIR_ZERO.slice()
+    : W_PAIR_LEGACY.filter((label) => analysis.usage.w.has(label));
   if (fixedSlots.length && dynamicSlots.length) {
     return {
       mode: 'invalid',

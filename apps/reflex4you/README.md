@@ -51,7 +51,7 @@ Formulas can reference special complex constants that you edit directly on the c
 | --- | --- | --- |
 | `F1`, `F2`, `F3` | Fixed handles | Fingers are assigned in order (first touch → `F1`, etc.). |
 | `D1`, `D2`, `D3` | Dynamic handles | Touch the handle closest to the complex point you want to move. |
-| `W0`, `W1` (and `W2`) | Workspace frame | Gestures update both values together. One finger pans; two fingers capture the full similarity transform (pan, zoom, rotate) so you can navigate like Google Maps. `W0` is an alias for `W2` (the default zero point). |
+| `W0`, `W1` (or `W1`, `W2`) | Workspace frame | Gestures update both values together. One finger pans; two fingers capture the full similarity transform (pan, zoom, rotate) so you can navigate like Google Maps. If `W0` is present, the workspace pair is `W0`/`W1`; otherwise it is `W1`/`W2`. |
 
 Rules of thumb:
 
@@ -64,7 +64,7 @@ Rules of thumb:
 The input accepts succinct expressions with complex arithmetic, composition, and built-in helpers:
 
 - **Variables:** `z`, `x`, `y`, `real`, `imag`.
-- **Finger tokens:** `F1`‑`F3`, `D1`‑`D3`, `W0`, `W1`, `W2` (`W0` is an alias for `W2`).
+- **Finger tokens:** `F1`‑`F3`, `D1`‑`D3`, `W0`, `W1`, `W2` (use either `W0`/`W1` or `W1`/`W2`).
 - **Literals:** `1.25`, `-3.5`, `2+3i`, `0,1`, `i`, `-i`, `j` (for `-½ + √3/2 i`).
 - **Operators:** `+`, `-`, `*`, `/`, power (`^` with integer exponents), composition (`o(f, g)` or `f $ g`), repeated composition (`oo(f, n)` or `f $$ n`).
 - **Functions:** `exp`, `sin`, `cos`, `tan`, `atan`, `ln`, `sqrt`, `abs`/`modulus`, `floor`, `conj`, `heav`. `sqrt(z, k)` desugars to `exp(0.5 * ln(z, k))`, so the optional second argument shifts the log branch; `heav(x)` evaluates to `1` when `x > 0` and `0` otherwise.

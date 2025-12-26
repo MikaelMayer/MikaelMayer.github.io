@@ -67,7 +67,9 @@ const SOLOS_PARAM = 'solos';
 
 const DEFAULT_ANIMATION_SECONDS = 5;
 
-const W_FINGER_ORDER = ['W0', 'W1', 'W2'];
+const ALL_W_FINGER_LABELS = ['W0', 'W1', 'W2'];
+const W_PAIR_ZERO = ['W0', 'W1'];
+const W_PAIR_LEGACY = ['W1', 'W2'];
 const FINGER_LABEL_REGEX = /^(?:[FD][1-9]\d*|W[012])$/;
 
 function isFingerLabel(label) {
@@ -165,7 +167,7 @@ function ensureFingerState(label) {
 }
 
 // Always keep workspace fingers in a known state.
-W_FINGER_ORDER.forEach((label) => ensureFingerState(label));
+ALL_W_FINGER_LABELS.forEach((label) => ensureFingerState(label));
 
 function ensureFingerSubscriptions(labels) {
   if (!reflexCore) {
@@ -1982,19 +1984,24 @@ function resolveAxisContext(parent, node) {
 function deriveFingerState(analysis) {
   const fixedSlots = sortFingerLabels(Array.from(analysis.usage.fixed));
   const dynamicSlots = sortFingerLabels(Array.from(analysis.usage.dynamic));
-  // W0 and W2 are aliases: keep only one for interaction/solo UI if both appear.
-  const rawWSlots = W_FINGER_ORDER.filter((label) => analysis.usage.w.has(label));
-  const wSlots = [];
-  let seenW0W2 = false;
-  rawWSlots.forEach((label) => {
-    if (label === 'W0' || label === 'W2') {
-      if (seenW0W2) return;
-      seenW0W2 = true;
-      wSlots.push(label);
-      return;
-    }
-    wSlots.push(label);
-  });
+  const usesW0 = analysis.usage.w.has('W0');
+  const usesW2 = analysis.usage.w.has('W2');
+  if (usesW0 && usesW2) {
+    return {
+      mode: 'invalid',
+      fixedSlots: [],
+      dynamicSlots: [],
+      wSlots: [],
+      axisConstraints: new Map(),
+      error: 'Formulas cannot mix W0 with W2. Use W0/W1 or W1/W2.',
+    };
+  }
+
+  // If W0 is present, it takes over the workspace pair: always activate W0+W1.
+  // Otherwise, keep the legacy W1/W2 behavior (only activate labels that appear).
+  const wSlots = usesW0
+    ? W_PAIR_ZERO.slice()
+    : W_PAIR_LEGACY.filter((label) => analysis.usage.w.has(label));
   if (fixedSlots.length && dynamicSlots.length) {
     return {
       mode: 'invalid',
@@ -2243,7 +2250,7 @@ async function bootstrapReflexApplication() {
     }
     // Subscribe only to the finger labels that are actually used.
     const initialActiveLabels = initialFingerState.mode === 'invalid'
-      ? W_FINGER_ORDER
+      ? ALL_W_FINGER_LABELS
       : [
         ...(initialFingerState.fixedSlots || []),
         ...(initialFingerState.dynamicSlots || []),
