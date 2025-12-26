@@ -377,12 +377,19 @@ function randomInRange(min, max) {
 }
 
 function proposeCandidate({ coreForClamp, baseFingers, labels, axisConstraints, band, avoidKeys }) {
+  // `labels` are the mutable labels for exploration (typically the solo set).
+  // Always preserve non-mutable labels to avoid resetting parameters.
   const candidate = {};
+  for (const label of allUsedLabels) {
+    const base = baseFingers[label] || { x: 0, y: 0 };
+    candidate[label] = { x: base.x, y: base.y };
+  }
+
   for (const label of labels) {
     const base = baseFingers[label] || { x: 0, y: 0 };
-    // W* finger constants must never be modified by exploration mode.
-    // Keep them exactly as-is (no randomization, no clamping adjustments).
-    if (String(label).startsWith('W')) {
+    // By default, exploration keeps W* constants fixed (so navigation doesn't drift),
+    // but when `solos` is present and W is explicitly solo-selected, allow exploring it.
+    if (String(label).startsWith('W') && !solosPresent) {
       candidate[label] = { x: base.x, y: base.y };
       continue;
     }
@@ -471,6 +478,8 @@ let activeLabels = [];
 let allUsedLabels = [];
 let activeAxisConstraints = new Map();
 let activeFingerConfig = { fixedSlots: [], dynamicSlots: [], wSlots: [], axisConstraints: new Map() };
+let solosPresent = false;
+let soloLabelSet = new Set();
 
 let isTransitioning = false;
 let pendingTransitionToken = 0;
@@ -689,7 +698,7 @@ function updateUrlForBaseFingers(baseFingers) {
   // Canonicalize formula into the share params.
   return (async () => {
     await writeFormulaToSearchParams(params, activeFormulaSource);
-    for (const label of activeLabels) {
+    for (const label of allUsedLabels) {
       const v = baseFingers[label];
       const serialized = formatComplexForQuery(v?.x, v?.y);
       if (serialized) params.set(label, serialized);
@@ -988,15 +997,19 @@ async function buildExploreUrl({ targetPath, baseFingers, includeEditParam }) {
   const url = new URL(window.location.href);
   url.pathname = url.pathname.replace(/[^/]*$/, targetPath);
   url.hash = '';
-  const params = new URLSearchParams();
+  // Preserve other query params (notably `solos`) when switching pages.
+  const params = new URLSearchParams(window.location.search);
   await writeFormulaToSearchParams(params, activeFormulaSource);
   if (includeEditParam) {
     params.set('edit', 'true');
+  } else {
+    params.delete('edit');
   }
-  for (const label of activeLabels) {
+  for (const label of allUsedLabels) {
     const v = baseFingers[label];
     const serialized = formatComplexForQuery(v?.x, v?.y);
     if (serialized) params.set(label, serialized);
+    else params.delete(label);
   }
   url.search = params.toString();
   return url.toString();
@@ -1113,8 +1126,8 @@ async function bootstrap() {
 
   // Seed finger values from query for parse-time desugaring (e.g. $$ counts).
   const params = new URLSearchParams(window.location.search);
-  const solosPresent = params.has(SOLOS_PARAM);
-  const soloLabelSet = solosPresent ? parseSolosParam(params.get(SOLOS_PARAM)) : new Set();
+  solosPresent = params.has(SOLOS_PARAM);
+  soloLabelSet = solosPresent ? parseSolosParam(params.get(SOLOS_PARAM)) : new Set();
   const seededFingerValues = {};
   params.forEach((value, key) => {
     if (!isFingerLabel(key)) return;
@@ -1185,9 +1198,14 @@ async function bootstrap() {
 
   // Clamp into visible interval (view bounds), then render again.
   const clampedBase = {};
-  for (const label of activeLabels) {
+  for (const label of allUsedLabels) {
     const v = topCore.getFingerValue(label);
-    clampedBase[label] = clampToView(topCore, v.x, v.y);
+    // Only clamp labels that exploration is allowed to modify.
+    if (activeLabels.includes(label)) {
+      clampedBase[label] = clampToView(topCore, v.x, v.y);
+    } else {
+      clampedBase[label] = { x: v.x, y: v.y };
+    }
   }
   applyFingersToCore(topCore, clampedBase);
   topCore.render();
