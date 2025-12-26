@@ -180,6 +180,12 @@ export function Conjugate(value) {
   return { kind: "Conjugate", value };
 }
 
+// Formula language: `isnan(expr)` -> returns 1+0i when `expr` is an error value, else 0+0i.
+// "Error" matches the renderer's handling: non-finite values or overflow-sentinel magnitude.
+export function IsNaN(value) {
+  return { kind: "IsNaN", value };
+}
+
 export function oo(f, n) {
   const count = Number(n);
   if (!Number.isInteger(count) || count < 1) {
@@ -225,6 +231,7 @@ function analyzeFingerUniformCounts(ast) {
       case "Abs2":
       case "Floor":
       case "Conjugate":
+      case "IsNaN":
         visit(node.value);
         return;
       case "Ln":
@@ -415,6 +422,7 @@ function materializeComposeMultiples(ast) {
       case "Abs2":
       case "Floor":
       case "Conjugate":
+      case "IsNaN":
         visit(node.value, node, "value");
         return;
       case "Ln":
@@ -517,6 +525,7 @@ function prepareAstForGpu(ast) {
       case 'Abs2':
       case 'Floor':
       case 'Conjugate':
+      case 'IsNaN':
         return { ...node, value: lower(node.value) };
       case 'Ln':
         return { ...node, value: lower(node.value), branch: node.branch ? lower(node.branch) : null };
@@ -626,6 +635,7 @@ const formulaGlobals = Object.freeze({
   Abs2,
   Floor,
   Conjugate,
+  IsNaN,
   oo,
 });
 
@@ -687,6 +697,7 @@ function assignNodeIds(ast) {
     case "Abs2":
     case "Floor":
     case "Conjugate":
+    case "IsNaN":
       assignNodeIds(ast.value);
       return;
     case "Ln":
@@ -762,6 +773,7 @@ function collectNodesPostOrder(ast, out) {
     case "Abs2":
     case "Floor":
     case "Conjugate":
+    case "IsNaN":
       collectNodesPostOrder(ast.value, out);
       break;
     case "Ln":
@@ -909,6 +921,16 @@ vec2 ${name}(vec2 z) {
 vec2 ${name}(vec2 z) {
     vec2 inner = ${valueName}(z);
     return vec2(inner.x, -inner.y);
+}`.trim();
+  }
+
+  if (ast.kind === "IsNaN") {
+    const valueName = functionName(ast.value);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 inner = ${valueName}(z);
+    float flag = c_is_error(inner);
+    return vec2(flag, 0.0);
 }`.trim();
   }
 
@@ -1426,6 +1448,16 @@ vec2 c_atan(vec2 z) {
   vec2 term2 = c_ln(one + iz);
   vec2 diff = term1 - term2;
   return c_mul(vec2(0.0, 0.5), diff);
+}
+
+// Reflex4You "error" predicate used by the 'isnan(...)' formula function.
+// Treat as error when:
+// - magnitude is above the overflow sentinel threshold, or
+// - magnitude is NaN / non-finite (covers NaN and Inf).
+float c_is_error(vec2 z) {
+  float m = length(z);
+  // For NaN, comparisons are false; !(m <= threshold) reliably detects NaN as well.
+  return (m > 1.0e10 || !(m <= 1.0e10)) ? 1.0 : 0.0;
 }
 
 /*NODE_FUNCS*/

@@ -11,6 +11,7 @@ import {
   Offset,
   Offset2,
   Add,
+  Div,
   Compose,
   Const,
   Pow,
@@ -36,6 +37,7 @@ import {
   Abs2,
   Floor,
   Conjugate,
+  IsNaN,
   buildFragmentSourceFromAST,
 } from './core-engine.mjs';
 
@@ -215,6 +217,14 @@ test('Conjugate nodes flip the imaginary component', () => {
   const fragment = buildFragmentSourceFromAST(ast);
   assert.match(fragment, /vec2 inner =/);
   assert.match(fragment, /vec2\(inner\.x, -inner\.y\)/);
+});
+
+test('isnan() nodes emit the error predicate helper and boolean output', () => {
+  const ast = IsNaN(Div(Const(1, 0), Const(0, 0)));
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /float c_is_error\(vec2 z\)/);
+  assert.match(fragment, /c_is_error\(inner\)/);
+  assert.match(fragment, /return vec2\(flag, 0\.0\);/);
 });
 
 test('LessThan nodes compare real parts and emit boolean constants', () => {

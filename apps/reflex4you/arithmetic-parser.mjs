@@ -44,6 +44,7 @@ import {
   Abs2,
   Floor,
   Conjugate,
+  IsNaN,
   oo,
   If,
   FingerOffset,
@@ -178,6 +179,7 @@ const BUILTIN_FUNCTION_DEFINITIONS = [
   { name: 'abs2', factory: Abs2 },
   { name: 'conj', factory: Conjugate },
   { name: 'floor', factory: Floor },
+  { name: 'isnan', factory: IsNaN },
   { name: 'heav', factory: (value) => createHeavExpression(value) },
 ];
 
@@ -402,6 +404,7 @@ const RESERVED_BINDING_NAMES = new Set([
   'abs2',
   'floor',
   'conj',
+  'isnan',
   'heav',
   'oo',
   'comp',
@@ -758,6 +761,7 @@ const elementaryFunctionParser = Choice([
   ...createUnaryFunctionParsers(['abs2'], Abs2),
   ...createUnaryFunctionParsers(['floor'], Floor),
   ...createUnaryFunctionParsers(['conj'], Conjugate),
+  ...createUnaryFunctionParsers(['isnan'], IsNaN),
   ...createUnaryFunctionParsers(['heav'], (value) => createHeavExpression(value)),
 ], { ctor: 'ElementaryFunction' });
 
@@ -1137,6 +1141,7 @@ function substitutePlaceholder(node, placeholder, replacement) {
     case 'Abs2':
     case 'Floor':
     case 'Conjugate':
+    case 'IsNaN':
       return { ...node, value: substitutePlaceholder(node.value, placeholder, replacement) };
     case 'Ln': {
       const nextValue = substitutePlaceholder(node.value, placeholder, replacement);
@@ -1239,6 +1244,7 @@ function cloneAst(node) {
     case 'Abs2':
     case 'Floor':
     case 'Conjugate':
+    case 'IsNaN':
       return { ...node, value: cloneAst(node.value) };
     case 'Ln':
       return {
@@ -1338,6 +1344,7 @@ function substituteIdentifierWithClone(node, targetName, replacement) {
     case 'Abs2':
     case 'Floor':
     case 'Conjugate':
+    case 'IsNaN':
       return { ...node, value: substituteIdentifierWithClone(node.value, targetName, replacement) };
     case 'Ln': {
       const nextValue = substituteIdentifierWithClone(node.value, targetName, replacement);
@@ -1436,6 +1443,7 @@ function findFirstPlaceholderNode(ast) {
       case 'Abs2':
       case 'Floor':
       case 'Conjugate':
+      case 'IsNaN':
         stack.push(node.value);
         if (node.kind === 'Ln' && node.branch) {
           stack.push(node.branch);
@@ -1512,6 +1520,7 @@ function findFirstLetBinding(ast) {
       case 'Abs2':
       case 'Floor':
       case 'Conjugate':
+      case 'IsNaN':
         stack.push(node.value);
         if (node.kind === 'Ln' && node.branch) {
           stack.push(node.branch);
@@ -1672,6 +1681,7 @@ function resolveSetReferences(ast, input) {
       case 'Abs2':
       case 'Conjugate':
       case 'Floor':
+      case 'IsNaN':
         return visit(node.value);
       case 'Ln': {
         const valueErr = visit(node.value);
@@ -1942,6 +1952,7 @@ function resolveRepeatPlaceholders(ast, parseOptions, input) {
       case 'Abs2':
       case 'Floor':
       case 'Conjugate':
+      case 'IsNaN':
         return visit(node.value, node, 'value');
       case 'Ln': {
         const valueErr = visit(node.value, node, 'value');
@@ -2204,6 +2215,15 @@ function evaluateConstantNode(node, context, scope = {}, localBindings = []) {
     case 'Conjugate': {
       const value = evaluateConstantNode(node.value, context, scope, localBindings);
       return value ? complexConjugate(value) : null;
+    }
+    case 'IsNaN': {
+      const value = evaluateConstantNode(node.value, context, scope, localBindings);
+      if (!value) {
+        return null;
+      }
+      const m = Math.hypot(value.re, value.im);
+      const isError = !(m <= 1e10);
+      return { re: isError ? 1 : 0, im: 0 };
     }
     case 'Compose': {
       const inner = evaluateConstantNode(node.g, context, scope, localBindings);

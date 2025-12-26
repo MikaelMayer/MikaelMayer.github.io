@@ -36,6 +36,7 @@ export function childEntries(node) {
     case 'Abs2':
     case 'Floor':
     case 'Conjugate':
+    case 'IsNaN':
       return [['value', node.value]];
     case 'Ln': {
       const entries = [['value', node.value]];
