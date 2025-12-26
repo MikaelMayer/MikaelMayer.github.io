@@ -1952,6 +1952,7 @@ let formulaCompileDebounceTimer = null;
 let scheduledApplyHandle = null;
 let scheduledApplyHandleKind = null; // 'idle' | 'timeout'
 let pendingHistoryCommitAfterApply = false;
+let latestCompileMeta = null;
 
 function terminateFormulaWorker() {
   if (!formulaCompileWorker) return;
@@ -1989,26 +1990,23 @@ function scheduleApplyCompiledFormula(compiled, { preserveFingerState, updateQue
 
   const applyNow = () => {
     try {
-      const usage = analyzeFingerUsage(compiled.ast);
-      const nextState = deriveFingerState(usage);
-      if (nextState.mode === 'invalid') {
-        showError(nextState.error);
-        setCompileOverlayVisible(false);
-        return;
-      }
+      const meta = latestCompileMeta;
+      const astForDisplay =
+        meta && meta.ast && typeof meta.ast === 'object'
+          ? meta.ast
+          : reflexCore?.getFormulaAST?.() ?? fallbackDefaultAST;
 
       clearError();
-      lastAppliedFormulaSource = String(formulaTextarea.value || DEFAULT_FORMULA_TEXT);
+      lastAppliedFormulaSource = String(meta?.source || formulaTextarea.value || DEFAULT_FORMULA_TEXT);
 
       reflexCore?.setCompiledFormula({
-        ast: compiled.ast,
-        gpuAst: compiled.gpuAst,
+        ast: astForDisplay,
         fragmentSource: compiled.fragmentSource,
         uniformCounts: compiled.uniformCounts,
       });
 
-      if (!preserveFingerState) {
-        applyFingerState(nextState);
+      if (!preserveFingerState && meta?.nextFingerState) {
+        applyFingerState(meta.nextFingerState);
       }
 
       if (updateQuery) {
@@ -2047,7 +2045,10 @@ function scheduleApplyCompiledFormula(compiled, { preserveFingerState, updateQue
   applyNow();
 }
 
-function requestWorkerCompile(source, { preserveFingerState, updateQuery, applyMode, overlayMessage } = {}) {
+function requestWorkerCompile(
+  source,
+  { preserveFingerState, updateQuery, applyMode, overlayMessage, ast = null, nextFingerState = null } = {},
+) {
   formulaCompileRequestId += 1;
   const requestId = formulaCompileRequestId;
 
@@ -2058,6 +2059,16 @@ function requestWorkerCompile(source, { preserveFingerState, updateQuery, applyM
   }
   cancelScheduledApply();
   terminateFormulaWorker();
+
+  latestCompileMeta = {
+    id: requestId,
+    source,
+    preserveFingerState: Boolean(preserveFingerState),
+    updateQuery: Boolean(updateQuery),
+    applyMode,
+    ast,
+    nextFingerState,
+  };
 
   if (overlayMessage != null) {
     setCompileOverlayVisible(true, overlayMessage || 'Compiling…');
@@ -2617,6 +2628,27 @@ function applyFormulaFromTextarea({ updateQuery = true, preserveFingerState = fa
     return;
   }
 
+  // For regular editing / history restores, parse on the main thread so we can:
+  // - update finger UI state immediately
+  // - keep a non-serializable AST (function literals like `abs`) for export/latex
+  let ast = null;
+  let nextState = null;
+  if (!preserveFingerState) {
+    const result = parseFormulaInput(source, getParserOptionsFromFingers());
+    if (!result.ok) {
+      showParseError(source, result);
+      return;
+    }
+    const usage = analyzeFingerUsage(result.value);
+    nextState = deriveFingerState(usage);
+    if (nextState.mode === 'invalid') {
+      showError(nextState.error);
+      return;
+    }
+    ast = result.value;
+    clearError();
+  }
+
   // Compile in a worker and apply only the latest result.
   requestWorkerCompile(source, {
     preserveFingerState,
@@ -2627,6 +2659,8 @@ function applyFormulaFromTextarea({ updateQuery = true, preserveFingerState = fa
     // Only show the overlay for user-driven formula edits / cold start.
     // (Finger-driven reparses should stay visually quiet to preserve gesture flow.)
     overlayMessage: preserveFingerState ? null : 'Compiling…',
+    ast,
+    nextFingerState: nextState,
   });
 }
 

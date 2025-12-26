@@ -24,8 +24,6 @@ self.onmessage = (event) => {
     self.postMessage({
       id,
       ok: true,
-      ast,
-      gpuAst: compiled.gpuAst,
       fragmentSource: compiled.fragmentSource,
       uniformCounts: compiled.uniformCounts,
     });
