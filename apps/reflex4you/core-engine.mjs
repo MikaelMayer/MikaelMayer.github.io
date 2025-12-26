@@ -124,6 +124,14 @@ export function If(condition, thenBranch, elseBranch) {
   return { kind: "If", condition, thenBranch, elseBranch };
 }
 
+// IfNaN(value, fallback):
+// - evaluates `value` once
+// - if that value is an "error" (NaN/Inf/overflow sentinel), returns `fallback`
+// - otherwise returns the original `value`
+export function IfNaN(value, fallback) {
+  return { kind: "IfNaN", value, fallback };
+}
+
 export function Const(re, im) {
   return { kind: "Const", re, im };
 }
@@ -277,6 +285,10 @@ function analyzeFingerUniformCounts(ast) {
         visit(node.condition);
         visit(node.thenBranch);
         visit(node.elseBranch);
+        return;
+      case "IfNaN":
+        visit(node.value);
+        visit(node.fallback);
         return;
       case "Compose":
         visit(node.f);
@@ -455,6 +467,10 @@ function materializeComposeMultiples(ast) {
         visit(node.thenBranch, node, "thenBranch");
         visit(node.elseBranch, node, "elseBranch");
         return;
+      case "IfNaN":
+        visit(node.value, node, "value");
+        visit(node.fallback, node, "fallback");
+        return;
       case "SetBinding":
         visit(node.value, node, "value");
         visit(node.body, node, "body");
@@ -557,6 +573,8 @@ function prepareAstForGpu(ast) {
           thenBranch: lower(node.thenBranch),
           elseBranch: lower(node.elseBranch),
         };
+      case 'IfNaN':
+        return { ...node, value: lower(node.value), fallback: lower(node.fallback) };
       case 'RepeatComposePlaceholder':
         return {
           ...node,
@@ -621,6 +639,7 @@ const formulaGlobals = Object.freeze({
   LogicalAnd,
   LogicalOr,
   If,
+  IfNaN,
   Const,
   Compose,
   Exp,
@@ -726,6 +745,10 @@ function assignNodeIds(ast) {
       assignNodeIds(ast.thenBranch);
       assignNodeIds(ast.elseBranch);
       return;
+    case "IfNaN":
+      assignNodeIds(ast.value);
+      assignNodeIds(ast.fallback);
+      return;
     case "SetBinding":
       assignNodeIds(ast.value);
       assignNodeIds(ast.body);
@@ -801,6 +824,10 @@ function collectNodesPostOrder(ast, out) {
       collectNodesPostOrder(ast.condition, out);
       collectNodesPostOrder(ast.thenBranch, out);
       collectNodesPostOrder(ast.elseBranch, out);
+      break;
+    case "IfNaN":
+      collectNodesPostOrder(ast.value, out);
+      collectNodesPostOrder(ast.fallback, out);
       break;
     case "SetBinding":
       collectNodesPostOrder(ast.value, out);
@@ -1237,6 +1264,20 @@ vec2 ${name}(vec2 z) {
         return ${thenName}(z);
     }
     return ${elseName}(z);
+}`.trim();
+  }
+
+  if (ast.kind === "IfNaN") {
+    const valueName = functionName(ast.value);
+    const fallbackName = functionName(ast.fallback);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 inner = ${valueName}(z);
+    float flag = c_is_error(inner);
+    if (flag > 0.5) {
+        return ${fallbackName}(z);
+    }
+    return inner;
 }`.trim();
   }
 

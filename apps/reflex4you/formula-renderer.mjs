@@ -13,6 +13,7 @@ function precedence(node) {
   switch (node.kind) {
     case 'SetBinding':
     case 'If':
+    case 'IfNaN':
       return 1;
     case 'LogicalOr':
       return 2;

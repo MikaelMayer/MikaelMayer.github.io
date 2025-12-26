@@ -77,6 +77,11 @@ export function childEntries(node) {
         ['thenBranch', node.thenBranch],
         ['elseBranch', node.elseBranch],
       ];
+    case 'IfNaN':
+      return [
+        ['value', node.value],
+        ['fallback', node.fallback],
+      ];
     case 'SetBinding':
       return [
         ['value', node.value],

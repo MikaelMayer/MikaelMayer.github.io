@@ -33,6 +33,7 @@ import {
   LogicalAnd,
   LogicalOr,
   If,
+  IfNaN,
   Abs,
   Abs2,
   Floor,
@@ -273,6 +274,15 @@ test('If nodes branch based on non-zero condition', () => {
   assert.match(fragment, /vec2 cond =/);
   assert.match(fragment, /bool selector =/);
   assert.match(fragment, /if \(selector\)/);
+});
+
+test('ifnan(value, fallback) evaluates value once and returns it when not error', () => {
+  const ast = IfNaN(Div(VarZ(), Const(0, 0)), Const(7, 0));
+  const fragment = buildFragmentSourceFromAST(ast);
+  // Compiles via local `inner` (avoids recomputing the value expression).
+  assert.match(fragment, /vec2 inner = node\d+\(z\);/);
+  assert.match(fragment, /float flag = c_is_error\(inner\);/);
+  assert.match(fragment, /return inner;/);
 });
 
 test('Abs nodes emit magnitude as real output', () => {
