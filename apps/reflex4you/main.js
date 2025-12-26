@@ -38,9 +38,24 @@ const menuDropdown = document.getElementById('menu-dropdown');
 const undoButton = document.getElementById('undo-button');
 const redoButton = document.getElementById('redo-button');
 const versionPill = document.getElementById('app-version-pill');
+const compileOverlay = document.getElementById('compile-overlay');
+const compileOverlayText = document.getElementById('compile-overlay-text');
 const rootElement = typeof document !== 'undefined' ? document.documentElement : null;
 
 let fatalErrorActive = false;
+
+function setCompileOverlayVisible(visible, message = null) {
+  if (!compileOverlay) {
+    return;
+  }
+  compileOverlay.dataset.visible = visible ? 'true' : 'false';
+  if (compileOverlayText && message != null) {
+    compileOverlayText.textContent = String(message || '');
+  }
+}
+
+// Show a cold-start loading indicator by default; hide it once we have a first render.
+setCompileOverlayVisible(true, 'Loading…');
 
 const APP_VERSION = 24;
 const CONTEXT_LOSS_RELOAD_KEY = `reflex4you:contextLossReloaded:v${APP_VERSION}`;
@@ -1927,6 +1942,168 @@ function showParseError(source, failure) {
   showError(formatCaretIndicator(source, failure));
 }
 
+// =========================
+// Async formula compilation (worker + latest-wins cancellation)
+// =========================
+
+let formulaCompileWorker = null;
+let formulaCompileRequestId = 0;
+let formulaCompileDebounceTimer = null;
+let scheduledApplyHandle = null;
+let scheduledApplyHandleKind = null; // 'idle' | 'timeout'
+let pendingHistoryCommitAfterApply = false;
+
+function terminateFormulaWorker() {
+  if (!formulaCompileWorker) return;
+  try {
+    formulaCompileWorker.terminate();
+  } catch (_) {
+    // ignore
+  }
+  formulaCompileWorker = null;
+}
+
+function cancelScheduledApply() {
+  if (scheduledApplyHandle == null) return;
+  if (scheduledApplyHandleKind === 'idle' && typeof window !== 'undefined' && typeof window.cancelIdleCallback === 'function') {
+    try {
+      window.cancelIdleCallback(scheduledApplyHandle);
+    } catch (_) {
+      // ignore
+    }
+  } else if (scheduledApplyHandleKind === 'timeout' && typeof window !== 'undefined') {
+    try {
+      window.clearTimeout(scheduledApplyHandle);
+    } catch (_) {
+      // ignore
+    }
+  }
+  scheduledApplyHandle = null;
+  scheduledApplyHandleKind = null;
+}
+
+function scheduleApplyCompiledFormula(compiled, { preserveFingerState, updateQuery, applyMode } = {}) {
+  if (!compiled || !compiled.ok) {
+    return;
+  }
+
+  const applyNow = () => {
+    try {
+      const usage = analyzeFingerUsage(compiled.ast);
+      const nextState = deriveFingerState(usage);
+      if (nextState.mode === 'invalid') {
+        showError(nextState.error);
+        setCompileOverlayVisible(false);
+        return;
+      }
+
+      clearError();
+      lastAppliedFormulaSource = String(formulaTextarea.value || DEFAULT_FORMULA_TEXT);
+
+      reflexCore?.setCompiledFormula({
+        ast: compiled.ast,
+        gpuAst: compiled.gpuAst,
+        fragmentSource: compiled.fragmentSource,
+        uniformCounts: compiled.uniformCounts,
+      });
+
+      if (!preserveFingerState) {
+        applyFingerState(nextState);
+      }
+
+      if (updateQuery) {
+        // The input handler keeps the legacy `formula=` param in sync immediately.
+        // Here we only attempt the compressed upgrade (`formulab64`) asynchronously.
+        const source = String(formulaTextarea.value || '');
+        updateFormulaQueryParam(source).catch((error) =>
+          console.warn('Failed to persist formula parameter.', error),
+        );
+      }
+
+      if (pendingHistoryCommitAfterApply && activePointerIds.size === 0) {
+        pendingHistoryCommitAfterApply = false;
+        commitHistorySnapshot();
+      }
+    } catch (error) {
+      console.error('Failed to apply compiled formula.', error);
+      showError('Unable to render formula.');
+    } finally {
+      setCompileOverlayVisible(false);
+    }
+  };
+
+  // If applyMode is 'idle', avoid blocking typing: only swap shaders when the browser is idle.
+  cancelScheduledApply();
+  if (applyMode === 'idle' && typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+    scheduledApplyHandleKind = 'idle';
+    scheduledApplyHandle = window.requestIdleCallback(applyNow, { timeout: 1500 });
+    return;
+  }
+  if (applyMode === 'idle') {
+    scheduledApplyHandleKind = 'timeout';
+    scheduledApplyHandle = window.setTimeout(applyNow, 0);
+    return;
+  }
+  applyNow();
+}
+
+function requestWorkerCompile(source, { preserveFingerState, updateQuery, applyMode, overlayMessage } = {}) {
+  formulaCompileRequestId += 1;
+  const requestId = formulaCompileRequestId;
+
+  // Cancel anything in-flight so we always compile the latest formula.
+  if (formulaCompileDebounceTimer != null) {
+    window.clearTimeout(formulaCompileDebounceTimer);
+    formulaCompileDebounceTimer = null;
+  }
+  cancelScheduledApply();
+  terminateFormulaWorker();
+
+  if (overlayMessage != null) {
+    setCompileOverlayVisible(true, overlayMessage || 'Compiling…');
+  }
+
+  const worker = new Worker(new URL('./formula-compile-worker.mjs', import.meta.url), { type: 'module' });
+  formulaCompileWorker = worker;
+
+  worker.onmessage = (event) => {
+    const data = event?.data || {};
+    if (data.id !== requestId) {
+      return;
+    }
+    // Worker finished; if another request started meanwhile, ignore this.
+    if (requestId !== formulaCompileRequestId) {
+      return;
+    }
+
+    if (!data.ok) {
+      showError(String(data.caretMessage || 'Unable to parse formula.'));
+      setCompileOverlayVisible(false);
+      return;
+    }
+
+    // Apply the result, but keep typing responsive by deferring the shader swap when needed.
+    scheduleApplyCompiledFormula(
+      data,
+      { preserveFingerState, updateQuery, applyMode },
+    );
+  };
+
+  worker.onerror = (error) => {
+    // Only surface errors for the active request.
+    if (requestId !== formulaCompileRequestId) return;
+    console.error('Formula compile worker failed.', error);
+    showError('Unable to compile formula.');
+    setCompileOverlayVisible(false);
+  };
+
+  worker.postMessage({
+    id: requestId,
+    source,
+    fingerValues: latestOffsets,
+  });
+}
+
 function analyzeFingerUsage(ast) {
   const usage = {
     fixed: new Set(),
@@ -2422,7 +2599,14 @@ formulaTextarea.addEventListener('blur', () => {
 // (change fires on blur for textarea edits).
 formulaTextarea.addEventListener('change', () => {
   if (activePointerIds.size === 0) {
-    commitHistorySnapshot();
+    // The history snapshot stores only successfully parsed/applied formulas.
+    // With async compilation, ensure we commit *after* the latest successful apply.
+    pendingHistoryCommitAfterApply = true;
+    if (formulaCompileDebounceTimer != null) {
+      window.clearTimeout(formulaCompileDebounceTimer);
+      formulaCompileDebounceTimer = null;
+    }
+    applyFormulaFromTextarea({ updateQuery: true, preserveFingerState: false });
   }
 });
 
@@ -2432,38 +2616,49 @@ function applyFormulaFromTextarea({ updateQuery = true, preserveFingerState = fa
     showError('Formula cannot be empty.');
     return;
   }
-  const result = parseFormulaInput(source, getParserOptionsFromFingers());
-  if (!result.ok) {
-    showParseError(source, result);
-    return;
-  }
-  const usage = analyzeFingerUsage(result.value);
-  const nextState = deriveFingerState(usage);
-  if (nextState.mode === 'invalid') {
-    showError(nextState.error);
-    return;
-  }
-  clearError();
-  lastAppliedFormulaSource = source;
-  reflexCore?.setFormulaAST(result.value);
-  // Finger-driven reparses happen while a pointer is down (e.g. `$$` repeat counts
-  // derived from D1). Re-applying the finger state would call into ReflexCore's
-  // `setActiveFingerConfig`, which intentionally releases pointer capture and
-  // clears active pointer assignments — interrupting the drag mid-gesture.
-  if (!preserveFingerState) {
-    applyFingerState(nextState);
-  }
-  if (updateQuery) {
-    // Update immediately (tests + deterministic sharing), then try to upgrade
-    // to the compressed param asynchronously when supported.
-    updateFormulaQueryParamImmediately(source);
-    updateFormulaQueryParam(source).catch((error) =>
-      console.warn('Failed to persist formula parameter.', error),
-    );
-  }
+
+  // Compile in a worker and apply only the latest result.
+  requestWorkerCompile(source, {
+    preserveFingerState,
+    updateQuery,
+    // When the user is typing, defer the WebGL shader swap to idle time.
+    // For programmatic applies (startup, undo/redo, reset), apply immediately.
+    applyMode: preserveFingerState || !updateQuery ? 'immediate' : 'idle',
+    // Only show the overlay for user-driven formula edits / cold start.
+    // (Finger-driven reparses should stay visually quiet to preserve gesture flow.)
+    overlayMessage: preserveFingerState ? null : 'Compiling…',
+  });
 }
 
-formulaTextarea.addEventListener('input', () => applyFormulaFromTextarea());
+formulaTextarea.addEventListener('input', () => {
+  const source = formulaTextarea.value;
+  if (!source.trim()) {
+    cancelScheduledApply();
+    terminateFormulaWorker();
+    setCompileOverlayVisible(false);
+    showError('Formula cannot be empty.');
+    updateFormulaQueryParamImmediately('');
+    return;
+  }
+
+  // Keep the shareable URL/localStorage in sync with what the user is typing,
+  // even before compilation finishes (compressed upgrade happens later).
+  updateFormulaQueryParamImmediately(source);
+
+  // If the user keeps typing, never let a pending shader swap block the input thread.
+  cancelScheduledApply();
+  terminateFormulaWorker();
+  setCompileOverlayVisible(false);
+
+  // Debounce compiles while typing so the UI stays responsive.
+  if (formulaCompileDebounceTimer != null) {
+    window.clearTimeout(formulaCompileDebounceTimer);
+  }
+  formulaCompileDebounceTimer = window.setTimeout(() => {
+    formulaCompileDebounceTimer = null;
+    applyFormulaFromTextarea({ updateQuery: true, preserveFingerState: false });
+  }, 220);
+});
 
 window.addEventListener('resize', () => {
   activeFingerState.allSlots.forEach((label) => updateFingerDotPosition(label));
@@ -3402,7 +3597,7 @@ function triggerImageDownload(url, filename, shouldRevoke) {
 
 if ('serviceWorker' in navigator) {
   // Version the SW script URL so updates can't get stuck behind a cached SW script.
-  const SW_URL = './service-worker.js?sw=24.0';
+  const SW_URL = './service-worker.js?sw=24.1';
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(SW_URL).then((registration) => {
       // Auto-activate updated workers so cache/version bumps take effect quickly.

@@ -1528,6 +1528,10 @@ void main() {
 }`;
 
 export function buildFragmentSourceFromAST(ast) {
+  return compileFormulaForGpu(ast).fragmentSource;
+}
+
+export function compileFormulaForGpu(ast) {
   const lowered = prepareAstForGpu(ast);
   const preparedAst = materializeComposeMultiples(lowered);
   // Compute uniform counts *before* materializing `ComposeMultiple`, because
@@ -1535,11 +1539,12 @@ export function buildFragmentSourceFromAST(ast) {
   // slots even though the shader uses only the resolved repeat count.
   const uniformCounts = analyzeFingerUniformCounts(lowered);
   const { funcs, topName } = buildNodeFunctionsAndTop(preparedAst);
-  return fragmentTemplate
+  const fragmentSource = fragmentTemplate
     .replace("/*FIXED_OFFSETS_COUNT*/", String(uniformCounts.fixedCount))
     .replace("/*DYNAMIC_OFFSETS_COUNT*/", String(uniformCounts.dynamicCount))
     .replace("/*NODE_FUNCS*/", funcs)
     .replace("/*TOP_FUNC*/", topName);
+  return { fragmentSource, uniformCounts, gpuAst: lowered };
 }
 
 // =========================
@@ -1801,6 +1806,24 @@ export class ReflexCore {
     this.render();
   }
 
+  setCompiledFormula({ ast, gpuAst = null, fragmentSource, uniformCounts } = {}) {
+    if (!ast || typeof ast !== 'object') {
+      throw new Error('setCompiledFormula requires an AST.');
+    }
+    if (typeof fragmentSource !== 'string' || !fragmentSource.trim()) {
+      throw new Error('setCompiledFormula requires a fragmentSource string.');
+    }
+    if (!uniformCounts || typeof uniformCounts !== 'object') {
+      throw new Error('setCompiledFormula requires uniformCounts.');
+    }
+    // Preserve the display AST. Accept a pre-lowered GPU AST to avoid doing that
+    // work on the main thread (useful when compiling in a Web Worker).
+    this.formulaAST = ast;
+    this._gpuAST = gpuAst && typeof gpuAst === 'object' ? gpuAst : prepareAstForGpu(ast);
+    this.rebuildProgramFromCompiled(fragmentSource, uniformCounts);
+    this.render();
+  }
+
   getFormulaAST() {
     return this.formulaAST;
   }
@@ -2012,7 +2035,11 @@ export class ReflexCore {
   }
 
   rebuildProgram() {
-    const uniformCounts = analyzeFingerUniformCounts(this._gpuAST);
+    const compiled = compileFormulaForGpu(this._gpuAST);
+    this.rebuildProgramFromCompiled(compiled.fragmentSource, compiled.uniformCounts);
+  }
+
+  rebuildProgramFromCompiled(fragmentSource, uniformCounts) {
     this.fixedUniformCount = uniformCounts.fixedCount;
     this.dynamicUniformCount = uniformCounts.dynamicCount;
     this.wUniformCount = uniformCounts.wCount;
@@ -2025,7 +2052,6 @@ export class ReflexCore {
     // Fill buffers from current fingerValues (defaults to 0, with W1 defaulting to 1+0i).
     this.hydrateUniformBuffersFromFingerValues();
 
-    const fragmentSource = buildFragmentSourceFromAST(this._gpuAST);
     this.lastFragmentSource = fragmentSource;
     const newProgram = this.createProgram(vertexSource, fragmentSource);
     this.program = newProgram;

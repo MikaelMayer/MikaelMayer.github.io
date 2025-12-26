@@ -847,10 +847,72 @@
       cursor: pointer;
       touch-action: manipulation;
     }
+
+    /* Lightweight compile/loading overlay (shown on cold start + recompiles). */
+    #compile-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9000;
+      pointer-events: none; /* never block editing/gestures */
+      background: rgba(0, 0, 0, 0.35);
+      opacity: 1;
+      transition: opacity 0.18s ease;
+    }
+
+    #compile-overlay[data-visible="false"] {
+      opacity: 0;
+      display: none;
+    }
+
+    .compile-overlay__card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(0, 0, 0, 0.70);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+      max-width: min(86vw, 520px);
+    }
+
+    .compile-overlay__spinner {
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      border: 3px solid rgba(255, 255, 255, 0.18);
+      border-top-color: rgba(158, 240, 255, 0.95);
+      animation: compile-overlay-spin 0.9s linear infinite;
+    }
+
+    @keyframes compile-overlay-spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    #compile-overlay-text {
+      font-size: 13px;
+      letter-spacing: 0.02em;
+      color: rgba(255, 255, 255, 0.86);
+      text-align: center;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      white-space: pre-wrap;
+    }
   </style>
 </head>
 <body>
 <canvas id="glcanvas"></canvas>
+
+<div id="compile-overlay" data-visible="true" aria-live="polite" aria-hidden="false">
+  <div class="compile-overlay__card">
+    <div class="compile-overlay__spinner" aria-hidden="true"></div>
+    <div id="compile-overlay-text">Loading…</div>
+  </div>
+</div>
 
 <div id="finger-overlay" aria-hidden="true"></div>
 
