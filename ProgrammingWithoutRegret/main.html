@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Programming Without Regret</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+  <link rel="stylesheet" type="text/css" href="bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" type="text/css" href="bootstrap/css/bootstrap-theme.min.css">
+  <link rel="stylesheet" type="text/css" href="https://cdn.rawgit.com/dreampulse/computer-modern-web-font/master/fonts.css">
+  <style>
+
+  body {
+    height: 100%;
+    width: 100%;
+    position: absolute;
+  }
+
+  div.container {
+    height: calc(100% - 100px);
+    position: absolute;
+    width: 100%;
+  }
+
+  #programview, #outputview, #outputcode {
+    height:100%;
+  }
+
+  #programfeedback {
+    height: 3em;
+    overflow-y: scroll;
+  }
+
+  #programfeedback .old {
+    color: #AAA;
+  }
+
+  .programblock {
+    /*width:calc(50% - 60px);*/
+    /*max-width:400px;*/
+    height:calc(100% - 60px);
+    width: 100%;
+    /*vertical-align:top;*/
+    background-color: transparent;
+    z-index: 1;
+    font-family: monospace;
+  }
+  
+  .corrector {
+    color: red;
+    z-index: -1;
+    position:absolute;
+    width: calc(100% - 30px) !important;
+  }
+  /*#description {
+      max-width: 800px;
+      display:inline-block;
+      text-align:left;
+  }*/
+  #description pre {
+      display:inline-block;
+      margin: 0px;
+      padding: 0px;
+  }
+</style>
+<style id="booleanswitch">
+  /* The switch - the box around the slider */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 30px;
+  height: 17px;
+  vertical-align: middle;
+}
+
+/* Hide default HTML checkbox */
+.switch input {display:none;}
+
+/* The slider */
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 13px;
+  width: 13px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+input:checked + .slider {
+  background-color: #2196F3;
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px #2196F3;
+}
+
+input:checked + .slider:before {
+  -webkit-transform: translateX(13px);
+  -ms-transform: translateX(13px);
+  transform: translateX(13px);
+}
+
+/* Rounded sliders */
+.slider.round {
+  border-radius: 17px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}
+
+.switch + label {
+  cursor: pointer;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+</style>
+<style>
+.switch:not(:first-child) {
+  margin-left: 10px;
+}
+menu h2 {
+  display: inline-block;
+}
+menu > select {
+  margin-left: 10px;
+}
+#programview {
+  resize: both;
+}
+
+.hidden {
+  display: none !important;
+}
+
+#outputhtml {
+    text-align: initial;
+}
+
+.computing {
+  background-color: #CCC;
+}
+
+.repairok {
+  background-color: #8F8;
+}
+.repairnotok {
+  background-color: #F88;
+}
+#connecttogoogledrive > img {
+  width: 1em;
+}
+</style>
+</head>
+<body>
+<h1>Loading...</h1>
+<script type="text/javascript" src="lambda-perfect-opt.js?mp=58"></script>
+<script type="text/javascript" src="/workbench.js"></script>
+
+<script type="text/javascript">
+// Client ID and API key from the Developer Console
+var CLIENT_ID = '638490851241-7p0432q8kr3siac1so550cn2j3ogitdg.apps.googleusercontent.com';
+var API_KEY = 'AIzaSyASeZy5zKxRXoo2kYjZSTpafqjOMrOhME4';
+
+// Array of API discovery doc URLs for APIs used by the quickstart
+var DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"];
+
+// Authorization scopes required by the API; multiple scopes can be
+// included, separated by spaces.
+var SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.install';
+
+//var authorizeButton = document.getElementById('authorize-button');
+//var signoutButton = document.getElementById('signout-button');
+//var openButton = document.getElementById('open-button');
+
+/**
+ *  On load, called to load the auth2 library and API client library.
+ */
+function handleClientLoad() {
+  gapi.load('client:auth2', initClient);
+}
+
+/**
+ *  Initializes the API client library and sets up sign-in state
+ *  listeners.
+ */
+function initClient() {
+  gapi.client.init({
+    apiKey: API_KEY,
+    clientId: CLIENT_ID,
+    prompt: 'none',
+    discoveryDocs: DISCOVERY_DOCS,
+    scope: SCOPES
+  }).then(function () {
+    // Listen for sign-in state changes.
+    gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
+
+    // Handle the initial sign-in state.
+    updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
+  });
+}
+
+var googleDriveIsSignedIn = false;
+var googleDriveIsSignedInStateCallback = undefined
+
+/**
+ *  Called when the signed in status changes, to update the UI
+ *  appropriately. After a sign-in, the API is called.
+ */
+function updateSigninStatus(isSignedIn) {
+  var connecttogoogledrive = document.getElementById("connecttogoogledrive")
+  if (isSignedIn) {
+    if(typeof connecttogoogledrive != "undefined") {
+      connecttogoogledrive.firstChild.setAttribute("src", "images/google-drive-48.png")
+      connecttogoogledrive.setAttribute("title", "Connected to Google Drive")
+    }
+
+    googleDriveIsSignedIn = true
+    if (typeof googleDriveIsSignedInStateCallback == "function") {
+      console.log("Calling the callback");
+      googleDriveIsSignedInStateCallback();
+      googleDriveIsSignedInStateCallback = undefined;
+    } else {
+      console.log("No callback after signing in...")
+    }
+  } else {
+    if(typeof connecttogoogledrive != "undefined") {
+      connecttogoogledrive.firstChild.setAttribute("src", "images/google-drive-monochromatic-48.png")
+      connecttogoogledrive.setAttribute("title", "")
+    }
+
+    googleDriveIsSignedIn = false
+  }
+}
+
+/**
+ *  Sign in the user upon button click.
+ */
+function handleAuthClick(event) {
+  if(typeof gapi == "undefined")
+    setTimeout(handleAuthClick, 100)
+  else if(typeof gapi.auth2 == "undefined")
+    setTimeout(handleAuthClick, 100)
+  else {
+    console.log("handleAuthClick")
+    gapi.auth2.getAuthInstance().signIn();
+  }
+}
+
+/**
+ *  Sign out the user upon button click.
+ */
+function handleSignoutClick(event) {
+  gapi.auth2.getAuthInstance().signOut();
+}
+
+// Launches the application
+</script>
+<script async defer src="https://apis.google.com/js/api.js"
+        onload="this.onload=function(){};handleClientLoad()"
+        onreadystatechange="if (this.readyState === 'complete') this.onload()">
+</script>
+<script>
+LambdaPerfect.main(); // Removes all scripts !
+</script>
+</body>
+</html>
