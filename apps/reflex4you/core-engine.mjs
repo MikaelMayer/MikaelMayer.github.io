@@ -2461,8 +2461,10 @@ export class ReflexCore {
 
     const assignDynamicNearest = (states, slots) => {
       const availableSlots = Array.isArray(slots) ? slots.slice() : [];
+      const unassigned = [];
       (states || []).forEach((state) => {
         if (!availableSlots.length) {
+          unassigned.push(state);
           return;
         }
         const pointerPoint = this.clientPointToComplex(state.lastClientX, state.lastClientY);
@@ -2489,6 +2491,7 @@ export class ReflexCore {
         }
         this.assignPointerToSlot(state, bestSlot);
       });
+      return unassigned;
     };
 
     if (this.activeFingerFamily === 'fixed') {
@@ -2551,8 +2554,15 @@ export class ReflexCore {
             assignDynamicNearest(leftoverStates, dynamicSlots);
           }
         } else {
-          // Treat as purely dynamic (fixed constants only move when the gesture starts near them).
-          assignDynamicNearest(remainingStates, dynamicSlots);
+          // Prefer dynamic matching first; if we use more fingers than dynamic slots,
+          // fall back to fixed slots in order (F1, F2, ...).
+          const leftoverStates = assignDynamicNearest(remainingStates, dynamicSlots);
+          if (leftoverStates.length) {
+            let stateIndex = 0;
+            for (; stateIndex < leftoverStates.length && stateIndex < fixedSlots.length; stateIndex += 1) {
+              this.assignPointerToSlot(leftoverStates[stateIndex], fixedSlots[stateIndex]);
+            }
+          }
         }
       }
     }
