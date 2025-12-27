@@ -82,8 +82,10 @@ const SOLOS_PARAM = 'solos';
 
 const DEFAULT_ANIMATION_SECONDS = 5;
 
-const W_FINGER_ORDER = ['W1', 'W2'];
-const FINGER_LABEL_REGEX = /^(?:[FD][1-9]\d*|W[12])$/;
+const ALL_W_FINGER_LABELS = ['W0', 'W1', 'W2'];
+const W_PAIR_ZERO = ['W0', 'W1'];
+const W_PAIR_LEGACY = ['W1', 'W2'];
+const FINGER_LABEL_REGEX = /^(?:[FD]\d+|W[012])$/;
 
 function isFingerLabel(label) {
   return typeof label === 'string' && FINGER_LABEL_REGEX.test(label);
@@ -99,11 +101,14 @@ function fingerFamily(label) {
 
 function fingerIndex(label) {
   if (!label) return -1;
-  if (label === 'W1') return 0;
-  if (label === 'W2') return 1;
-  const match = /^([FD])([1-9]\d*)$/.exec(label);
+  if (label === 'W0') return 0;
+  if (label === 'W1') return 1;
+  if (label === 'W2') return 2;
+  const match = /^([FD])(\d+)$/.exec(label);
   if (!match) return -1;
-  return Number(match[2]) - 1;
+  const raw = Number(match[2]);
+  if (!Number.isInteger(raw) || raw < 0) return -1;
+  return raw === 0 ? 0 : raw - 1;
 }
 
 function defaultFingerOffset(label) {
@@ -179,7 +184,7 @@ function ensureFingerState(label) {
 }
 
 // Always keep workspace fingers in a known state.
-W_FINGER_ORDER.forEach((label) => ensureFingerState(label));
+ALL_W_FINGER_LABELS.forEach((label) => ensureFingerState(label));
 
 function ensureFingerSubscriptions(labels) {
   if (!reflexCore) {
@@ -210,7 +215,12 @@ function applyFingerValuesFromQuery(labels) {
       if (!isFingerLabel(label)) {
         return;
       }
-      const raw = params.get(label);
+      // W0 and W2 are aliases (W0 is the "zero" end). Accept either in share links.
+      let raw = params.get(label);
+      if ((label === 'W0' || label === 'W2') && (raw == null || raw === '')) {
+        const peer = label === 'W0' ? 'W2' : 'W0';
+        raw = params.get(peer);
+      }
       const parsed = parseComplexString(raw);
       if (parsed) {
         reflexCore.setFingerValue(label, parsed.x, parsed.y, { triggerRender: false });
@@ -2164,18 +2174,33 @@ function resolveAxisContext(parent, node) {
 function deriveFingerState(analysis) {
   const fixedSlots = sortFingerLabels(Array.from(analysis.usage.fixed));
   const dynamicSlots = sortFingerLabels(Array.from(analysis.usage.dynamic));
-  const wSlots = W_FINGER_ORDER.filter((label) => analysis.usage.w.has(label));
-  if (fixedSlots.length && dynamicSlots.length) {
+  const usesW0 = analysis.usage.w.has('W0');
+  const usesW2 = analysis.usage.w.has('W2');
+  if (usesW0 && usesW2) {
     return {
       mode: 'invalid',
       fixedSlots: [],
       dynamicSlots: [],
       wSlots: [],
       axisConstraints: new Map(),
-      error: 'Formulas cannot mix F* fingers with D* fingers.',
+      error: 'Formulas cannot mix W0 with W2. Use W0/W1 or W1/W2.',
     };
   }
-  const mode = fixedSlots.length ? 'fixed' : dynamicSlots.length ? 'dynamic' : 'none';
+
+  // If W0 is present, it takes over the workspace pair: always activate W0+W1.
+  // Otherwise, keep the legacy W1/W2 behavior (only activate labels that appear).
+  const wSlots = usesW0
+    ? W_PAIR_ZERO.slice()
+    : W_PAIR_LEGACY.filter((label) => analysis.usage.w.has(label));
+  // Mixed fixed+dynamic is allowed. Interaction is resolved at runtime:
+  // the first non-W finger chooses whether to latch onto fixed or dynamic.
+  const mode = fixedSlots.length && dynamicSlots.length
+    ? 'mixed'
+    : fixedSlots.length
+      ? 'fixed'
+      : dynamicSlots.length
+        ? 'dynamic'
+        : 'none';
   const axisConstraints = new Map();
   [...fixedSlots, ...dynamicSlots, ...wSlots].forEach((label) => {
     if (analysis.axisConstraints.has(label)) {
@@ -2413,7 +2438,7 @@ async function bootstrapReflexApplication() {
     }
     // Subscribe only to the finger labels that are actually used.
     const initialActiveLabels = initialFingerState.mode === 'invalid'
-      ? W_FINGER_ORDER
+      ? ALL_W_FINGER_LABELS
       : [
         ...(initialFingerState.fixedSlots || []),
         ...(initialFingerState.dynamicSlots || []),

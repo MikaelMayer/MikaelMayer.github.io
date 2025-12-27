@@ -25,11 +25,18 @@ export function Pow(base, exponent) {
   return { kind: "Pow", base, exponent };
 }
 
-const W_FINGER_LABELS = Object.freeze(["W1", "W2"]);
+// Workspace frame labels.
+// `W0` enables the intuitive default-normalization `(z - W0)/(W1 - W0)` with W0=0 and W1=1.
+const W_FINGER_LABELS = Object.freeze(["W0", "W1", "W2"]);
 
 function parseFingerLabel(label) {
   if (!label || typeof label !== "string") {
     return null;
+  }
+  // W0 is the "zero" end of the workspace pair (W0/W1).
+  // It shares the same uniform slot index as W2, but is NOT kept in sync with W2.
+  if (label === "W0") {
+    return { family: "w", index: 1 };
   }
   if (label === "W1") {
     return { family: "w", index: 0 };
@@ -37,16 +44,18 @@ function parseFingerLabel(label) {
   if (label === "W2") {
     return { family: "w", index: 1 };
   }
-  const match = /^([FD])([1-9]\d*)$/.exec(label);
+  const match = /^([FD])(\d+)$/.exec(label);
   if (!match) {
     return null;
   }
   const prefix = match[1];
   const rawIndex = Number(match[2]);
-  if (!Number.isInteger(rawIndex) || rawIndex < 1) {
+  if (!Number.isInteger(rawIndex) || rawIndex < 0) {
     return null;
   }
-  const index = rawIndex - 1;
+  // Support `F0`/`D0` as 0-based aliases of the first slot (same as `F1`/`D1`).
+  // This avoids breaking legacy formulas that already use `F1`/`D1`.
+  const index = rawIndex === 0 ? 0 : rawIndex - 1;
   return {
     family: prefix === "F" ? "fixed" : "dynamic",
     index,
@@ -1673,6 +1682,7 @@ export class ReflexCore {
     this.dynamicOffsetsDirty = true;
     this.wOffsetsDirty = true;
 
+    this.setFingerValue('W0', 0, 0, { triggerRender: false });
     this.setFingerValue('W1', 1, 0, { triggerRender: false });
     this.setFingerValue('W2', 0, 0, { triggerRender: false });
 
@@ -1910,15 +1920,13 @@ export class ReflexCore {
     this.activeFixedSlots = Array.isArray(fixedSlots) ? [...fixedSlots] : [];
     this.activeDynamicSlots = Array.isArray(dynamicSlots) ? [...dynamicSlots] : [];
     this.activeWSlots = Array.isArray(wSlots) ? [...wSlots] : [];
-    if (this.activeFixedSlots.length && this.activeDynamicSlots.length) {
-      // Should never happen, but guard to keep internal state consistent.
-      this.activeDynamicSlots = [];
-    }
-    this.activeFingerFamily = this.activeFixedSlots.length
-      ? 'fixed'
-      : this.activeDynamicSlots.length
-        ? 'dynamic'
-        : 'none';
+    this.activeFingerFamily = this.activeFixedSlots.length && this.activeDynamicSlots.length
+      ? 'mixed'
+      : this.activeFixedSlots.length
+        ? 'fixed'
+        : this.activeDynamicSlots.length
+          ? 'dynamic'
+          : 'none';
     this.fingerAxisConstraints = axisConstraints instanceof Map ? new Map(axisConstraints) : new Map();
     this.releaseAllPointerAssignments();
   }
@@ -2163,7 +2171,12 @@ export class ReflexCore {
     }
     // Workspace offsets
     for (let i = 0; i < this.wUniformCount; i += 1) {
-      const label = `W${i + 1}`;
+      // We always expose only 2 W uniforms (`W1` and `W2`) to the shader.
+      // When interacting with the W0/W1 pair, we map W0 onto the W2 slot.
+      let label = `W${i + 1}`;
+      if (label === 'W2' && this.activeWSlots?.includes?.('W0')) {
+        label = 'W0';
+      }
       const value = this.fingerValues.get(label) || this.defaultFingerValue(label);
       this.wOffsetsBuffer[i * 2] = value.x;
       this.wOffsetsBuffer[i * 2 + 1] = value.y;
@@ -2446,20 +2459,12 @@ export class ReflexCore {
 
     const remainingStates = pointerList.filter((state) => !assignedPointerIds.has(state.pointerId));
 
-    if (this.activeFingerFamily === 'fixed') {
-      let stateIndex = 0;
-      this.activeFixedSlots.forEach((slot) => {
-        if (stateIndex >= remainingStates.length) {
-          return;
-        }
-        const state = remainingStates[stateIndex];
-        this.assignPointerToSlot(state, slot);
-        stateIndex += 1;
-      });
-    } else if (this.activeFingerFamily === 'dynamic') {
-      const availableSlots = this.activeDynamicSlots.slice();
-      remainingStates.forEach((state) => {
+    const assignDynamicNearest = (states, slots) => {
+      const availableSlots = Array.isArray(slots) ? slots.slice() : [];
+      const unassigned = [];
+      (states || []).forEach((state) => {
         if (!availableSlots.length) {
+          unassigned.push(state);
           return;
         }
         const pointerPoint = this.clientPointToComplex(state.lastClientX, state.lastClientY);
@@ -2486,6 +2491,80 @@ export class ReflexCore {
         }
         this.assignPointerToSlot(state, bestSlot);
       });
+      return unassigned;
+    };
+
+    if (this.activeFingerFamily === 'fixed') {
+      let stateIndex = 0;
+      this.activeFixedSlots.forEach((slot) => {
+        if (stateIndex >= remainingStates.length) {
+          return;
+        }
+        const state = remainingStates[stateIndex];
+        this.assignPointerToSlot(state, slot);
+        stateIndex += 1;
+      });
+    } else if (this.activeFingerFamily === 'dynamic') {
+      assignDynamicNearest(remainingStates, this.activeDynamicSlots);
+    } else if (this.activeFingerFamily === 'mixed') {
+      const fixedSlots = this.activeFixedSlots.slice();
+      const dynamicSlots = this.activeDynamicSlots.slice();
+      if (!remainingStates.length) {
+        // nothing
+      } else if (!fixedSlots.length) {
+        assignDynamicNearest(remainingStates, dynamicSlots);
+      } else if (!dynamicSlots.length) {
+        let stateIndex = 0;
+        fixedSlots.forEach((slot) => {
+          if (stateIndex >= remainingStates.length) return;
+          this.assignPointerToSlot(remainingStates[stateIndex], slot);
+          stateIndex += 1;
+        });
+      } else {
+        // Decide fixed vs dynamic based on the first non-W pointer.
+        const leader = remainingStates[0];
+        const pointerPoint = this.clientPointToComplex(leader.lastClientX, leader.lastClientY);
+        let chooseFixed = false;
+        if (pointerPoint) {
+          const firstFixed = fixedSlots[0];
+          const fv = this.getFingerValue(firstFixed);
+          const dxF = fv.x - pointerPoint.x;
+          const dyF = fv.y - pointerPoint.y;
+          const distF = dxF * dxF + dyF * dyF;
+
+          let bestDynDist = Infinity;
+          dynamicSlots.forEach((slot) => {
+            const dv = this.getFingerValue(slot);
+            const dx = dv.x - pointerPoint.x;
+            const dy = dv.y - pointerPoint.y;
+            const dist = dx * dx + dy * dy;
+            if (dist < bestDynDist) bestDynDist = dist;
+          });
+          chooseFixed = distF < bestDynDist;
+        }
+
+        if (chooseFixed) {
+          // Assign sequential fixed slots first, then fall back to dynamic for remaining pointers.
+          let stateIndex = 0;
+          for (; stateIndex < remainingStates.length && stateIndex < fixedSlots.length; stateIndex += 1) {
+            this.assignPointerToSlot(remainingStates[stateIndex], fixedSlots[stateIndex]);
+          }
+          const leftoverStates = remainingStates.slice(stateIndex);
+          if (leftoverStates.length) {
+            assignDynamicNearest(leftoverStates, dynamicSlots);
+          }
+        } else {
+          // Prefer dynamic matching first; if we use more fingers than dynamic slots,
+          // fall back to fixed slots in order (F1, F2, ...).
+          const leftoverStates = assignDynamicNearest(remainingStates, dynamicSlots);
+          if (leftoverStates.length) {
+            let stateIndex = 0;
+            for (; stateIndex < leftoverStates.length && stateIndex < fixedSlots.length; stateIndex += 1) {
+              this.assignPointerToSlot(leftoverStates[stateIndex], fixedSlots[stateIndex]);
+            }
+          }
+        }
+      }
     }
 
     const currentWStates = pointerList.filter((state) => state.role === 'w');

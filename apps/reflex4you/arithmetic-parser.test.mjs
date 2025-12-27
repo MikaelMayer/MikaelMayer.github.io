@@ -225,6 +225,16 @@ test('parses non-consecutive finger primitives (any F*/D*)', () => {
   assert.equal(result.value.right.slot, 'D12');
 });
 
+test('parses F0 and D0 finger primitives', () => {
+  const result = parseFormulaInput('F0 + D0');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Add');
+  assert.equal(result.value.left.kind, 'FingerOffset');
+  assert.equal(result.value.left.slot, 'F0');
+  assert.equal(result.value.right.kind, 'FingerOffset');
+  assert.equal(result.value.right.slot, 'D0');
+});
+
 test('rejects binding finger names with set', () => {
   const result = parseFormulaInput('set F7 = 1 in F7');
   assert.equal(result.ok, false);
@@ -239,6 +249,16 @@ test('parses W finger primitives', () => {
   assert.equal(result.value.left.slot, 'W1');
   assert.equal(result.value.right.kind, 'FingerOffset');
   assert.equal(result.value.right.slot, 'W2');
+});
+
+test('parses W0 as a workspace finger primitive', () => {
+  const result = parseFormulaInput('W0 + W1');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Add');
+  assert.equal(result.value.left.kind, 'FingerOffset');
+  assert.equal(result.value.left.slot, 'W0');
+  assert.equal(result.value.right.kind, 'FingerOffset');
+  assert.equal(result.value.right.slot, 'W1');
 });
 
 test('parses function composition forms', () => {

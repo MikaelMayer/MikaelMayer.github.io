@@ -142,6 +142,16 @@ test('dynamic fingers read from the dynamic offset array', () => {
   assert.match(fragment, /return u_dynamicOffsets\[0\];/);
 });
 
+test('F0 and D0 map to the first uniform slot', () => {
+  const fixed = buildFragmentSourceFromAST(FingerOffset('F0'));
+  assert.match(fixed, /uniform vec2 u_fixedOffsets\[1\]/);
+  assert.match(fixed, /return u_fixedOffsets\[0\];/);
+
+  const dyn = buildFragmentSourceFromAST(FingerOffset('D0'));
+  assert.match(dyn, /uniform vec2 u_dynamicOffsets\[1\]/);
+  assert.match(dyn, /return u_dynamicOffsets\[0\];/);
+});
+
 test('supports sparse high-index finger uniforms', () => {
   const fixedAst = FingerOffset('F7');
   const fixedFragment = buildFragmentSourceFromAST(fixedAst);
@@ -156,6 +166,13 @@ test('supports sparse high-index finger uniforms', () => {
 
 test('W fingers read from the W offset array', () => {
   const ast = FingerOffset('W2');
+  const fragment = buildFragmentSourceFromAST(ast);
+  assert.match(fragment, /uniform vec2 u_wOffsets\[2\]/);
+  assert.match(fragment, /return u_wOffsets\[1\];/);
+});
+
+test('W0 maps to the W2 uniform slot in shaders', () => {
+  const ast = FingerOffset('W0');
   const fragment = buildFragmentSourceFromAST(ast);
   assert.match(fragment, /uniform vec2 u_wOffsets\[2\]/);
   assert.match(fragment, /return u_wOffsets\[1\];/);

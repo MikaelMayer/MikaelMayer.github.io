@@ -58,6 +58,8 @@ const redoButton = document.getElementById('redo-button');
 const menuButton = document.getElementById('menu-button');
 const menuDropdown = document.getElementById('menu-dropdown');
 
+const SOLOS_PARAM = 'solos';
+
 // Apply the top split fraction.
 try {
   const pct = Math.max(10, Math.min(90, Math.round(TOP_FRACTION * 100)));
@@ -70,8 +72,10 @@ try {
 // Utilities (URL + finger parsing)
 // ---------------------------------------------------------------------------
 
-const FINGER_LABEL_REGEX = /^(?:[FD][1-9]\d*|W[12])$/;
-const W_FINGER_ORDER = ['W1', 'W2'];
+const FINGER_LABEL_REGEX = /^(?:[FD]\d+|W[012])$/;
+const ALL_W_FINGER_LABELS = ['W0', 'W1', 'W2'];
+const W_PAIR_ZERO = ['W0', 'W1'];
+const W_PAIR_LEGACY = ['W1', 'W2'];
 
 function isFingerLabel(label) {
   return typeof label === 'string' && FINGER_LABEL_REGEX.test(label);
@@ -87,11 +91,14 @@ function fingerFamily(label) {
 
 function fingerIndex(label) {
   if (!label) return -1;
-  if (label === 'W1') return 0;
-  if (label === 'W2') return 1;
-  const match = /^([FD])([1-9]\d*)$/.exec(label);
+  if (label === 'W0') return 0;
+  if (label === 'W1') return 1;
+  if (label === 'W2') return 2;
+  const match = /^([FD])(\d+)$/.exec(label);
   if (!match) return -1;
-  return Number(match[2]) - 1;
+  const raw = Number(match[2]);
+  if (!Number.isInteger(raw) || raw < 0) return -1;
+  return raw === 0 ? 0 : raw - 1;
 }
 
 function compareFingerLabels(a, b) {
@@ -106,6 +113,23 @@ function compareFingerLabels(a, b) {
 
 function sortedLabels(labels) {
   return (labels || []).filter(isFingerLabel).slice().sort(compareFingerLabels);
+}
+
+function parseSolosParam(raw) {
+  if (raw == null) return new Set();
+  const normalized = String(raw).trim();
+  if (!normalized) return new Set();
+  const parts = normalized
+    .split(',')
+    .map((part) => String(part || '').trim())
+    .filter(Boolean);
+  const set = new Set();
+  for (const label of parts) {
+    if (isFingerLabel(label)) {
+      set.add(label);
+    }
+  }
+  return set;
 }
 
 function parseComplexString(raw) {
@@ -273,18 +297,28 @@ function analyzeFingerUsage(ast) {
 function deriveFingerState(analysis) {
   const fixedSlots = sortedLabels(Array.from(analysis.usage.fixed));
   const dynamicSlots = sortedLabels(Array.from(analysis.usage.dynamic));
-  const wSlots = W_FINGER_ORDER.filter((label) => analysis.usage.w.has(label));
-  if (fixedSlots.length && dynamicSlots.length) {
+  const usesW0 = analysis.usage.w.has('W0');
+  const usesW2 = analysis.usage.w.has('W2');
+  if (usesW0 && usesW2) {
     return {
       mode: 'invalid',
       fixedSlots: [],
       dynamicSlots: [],
       wSlots: [],
       axisConstraints: new Map(),
-      error: 'Formulas cannot mix F* fingers with D* fingers.',
+      error: 'Formulas cannot mix W0 with W2. Use W0/W1 or W1/W2.',
     };
   }
-  const mode = fixedSlots.length ? 'fixed' : dynamicSlots.length ? 'dynamic' : 'none';
+  const wSlots = usesW0
+    ? W_PAIR_ZERO.slice()
+    : W_PAIR_LEGACY.filter((label) => analysis.usage.w.has(label));
+  const mode = fixedSlots.length && dynamicSlots.length
+    ? 'mixed'
+    : fixedSlots.length
+      ? 'fixed'
+      : dynamicSlots.length
+        ? 'dynamic'
+        : 'none';
   const axisConstraints = new Map();
   [...fixedSlots, ...dynamicSlots, ...wSlots].forEach((label) => {
     if (analysis.axisConstraints.has(label)) {
@@ -343,12 +377,19 @@ function randomInRange(min, max) {
 }
 
 function proposeCandidate({ coreForClamp, baseFingers, labels, axisConstraints, band, avoidKeys }) {
+  // `labels` are the mutable labels for exploration (typically the solo set).
+  // Always preserve non-mutable labels to avoid resetting parameters.
   const candidate = {};
+  for (const label of allUsedLabels) {
+    const base = baseFingers[label] || { x: 0, y: 0 };
+    candidate[label] = { x: base.x, y: base.y };
+  }
+
   for (const label of labels) {
     const base = baseFingers[label] || { x: 0, y: 0 };
-    // W* finger constants must never be modified by exploration mode.
-    // Keep them exactly as-is (no randomization, no clamping adjustments).
-    if (String(label).startsWith('W')) {
+    // By default, exploration keeps W* constants fixed (so navigation doesn't drift),
+    // but when `solos` is present and W is explicitly solo-selected, allow exploring it.
+    if (String(label).startsWith('W') && !solosPresent) {
       candidate[label] = { x: base.x, y: base.y };
       continue;
     }
@@ -434,8 +475,11 @@ let thumbWebglCanvas = null;
 let activeFormulaSource = 'z';
 let activeAst = createDefaultFormulaAST();
 let activeLabels = [];
+let allUsedLabels = [];
 let activeAxisConstraints = new Map();
 let activeFingerConfig = { fixedSlots: [], dynamicSlots: [], wSlots: [], axisConstraints: new Map() };
+let solosPresent = false;
+let soloLabelSet = new Set();
 
 let isTransitioning = false;
 let pendingTransitionToken = 0;
@@ -654,7 +698,7 @@ function updateUrlForBaseFingers(baseFingers) {
   // Canonicalize formula into the share params.
   return (async () => {
     await writeFormulaToSearchParams(params, activeFormulaSource);
-    for (const label of activeLabels) {
+    for (const label of allUsedLabels) {
       const v = baseFingers[label];
       const serialized = formatComplexForQuery(v?.x, v?.y);
       if (serialized) params.set(label, serialized);
@@ -953,15 +997,19 @@ async function buildExploreUrl({ targetPath, baseFingers, includeEditParam }) {
   const url = new URL(window.location.href);
   url.pathname = url.pathname.replace(/[^/]*$/, targetPath);
   url.hash = '';
-  const params = new URLSearchParams();
+  // Preserve other query params (notably `solos`) when switching pages.
+  const params = new URLSearchParams(window.location.search);
   await writeFormulaToSearchParams(params, activeFormulaSource);
   if (includeEditParam) {
     params.set('edit', 'true');
+  } else {
+    params.delete('edit');
   }
-  for (const label of activeLabels) {
+  for (const label of allUsedLabels) {
     const v = baseFingers[label];
     const serialized = formatComplexForQuery(v?.x, v?.y);
     if (serialized) params.set(label, serialized);
+    else params.delete(label);
   }
   url.search = params.toString();
   return url.toString();
@@ -1078,6 +1126,8 @@ async function bootstrap() {
 
   // Seed finger values from query for parse-time desugaring (e.g. $$ counts).
   const params = new URLSearchParams(window.location.search);
+  solosPresent = params.has(SOLOS_PARAM);
+  soloLabelSet = solosPresent ? parseSolosParam(params.get(SOLOS_PARAM)) : new Set();
   const seededFingerValues = {};
   params.forEach((value, key) => {
     if (!isFingerLabel(key)) return;
@@ -1103,17 +1153,29 @@ async function bootstrap() {
     return;
   }
 
+  allUsedLabels = sortedLabels([
+    ...(fingerState.fixedSlots || []),
+    ...(fingerState.dynamicSlots || []),
+    ...(fingerState.wSlots || []),
+  ]);
+
+  const filterBySolos = (labels) => {
+    const arr = Array.isArray(labels) ? labels : [];
+    if (!solosPresent) return arr;
+    return arr.filter((l) => soloLabelSet.has(l));
+  };
+
   activeFingerConfig = {
-    fixedSlots: fingerState.fixedSlots,
-    dynamicSlots: fingerState.dynamicSlots,
-    wSlots: fingerState.wSlots,
+    fixedSlots: filterBySolos(fingerState.fixedSlots),
+    dynamicSlots: filterBySolos(fingerState.dynamicSlots),
+    wSlots: filterBySolos(fingerState.wSlots),
     axisConstraints: fingerState.axisConstraints,
   };
   activeAxisConstraints = fingerState.axisConstraints;
   activeLabels = sortedLabels([
-    ...(fingerState.fixedSlots || []),
-    ...(fingerState.dynamicSlots || []),
-    ...(fingerState.wSlots || []),
+    ...(activeFingerConfig.fixedSlots || []),
+    ...(activeFingerConfig.dynamicSlots || []),
+    ...(activeFingerConfig.wSlots || []),
   ]);
 
   // Initialize top renderer.
@@ -1121,7 +1183,7 @@ async function bootstrap() {
   topCore.setActiveFingerConfig(activeFingerConfig);
 
   // Apply query finger values to the renderer.
-  for (const label of activeLabels) {
+  for (const label of allUsedLabels) {
     const raw = params.get(label);
     const parsedValue = parseComplexString(raw);
     if (parsedValue) {
@@ -1136,9 +1198,14 @@ async function bootstrap() {
 
   // Clamp into visible interval (view bounds), then render again.
   const clampedBase = {};
-  for (const label of activeLabels) {
+  for (const label of allUsedLabels) {
     const v = topCore.getFingerValue(label);
-    clampedBase[label] = clampToView(topCore, v.x, v.y);
+    // Only clamp labels that exploration is allowed to modify.
+    if (activeLabels.includes(label)) {
+      clampedBase[label] = clampToView(topCore, v.x, v.y);
+    } else {
+      clampedBase[label] = { x: v.x, y: v.y };
+    }
   }
   applyFingersToCore(topCore, clampedBase);
   topCore.render();
