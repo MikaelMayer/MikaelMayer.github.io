@@ -30,6 +30,7 @@ const PRECACHE_URLS = [
   './icon-512.png',
   './Screenshot_20251213-082055.png',
   './main.js',
+  './formula-compile-worker.mjs',
   './menu-ui.mjs',
   './anim-utils.mjs',
   './explore-page.mjs',

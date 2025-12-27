@@ -36,6 +36,7 @@ export function childEntries(node) {
     case 'Abs2':
     case 'Floor':
     case 'Conjugate':
+    case 'IsNaN':
       return [['value', node.value]];
     case 'Ln': {
       const entries = [['value', node.value]];
@@ -75,6 +76,11 @@ export function childEntries(node) {
         ['condition', node.condition],
         ['thenBranch', node.thenBranch],
         ['elseBranch', node.elseBranch],
+      ];
+    case 'IfNaN':
+      return [
+        ['value', node.value],
+        ['fallback', node.fallback],
       ];
     case 'SetBinding':
       return [

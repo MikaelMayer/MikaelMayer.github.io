@@ -13,6 +13,7 @@ function precedence(node) {
   switch (node.kind) {
     case 'SetBinding':
     case 'If':
+    case 'IfNaN':
       return 1;
     case 'LogicalOr':
       return 2;
@@ -315,6 +316,8 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
       return `\\left\\lfloor${nodeToLatex(node.value, 0, options)}\\right\\rfloor`;
     case 'Conjugate':
       return `\\overline{${nodeToLatex(node.value, 0, options)}}`;
+    case 'IsNaN':
+      return functionCallLatex('isnan', [node.value], options, identifierHighlights(node));
 
     case 'Add':
     case 'Sub':
