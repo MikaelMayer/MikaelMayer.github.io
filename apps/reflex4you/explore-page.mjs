@@ -802,10 +802,6 @@ async function animateTopToFingers(targetFingers, { durationMs } = {}) {
   const token = ++pendingTransitionToken;
   isTransitioning = true;
   pushUiFreeze();
-  const shouldResumeAnimations = Boolean(animationController?.isPlaying?.());
-  if (shouldResumeAnimations) {
-    animationController.pause();
-  }
 
   try {
     const from = readFingersFromCore(topCore, activeLabels);
@@ -853,9 +849,6 @@ async function animateTopToFingers(targetFingers, { durationMs } = {}) {
   } finally {
     isTransitioning = false;
     popUiFreeze();
-    if (shouldResumeAnimations) {
-      animationController.resume();
-    }
   }
 }
 
