@@ -21,6 +21,12 @@ const TOP_FRACTION = 2 / 3;
 // Number of miniature choices (excluding refresh).
 const THUMB_COUNT = 7;
 
+// Keep URL-driven parameter animations consistent with index.html.
+const ANIMATION_SUFFIX = 'A';
+const ANIMATION_TIME_PARAM = 't';
+const DEFAULT_ANIMATION_SECONDS = 5;
+const THUMB_ANIMATION_FPS = 20;
+
 // View transition timing: seconds per unit of RMS finger distance.
 // Example: distance 1 => 1 second when set to 1.
 const TRANSITION_SECONDS_PER_DISTANCE = 1;
@@ -79,6 +85,16 @@ const W_PAIR_LEGACY = ['W1', 'W2'];
 
 function isFingerLabel(label) {
   return typeof label === 'string' && FINGER_LABEL_REGEX.test(label);
+}
+
+function parseSecondsFromQuery(raw) {
+  if (raw == null) return null;
+  const trimmed = String(raw).trim().toLowerCase();
+  if (!trimmed) return null;
+  const numeric = trimmed.endsWith('s') ? trimmed.slice(0, -1) : trimmed;
+  const seconds = Number(numeric);
+  if (!Number.isFinite(seconds) || seconds <= 0) return null;
+  return seconds;
 }
 
 function fingerFamily(label) {
@@ -174,6 +190,24 @@ function parseComplexString(raw) {
     return { x: realValue, y: 0 };
   }
   return null;
+}
+
+function parseComplexInterval(raw) {
+  if (!raw) return null;
+  const normalized = String(raw).trim().replace(/\s+/g, '');
+  if (!normalized || normalized.includes(';') || normalized.includes('|')) return null;
+  const parts = normalized.split('..');
+  if (parts.length !== 2) return null;
+  const start = parseComplexString(parts[0]);
+  const end = parseComplexString(parts[1]);
+  if (!start || !end) return null;
+  return { start, end };
+}
+
+function readAnimationIntervalFromQuery(label) {
+  const params = new URLSearchParams(window.location.search);
+  const key = `${label}${ANIMATION_SUFFIX}`;
+  return parseComplexInterval(params.get(key));
 }
 
 const FINGER_DECIMAL_FACTOR = 10 ** FINGER_DECIMAL_PLACES;
@@ -387,6 +421,11 @@ function proposeCandidate({ coreForClamp, baseFingers, labels, axisConstraints, 
 
   for (const label of labels) {
     const base = baseFingers[label] || { x: 0, y: 0 };
+    // Animated parameters should never be assigned random values in explore mode.
+    if (animatedLabelSet.has(label)) {
+      candidate[label] = { x: base.x, y: base.y };
+      continue;
+    }
     // By default, exploration keeps W* constants fixed (so navigation doesn't drift),
     // but when `solos` is present and W is explicitly solo-selected, allow exploring it.
     if (String(label).startsWith('W') && !solosPresent) {
@@ -481,6 +520,12 @@ let activeFingerConfig = { fixedSlots: [], dynamicSlots: [], wSlots: [], axisCon
 let solosPresent = false;
 let soloLabelSet = new Set();
 
+let animationSeconds = DEFAULT_ANIMATION_SECONDS;
+let animationController = null;
+let animatedLabelSet = new Set();
+let latestAnimatedValues = new Map(); // label -> { x, y }
+let lastThumbAnimationMs = 0;
+
 let isTransitioning = false;
 let pendingTransitionToken = 0;
 
@@ -556,12 +601,149 @@ function readFingersFromCore(core, labels) {
   return fingers;
 }
 
-function applyFingersToCore(core, fingers) {
-  for (const label of activeLabels) {
+function applyFingersToCore(core, fingers, { ignoreLabels = null } = {}) {
+  const ignore = ignoreLabels instanceof Set ? ignoreLabels : null;
+  for (const label of allUsedLabels) {
+    if (ignore && ignore.has(label)) continue;
     const v = fingers[label];
     if (!v) continue;
     core.setFingerValue(label, v.x, v.y, { triggerRender: false });
   }
+}
+
+function buildAnimationTracksFromQuery(labels) {
+  const tracks = new Map();
+  for (const label of labels || []) {
+    const interval = readAnimationIntervalFromQuery(label);
+    if (interval) tracks.set(label, interval);
+  }
+  return tracks;
+}
+
+function applyAnimationStartValuesToCore(core, tracks) {
+  if (!core || !tracks) return;
+  for (const [label, interval] of tracks.entries()) {
+    if (!interval?.start) continue;
+    core.setFingerValue(label, interval.start.x, interval.start.y, { triggerRender: false });
+  }
+}
+
+function applyLatestAnimatedValuesToCore(core) {
+  if (!core || !animatedLabelSet.size) return;
+  for (const label of animatedLabelSet) {
+    const v = latestAnimatedValues.get(label);
+    if (!v) continue;
+    core.setFingerValue(label, v.x, v.y, { triggerRender: false });
+  }
+}
+
+function createAnimationController({ tracks, secondsPerSegment }) {
+  const state = {
+    tracks: new Map(tracks || []),
+    secondsPerSegment: Math.max(0.001, Number(secondsPerSegment) || DEFAULT_ANIMATION_SECONDS),
+    rafId: null,
+    playing: false,
+    paused: false,
+    pausedAtMs: 0,
+    perTrack: new Map(),
+  };
+
+  for (const [label, interval] of state.tracks.entries()) {
+    state.perTrack.set(label, { label, interval, baseStartMs: 0, initialized: false });
+  }
+
+  function lerpComplex(a, b, t) {
+    return { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t) };
+  }
+
+  function stepTrack(track, nowMs) {
+    const durationMs = state.secondsPerSegment * 1000;
+    if (!track.initialized) {
+      track.baseStartMs = nowMs;
+      track.initialized = true;
+    }
+    const interval = track.interval;
+    const start = interval?.start;
+    const end = interval?.end;
+    if (!start || !end) return null;
+    const elapsed = nowMs - track.baseStartMs;
+    const t = durationMs > 0 ? elapsed / durationMs : 0;
+    const frac = t - Math.floor(t);
+    const clamped = Math.max(0, Math.min(1, frac));
+    return lerpComplex(start, end, clamped);
+  }
+
+  function frame(nowMs) {
+    if (!state.playing || state.paused) return;
+
+    for (const track of state.perTrack.values()) {
+      const value = stepTrack(track, nowMs);
+      if (!value) continue;
+      latestAnimatedValues.set(track.label, value);
+      topCore?.setFingerValue?.(track.label, value.x, value.y, { triggerRender: false });
+      thumbCore?.setFingerValue?.(track.label, value.x, value.y, { triggerRender: false });
+    }
+
+    // Only the top canvas needs continuous updates; thumbnails are updated on demand.
+    topCore?.render?.();
+
+    // Keep miniatures animated too (throttled for performance).
+    const intervalMs = 1000 / Math.max(1, THUMB_ANIMATION_FPS);
+    if (thumbCore && gridEl && thumbWebglCanvas && nowMs - lastThumbAnimationMs >= intervalMs) {
+      lastThumbAnimationMs = nowMs;
+      try {
+        const snap = currentSnapshot();
+        if (snap) {
+          renderThumbsAnimatedFast(snap);
+        }
+      } catch (_) {
+        // ignore
+      }
+    }
+
+    state.rafId = window.requestAnimationFrame(frame);
+  }
+
+  return {
+    start() {
+      if (state.playing && !state.paused) return;
+      state.playing = true;
+      state.paused = false;
+      state.rafId = window.requestAnimationFrame(frame);
+    },
+    pause() {
+      if (!state.playing || state.paused) return;
+      state.paused = true;
+      state.pausedAtMs = performance.now();
+      if (state.rafId != null) {
+        window.cancelAnimationFrame(state.rafId);
+        state.rafId = null;
+      }
+    },
+    resume() {
+      if (!state.playing || !state.paused) return;
+      const now = performance.now();
+      const delta = now - (state.pausedAtMs || now);
+      for (const track of state.perTrack.values()) {
+        if (track.initialized) {
+          track.baseStartMs += delta;
+        }
+      }
+      state.paused = false;
+      state.rafId = window.requestAnimationFrame(frame);
+    },
+    stop() {
+      state.playing = false;
+      state.paused = false;
+      if (state.rafId != null) {
+        window.cancelAnimationFrame(state.rafId);
+        state.rafId = null;
+      }
+    },
+    isPlaying() {
+      return state.playing && !state.paused;
+    },
+  };
 }
 
 function setUiDisabled(disabled) {
@@ -667,6 +849,7 @@ async function animateTopToFingers(targetFingers, { durationMs } = {}) {
       const e = easeInOutCubic(t);
 
       for (const label of activeLabels) {
+        if (animatedLabelSet.has(label)) continue;
         const a = from[label] || { x: 0, y: 0 };
         const b = to[label] || a;
         const x = lerp(a.x, b.x, e);
@@ -679,7 +862,8 @@ async function animateTopToFingers(targetFingers, { durationMs } = {}) {
     }
 
     // Snap to exact target at the end (avoid drift).
-    applyFingersToCore(topCore, to);
+    applyFingersToCore(topCore, to, { ignoreLabels: animatedLabelSet });
+    applyLatestAnimatedValuesToCore(topCore);
     topCore.render();
     await waitForNextFrame();
 
@@ -710,7 +894,8 @@ function updateUrlForBaseFingers(baseFingers) {
 
 async function renderTop(snapshot) {
   if (!topCore || !snapshot) return;
-  applyFingersToCore(topCore, snapshot.baseFingers);
+  applyFingersToCore(topCore, snapshot.baseFingers, { ignoreLabels: animatedLabelSet });
+  applyLatestAnimatedValuesToCore(topCore);
   topCore.render();
   await waitForNextFrame();
 }
@@ -756,7 +941,8 @@ async function renderThumbs(snapshot) {
           // ignore
         }
 
-        applyFingersToCore(thumbCore, candidate.fingers);
+        applyFingersToCore(thumbCore, candidate.fingers, { ignoreLabels: animatedLabelSet });
+        applyLatestAnimatedValuesToCore(thumbCore);
         thumbCore.renderToPixelSize(targetW, targetH);
         try {
           thumbCore.gl?.finish?.();
@@ -898,6 +1084,39 @@ function redo() {
     await renderThumbs(next);
     updateUndoRedoButtons();
   })().catch(() => {});
+}
+
+function renderThumbsAnimatedFast(snapshot) {
+  // Fast-path redraw for animation frames: no rerolling, no uniform checks.
+  if (!gridEl || !thumbCore || !thumbWebglCanvas || !snapshot) return;
+  const cells = Array.from(gridEl.querySelectorAll('[data-thumb-index]'));
+  const sizeProbe = cells[0]?.querySelector?.('canvas') || null;
+  const targetW = Math.max(64, Math.floor(sizeProbe?.clientWidth || 160));
+  const targetH = Math.max(64, Math.floor(sizeProbe?.clientHeight || 110));
+
+  for (let i = 0; i < THUMB_COUNT; i++) {
+    const cell = gridEl.querySelector(`[data-thumb-index="${i}"]`);
+    const canvas = cell?.querySelector?.('canvas');
+    if (!canvas) continue;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) continue;
+    if (canvas.width !== targetW) canvas.width = targetW;
+    if (canvas.height !== targetH) canvas.height = targetH;
+
+    const candidate = snapshot.candidates?.[i];
+    if (!candidate?.fingers) continue;
+
+    applyFingersToCore(thumbCore, candidate.fingers, { ignoreLabels: animatedLabelSet });
+    applyLatestAnimatedValuesToCore(thumbCore);
+    thumbCore.renderToPixelSize(targetW, targetH);
+    try {
+      thumbCore.gl?.finish?.();
+    } catch (_) {
+      // ignore
+    }
+    ctx.clearRect(0, 0, targetW, targetH);
+    ctx.drawImage(thumbWebglCanvas, 0, 0, targetW, targetH);
+  }
 }
 
 async function handleRefresh() {
@@ -1076,7 +1295,7 @@ async function handleMenuAction(action) {
 async function bootstrap() {
   // Service worker (same behavior as other pages).
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    const SW_URL = './service-worker.js?sw=26.0';
+    const SW_URL = './service-worker.js?sw=27.0';
     window.addEventListener('load', () => {
       navigator.serviceWorker.register(SW_URL).then((registration) => {
         if (registration?.waiting) {
@@ -1126,6 +1345,7 @@ async function bootstrap() {
 
   // Seed finger values from query for parse-time desugaring (e.g. $$ counts).
   const params = new URLSearchParams(window.location.search);
+  animationSeconds = parseSecondsFromQuery(params.get(ANIMATION_TIME_PARAM)) ?? DEFAULT_ANIMATION_SECONDS;
   solosPresent = params.has(SOLOS_PARAM);
   soloLabelSet = solosPresent ? parseSolosParam(params.get(SOLOS_PARAM)) : new Set();
   const seededFingerValues = {};
@@ -1191,6 +1411,18 @@ async function bootstrap() {
     }
   }
 
+  // If any parameters are animated (as configured in index.html), apply their start values now.
+  const initialTracks = buildAnimationTracksFromQuery(allUsedLabels);
+  animatedLabelSet = new Set(Array.from(initialTracks.keys()));
+  if (initialTracks.size) {
+    applyAnimationStartValuesToCore(topCore, initialTracks);
+    for (const [label, interval] of initialTracks.entries()) {
+      if (interval?.start) {
+        latestAnimatedValues.set(label, { x: interval.start.x, y: interval.start.y });
+      }
+    }
+  }
+
   // Ensure layout is ready so view extents are correct.
   await waitForNextFrame();
   topCore.render();
@@ -1201,7 +1433,7 @@ async function bootstrap() {
   for (const label of allUsedLabels) {
     const v = topCore.getFingerValue(label);
     // Only clamp labels that exploration is allowed to modify.
-    if (activeLabels.includes(label)) {
+    if (activeLabels.includes(label) && !animatedLabelSet.has(label)) {
       clampedBase[label] = clampToView(topCore, v.x, v.y);
     } else {
       clampedBase[label] = { x: v.x, y: v.y };
@@ -1221,6 +1453,9 @@ async function bootstrap() {
   document.body.appendChild(thumbWebglCanvas);
   thumbCore = new ReflexCore(thumbWebglCanvas, activeAst, { autoRender: false, installEventListeners: false });
   thumbCore.setActiveFingerConfig(activeFingerConfig);
+  if (initialTracks.size) {
+    applyAnimationStartValuesToCore(thumbCore, initialTracks);
+  }
 
   const baseKey = snapshotKey({ formulaSource: activeFormulaSource, fingers: clampedBase });
   const visitedTopKeys = new Set([baseKey]);
@@ -1242,6 +1477,13 @@ async function bootstrap() {
 
   await updateUrlForBaseFingers(clampedBase);
   await renderAll();
+
+  // Start URL-driven animations after first paint.
+  if (initialTracks.size) {
+    animationController?.stop?.();
+    animationController = createAnimationController({ tracks: initialTracks, secondsPerSegment: animationSeconds });
+    animationController.start();
+  }
 }
 
 bootstrap().catch((err) => {
