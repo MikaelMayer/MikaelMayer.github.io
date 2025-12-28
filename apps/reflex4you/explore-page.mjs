@@ -25,6 +25,7 @@ const THUMB_COUNT = 7;
 const ANIMATION_SUFFIX = 'A';
 const ANIMATION_TIME_PARAM = 't';
 const DEFAULT_ANIMATION_SECONDS = 5;
+const THUMB_ANIMATION_FPS = 20;
 
 // View transition timing: seconds per unit of RMS finger distance.
 // Example: distance 1 => 1 second when set to 1.
@@ -420,6 +421,11 @@ function proposeCandidate({ coreForClamp, baseFingers, labels, axisConstraints, 
 
   for (const label of labels) {
     const base = baseFingers[label] || { x: 0, y: 0 };
+    // Animated parameters should never be assigned random values in explore mode.
+    if (animatedLabelSet.has(label)) {
+      candidate[label] = { x: base.x, y: base.y };
+      continue;
+    }
     // By default, exploration keeps W* constants fixed (so navigation doesn't drift),
     // but when `solos` is present and W is explicitly solo-selected, allow exploring it.
     if (String(label).startsWith('W') && !solosPresent) {
@@ -518,6 +524,7 @@ let animationSeconds = DEFAULT_ANIMATION_SECONDS;
 let animationController = null;
 let animatedLabelSet = new Set();
 let latestAnimatedValues = new Map(); // label -> { x, y }
+let lastThumbAnimationMs = 0;
 
 let isTransitioning = false;
 let pendingTransitionToken = 0;
@@ -679,6 +686,21 @@ function createAnimationController({ tracks, secondsPerSegment }) {
 
     // Only the top canvas needs continuous updates; thumbnails are updated on demand.
     topCore?.render?.();
+
+    // Keep miniatures animated too (throttled for performance).
+    const intervalMs = 1000 / Math.max(1, THUMB_ANIMATION_FPS);
+    if (thumbCore && gridEl && thumbWebglCanvas && nowMs - lastThumbAnimationMs >= intervalMs) {
+      lastThumbAnimationMs = nowMs;
+      try {
+        const snap = currentSnapshot();
+        if (snap) {
+          renderThumbsAnimatedFast(snap);
+        }
+      } catch (_) {
+        // ignore
+      }
+    }
+
     state.rafId = window.requestAnimationFrame(frame);
   }
 
@@ -1064,6 +1086,39 @@ function redo() {
   })().catch(() => {});
 }
 
+function renderThumbsAnimatedFast(snapshot) {
+  // Fast-path redraw for animation frames: no rerolling, no uniform checks.
+  if (!gridEl || !thumbCore || !thumbWebglCanvas || !snapshot) return;
+  const cells = Array.from(gridEl.querySelectorAll('[data-thumb-index]'));
+  const sizeProbe = cells[0]?.querySelector?.('canvas') || null;
+  const targetW = Math.max(64, Math.floor(sizeProbe?.clientWidth || 160));
+  const targetH = Math.max(64, Math.floor(sizeProbe?.clientHeight || 110));
+
+  for (let i = 0; i < THUMB_COUNT; i++) {
+    const cell = gridEl.querySelector(`[data-thumb-index="${i}"]`);
+    const canvas = cell?.querySelector?.('canvas');
+    if (!canvas) continue;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) continue;
+    if (canvas.width !== targetW) canvas.width = targetW;
+    if (canvas.height !== targetH) canvas.height = targetH;
+
+    const candidate = snapshot.candidates?.[i];
+    if (!candidate?.fingers) continue;
+
+    applyFingersToCore(thumbCore, candidate.fingers, { ignoreLabels: animatedLabelSet });
+    applyLatestAnimatedValuesToCore(thumbCore);
+    thumbCore.renderToPixelSize(targetW, targetH);
+    try {
+      thumbCore.gl?.finish?.();
+    } catch (_) {
+      // ignore
+    }
+    ctx.clearRect(0, 0, targetW, targetH);
+    ctx.drawImage(thumbWebglCanvas, 0, 0, targetW, targetH);
+  }
+}
+
 async function handleRefresh() {
   const snap = currentSnapshot();
   if (!snap) return;
@@ -1378,7 +1433,7 @@ async function bootstrap() {
   for (const label of allUsedLabels) {
     const v = topCore.getFingerValue(label);
     // Only clamp labels that exploration is allowed to modify.
-    if (activeLabels.includes(label)) {
+    if (activeLabels.includes(label) && !animatedLabelSet.has(label)) {
       clampedBase[label] = clampToView(topCore, v.x, v.y);
     } else {
       clampedBase[label] = { x: v.x, y: v.y };
