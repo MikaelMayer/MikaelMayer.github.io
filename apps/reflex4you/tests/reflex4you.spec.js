@@ -329,6 +329,40 @@ test('parameter value opens inline editor in dropdown', async ({ page }) => {
   await expect(input).toBeVisible();
 });
 
+test('pressing play immediately after opening an animated parameter starts playback (no extra click needed)', async ({ page }) => {
+  const supportsCompression = await detectCompressionCapability(page);
+  const source = 'z + D1';
+  const interval = encodeURIComponent('0+0i..1+0i');
+  const targetUrl = supportsCompression
+    ? `/index.html?formulab64=${encodeURIComponent(encodeFormulaToFormulab64(source))}&edit=true&D1A=${interval}`
+    : `/index.html?formula=${encodeURIComponent(source)}&edit=true&D1A=${interval}`;
+
+  await page.goto(targetUrl);
+  await waitForReflexReady(page);
+
+  await page.locator('#finger-solo-button').click();
+
+  const valueChip = page.locator('.finger-solo-row[data-finger="D1"] .finger-solo-row__value');
+  await expect(valueChip).toBeVisible();
+  await valueChip.click();
+
+  const currentInput = page.locator('.finger-solo-row[data-finger="D1"] .finger-solo-row__value-input--current');
+  const startInput = page.locator('.finger-solo-row[data-finger="D1"] .finger-solo-row__value-input--start');
+  const endInput = page.locator('.finger-solo-row[data-finger="D1"] .finger-solo-row__value-input--end');
+  await expect(currentInput).toBeVisible();
+  await expect(startInput).toBeVisible();
+  await expect(endInput).toBeVisible();
+
+  const playBtn = page.locator('.finger-solo-row[data-finger="D1"] .finger-solo-row__anim-play');
+  await expect(playBtn).toBeVisible();
+  await playBtn.click();
+
+  await expect.poll(async () => await playBtn.textContent()).toContain('⏸');
+  // Ensure the inline editor didn't collapse while tapping play.
+  await expect(startInput).toBeVisible();
+  await expect(endInput).toBeVisible();
+});
+
 test('menu can copy a share link for the current reflex', async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'clipboard', {

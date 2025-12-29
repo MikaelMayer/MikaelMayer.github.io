@@ -875,7 +875,11 @@ function buildInlineFingerValueEditor(label) {
     if (!interval) return;
     // If a global URL animation controller exists, this toggles participation
     // for this label (mute/unmute). Otherwise, it plays this label as a preview loop.
-    if (animationController || globalAllTrackLabelSet.has(label)) {
+    //
+    // Important: do NOT treat "has an interval in the URL" as "global playback is active".
+    // Users expect the per-parameter ▶ button to start playback immediately; global playback
+    // is controlled via the footer's "▶ Anim" button.
+    if (animationController) {
       const currentlyActive = globalEffectiveTrackLabelSet.has(label);
       setGlobalLabelMuted(label, currentlyActive);
       refresh();
@@ -887,9 +891,35 @@ function buildInlineFingerValueEditor(label) {
     refresh();
   });
 
+  // On some mobile browsers, focus transitions triggered by tapping a button can
+  // dispatch `focusout` with `relatedTarget === null`, which we previously treated
+  // as "focus left the editor" and closed it before the button's click handler ran.
+  // Track pointer interaction inside the editor so we don't prematurely close.
+  let suppressCloseOnFocusout = false;
+  wrap.addEventListener(
+    'pointerdown',
+    (event) => {
+      if (!wrap.contains(event.target)) {
+        return;
+      }
+      suppressCloseOnFocusout = true;
+      try {
+        window.setTimeout(() => {
+          suppressCloseOnFocusout = false;
+        }, 0);
+      } catch (_) {
+        suppressCloseOnFocusout = false;
+      }
+    },
+    true,
+  );
+
   // Close editor + push a single undo frame when focus leaves this control.
   wrap.addEventListener('focusout', (event) => {
     const next = event.relatedTarget;
+    if (!next && suppressCloseOnFocusout) {
+      return;
+    }
     if (next && wrap.contains(next)) {
       return;
     }
