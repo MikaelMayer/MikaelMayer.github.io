@@ -78,6 +78,22 @@ u_rot = (A*u + B) / (-(B.conj)*u + A.conj)
 
 (`A.conj` means `conj(A)` via dot-composition.)
 
+#### Reverse (invert) a rotation
+
+The inverse (undo / reverse) of an SU(2) rotation `(A,B)` is:
+
+```text
+set Ainv = A.conj in
+set Binv = -B in
+...
+```
+
+Using the inverse in the Möbius action is often what you want for “grab the sphere and drag it” interactions:
+
+```text
+u_rot = (Ainv*u + Binv) / (-(Binv.conj)*u + Ainv.conj)
+```
+
 #### Compose two rotations (e.g. device ∘ trackball)
 
 If you want to combine device rotation `(QA,QB)` with trackball rotation `(RA,RB)`, form a composed pair `(A,B)`:
@@ -89,6 +105,69 @@ set B = QA*RB + QB*(RA.conj) in
 ```
 
 Swap the order if you want trackball ∘ device instead.
+
+#### Base rotations (yaw/pitch/roll style building blocks)
+
+If you want a “base rotation” about a principal axis by an angle `t` (in radians), you can build an SU(2) pair directly. Let:
+
+- `c = cos(t/2)`
+- `s = sin(t/2)`
+
+Then:
+
+- **Rotate about +X by `t`**:
+
+```text
+set A = c in
+set B = s in
+...
+```
+
+- **Rotate about +Y by `t`**:
+
+```text
+set A = c in
+set B = i*s in
+...
+```
+
+- **Rotate about +Z by `t`**:
+
+```text
+set A = c + i*s in
+set B = 0 in
+...
+```
+
+Tip: if you store `t` in a handle like `D1`, use `x$D1` (real part) as the angle.
+
+#### Sphere example (minimal): rotate then `sin`
+
+This is a compact “Riemann sphere” template that:
+
+- maps the screen point onto the sphere (front hemisphere),
+- composes device + trackball rotations,
+- applies the **inverse** rotation (so dragging feels like grabbing the sphere),
+- evaluates a simple function (`sin`) on the rotated sphere coordinate.
+
+```text
+set R = 1.5 in
+set r2 = abs^2 in
+if(r2 > R*R, 0,
+  set z_s = -sqrt(R*R - r2) in
+  set u = (x + i*y)/(R - z_s) in
+  set u1 = i*u in
+  set A = QA*RA - QB*(RB.conj) in
+  set B = QA*RB + QB*(RA.conj) in
+  set Ainv = A.conj in
+  set Binv = -B in
+  set u2 = (Ainv*u1 + Binv)/(-(Binv.conj)*u1 + Ainv.conj) in
+  set u_rot = (-i)*u2 in
+  sin(u_rot)
+)
+```
+
+The `i*u` / `(-i)` sandwich is a fixed basis alignment so “screen up/right” matches the on-screen trackball axes.
 
 #### Recover yaw/pitch/roll (optional)
 
