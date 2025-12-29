@@ -223,10 +223,12 @@ set rollZ =
     if(rollDen > 0, a, if(rollNum >= 0, a + pi, a - pi))
   ) in
 
-pitchX + i*(yawY) + 0*(rollZ)
+yawY + i*pitchX
 ```
 
-This computes `pitchX`, `yawY`, and `rollZ` (all real, in radians). Euler angles always have singularities (for `YXZ`, the singularity is at `pitchX = ±π/2`), so SU(2) is the recommended default.
+This computes `pitchX`, `yawY`, and `rollZ` (all real, in radians). The final line returns a single complex number packing **yaw** (real part) and **pitch** (imag part); to inspect roll instead, replace the last line with `rollZ` (or `rollZ + i*pitchX`).
+
+Euler angles always have singularities (for `YXZ`, the singularity is at `pitchX = ±π/2`), so SU(2) is the recommended default.
 
 Rules of thumb:
 
