@@ -83,10 +83,10 @@ u_rot = (A*u + B) / (-(B.conj)*u + A.conj)
 If you want the feeling of viewing a function from *inside* the sphere (a different but very intuitive Möbius warp), you can use:
 
 ```text
-sin $ 3*z $ (a*z+i*b)/(i*b.conj*z+a.conj)
+sin $ 3*z $ (QA*z+i*QB)/(i*QB.conj*z+QA.conj)
 ```
 
-Here `(a,b)` is an SU(2) pair (same idea as `(A,B)` above). Try setting `a,b` from rotations like `RA/RB` or `QA/QB` (or any composed rotation) to steer the “inside view”.
+Here `(QA,QB)` is an SU(2) pair (same idea as `(A,B)` above). Try swapping `QA/QB` for `RA/RB` (or any composed rotation) to steer the “inside view”.
 
 #### Reverse (invert) a rotation
 
