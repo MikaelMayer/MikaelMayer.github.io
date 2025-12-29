@@ -78,6 +78,16 @@ u_rot = (A*u + B) / (-(B.conj)*u + A.conj)
 
 (`A.conj` means `conj(A)` via dot-composition.)
 
+#### “View from the inside” (simple effect)
+
+If you want the feeling of viewing a function from *inside* the sphere (a different but very intuitive Möbius warp), you can use:
+
+```text
+sin $ 3*z $ (a*z+i*b)/(i*b.conj*z+a.conj)
+```
+
+Here `(a,b)` is an SU(2) pair (same idea as `(A,B)` above). Try setting `a,b` from rotations like `RA/RB` or `QA/QB` (or any composed rotation) to steer the “inside view”.
+
 #### Reverse (invert) a rotation
 
 The inverse (undo / reverse) of an SU(2) rotation `(A,B)` is:
