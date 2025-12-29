@@ -29,8 +29,8 @@ Reflex4You is an interactive complex-function explorer. Type a formula, drag the
    let sqrt = exp $ 0.5*ln in
    set d1 = 2*D1 in
    set scale = 5 in
-   set r = sqrt $ abs((d1.x) + i*(d1.y))^2 + x^2 + y^2 $ scale*(z - D3) in
-   set r2 = sqrt $ abs((d1.x) - i*(d1.y))^2 + x^2 + y^2 $ scale*(z + D3) in
+   set r = sqrt $ abs(d1.x + i*d1.y)^2 + x^2 + y^2 $ scale*(z - D3) in
+   set r2 = sqrt $ abs(d1.x - i*d1.y)^2 + x^2 + y^2 $ scale*(z + D3) in
    abs $
    10*z $ 1/(r^2)*exp(8*abs(D2.x)*i*r) + 1/(r2^2)*exp(8*abs(D2.x)*i*r2)
    ```
