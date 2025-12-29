@@ -266,6 +266,8 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
         }
       }
       return fingerSlotToLatex(node.slot);
+    case 'DeviceOrientation':
+      return latexIdentifierWithMetadata(node.axis || '?', identifierHighlights(node));
 
     case 'Pow': {
       const baseLatex = nodeToLatex(node.base, precedence(node), options);

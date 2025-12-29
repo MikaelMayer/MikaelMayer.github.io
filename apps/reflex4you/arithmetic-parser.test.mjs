@@ -261,6 +261,25 @@ test('parses W0 as a workspace finger primitive', () => {
   assert.equal(result.value.right.slot, 'W1');
 });
 
+test('parses device orientation primitives (RX/RY/RZ)', () => {
+  const result = parseFormulaInput('RX + RY + RZ');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Add');
+  assert.equal(result.value.left.kind, 'Add');
+  assert.equal(result.value.left.left.kind, 'DeviceOrientation');
+  assert.equal(result.value.left.left.axis, 'RX');
+  assert.equal(result.value.left.right.kind, 'DeviceOrientation');
+  assert.equal(result.value.left.right.axis, 'RY');
+  assert.equal(result.value.right.kind, 'DeviceOrientation');
+  assert.equal(result.value.right.axis, 'RZ');
+});
+
+test('rejects binding device orientation names with set', () => {
+  const result = parseFormulaInput('set RX = 1 in RX');
+  assert.equal(result.ok, false);
+  assert.match(result.message, /reserved identifier/i);
+});
+
 test('parses function composition forms', () => {
   const result = parseFormulaInput('o(z, F1) $ (z + 1)');
   assert.equal(result.ok, true);

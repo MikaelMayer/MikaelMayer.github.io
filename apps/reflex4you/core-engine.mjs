@@ -74,6 +74,22 @@ export function FingerOffset(slot) {
   return { kind: "FingerOffset", slot: validateFingerLabel(slot) };
 }
 
+const DEVICE_ORIENTATION_AXES = Object.freeze(['RX', 'RY', 'RZ']);
+
+function validateDeviceOrientationAxis(axis) {
+  const normalized = String(axis || '');
+  if (!DEVICE_ORIENTATION_AXES.includes(normalized)) {
+    throw new Error(`Unknown device orientation axis: ${axis}`);
+  }
+  return normalized;
+}
+
+// Device orientation parameters (read-only): RX, RY, RZ (radians).
+// Provided by the runtime (ReflexCore) as real scalars (imaginary part = 0).
+export function DeviceOrientation(axis) {
+  return { kind: 'DeviceOrientation', axis: validateDeviceOrientationAxis(axis) };
+}
+
 export function Offset() {
   return FingerOffset("F1");
 }
@@ -595,6 +611,7 @@ function prepareAstForGpu(ast) {
       case 'VarX':
       case 'VarY':
       case 'FingerOffset':
+      case 'DeviceOrientation':
       case 'Const':
       case 'PlaceholderVar':
         return node;
@@ -635,6 +652,7 @@ const formulaGlobals = Object.freeze({
   Offset,
   Offset2,
   FingerOffset,
+  DeviceOrientation,
   Sub,
   Mul,
   Op,
@@ -763,6 +781,7 @@ function assignNodeIds(ast) {
       assignNodeIds(ast.body);
       return;
     case "SetRef":
+    case "DeviceOrientation":
       return;
     case "Compose":
       assignNodeIds(ast.f);
@@ -864,6 +883,7 @@ function collectNodesPostOrder(ast, out) {
     case "VarX":
     case "VarY":
     case "FingerOffset":
+    case "DeviceOrientation":
     case "Const":
       break;
     default:
@@ -941,6 +961,20 @@ vec2 ${name}(vec2 z) {
     return `
 vec2 ${name}(vec2 z) {
     return ${uniform};
+}`.trim();
+  }
+
+  if (ast.kind === 'DeviceOrientation') {
+    const axis = ast.axis;
+    const uniform =
+      axis === 'RX'
+        ? 'u_deviceRx'
+        : axis === 'RY'
+          ? 'u_deviceRy'
+          : 'u_deviceRz';
+    return `
+vec2 ${name}(vec2 z) {
+    return vec2(${uniform}, 0.0);
 }`.trim();
   }
 
@@ -1364,6 +1398,9 @@ precision highp float;
 uniform vec2 u_min;
 uniform vec2 u_max;
 uniform vec2 u_resolution;
+uniform float u_deviceRx;
+uniform float u_deviceRy;
+uniform float u_deviceRz;
 uniform vec2 u_fixedOffsets[/*FIXED_OFFSETS_COUNT*/];
 uniform vec2 u_dynamicOffsets[/*DYNAMIC_OFFSETS_COUNT*/];
 uniform vec2 u_wOffsets[2];
@@ -1659,6 +1696,12 @@ export class ReflexCore {
     this.uFixedOffsetsLoc = null;
     this.uDynamicOffsetsLoc = null;
     this.uWOffsetsLoc = null;
+    this.uDeviceRxLoc = null;
+    this.uDeviceRyLoc = null;
+    this.uDeviceRzLoc = null;
+    this.uDeviceRxLoc = null;
+    this.uDeviceRyLoc = null;
+    this.uDeviceRzLoc = null;
 
     this.baseHalfSpan = 4.0;
     this.viewXSpan = 8.0;
@@ -1704,6 +1747,17 @@ export class ReflexCore {
     this._resizeObserverRaf = null;
     this._visibilityListener = null;
     this._pageShowListener = null;
+
+    // Device orientation (RX/RY/RZ) state.
+    this._deviceOrientationListener = null;
+    this._deviceOrientationEventName = null;
+    this._deviceOrientationRaf = null;
+    this._deviceOrientationPermissionRequested = false;
+    this._deviceOrientationBaselines = {
+      headingRad: null, // baseline for RY
+      rollRad: null, // baseline for RZ (gamma)
+    };
+    this._deviceOrientation = { rx: 0, ry: 0, rz: 0 };
 
     // Keep the original AST for display/export, but compile a lowered version for the GPU.
     this.formulaAST = initialAST;
@@ -1758,6 +1812,11 @@ export class ReflexCore {
     if (installEventListeners && typeof window !== 'undefined') {
       this._pageShowListener = () => this.render();
       window.addEventListener('pageshow', this._pageShowListener);
+    }
+
+    if (installEventListeners) {
+      // Best-effort: starts immediately on most browsers; on iOS it activates after permission.
+      this.ensureDeviceOrientationListener();
     }
 
     // Mobile PWAs can lose the WebGL context while backgrounded. Without explicit
@@ -1851,6 +1910,24 @@ export class ReflexCore {
       }
       this._contextRestoredListener = null;
     }
+
+    if (typeof window !== 'undefined' && this._deviceOrientationListener && this._deviceOrientationEventName) {
+      try {
+        window.removeEventListener(this._deviceOrientationEventName, this._deviceOrientationListener);
+      } catch (_) {
+        // ignore
+      }
+    }
+    this._deviceOrientationListener = null;
+    this._deviceOrientationEventName = null;
+    if (this._deviceOrientationRaf != null && typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function') {
+      try {
+        window.cancelAnimationFrame(this._deviceOrientationRaf);
+      } catch (_) {
+        // ignore
+      }
+    }
+    this._deviceOrientationRaf = null;
   }
 
   handleContextRestored() {
@@ -2146,6 +2223,9 @@ export class ReflexCore {
     this.uMinLoc = this.gl.getUniformLocation(this.program, 'u_min');
     this.uMaxLoc = this.gl.getUniformLocation(this.program, 'u_max');
     this.uResolutionLoc = this.gl.getUniformLocation(this.program, 'u_resolution');
+    this.uDeviceRxLoc = this.gl.getUniformLocation(this.program, 'u_deviceRx');
+    this.uDeviceRyLoc = this.gl.getUniformLocation(this.program, 'u_deviceRy');
+    this.uDeviceRzLoc = this.gl.getUniformLocation(this.program, 'u_deviceRz');
     this.uFixedOffsetsLoc = this.gl.getUniformLocation(this.program, 'u_fixedOffsets[0]');
     this.uDynamicOffsetsLoc = this.gl.getUniformLocation(this.program, 'u_dynamicOffsets[0]');
     this.uWOffsetsLoc = this.gl.getUniformLocation(this.program, 'u_wOffsets[0]');
@@ -2264,6 +2344,14 @@ export class ReflexCore {
     }
   }
 
+  uploadDeviceOrientationUniforms() {
+    // These uniforms may be optimized out if unused.
+    const { rx, ry, rz } = this._deviceOrientation || { rx: 0, ry: 0, rz: 0 };
+    if (this.uDeviceRxLoc) this.gl.uniform1f(this.uDeviceRxLoc, Number.isFinite(rx) ? rx : 0);
+    if (this.uDeviceRyLoc) this.gl.uniform1f(this.uDeviceRyLoc, Number.isFinite(ry) ? ry : 0);
+    if (this.uDeviceRzLoc) this.gl.uniform1f(this.uDeviceRzLoc, Number.isFinite(rz) ? rz : 0);
+  }
+
   render() {
     if (!this.program) return;
     if (
@@ -2283,6 +2371,7 @@ export class ReflexCore {
     }
     this.gl.useProgram(this.program);
     this.uploadFingerUniforms();
+    this.uploadDeviceOrientationUniforms();
     this.gl.uniform2f(this.uResolutionLoc, this.canvas.width, this.canvas.height);
     this.updateView();
 
@@ -2317,6 +2406,7 @@ export class ReflexCore {
 
     this.gl.useProgram(this.program);
     this.uploadFingerUniforms();
+    this.uploadDeviceOrientationUniforms();
     this.gl.uniform2f(this.uResolutionLoc, w, h);
     this.updateView();
 
@@ -2326,6 +2416,8 @@ export class ReflexCore {
   }
 
   handlePointerDown(e) {
+    // iOS Safari requires a user gesture for device orientation access.
+    this.maybeRequestDeviceOrientationPermission();
     if (
       this.activeFingerFamily === 'none' &&
       !this.activeWSlots.length
@@ -2358,6 +2450,114 @@ export class ReflexCore {
       // ignore
     }
     this.recomputePointerRoles();
+  }
+
+  maybeRequestDeviceOrientationPermission() {
+    if (this._deviceOrientationPermissionRequested) {
+      return;
+    }
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const DOE = window.DeviceOrientationEvent;
+    if (!DOE || typeof DOE.requestPermission !== 'function') {
+      // No permission gate: ensure listener is installed.
+      this.ensureDeviceOrientationListener();
+      return;
+    }
+    this._deviceOrientationPermissionRequested = true;
+    Promise.resolve()
+      .then(() => DOE.requestPermission())
+      .then((result) => {
+        if (result === 'granted') {
+          this.ensureDeviceOrientationListener({ force: true });
+        }
+      })
+      .catch(() => {
+        // Permission denied or unsupported; keep values at zero.
+      });
+  }
+
+  ensureDeviceOrientationListener({ force = false } = {}) {
+    if (this._deviceOrientationListener || typeof window === 'undefined') {
+      return;
+    }
+    const DOE = window.DeviceOrientationEvent;
+    if (!DOE) {
+      return;
+    }
+    // On iOS, a permission gate exists. Only install after permission is granted
+    // (we can’t query state, so rely on the gesture-triggered request flow).
+    if (!force && typeof DOE.requestPermission === 'function') {
+      return;
+    }
+
+    const eventName = ('ondeviceorientationabsolute' in window)
+      ? 'deviceorientationabsolute'
+      : 'deviceorientation';
+    this._deviceOrientationEventName = eventName;
+    this._deviceOrientationListener = (ev) => this.handleDeviceOrientationEvent(ev);
+    try {
+      window.addEventListener(eventName, this._deviceOrientationListener);
+    } catch (_) {
+      this._deviceOrientationListener = null;
+      this._deviceOrientationEventName = null;
+    }
+  }
+
+  handleDeviceOrientationEvent(event) {
+    // DeviceOrientationEvent reports degrees.
+    const degToRad = (deg) => (Number(deg) * Math.PI) / 180;
+    const wrap = (rad) => {
+      const twoPi = Math.PI * 2;
+      let x = Number(rad);
+      if (!Number.isFinite(x)) return 0;
+      x = x - twoPi * Math.floor((x + Math.PI) / twoPi);
+      return x;
+    };
+
+    const beta = degToRad(event?.beta);
+    const gamma = degToRad(event?.gamma);
+
+    // Heading vs north: prefer iOS Safari's `webkitCompassHeading` (0° = north).
+    // Fallback: use alpha as a best-effort proxy.
+    const headingDeg =
+      (event && typeof event.webkitCompassHeading === 'number' && Number.isFinite(event.webkitCompassHeading))
+        ? event.webkitCompassHeading
+        : event?.alpha;
+    const heading = degToRad(headingDeg);
+
+    if (Number.isFinite(heading) && this._deviceOrientationBaselines.headingRad == null) {
+      this._deviceOrientationBaselines.headingRad = heading;
+    }
+    if (Number.isFinite(gamma) && this._deviceOrientationBaselines.rollRad == null) {
+      this._deviceOrientationBaselines.rollRad = gamma;
+    }
+
+    const heading0 = this._deviceOrientationBaselines.headingRad ?? 0;
+    const roll0 = this._deviceOrientationBaselines.rollRad ?? 0;
+
+    this._deviceOrientation = {
+      // RX: pitch vs horizontal (RX = 0 when horizontal).
+      rx: Number.isFinite(beta) ? beta : 0,
+      // RY: yaw/heading vs north, zeroed at load/first sensor reading.
+      ry: Number.isFinite(heading) ? wrap(heading - heading0) : 0,
+      // RZ: roll, zeroed at load/first sensor reading.
+      rz: Number.isFinite(gamma) ? wrap(gamma - roll0) : 0,
+    };
+
+    // Throttle redraw to one per animation frame.
+    if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+      this.render();
+      return;
+    }
+    if (this._deviceOrientationRaf != null) {
+      return;
+    }
+    this._deviceOrientationRaf = window.requestAnimationFrame(() => {
+      this._deviceOrientationRaf = null;
+      this.render();
+    });
   }
 
   handlePointerMove(e) {
