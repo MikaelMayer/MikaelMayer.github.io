@@ -2635,32 +2635,46 @@ export class ReflexCore {
       return { w: q.w / n, x: q.x / n, y: q.y / n, z: q.z / n };
     }
 
-    // Quaternion for intrinsic Z-X'-Y'' (alpha, beta, gamma): q = qz(alpha)*qx(beta)*qy(gamma)
-    const c1 = Math.cos(alpha / 2);
-    const s1 = Math.sin(alpha / 2);
-    const c2 = Math.cos(beta / 2);
-    const s2 = Math.sin(beta / 2);
-    const c3 = Math.cos(gamma / 2);
-    const s3 = Math.sin(gamma / 2);
-    let q = quatNormalize({
-      w: c1 * c2 * c3 - s1 * s2 * s3,
-      x: c1 * s2 * c3 - s1 * c2 * s3,
-      y: c1 * c2 * s3 + s1 * s2 * c3,
-      z: c1 * s2 * s3 + s1 * c2 * c3,
-    });
+    // Convert deviceorientation Euler angles -> quaternion using the same convention as
+    // Three.js DeviceOrientationControls (stable + widely tested):
+    //   euler = (beta, alpha, -gamma) in 'YXZ' order
+    //   q = quatFromEuler(euler) * q1 * q0
+    // where:
+    //   q1 = rotation around X by -PI/2 (so +Z points out of screen)
+    //   q0 = rotation around Z by -screenOrientation
 
-    // Account for screen rotation (portrait/landscape) if available.
+    function quatFromEulerYXZ(x, y, z) {
+      const c1 = Math.cos(y / 2);
+      const c2 = Math.cos(x / 2);
+      const c3 = Math.cos(z / 2);
+      const s1 = Math.sin(y / 2);
+      const s2 = Math.sin(x / 2);
+      const s3 = Math.sin(z / 2);
+      return quatNormalize({
+        w: c1 * c2 * c3 + s1 * s2 * s3,
+        x: s2 * c1 * c3 + c2 * s1 * s3,
+        y: c2 * s1 * c3 - s2 * c1 * s3,
+        z: c2 * c1 * s3 - s2 * s1 * c3,
+      });
+    }
+
     let screenAngleDeg = 0;
     try {
       screenAngleDeg = Number(window?.screen?.orientation?.angle ?? window?.orientation ?? 0);
     } catch (_) {
       screenAngleDeg = 0;
     }
-    const screenAngle = degToRad(screenAngleDeg);
-    if (Number.isFinite(screenAngle) && screenAngle !== 0) {
-      const half = -screenAngle / 2;
-      const qScreen = { w: Math.cos(half), x: 0, y: 0, z: Math.sin(half) };
-      q = quatNormalize(quatMultiply(q, qScreen));
+    const orient = degToRad(screenAngleDeg);
+
+    // Note: z = -gamma (per DeviceOrientationControls).
+    let q = quatFromEulerYXZ(beta, alpha, -gamma);
+    const SQRT1_2 = Math.SQRT1_2;
+    const q1 = { w: SQRT1_2, x: -SQRT1_2, y: 0, z: 0 };
+    q = quatNormalize(quatMultiply(q, q1));
+    if (Number.isFinite(orient) && orient !== 0) {
+      const half = -orient / 2;
+      const q0 = { w: Math.cos(half), x: 0, y: 0, z: Math.sin(half) };
+      q = quatNormalize(quatMultiply(q, q0));
     }
 
     if (!this._deviceRotationBaselineQuat) {

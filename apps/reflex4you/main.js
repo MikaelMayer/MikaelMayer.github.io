@@ -517,10 +517,10 @@ function ensureTrackballOverlay() {
       .trackball-overlay {
         position: fixed;
         right: 14px;
-        bottom: 14px;
+        top: 14px;
         width: 140px;
         height: 140px;
-        z-index: 50;
+        z-index: 100;
         pointer-events: none;
         opacity: 0.9;
         filter: drop-shadow(0 2px 10px rgba(0,0,0,0.35));
