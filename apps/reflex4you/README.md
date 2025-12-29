@@ -185,20 +185,48 @@ If you really need Euler-style angles, derive them from `(A,B)` by first convert
 
 - `w = A.x`, `z = A.y`, `x = B.x`, `y = B.y`
 
-Then apply your preferred yaw/pitch/roll convention. Here is one **concrete example** (matching the `YXZ` Euler order used by many `DeviceOrientation` helpers, i.e. yaw about **Y**, then pitch about **X**, then roll about **Z**):
+Then apply your preferred yaw/pitch/roll convention. Here is one **concrete example in the Reflex formula language** (Euler order **`YXZ`**: yaw about **Y**, then pitch about **X**, then roll about **Z**).
 
-```js
-// Given quaternion (w, x, y, z):
-//   w = A.re, z = A.im, x = B.re, y = B.im
-const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+Notes:
 
-// Euler order 'YXZ'
-const pitchX = Math.asin(clamp(2 * (w * x - y * z), -1, 1));
-const yawY   = Math.atan2(2 * (w * y + x * z), 1 - 2 * (x * x + y * y));
-const rollZ  = Math.atan2(2 * (w * z + x * y), 1 - 2 * (x * x + z * z));
+- Reflex currently has `atan(...)` but not `atan2(y, x)`. The snippet below shows an `atan2`-style pattern using `if(...)`.
+- Clamping to `[-1, 1]` is written explicitly with nested `if(...)`.
+
+```text
+set pi = 3.141592653589793 in
+set eps = 1e-9 in
+
+set qw = A.x in
+set qx = B.x in
+set qy = B.y in
+set qz = A.y in
+
+set tPitch = 2*(qw*qx - qy*qz) in
+set tPitchClamped = if(tPitch < -1, -1, if(tPitch > 1, 1, tPitch)) in
+set pitchX = asin(tPitchClamped) in
+
+set yawNum = 2*(qw*qy + qx*qz) in
+set yawDen = 1 - 2*(qx*qx + qy*qy) in
+set yawY =
+  if(abs(yawDen) < eps,
+    if(yawNum > 0, pi/2, if(yawNum < 0, -pi/2, 0)),
+    set a = atan(yawNum / yawDen) in
+    if(yawDen > 0, a, if(yawNum >= 0, a + pi, a - pi))
+  ) in
+
+set rollNum = 2*(qw*qz + qx*qy) in
+set rollDen = 1 - 2*(qx*qx + qz*qz) in
+set rollZ =
+  if(abs(rollDen) < eps,
+    if(rollNum > 0, pi/2, if(rollNum < 0, -pi/2, 0)),
+    set a = atan(rollNum / rollDen) in
+    if(rollDen > 0, a, if(rollNum >= 0, a + pi, a - pi))
+  ) in
+
+pitchX + i*(yawY) + 0*(rollZ)
 ```
 
-Euler angles always have singularities (for `YXZ`, the singularity is at `pitchX = ±π/2`), so SU(2) is the recommended default.
+This computes `pitchX`, `yawY`, and `rollZ` (all real, in radians). Euler angles always have singularities (for `YXZ`, the singularity is at `pitchX = ±π/2`), so SU(2) is the recommended default.
 
 Rules of thumb:
 
