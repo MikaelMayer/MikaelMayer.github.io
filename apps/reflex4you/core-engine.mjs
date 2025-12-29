@@ -2749,11 +2749,28 @@ export class ReflexCore {
     const dx = (Number(clientX) - cx) / radius;
     const dy = (cy - Number(clientY)) / radius;
     const d2 = dx * dx + dy * dy;
-    if (d2 <= 1) {
-      return { x: dx, y: dy, z: Math.sqrt(1 - d2) };
+    // Shoemake arcball mapping: inside the unit disk we use the sphere, outside we
+    // use a hyperbolic sheet so drags past the rim keep producing rotation (no clamp).
+    const r2 = 1;
+    const r2Half = r2 / 2;
+    let x;
+    let y;
+    let z;
+    if (d2 <= r2Half) {
+      // On the sphere.
+      x = dx;
+      y = dy;
+      z = Math.sqrt(r2 - d2);
+    } else {
+      // On the hyperbola.
+      const d = Math.sqrt(d2) || 1;
+      x = dx / d;
+      y = dy / d;
+      z = r2Half / d;
     }
-    const d = Math.sqrt(d2) || 1;
-    return { x: dx / d, y: dy / d, z: 0 };
+    // Ensure unit length for stable quatFromArcballVectors math.
+    const n = Math.hypot(x, y, z) || 1;
+    return { x: x / n, y: y / n, z: z / n };
   }
 
   quatMultiply(a, b) {
