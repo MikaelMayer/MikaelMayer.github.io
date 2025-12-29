@@ -2806,15 +2806,22 @@ export class ReflexCore {
     const midX = (s1.lastClientX + s2.lastClientX) / 2;
     const midY = (s1.lastClientY + s2.lastClientY) / 2;
     const v1 = this.mapClientPointToArcball(midX, midY);
-    const qArc = this.quatFromArcballVectors(gs.startVec, v1);
+    const v0 = gs.prevVec || gs.startVec || v1;
+    const qArc = this.quatFromArcballVectors(v0, v1);
 
     const ang = Math.atan2(s2.lastClientY - s1.lastClientY, s2.lastClientX - s1.lastClientX);
-    const twist = ang - gs.startTwist;
+    const prevTwist = Number.isFinite(gs.prevTwist) ? gs.prevTwist : gs.startTwist;
+    const twist = ang - prevTwist;
     const qTwist = { w: Math.cos(twist / 2), x: 0, y: 0, z: Math.sin(twist / 2) };
 
     const deltaScreen = this.quatMultiply(qTwist, qArc);
-    const next = this.quatNormalize(this.quatMultiply(deltaScreen, gs.startQuat));
+    const next = this.quatNormalize(this.quatMultiply(deltaScreen, this._trackballQuat));
     this.setTrackballFromQuaternion(next);
+
+    // Switch to incremental mode to avoid the 180° arcball clamp:
+    // each move applies a small delta and updates the reference.
+    gs.prevVec = v1;
+    gs.prevTwist = ang;
   }
 
   updatePointerControlledFinger(state) {
@@ -2888,7 +2895,8 @@ export class ReflexCore {
           pointerIds: [p1.pointerId, p2.pointerId],
           startVec,
           startTwist,
-          startQuat: { ...this._trackballQuat },
+          prevVec: startVec,
+          prevTwist: startTwist,
         };
       }
       // Trackball owns the gesture; do not assign other roles.
