@@ -2089,11 +2089,13 @@ export class ReflexCore {
     if (!(n > 0) || !Number.isFinite(n)) {
       return;
     }
+    // Store trackball rotation in the same "app frame" as the device rotation mapping.
+    // This keeps left/right vs up/down consistent between QA/QB and RA/RB.
     const q = { w: w / n, x: x / n, y: y / n, z: z / n };
     this._trackballQuat = q;
     this._trackballSU2 = {
-      A: { x: q.w, y: q.z },
-      B: { x: q.x, y: q.y },
+      A: { x: q.w, y: q.z }, // w + i z
+      B: { x: q.x, y: q.y }, // x + i y
     };
     this.notifyTrackballChange();
     if (triggerRender) {
@@ -2812,8 +2814,17 @@ export class ReflexCore {
     const twist = ang - gs.startTwist;
     const qTwist = { w: Math.cos(twist / 2), x: 0, y: 0, z: Math.sin(twist / 2) };
 
-    const delta = this.quatMultiply(qTwist, qArc);
-    const next = this.quatNormalize(this.quatMultiply(delta, gs.startQuat));
+    // The arcball delta is computed in a screen-centric frame (x=right, y=up).
+    // Map it into the app frame so that horizontal drags produce left/right rotations
+    // on the rendered sphere (matching QA/QB semantics).
+    const deltaScreen = this.quatMultiply(qTwist, qArc);
+    const deltaApp = this.quatNormalize({
+      w: deltaScreen.w,
+      x: -deltaScreen.y,
+      y: deltaScreen.x,
+      z: deltaScreen.z,
+    });
+    const next = this.quatNormalize(this.quatMultiply(deltaApp, gs.startQuat));
     this.setTrackballFromQuaternion(next);
   }
 
