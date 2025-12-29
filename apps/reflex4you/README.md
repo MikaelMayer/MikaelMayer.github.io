@@ -29,10 +29,10 @@ Reflex4You is an interactive complex-function explorer. Type a formula, drag the
    let sqrt = exp $ 0.5*ln in
    set d1 = 2*D1 in
    set scale = 5 in
-   set r = sqrt $ abs((x$d1) + (y$d1))^2 + x^2 + y^2 $ scale*(z - D3) in
-   set r2 = sqrt $ abs((x$d1) - (y$d1))^2 + x^2 + y^2 $ scale*(z + D3) in
+   set r = sqrt $ abs(d1.x + i*d1.y)^2 + x^2 + y^2 $ scale*(z - D3) in
+   set r2 = sqrt $ abs(d1.x - i*d1.y)^2 + x^2 + y^2 $ scale*(z + D3) in
    abs $
-   10*z $ 1/(r^2)*exp(8*abs(x$D2)*i*r) + 1/(r2^2)*exp(8*abs(x$D2)*i*r2)
+   10*z $ 1/(r^2)*exp(8*abs(D2.x)*i*r) + 1/(r2^2)*exp(8*abs(D2.x)*i*r2)
    ```
 
    Drag `D1` to change the arm angle, `D2` to tweak the wavelength, and `D3` to offset the detectors; the visual interference pattern updates instantly and the full configuration is still shareable via the URL.
@@ -53,6 +53,183 @@ Formulas can reference special complex constants that you edit directly on the c
 | `D0`, `D1`, `D2`, `D3` | Dynamic handles | Touch the handle closest to the complex point you want to move. (`D0` is supported as an alias of `D1`.) |
 | `W0`, `W1` | Workspace frame | Gestures update both values together. One finger pans; two fingers capture the full similarity transform (pan, zoom, rotate) so you can navigate like Google Maps. |
 
+### 3D rotations via SU(2): device (`QA`/`QB`) + trackball (`RA`/`RB`)
+
+Reflex4You works in the complex plane, but many demos want **true 3D rotations** (e.g. rotating a function on the Riemann sphere). For that, the app exposes rotations as **SU(2) elements**: a pair of complex numbers \((A,B)\) with \(|A|^2 + |B|^2 = 1\).
+
+| Token | Meaning | Serialized? |
+| --- | --- | --- |
+| `QA`, `QB` | **Device rotation** as a *relative* SU(2) element (baseline captured on the first valid sensor reading after load / permission). | No |
+| `RA`, `RB` | **Draggable trackball rotation** (two-finger gesture by default). | Yes (`RA=...&RB=...`) |
+
+Notes:
+
+- **Identity rotation** is `A = 1+0i`, `B = 0+0i` (so “zero rotation” is `(1, 0)`, not `(0, 0)`).
+- On iOS Safari, motion access requires a user gesture; the viewer requests permission on first touch.
+- `QA/QB` are never written to the URL. `RA/RB` *are* shareable, like other parameters.
+
+#### Rotate a complex sphere coordinate (Möbius action)
+
+Under stereographic projection, SU(2) acts by a Möbius transform. If your sphere coordinate is `u` (a complex number), then rotating by `(A,B)` is:
+
+```text
+u_rot = (A*u + B) / (-(B.conj)*u + A.conj)
+```
+
+(`A.conj` means `conj(A)` via dot-composition.)
+
+#### “View from the inside” (simple effect)
+
+If you want the feeling of viewing a function from *inside* the sphere (a different but very intuitive Möbius warp), you can use:
+
+```text
+sin $ 3*z $ (QA*z+i*QB)/(i*QB.conj*z+QA.conj)
+```
+
+Here `(QA,QB)` is an SU(2) pair (same idea as `(A,B)` above). Try swapping `QA/QB` for `RA/RB` (or any composed rotation) to steer the “inside view”.
+
+#### Reverse (invert) a rotation
+
+The inverse (undo / reverse) of an SU(2) rotation `(A,B)` is:
+
+```text
+set Ainv = A.conj in
+set Binv = -B in
+...
+```
+
+Using the inverse in the Möbius action is often what you want for “grab the sphere and drag it” interactions:
+
+```text
+u_rot = (Ainv*u + Binv) / (-(Binv.conj)*u + Ainv.conj)
+```
+
+#### Compose two rotations (e.g. device ∘ trackball)
+
+If you want to combine device rotation `(QA,QB)` with trackball rotation `(RA,RB)`, form a composed pair `(A,B)`:
+
+```text
+set A = QA*RA - QB*(RB.conj) in
+set B = QA*RB + QB*(RA.conj) in
+...
+```
+
+Swap the order if you want trackball ∘ device instead.
+
+#### Base rotations (yaw/pitch/roll style building blocks)
+
+If you want a “base rotation” about a principal axis by an angle `t` (in radians), you can build an SU(2) pair directly. Let:
+
+- `c = cos(t/2)`
+- `s = sin(t/2)`
+
+Then:
+
+- **Rotate about +X by `t`**:
+
+```text
+set A = c in
+set B = s in
+...
+```
+
+- **Rotate about +Y by `t`**:
+
+```text
+set A = c in
+set B = i*s in
+...
+```
+
+- **Rotate about +Z by `t`**:
+
+```text
+set A = c + i*s in
+set B = 0 in
+...
+```
+
+Tip: if you store `t` in a handle like `D1`, use `D1.x` (real part) as the angle.
+
+#### Sphere example (minimal): rotate then `sin`
+
+This is a compact “Riemann sphere” template that:
+
+- maps the screen point onto the sphere (front hemisphere),
+- composes device + trackball rotations,
+- applies the **inverse** rotation (so dragging feels like grabbing the sphere),
+- evaluates a simple function (`sin`) on the rotated sphere coordinate.
+
+```text
+set R = 1.5 in
+set r2 = abs^2 in
+if(r2 > R*R, 0,
+  set z_s = -sqrt(R*R - r2) in
+    set u = z/(R - z_s) in
+  set u1 = i*u in
+  set A = QA*RA - QB*(RB.conj) in
+  set B = QA*RB + QB*(RA.conj) in
+  set Ainv = A.conj in
+  set Binv = -B in
+  set u2 = (Ainv*u1 + Binv)/(-(Binv.conj)*u1 + Ainv.conj) in
+  set u_rot = (-i)*u2 in
+  sin(u_rot)
+)
+```
+
+The `i*u` / `(-i)` sandwich is a fixed basis alignment so “screen up/right” matches the on-screen trackball axes.
+
+#### Recover yaw/pitch/roll (optional)
+
+If you really need Euler-style angles, derive them from `(A,B)` by first converting to a quaternion:
+
+- `w = A.x`, `z = A.y`, `x = B.x`, `y = B.y`
+
+Then apply your preferred yaw/pitch/roll convention. Here is one **concrete example in the Reflex formula language** (Euler order **`YXZ`**: yaw about **Y**, then pitch about **X**, then roll about **Z**).
+
+Notes:
+
+- Reflex currently has `atan(...)` but not `atan2(y, x)`. The snippet below shows an `atan2`-style pattern using `if(...)`.
+- Clamping to `[-1, 1]` is written explicitly with nested `if(...)`.
+
+```text
+set pi = 3.141592653589793 in
+set eps = 1e-9 in
+
+set qw = A.x in
+set qx = B.x in
+set qy = B.y in
+set qz = A.y in
+
+set tPitch = 2*(qw*qx - qy*qz) in
+set tPitchClamped = if(tPitch < -1, -1, if(tPitch > 1, 1, tPitch)) in
+set pitchX = asin(tPitchClamped) in
+
+set yawNum = 2*(qw*qy + qx*qz) in
+set yawDen = 1 - 2*(qx*qx + qy*qy) in
+set yawY =
+  if(abs(yawDen) < eps,
+    if(yawNum > 0, pi/2, if(yawNum < 0, -pi/2, 0)),
+    set a = atan(yawNum / yawDen) in
+    if(yawDen > 0, a, if(yawNum >= 0, a + pi, a - pi))
+  ) in
+
+set rollNum = 2*(qw*qz + qx*qy) in
+set rollDen = 1 - 2*(qx*qx + qz*qz) in
+set rollZ =
+  if(abs(rollDen) < eps,
+    if(rollNum > 0, pi/2, if(rollNum < 0, -pi/2, 0)),
+    set a = atan(rollNum / rollDen) in
+    if(rollDen > 0, a, if(rollNum >= 0, a + pi, a - pi))
+  ) in
+
+yawY + i*pitchX
+```
+
+This computes `pitchX`, `yawY`, and `rollZ` (all real, in radians). The final line returns a single complex number packing **yaw** (real part) and **pitch** (imag part); to inspect roll instead, replace the last line with `rollZ` (or `rollZ + i*pitchX`).
+
+Euler angles always have singularities (for `YXZ`, the singularity is at `pitchX = ±π/2`), so SU(2) is the recommended default.
+
 Rules of thumb:
 
 - A formula can use the `F` family and/or the `D` family, plus the `W` pair.
@@ -66,6 +243,7 @@ The input accepts succinct expressions with complex arithmetic, composition, and
 
 - **Variables:** `z`, `x`, `y`, `real`, `imag`.
 - **Finger tokens:** `F0`‑`F3`, `D0`‑`D3`, `W0`, `W1`.
+- **3D rotations (SU(2))**: `QA`, `QB` (device), `RA`, `RB` (trackball).
 - **Literals:** `1.25`, `-3.5`, `2+3i`, `0,1`, `i`, `-i`, `j` (for `-½ + √3/2 i`).
 - **Operators:** `+`, `-`, `*`, `/`, power (`^` with integer exponents), composition (`o(f, g)` or `f $ g`), repeated composition (`oo(f, n)` or `f $$ n`).
 - **Functions:** `exp`, `sin`, `cos`, `tan`, `atan`, `ln`, `sqrt`, `abs`/`modulus`, `floor`, `conj`, `heav`. `sqrt(z, k)` desugars to `exp(0.5 * ln(z, k))`, so the optional second argument shifts the log branch; `heav(x)` evaluates to `1` when `x > 0` and `0` otherwise.

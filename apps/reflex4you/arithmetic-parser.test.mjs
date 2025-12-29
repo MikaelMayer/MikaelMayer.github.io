@@ -261,6 +261,31 @@ test('parses W0 as a workspace finger primitive', () => {
   assert.equal(result.value.right.slot, 'W1');
 });
 
+test('parses SU(2) rotation primitives (QA/QB/RA/RB)', () => {
+  const result = parseFormulaInput('QA + QB + RA + RB');
+  assert.equal(result.ok, true);
+  const seen = [];
+  (function walk(node) {
+    if (!node || typeof node !== 'object') return;
+    if (node.kind === 'DeviceRotation' || node.kind === 'TrackballRotation') {
+      seen.push(`${node.kind}:${node.slot}`);
+      return;
+    }
+    if (node.left) walk(node.left);
+    if (node.right) walk(node.right);
+  })(result.value);
+  assert.deepEqual(
+    seen.sort(),
+    ['DeviceRotation:A', 'DeviceRotation:B', 'TrackballRotation:A', 'TrackballRotation:B'].sort(),
+  );
+});
+
+test('rejects binding SU(2) rotation names with set', () => {
+  const result = parseFormulaInput('set QA = 1 in QA');
+  assert.equal(result.ok, false);
+  assert.match(result.message, /reserved identifier/i);
+});
+
 test('parses function composition forms', () => {
   const result = parseFormulaInput('o(z, F1) $ (z + 1)');
   assert.equal(result.ok, true);

@@ -105,6 +105,8 @@ export function childEntries(node) {
     case 'VarX':
     case 'VarY':
     case 'FingerOffset':
+    case 'DeviceRotation':
+    case 'TrackballRotation':
       return [];
     default:
       // Be strict: if a new node kind is added, we want tests to fail loudly
