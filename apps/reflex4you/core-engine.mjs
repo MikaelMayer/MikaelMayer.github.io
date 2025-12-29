@@ -2519,13 +2519,45 @@ export class ReflexCore {
     const beta = degToRad(event?.beta);
     const gamma = degToRad(event?.gamma);
 
-    // Heading vs north: prefer iOS Safari's `webkitCompassHeading` (0° = north).
-    // Fallback: use alpha as a best-effort proxy.
-    const headingDeg =
-      (event && typeof event.webkitCompassHeading === 'number' && Number.isFinite(event.webkitCompassHeading))
-        ? event.webkitCompassHeading
-        : event?.alpha;
-    const heading = degToRad(headingDeg);
+    // RY goal: a "yaw/heading" that stays stable when the phone is held vertically.
+    // Using raw `alpha` suffers from a gimbal-lock singularity near beta ~= ±90° (vertical).
+    //
+    // Instead, compute heading from the screen-normal direction projected onto the
+    // horizontal plane. This makes the singularity happen when the phone is horizontal
+    // (screen normal points up/down, projection ~ 0), matching the intended behavior.
+    const alpha = degToRad(event?.alpha);
+    let heading = null;
+    if (Number.isFinite(alpha) && Number.isFinite(beta) && Number.isFinite(gamma)) {
+      const cX = Math.cos(beta);
+      const cY = Math.cos(gamma);
+      const cZ = Math.cos(alpha);
+      const sX = Math.sin(beta);
+      const sY = Math.sin(gamma);
+      const sZ = Math.sin(alpha);
+
+      // Rotation matrix for intrinsic Z-X'-Y'' (alpha, beta, gamma).
+      // Third column gives the world direction of the device +Z axis (screen normal).
+      const m13 = cY * sZ * sX + cZ * sY;
+      const m23 = sZ * sY - cZ * cY * sX;
+      // const m33 = cX * cY;
+
+      // Project screen normal onto horizontal plane (world X/Y).
+      const nx = m13;
+      const ny = m23;
+      // Heading is angle from +Y (north) towards +X (east).
+      // atan2(0,0) -> 0; near-horizontal devices will be noisy here (intended singularity).
+      heading = Math.atan2(nx, ny);
+    }
+    if (heading == null) {
+      // Fallbacks when we can't build a stable world-frame heading.
+      // Prefer iOS Safari's `webkitCompassHeading` (0° = north) if present.
+      const headingDeg =
+        (event && typeof event.webkitCompassHeading === 'number' && Number.isFinite(event.webkitCompassHeading))
+          ? event.webkitCompassHeading
+          : event?.alpha;
+      const fallback = degToRad(headingDeg);
+      heading = Number.isFinite(fallback) ? fallback : 0;
+    }
 
     if (Number.isFinite(heading) && this._deviceOrientationBaselines.headingRad == null) {
       this._deviceOrientationBaselines.headingRad = heading;
