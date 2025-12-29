@@ -175,7 +175,20 @@ If you really need Euler-style angles, derive them from `(A,B)` by first convert
 
 - `w = A.x`, `z = A.y`, `x = B.x`, `y = B.y`
 
-Then apply your preferred yaw/pitch/roll convention. (Euler angles always have singularities; SU(2) is the recommended default.)
+Then apply your preferred yaw/pitch/roll convention. Here is one **concrete example** (matching the `YXZ` Euler order used by many `DeviceOrientation` helpers, i.e. yaw about **Y**, then pitch about **X**, then roll about **Z**):
+
+```js
+// Given quaternion (w, x, y, z):
+//   w = A.re, z = A.im, x = B.re, y = B.im
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+// Euler order 'YXZ'
+const pitchX = Math.asin(clamp(2 * (w * x - y * z), -1, 1));
+const yawY   = Math.atan2(2 * (w * y + x * z), 1 - 2 * (x * x + y * y));
+const rollZ  = Math.atan2(2 * (w * z + x * y), 1 - 2 * (x * x + z * z));
+```
+
+Euler angles always have singularities (for `YXZ`, the singularity is at `pitchX = ±π/2`), so SU(2) is the recommended default.
 
 Rules of thumb:
 
