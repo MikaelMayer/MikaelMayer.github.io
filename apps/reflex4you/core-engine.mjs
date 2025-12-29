@@ -2671,10 +2671,10 @@ export class ReflexCore {
 
     // Coordinate convention adjustment:
     // The browser's deviceorientation Euler angles are reported in a device-centric frame
-    // that doesn't always match our "screen-facing user" intuition. Empirically, for the
-    // intended UX (tilt-left => sphere left/right, tilt-up => sphere up/down), we swap
-    // the x/y components of the relative quaternion before converting to SU(2).
-    const qMapped = { w: qRel.w, x: qRel.y, y: qRel.x, z: qRel.z };
+    // that doesn't always match our "screen-facing user" intuition. Empirically:
+    // - swap x/y to align tilt-left and tilt-up with sphere left/right and up/down
+    // - flip the mapped x sign so the x direction matches the y direction convention
+    const qMapped = { w: qRel.w, x: -qRel.y, y: qRel.x, z: qRel.z };
 
     this._deviceSU2 = {
       A: { x: qMapped.w, y: qMapped.z }, // w + i z
