@@ -38,6 +38,11 @@ export function childEntries(node) {
     case 'Conjugate':
     case 'IsNaN':
       return [['value', node.value]];
+    case 'Atan2':
+      return [
+        ['y', node.y],
+        ['x', node.x],
+      ];
     case 'Ln': {
       const entries = [['value', node.value]];
       if (node.branch) {

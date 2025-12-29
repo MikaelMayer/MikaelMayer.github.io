@@ -131,6 +131,14 @@ test('parses tan and atan calls', () => {
   assert.equal(result.value.value.kind, 'Atan');
 });
 
+test('parses atan2(y, x) calls', () => {
+  const result = parseFormulaInput('atan2(1, -1)');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Atan2');
+  assert.equal(result.value.y.kind, 'Const');
+  assert.equal(result.value.x.kind, 'Const');
+});
+
 test('parses arc trig aliases', () => {
   const asinResult = parseFormulaInput('asin(z)');
   assert.equal(asinResult.ok, true);

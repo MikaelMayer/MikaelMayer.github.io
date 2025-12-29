@@ -302,6 +302,8 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
       return `${identifierHighlights(node).length ? operatorNameWithMetadata('tan', identifierHighlights(node)) : '\\tan'}\\left(${nodeToLatex(node.value, 0, options)}\\right)`;
     case 'Atan':
       return `${identifierHighlights(node).length ? operatorNameWithMetadata('atan', identifierHighlights(node)) : '\\arctan'}\\left(${nodeToLatex(node.value, 0, options)}\\right)`;
+    case 'Atan2':
+      return functionCallLatex('atan2', [node.y, node.x], options, identifierHighlights(node));
     case 'Asin':
       return `${identifierHighlights(node).length ? operatorNameWithMetadata('asin', identifierHighlights(node)) : '\\arcsin'}\\left(${nodeToLatex(node.value, 0, options)}\\right)`;
     case 'Acos':

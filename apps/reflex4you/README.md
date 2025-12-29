@@ -189,13 +189,10 @@ Then apply your preferred yaw/pitch/roll convention. Here is one **concrete exam
 
 Notes:
 
-- Reflex currently has `atan(...)` but not `atan2(y, x)`. The snippet below shows an `atan2`-style pattern using `if(...)`.
+- Reflex supports `atan2(y, x)` (like `Math.atan2`): it returns a **real** angle in radians (using the **real parts** of `y` and `x`).
 - Clamping to `[-1, 1]` is written explicitly with nested `if(...)`.
 
 ```text
-set pi = 3.141592653589793 in
-set eps = 1e-9 in
-
 set qw = A.x in
 set qx = B.x in
 set qy = B.y in
@@ -207,21 +204,11 @@ set pitchX = asin(tPitchClamped) in
 
 set yawNum = 2*(qw*qy + qx*qz) in
 set yawDen = 1 - 2*(qx*qx + qy*qy) in
-set yawY =
-  if(abs(yawDen) < eps,
-    if(yawNum > 0, pi/2, if(yawNum < 0, -pi/2, 0)),
-    set a = atan(yawNum / yawDen) in
-    if(yawDen > 0, a, if(yawNum >= 0, a + pi, a - pi))
-  ) in
+set yawY = atan2(yawNum, yawDen) in
 
 set rollNum = 2*(qw*qz + qx*qy) in
 set rollDen = 1 - 2*(qx*qx + qz*qz) in
-set rollZ =
-  if(abs(rollDen) < eps,
-    if(rollNum > 0, pi/2, if(rollNum < 0, -pi/2, 0)),
-    set a = atan(rollNum / rollDen) in
-    if(rollDen > 0, a, if(rollNum >= 0, a + pi, a - pi))
-  ) in
+set rollZ = atan2(rollNum, rollDen) in
 
 yawY + i*pitchX
 ```
@@ -246,7 +233,7 @@ The input accepts succinct expressions with complex arithmetic, composition, and
 - **3D rotations (SU(2))**: `QA`, `QB` (device), `RA`, `RB` (trackball).
 - **Literals:** `1.25`, `-3.5`, `2+3i`, `0,1`, `i`, `-i`, `j` (for `-½ + √3/2 i`).
 - **Operators:** `+`, `-`, `*`, `/`, power (`^` with integer exponents), composition (`o(f, g)` or `f $ g`), repeated composition (`oo(f, n)` or `f $$ n`).
-- **Functions:** `exp`, `sin`, `cos`, `tan`, `atan`, `ln`, `sqrt`, `abs`/`modulus`, `floor`, `conj`, `heav`. `sqrt(z, k)` desugars to `exp(0.5 * ln(z, k))`, so the optional second argument shifts the log branch; `heav(x)` evaluates to `1` when `x > 0` and `0` otherwise.
+- **Functions:** `exp`, `sin`, `cos`, `tan`, `atan`/`arctan`, `atan2`, `asin`/`arcsin`, `acos`/`arccos`, `ln`, `sqrt`, `abs`/`modulus`, `abs2`, `floor`, `conj`, `heav`, `isnan`, `ifnan`/`iferror`. `sqrt(z, k)` desugars to `exp(0.5 * ln(z, k))`, so the optional second argument shifts the log branch; `heav(x)` evaluates to `1` when `x > 0` and `0` otherwise.
 - **Conditionals:** comparisons (`<`, `<=`, `>`, `>=`, `==`), logical ops (`&&`, `||`), and `if(cond, then, else)`.
 - **Bindings:** `set name = value in body` introduces reusable values (serialized with the formula when shared).
 
