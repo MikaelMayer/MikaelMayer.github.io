@@ -12,7 +12,7 @@ import {
 // on the formula page (e.g. from a shared link).
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
   // Version the SW script URL so updates can't get stuck behind a cached SW script.
-  const SW_URL = './service-worker.js?sw=28.4';
+  const SW_URL = './service-worker.js?sw=28.5';
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(SW_URL).then((registration) => {
       // Match the viewer page behavior: activate updated workers ASAP so
