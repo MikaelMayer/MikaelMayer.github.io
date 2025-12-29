@@ -1307,7 +1307,7 @@ async function handleMenuAction(action) {
 async function bootstrap() {
   // Service worker (same behavior as other pages).
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    const SW_URL = './service-worker.js?sw=28.5';
+    const SW_URL = './service-worker.js?sw=28.6';
     window.addEventListener('load', () => {
       navigator.serviceWorker.register(SW_URL).then((registration) => {
         if (registration?.waiting) {
