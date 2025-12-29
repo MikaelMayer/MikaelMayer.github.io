@@ -29,10 +29,10 @@ Reflex4You is an interactive complex-function explorer. Type a formula, drag the
    let sqrt = exp $ 0.5*ln in
    set d1 = 2*D1 in
    set scale = 5 in
-   set r = sqrt $ abs((x$d1) + (y$d1))^2 + x^2 + y^2 $ scale*(z - D3) in
-   set r2 = sqrt $ abs((x$d1) - (y$d1))^2 + x^2 + y^2 $ scale*(z + D3) in
+   set r = sqrt $ abs((d1.x) + i*(d1.y))^2 + x^2 + y^2 $ scale*(z - D3) in
+   set r2 = sqrt $ abs((d1.x) - i*(d1.y))^2 + x^2 + y^2 $ scale*(z + D3) in
    abs $
-   10*z $ 1/(r^2)*exp(8*abs(x$D2)*i*r) + 1/(r2^2)*exp(8*abs(x$D2)*i*r2)
+   10*z $ 1/(r^2)*exp(8*abs(D2.x)*i*r) + 1/(r2^2)*exp(8*abs(D2.x)*i*r2)
    ```
 
    Drag `D1` to change the arm angle, `D2` to tweak the wavelength, and `D3` to offset the detectors; the visual interference pattern updates instantly and the full configuration is still shareable via the URL.
@@ -139,7 +139,7 @@ set B = 0 in
 ...
 ```
 
-Tip: if you store `t` in a handle like `D1`, use `x$D1` (real part) as the angle.
+Tip: if you store `t` in a handle like `D1`, use `D1.x` (real part) as the angle.
 
 #### Sphere example (minimal): rotate then `sin`
 
