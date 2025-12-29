@@ -53,6 +53,21 @@ Formulas can reference special complex constants that you edit directly on the c
 | `D0`, `D1`, `D2`, `D3` | Dynamic handles | Touch the handle closest to the complex point you want to move. (`D0` is supported as an alias of `D1`.) |
 | `W0`, `W1` | Workspace frame | Gestures update both values together. One finger pans; two fingers capture the full similarity transform (pan, zoom, rotate) so you can navigate like Google Maps. |
 
+### Device orientation (`RX`, `RY`, `RZ`)
+
+On devices that expose motion sensors, formulas can also read **live orientation angles** (in **radians**) via three read-only parameters:
+
+| Token | Meaning | Notes |
+| --- | --- | --- |
+| `RY` | **Yaw / heading**: rotation around the vertical axis, measured **relative to the device heading when the app loaded**. This heading is computed against **north**, then zeroed at load time. | `RY = 0` at load. Turning left/right changes `RY`. |
+| `RX` | **Pitch**: rotation relative to the **horizontal** plane. | `RX = 0` means the phone is horizontal (lying flat). |
+| `RZ` | **Roll**: rotation of the phone around the screen-normal axis (“twist”). | `RZ = 0` at load. Twisting the phone changes `RZ`. |
+
+Practical notes:
+
+- These parameters are **not draggable** and are **not serialized into the URL** (they’re sensor readings, not saved handles).
+- Availability depends on browser/device permissions (notably iOS Safari requires a user gesture to grant motion access). When unavailable, the angles behave like constants (typically `0`).
+
 Rules of thumb:
 
 - A formula can use the `F` family and/or the `D` family, plus the `W` pair.
@@ -66,6 +81,7 @@ The input accepts succinct expressions with complex arithmetic, composition, and
 
 - **Variables:** `z`, `x`, `y`, `real`, `imag`.
 - **Finger tokens:** `F0`‑`F3`, `D0`‑`D3`, `W0`, `W1`.
+- **Device orientation:** `RX`, `RY`, `RZ` (live sensor angles, in radians).
 - **Literals:** `1.25`, `-3.5`, `2+3i`, `0,1`, `i`, `-i`, `j` (for `-½ + √3/2 i`).
 - **Operators:** `+`, `-`, `*`, `/`, power (`^` with integer exponents), composition (`o(f, g)` or `f $ g`), repeated composition (`oo(f, n)` or `f $$ n`).
 - **Functions:** `exp`, `sin`, `cos`, `tan`, `atan`, `ln`, `sqrt`, `abs`/`modulus`, `floor`, `conj`, `heav`. `sqrt(z, k)` desugars to `exp(0.5 * ln(z, k))`, so the optional second argument shifts the log branch; `heav(x)` evaluates to `1` when `x > 0` and `0` otherwise.
