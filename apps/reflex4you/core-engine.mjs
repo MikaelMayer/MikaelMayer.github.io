@@ -2822,22 +2822,48 @@ export class ReflexCore {
     }
     const midX = (s1.lastClientX + s2.lastClientX) / 2;
     const midY = (s1.lastClientY + s2.lastClientY) / 2;
-    const v1 = this.mapClientPointToArcball(midX, midY);
-    const v0 = gs.prevVec || gs.startVec || v1;
-    const qArc = this.quatFromArcballVectors(v0, v1);
+    const prevMidX = Number.isFinite(gs.prevMidX) ? gs.prevMidX : midX;
+    const prevMidY = Number.isFinite(gs.prevMidY) ? gs.prevMidY : midY;
+    const deltaX = midX - prevMidX;
+    // Use a "screen-up is positive" convention.
+    const deltaY = prevMidY - midY;
+
+    // Fully-relative trackball: interpret midpoint motion as incremental yaw/pitch.
+    // This avoids any finite disk radius / rim behavior and allows infinite drags
+    // starting from anywhere on the screen.
+    let rectW = 1;
+    let rectH = 1;
+    try {
+      const rect = this.canvas?.getBoundingClientRect?.();
+      rectW = rect?.width || this.canvas?.clientWidth || this.canvas?.width || 1;
+      rectH = rect?.height || this.canvas?.clientHeight || this.canvas?.height || 1;
+    } catch (_) {
+      rectW = this.canvas?.clientWidth || this.canvas?.width || 1;
+      rectH = this.canvas?.clientHeight || this.canvas?.height || 1;
+    }
+    const minDim = Math.max(1, Math.min(rectW, rectH));
+    // Dragging by one full screen width corresponds to ~one full turn.
+    const k = (2 * Math.PI) / minDim;
+
+    const yaw = deltaX * k;    // left/right drag
+    const pitch = deltaY * k;  // up/down drag
+
+    const qYaw = { w: Math.cos(yaw / 2), x: 0, y: Math.sin(yaw / 2), z: 0 };
+    const qPitch = { w: Math.cos(pitch / 2), x: Math.sin(pitch / 2), y: 0, z: 0 };
+    const qMove = this.quatNormalize(this.quatMultiply(qYaw, qPitch));
 
     const ang = Math.atan2(s2.lastClientY - s1.lastClientY, s2.lastClientX - s1.lastClientX);
     const prevTwist = Number.isFinite(gs.prevTwist) ? gs.prevTwist : gs.startTwist;
     const twist = ang - prevTwist;
     const qTwist = { w: Math.cos(twist / 2), x: 0, y: 0, z: Math.sin(twist / 2) };
 
-    const deltaScreen = this.quatMultiply(qTwist, qArc);
+    const deltaScreen = this.quatMultiply(qTwist, qMove);
     const next = this.quatNormalize(this.quatMultiply(deltaScreen, this._trackballQuat));
     this.setTrackballFromQuaternion(next);
 
-    // Switch to incremental mode to avoid the 180° arcball clamp:
-    // each move applies a small delta and updates the reference.
-    gs.prevVec = v1;
+    // Incremental reference update.
+    gs.prevMidX = midX;
+    gs.prevMidY = midY;
     gs.prevTwist = ang;
   }
 
@@ -2906,13 +2932,12 @@ export class ReflexCore {
       ) {
         const midX = (p1.lastClientX + p2.lastClientX) / 2;
         const midY = (p1.lastClientY + p2.lastClientY) / 2;
-        const startVec = this.mapClientPointToArcball(midX, midY);
         const startTwist = Math.atan2(p2.lastClientY - p1.lastClientY, p2.lastClientX - p1.lastClientX);
         this.trackballGestureState = {
           pointerIds: [p1.pointerId, p2.pointerId],
-          startVec,
           startTwist,
-          prevVec: startVec,
+          prevMidX: midX,
+          prevMidY: midY,
           prevTwist: startTwist,
         };
       }
