@@ -165,7 +165,7 @@ set R = 1.5 in
 set r2 = abs^2 in
 if(r2 > R*R, 0,
   set z_s = -sqrt(R*R - r2) in
-  set u = (x + i*y)/(R - z_s) in
+    set u = z/(R - z_s) in
   set u1 = i*u in
   set A = QA*RA - QB*(RB.conj) in
   set B = QA*RB + QB*(RA.conj) in
