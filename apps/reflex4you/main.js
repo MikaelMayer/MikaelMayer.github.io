@@ -132,10 +132,17 @@ function sortFingerLabels(labels) {
     .sort((a, b) => {
       const fa = fingerFamily(a);
       const fb = fingerFamily(b);
-      if (fa !== fb) {
-        // Keep fixed/dynamic ahead of workspace.
-        if (fa === 'w') return 1;
-        if (fb === 'w') return -1;
+      // Group by family: fixed (F*) first, then dynamic (D*), then workspace (W*).
+      const rank = (family) => {
+        if (family === 'fixed') return 0;
+        if (family === 'dynamic') return 1;
+        if (family === 'w') return 2;
+        return 3;
+      };
+      const ra = rank(fa);
+      const rb = rank(fb);
+      if (ra !== rb) {
+        return ra - rb;
       }
       return fingerIndex(a) - fingerIndex(b);
     });
@@ -650,7 +657,6 @@ function buildInlineFingerValueEditor(label) {
       Boolean(globalEffectiveTrackLabelSet?.has?.(label));
     const previewPlayingThis =
       Boolean(animated) &&
-      Boolean(previewController?.isPlaying?.()) &&
       Boolean(previewLabelSet && previewLabelSet.has(label));
     const playing = globalPlayingThis || previewPlayingThis;
     playBtn.textContent = playing ? '⏸' : '▶';
