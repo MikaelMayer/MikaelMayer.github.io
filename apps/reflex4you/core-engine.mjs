@@ -2669,9 +2669,16 @@ export class ReflexCore {
     const q0inv = quatConj(this._deviceRotationBaselineQuat);
     const qRel = quatNormalize(quatMultiply(q0inv, q));
 
+    // Coordinate convention adjustment:
+    // The browser's deviceorientation Euler angles are reported in a device-centric frame
+    // that doesn't always match our "screen-facing user" intuition. Empirically, for the
+    // intended UX (tilt-left => sphere left/right, tilt-up => sphere up/down), we swap
+    // the x/y components of the relative quaternion before converting to SU(2).
+    const qMapped = { w: qRel.w, x: qRel.y, y: qRel.x, z: qRel.z };
+
     this._deviceSU2 = {
-      A: { x: qRel.w, y: qRel.z }, // w + i z
-      B: { x: qRel.x, y: qRel.y }, // x + i y
+      A: { x: qMapped.w, y: qMapped.z }, // w + i z
+      B: { x: qMapped.x, y: qMapped.y }, // x + i y
     };
 
     // Throttle redraw to one per animation frame.
