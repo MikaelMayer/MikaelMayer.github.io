@@ -74,20 +74,25 @@ export function FingerOffset(slot) {
   return { kind: "FingerOffset", slot: validateFingerLabel(slot) };
 }
 
-const DEVICE_ORIENTATION_AXES = Object.freeze(['RX', 'RY', 'RZ']);
+const SU2_SLOTS = Object.freeze(['A', 'B']);
 
-function validateDeviceOrientationAxis(axis) {
-  const normalized = String(axis || '');
-  if (!DEVICE_ORIENTATION_AXES.includes(normalized)) {
-    throw new Error(`Unknown device orientation axis: ${axis}`);
+function validateSu2Slot(slot) {
+  const normalized = String(slot || '');
+  if (!SU2_SLOTS.includes(normalized)) {
+    throw new Error(`Unknown SU(2) slot: ${slot}`);
   }
   return normalized;
 }
 
-// Device orientation parameters (read-only): RX, RY, RZ (radians).
-// Provided by the runtime (ReflexCore) as real scalars (imaginary part = 0).
-export function DeviceOrientation(axis) {
-  return { kind: 'DeviceOrientation', axis: validateDeviceOrientationAxis(axis) };
+// SU(2) rotations are represented as a pair of complex numbers (A, B) with |A|^2 + |B|^2 = 1.
+// - `DeviceRotation('A'|'B')` exposes the device orientation as a *relative* SU(2) element.
+// - `TrackballRotation('A'|'B')` exposes a draggable SU(2) element (trackball UI).
+export function DeviceRotation(slot) {
+  return { kind: 'DeviceRotation', slot: validateSu2Slot(slot) };
+}
+
+export function TrackballRotation(slot) {
+  return { kind: 'TrackballRotation', slot: validateSu2Slot(slot) };
 }
 
 export function Offset() {
@@ -611,7 +616,8 @@ function prepareAstForGpu(ast) {
       case 'VarX':
       case 'VarY':
       case 'FingerOffset':
-      case 'DeviceOrientation':
+      case 'DeviceRotation':
+      case 'TrackballRotation':
       case 'Const':
       case 'PlaceholderVar':
         return node;
@@ -652,7 +658,8 @@ const formulaGlobals = Object.freeze({
   Offset,
   Offset2,
   FingerOffset,
-  DeviceOrientation,
+  DeviceRotation,
+  TrackballRotation,
   Sub,
   Mul,
   Op,
@@ -781,7 +788,8 @@ function assignNodeIds(ast) {
       assignNodeIds(ast.body);
       return;
     case "SetRef":
-    case "DeviceOrientation":
+    case "DeviceRotation":
+    case "TrackballRotation":
       return;
     case "Compose":
       assignNodeIds(ast.f);
@@ -883,7 +891,8 @@ function collectNodesPostOrder(ast, out) {
     case "VarX":
     case "VarY":
     case "FingerOffset":
-    case "DeviceOrientation":
+    case "DeviceRotation":
+    case "TrackballRotation":
     case "Const":
       break;
     default:
@@ -964,17 +973,19 @@ vec2 ${name}(vec2 z) {
 }`.trim();
   }
 
-  if (ast.kind === 'DeviceOrientation') {
-    const axis = ast.axis;
-    const uniform =
-      axis === 'RX'
-        ? 'u_deviceRx'
-        : axis === 'RY'
-          ? 'u_deviceRy'
-          : 'u_deviceRz';
+  if (ast.kind === 'DeviceRotation') {
+    const uniform = ast.slot === 'A' ? 'u_qA' : 'u_qB';
     return `
 vec2 ${name}(vec2 z) {
-    return vec2(${uniform}, 0.0);
+    return ${uniform};
+}`.trim();
+  }
+
+  if (ast.kind === 'TrackballRotation') {
+    const uniform = ast.slot === 'A' ? 'u_rA' : 'u_rB';
+    return `
+vec2 ${name}(vec2 z) {
+    return ${uniform};
 }`.trim();
   }
 
@@ -1398,9 +1409,10 @@ precision highp float;
 uniform vec2 u_min;
 uniform vec2 u_max;
 uniform vec2 u_resolution;
-uniform float u_deviceRx;
-uniform float u_deviceRy;
-uniform float u_deviceRz;
+uniform vec2 u_qA;
+uniform vec2 u_qB;
+uniform vec2 u_rA;
+uniform vec2 u_rB;
 uniform vec2 u_fixedOffsets[/*FIXED_OFFSETS_COUNT*/];
 uniform vec2 u_dynamicOffsets[/*DYNAMIC_OFFSETS_COUNT*/];
 uniform vec2 u_wOffsets[2];
@@ -1696,12 +1708,10 @@ export class ReflexCore {
     this.uFixedOffsetsLoc = null;
     this.uDynamicOffsetsLoc = null;
     this.uWOffsetsLoc = null;
-    this.uDeviceRxLoc = null;
-    this.uDeviceRyLoc = null;
-    this.uDeviceRzLoc = null;
-    this.uDeviceRxLoc = null;
-    this.uDeviceRyLoc = null;
-    this.uDeviceRzLoc = null;
+    this.uQA_Loc = null;
+    this.uQB_Loc = null;
+    this.uRA_Loc = null;
+    this.uRB_Loc = null;
 
     this.baseHalfSpan = 4.0;
     this.viewXSpan = 8.0;
@@ -1713,6 +1723,7 @@ export class ReflexCore {
 
     this.fingerValues = new Map();
     this.fingerListeners = new Map();
+    this.trackballListeners = new Set();
 
     this.fixedUniformCount = 1;
     this.dynamicUniformCount = 1;
@@ -1738,6 +1749,8 @@ export class ReflexCore {
     this.fingerAxisConstraints = new Map();
     this.wGestureState = null;
     this.wGestureLatched = false;
+    this.trackballEnabled = false;
+    this.trackballGestureState = null;
     // If we render before the browser has computed layout, canvas.clientWidth/Height can
     // temporarily report 0–1px (notably on mobile/PWA). Resizing the backing store to
     // that tiny size produces a uniform full-screen color until a later resize/re-render.
@@ -1748,16 +1761,17 @@ export class ReflexCore {
     this._visibilityListener = null;
     this._pageShowListener = null;
 
-    // Device orientation (RX/RY/RZ) state.
-    this._deviceOrientationListener = null;
-    this._deviceOrientationEventName = null;
-    this._deviceOrientationRaf = null;
-    this._deviceOrientationPermissionRequested = false;
-    this._deviceOrientationBaselines = {
-      headingRad: null, // baseline for RY
-      rollRad: null, // baseline for RZ (gamma)
-    };
-    this._deviceOrientation = { rx: 0, ry: 0, rz: 0 };
+    // SU(2) rotations:
+    // - device rotation (QA/QB): relative to the baseline captured on first reading
+    // - trackball rotation (RA/RB): user-controlled (UI), default identity
+    this._deviceRotationListener = null;
+    this._deviceRotationEventName = null;
+    this._deviceRotationRaf = null;
+    this._deviceRotationPermissionRequested = false;
+    this._deviceRotationBaselineQuat = null; // {w,x,y,z}
+    this._deviceSU2 = { A: { x: 1, y: 0 }, B: { x: 0, y: 0 } };
+    this._trackballSU2 = { A: { x: 1, y: 0 }, B: { x: 0, y: 0 } };
+    this._trackballQuat = { w: 1, x: 0, y: 0, z: 0 };
 
     // Keep the original AST for display/export, but compile a lowered version for the GPU.
     this.formulaAST = initialAST;
@@ -1816,7 +1830,7 @@ export class ReflexCore {
 
     if (installEventListeners) {
       // Best-effort: starts immediately on most browsers; on iOS it activates after permission.
-      this.ensureDeviceOrientationListener();
+      this.ensureDeviceRotationListener();
     }
 
     // Mobile PWAs can lose the WebGL context while backgrounded. Without explicit
@@ -1911,23 +1925,23 @@ export class ReflexCore {
       this._contextRestoredListener = null;
     }
 
-    if (typeof window !== 'undefined' && this._deviceOrientationListener && this._deviceOrientationEventName) {
+    if (typeof window !== 'undefined' && this._deviceRotationListener && this._deviceRotationEventName) {
       try {
-        window.removeEventListener(this._deviceOrientationEventName, this._deviceOrientationListener);
+        window.removeEventListener(this._deviceRotationEventName, this._deviceRotationListener);
       } catch (_) {
         // ignore
       }
     }
-    this._deviceOrientationListener = null;
-    this._deviceOrientationEventName = null;
-    if (this._deviceOrientationRaf != null && typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function') {
+    this._deviceRotationListener = null;
+    this._deviceRotationEventName = null;
+    if (this._deviceRotationRaf != null && typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function') {
       try {
-        window.cancelAnimationFrame(this._deviceOrientationRaf);
+        window.cancelAnimationFrame(this._deviceRotationRaf);
       } catch (_) {
         // ignore
       }
     }
-    this._deviceOrientationRaf = null;
+    this._deviceRotationRaf = null;
   }
 
   handleContextRestored() {
@@ -1993,10 +2007,12 @@ export class ReflexCore {
     dynamicSlots = [],
     wSlots = [],
     axisConstraints = new Map(),
+    trackballEnabled = false,
   } = {}) {
     this.activeFixedSlots = Array.isArray(fixedSlots) ? [...fixedSlots] : [];
     this.activeDynamicSlots = Array.isArray(dynamicSlots) ? [...dynamicSlots] : [];
     this.activeWSlots = Array.isArray(wSlots) ? [...wSlots] : [];
+    this.trackballEnabled = Boolean(trackballEnabled);
     this.activeFingerFamily = this.activeFixedSlots.length && this.activeDynamicSlots.length
       ? 'mixed'
       : this.activeFixedSlots.length
@@ -2022,6 +2038,81 @@ export class ReflexCore {
     this.pointerStates.clear();
     this.wGestureState = null;
     this.wGestureLatched = false;
+    this.trackballGestureState = null;
+  }
+
+  getTrackballSU2() {
+    return {
+      A: { x: this._trackballSU2.A.x, y: this._trackballSU2.A.y },
+      B: { x: this._trackballSU2.B.x, y: this._trackballSU2.B.y },
+    };
+  }
+
+  onTrackballChange(listener) {
+    if (typeof listener !== 'function') {
+      return () => {};
+    }
+    this.trackballListeners.add(listener);
+    try {
+      listener(this.getTrackballSU2());
+    } catch (err) {
+      console.error('ReflexCore trackball listener threw', err);
+    }
+    return () => {
+      this.trackballListeners.delete(listener);
+    };
+  }
+
+  notifyTrackballChange() {
+    if (!this.trackballListeners.size) {
+      return;
+    }
+    const snapshot = this.getTrackballSU2();
+    this.trackballListeners.forEach((listener) => {
+      try {
+        listener(snapshot);
+      } catch (err) {
+        console.error('ReflexCore trackball listener threw', err);
+      }
+    });
+  }
+
+  setTrackballFromQuaternion(quat, { triggerRender = true } = {}) {
+    if (!quat || typeof quat !== 'object') {
+      return;
+    }
+    const w = Number(quat.w);
+    const x = Number(quat.x);
+    const y = Number(quat.y);
+    const z = Number(quat.z);
+    const n = Math.hypot(w, x, y, z);
+    if (!(n > 0) || !Number.isFinite(n)) {
+      return;
+    }
+    const q = { w: w / n, x: x / n, y: y / n, z: z / n };
+    this._trackballQuat = q;
+    this._trackballSU2 = {
+      A: { x: q.w, y: q.z },
+      B: { x: q.x, y: q.y },
+    };
+    this.notifyTrackballChange();
+    if (triggerRender) {
+      this.render();
+    }
+  }
+
+  setTrackballFromSU2(A, B, { triggerRender = true } = {}) {
+    const a = A && typeof A === 'object' ? { x: Number(A.x), y: Number(A.y) } : null;
+    const b = B && typeof B === 'object' ? { x: Number(B.x), y: Number(B.y) } : null;
+    if (!a || !b || !Number.isFinite(a.x) || !Number.isFinite(a.y) || !Number.isFinite(b.x) || !Number.isFinite(b.y)) {
+      return;
+    }
+    // Convert SU(2) complex pair to quaternion: A = w + i z, B = x + i y.
+    this.setTrackballFromQuaternion({ w: a.x, x: b.x, y: b.y, z: a.y }, { triggerRender });
+  }
+
+  resetTrackball({ triggerRender = true } = {}) {
+    this.setTrackballFromQuaternion({ w: 1, x: 0, y: 0, z: 0 }, { triggerRender });
   }
 
   getFingerValue(label) {
@@ -2223,9 +2314,10 @@ export class ReflexCore {
     this.uMinLoc = this.gl.getUniformLocation(this.program, 'u_min');
     this.uMaxLoc = this.gl.getUniformLocation(this.program, 'u_max');
     this.uResolutionLoc = this.gl.getUniformLocation(this.program, 'u_resolution');
-    this.uDeviceRxLoc = this.gl.getUniformLocation(this.program, 'u_deviceRx');
-    this.uDeviceRyLoc = this.gl.getUniformLocation(this.program, 'u_deviceRy');
-    this.uDeviceRzLoc = this.gl.getUniformLocation(this.program, 'u_deviceRz');
+    this.uQA_Loc = this.gl.getUniformLocation(this.program, 'u_qA');
+    this.uQB_Loc = this.gl.getUniformLocation(this.program, 'u_qB');
+    this.uRA_Loc = this.gl.getUniformLocation(this.program, 'u_rA');
+    this.uRB_Loc = this.gl.getUniformLocation(this.program, 'u_rB');
     this.uFixedOffsetsLoc = this.gl.getUniformLocation(this.program, 'u_fixedOffsets[0]');
     this.uDynamicOffsetsLoc = this.gl.getUniformLocation(this.program, 'u_dynamicOffsets[0]');
     this.uWOffsetsLoc = this.gl.getUniformLocation(this.program, 'u_wOffsets[0]');
@@ -2344,12 +2436,17 @@ export class ReflexCore {
     }
   }
 
-  uploadDeviceOrientationUniforms() {
-    // These uniforms may be optimized out if unused.
-    const { rx, ry, rz } = this._deviceOrientation || { rx: 0, ry: 0, rz: 0 };
-    if (this.uDeviceRxLoc) this.gl.uniform1f(this.uDeviceRxLoc, Number.isFinite(rx) ? rx : 0);
-    if (this.uDeviceRyLoc) this.gl.uniform1f(this.uDeviceRyLoc, Number.isFinite(ry) ? ry : 0);
-    if (this.uDeviceRzLoc) this.gl.uniform1f(this.uDeviceRzLoc, Number.isFinite(rz) ? rz : 0);
+  uploadSu2Uniforms() {
+    // These uniforms may be optimized out if unused by the compiled shader.
+    const qA = this._deviceSU2?.A ?? { x: 1, y: 0 };
+    const qB = this._deviceSU2?.B ?? { x: 0, y: 0 };
+    const rA = this._trackballSU2?.A ?? { x: 1, y: 0 };
+    const rB = this._trackballSU2?.B ?? { x: 0, y: 0 };
+
+    if (this.uQA_Loc) this.gl.uniform2f(this.uQA_Loc, qA.x, qA.y);
+    if (this.uQB_Loc) this.gl.uniform2f(this.uQB_Loc, qB.x, qB.y);
+    if (this.uRA_Loc) this.gl.uniform2f(this.uRA_Loc, rA.x, rA.y);
+    if (this.uRB_Loc) this.gl.uniform2f(this.uRB_Loc, rB.x, rB.y);
   }
 
   render() {
@@ -2371,7 +2468,7 @@ export class ReflexCore {
     }
     this.gl.useProgram(this.program);
     this.uploadFingerUniforms();
-    this.uploadDeviceOrientationUniforms();
+    this.uploadSu2Uniforms();
     this.gl.uniform2f(this.uResolutionLoc, this.canvas.width, this.canvas.height);
     this.updateView();
 
@@ -2406,7 +2503,7 @@ export class ReflexCore {
 
     this.gl.useProgram(this.program);
     this.uploadFingerUniforms();
-    this.uploadDeviceOrientationUniforms();
+    this.uploadSu2Uniforms();
     this.gl.uniform2f(this.uResolutionLoc, w, h);
     this.updateView();
 
@@ -2417,7 +2514,7 @@ export class ReflexCore {
 
   handlePointerDown(e) {
     // iOS Safari requires a user gesture for device orientation access.
-    this.maybeRequestDeviceOrientationPermission();
+    this.maybeRequestDeviceRotationPermission();
     if (
       this.activeFingerFamily === 'none' &&
       !this.activeWSlots.length
@@ -2452,8 +2549,8 @@ export class ReflexCore {
     this.recomputePointerRoles();
   }
 
-  maybeRequestDeviceOrientationPermission() {
-    if (this._deviceOrientationPermissionRequested) {
+  maybeRequestDeviceRotationPermission() {
+    if (this._deviceRotationPermissionRequested) {
       return;
     }
     if (typeof window === 'undefined') {
@@ -2462,24 +2559,24 @@ export class ReflexCore {
     const DOE = window.DeviceOrientationEvent;
     if (!DOE || typeof DOE.requestPermission !== 'function') {
       // No permission gate: ensure listener is installed.
-      this.ensureDeviceOrientationListener();
+      this.ensureDeviceRotationListener();
       return;
     }
-    this._deviceOrientationPermissionRequested = true;
+    this._deviceRotationPermissionRequested = true;
     Promise.resolve()
       .then(() => DOE.requestPermission())
       .then((result) => {
         if (result === 'granted') {
-          this.ensureDeviceOrientationListener({ force: true });
+          this.ensureDeviceRotationListener({ force: true });
         }
       })
       .catch(() => {
-        // Permission denied or unsupported; keep values at zero.
+        // Permission denied or unsupported; keep values at identity.
       });
   }
 
-  ensureDeviceOrientationListener({ force = false } = {}) {
-    if (this._deviceOrientationListener || typeof window === 'undefined') {
+  ensureDeviceRotationListener({ force = false } = {}) {
+    if (this._deviceRotationListener || typeof window === 'undefined') {
       return;
     }
     const DOE = window.DeviceOrientationEvent;
@@ -2495,87 +2592,86 @@ export class ReflexCore {
     const eventName = ('ondeviceorientationabsolute' in window)
       ? 'deviceorientationabsolute'
       : 'deviceorientation';
-    this._deviceOrientationEventName = eventName;
-    this._deviceOrientationListener = (ev) => this.handleDeviceOrientationEvent(ev);
+    this._deviceRotationEventName = eventName;
+    this._deviceRotationListener = (ev) => this.handleDeviceRotationEvent(ev);
     try {
-      window.addEventListener(eventName, this._deviceOrientationListener);
+      window.addEventListener(eventName, this._deviceRotationListener);
     } catch (_) {
-      this._deviceOrientationListener = null;
-      this._deviceOrientationEventName = null;
+      this._deviceRotationListener = null;
+      this._deviceRotationEventName = null;
     }
   }
 
-  handleDeviceOrientationEvent(event) {
-    // DeviceOrientationEvent reports degrees.
+  handleDeviceRotationEvent(event) {
+    // DeviceOrientationEvent reports degrees; we convert to a unit quaternion,
+    // baseline it at the first valid reading, then expose the *relative* SU(2)
+    // element as (QA,QB) with:
+    //   QA = w + i z
+    //   QB = x + i y
     const degToRad = (deg) => (Number(deg) * Math.PI) / 180;
-    const wrap = (rad) => {
-      const twoPi = Math.PI * 2;
-      let x = Number(rad);
-      if (!Number.isFinite(x)) return 0;
-      x = x - twoPi * Math.floor((x + Math.PI) / twoPi);
-      return x;
-    };
-
+    const alpha = degToRad(event?.alpha);
     const beta = degToRad(event?.beta);
     const gamma = degToRad(event?.gamma);
-
-    // RY goal: a "yaw/heading" that stays stable when the phone is held vertically.
-    // Using raw `alpha` suffers from a gimbal-lock singularity near beta ~= ±90° (vertical).
-    //
-    // Instead, compute heading from the screen-normal direction projected onto the
-    // horizontal plane. This makes the singularity happen when the phone is horizontal
-    // (screen normal points up/down, projection ~ 0), matching the intended behavior.
-    const alpha = degToRad(event?.alpha);
-    let heading = null;
-    if (Number.isFinite(alpha) && Number.isFinite(beta) && Number.isFinite(gamma)) {
-      const cX = Math.cos(beta);
-      const cY = Math.cos(gamma);
-      const cZ = Math.cos(alpha);
-      const sX = Math.sin(beta);
-      const sY = Math.sin(gamma);
-      const sZ = Math.sin(alpha);
-
-      // Rotation matrix for intrinsic Z-X'-Y'' (alpha, beta, gamma).
-      // Third column gives the world direction of the device +Z axis (screen normal).
-      const m13 = cY * sZ * sX + cZ * sY;
-      const m23 = sZ * sY - cZ * cY * sX;
-      // const m33 = cX * cY;
-
-      // Project screen normal onto horizontal plane (world X/Y).
-      const nx = m13;
-      const ny = m23;
-      // Heading is angle from +Y (north) towards +X (east).
-      // atan2(0,0) -> 0; near-horizontal devices will be noisy here (intended singularity).
-      heading = Math.atan2(nx, ny);
-    }
-    if (heading == null) {
-      // Fallbacks when we can't build a stable world-frame heading.
-      // Prefer iOS Safari's `webkitCompassHeading` (0° = north) if present.
-      const headingDeg =
-        (event && typeof event.webkitCompassHeading === 'number' && Number.isFinite(event.webkitCompassHeading))
-          ? event.webkitCompassHeading
-          : event?.alpha;
-      const fallback = degToRad(headingDeg);
-      heading = Number.isFinite(fallback) ? fallback : 0;
+    if (!Number.isFinite(alpha) || !Number.isFinite(beta) || !Number.isFinite(gamma)) {
+      return;
     }
 
-    if (Number.isFinite(heading) && this._deviceOrientationBaselines.headingRad == null) {
-      this._deviceOrientationBaselines.headingRad = heading;
+    function quatMultiply(a, b) {
+      return {
+        w: a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,
+        x: a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+        y: a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+        z: a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
+      };
     }
-    if (Number.isFinite(gamma) && this._deviceOrientationBaselines.rollRad == null) {
-      this._deviceOrientationBaselines.rollRad = gamma;
+    function quatConj(q) {
+      return { w: q.w, x: -q.x, y: -q.y, z: -q.z };
+    }
+    function quatNormalize(q) {
+      const n = Math.hypot(q.w, q.x, q.y, q.z);
+      if (!(n > 0) || !Number.isFinite(n)) {
+        return { w: 1, x: 0, y: 0, z: 0 };
+      }
+      return { w: q.w / n, x: q.x / n, y: q.y / n, z: q.z / n };
     }
 
-    const heading0 = this._deviceOrientationBaselines.headingRad ?? 0;
-    const roll0 = this._deviceOrientationBaselines.rollRad ?? 0;
+    // Quaternion for intrinsic Z-X'-Y'' (alpha, beta, gamma): q = qz(alpha)*qx(beta)*qy(gamma)
+    const c1 = Math.cos(alpha / 2);
+    const s1 = Math.sin(alpha / 2);
+    const c2 = Math.cos(beta / 2);
+    const s2 = Math.sin(beta / 2);
+    const c3 = Math.cos(gamma / 2);
+    const s3 = Math.sin(gamma / 2);
+    let q = quatNormalize({
+      w: c1 * c2 * c3 - s1 * s2 * s3,
+      x: c1 * s2 * c3 - s1 * c2 * s3,
+      y: c1 * c2 * s3 + s1 * s2 * c3,
+      z: c1 * s2 * s3 + s1 * c2 * c3,
+    });
 
-    this._deviceOrientation = {
-      // RX: pitch vs horizontal (RX = 0 when horizontal).
-      rx: Number.isFinite(beta) ? beta : 0,
-      // RY: yaw/heading vs north, zeroed at load/first sensor reading.
-      ry: Number.isFinite(heading) ? wrap(heading - heading0) : 0,
-      // RZ: roll, zeroed at load/first sensor reading.
-      rz: Number.isFinite(gamma) ? wrap(gamma - roll0) : 0,
+    // Account for screen rotation (portrait/landscape) if available.
+    let screenAngleDeg = 0;
+    try {
+      screenAngleDeg = Number(window?.screen?.orientation?.angle ?? window?.orientation ?? 0);
+    } catch (_) {
+      screenAngleDeg = 0;
+    }
+    const screenAngle = degToRad(screenAngleDeg);
+    if (Number.isFinite(screenAngle) && screenAngle !== 0) {
+      const half = -screenAngle / 2;
+      const qScreen = { w: Math.cos(half), x: 0, y: 0, z: Math.sin(half) };
+      q = quatNormalize(quatMultiply(q, qScreen));
+    }
+
+    if (!this._deviceRotationBaselineQuat) {
+      this._deviceRotationBaselineQuat = q;
+    }
+    const q0inv = quatConj(this._deviceRotationBaselineQuat);
+    const qRel = quatNormalize(quatMultiply(q0inv, q));
+
+    this._deviceSU2 = {
+      A: { x: qRel.w, y: qRel.z }, // w + i z
+      B: { x: qRel.x, y: qRel.y }, // x + i y
     };
 
     // Throttle redraw to one per animation frame.
@@ -2583,11 +2679,11 @@ export class ReflexCore {
       this.render();
       return;
     }
-    if (this._deviceOrientationRaf != null) {
+    if (this._deviceRotationRaf != null) {
       return;
     }
-    this._deviceOrientationRaf = window.requestAnimationFrame(() => {
-      this._deviceOrientationRaf = null;
+    this._deviceRotationRaf = window.requestAnimationFrame(() => {
+      this._deviceRotationRaf = null;
       this.render();
     });
   }
@@ -2603,6 +2699,8 @@ export class ReflexCore {
       this.updatePointerControlledFinger(state);
     } else if (state.role === 'w') {
       this.updateWFromGesture();
+    } else if (state.role === 'trackball') {
+      this.updateTrackballFromGesture();
     }
   }
 
@@ -2618,6 +2716,84 @@ export class ReflexCore {
       // ignore
     }
     this.recomputePointerRoles();
+  }
+
+  mapClientPointToArcball(clientX, clientY) {
+    const rect = this.canvas?.getBoundingClientRect?.();
+    const w = rect?.width || this.canvas?.clientWidth || this.canvas?.width || 1;
+    const h = rect?.height || this.canvas?.clientHeight || this.canvas?.height || 1;
+    const cx = (rect?.left || 0) + w / 2;
+    const cy = (rect?.top || 0) + h / 2;
+    const radius = Math.max(1, Math.min(w, h) * 0.45);
+    const dx = (Number(clientX) - cx) / radius;
+    const dy = (cy - Number(clientY)) / radius;
+    const d2 = dx * dx + dy * dy;
+    if (d2 <= 1) {
+      return { x: dx, y: dy, z: Math.sqrt(1 - d2) };
+    }
+    const d = Math.sqrt(d2) || 1;
+    return { x: dx / d, y: dy / d, z: 0 };
+  }
+
+  quatMultiply(a, b) {
+    return {
+      w: a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,
+      x: a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+      y: a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+      z: a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
+    };
+  }
+
+  quatNormalize(q) {
+    const n = Math.hypot(q.w, q.x, q.y, q.z);
+    if (!(n > 0) || !Number.isFinite(n)) {
+      return { w: 1, x: 0, y: 0, z: 0 };
+    }
+    return { w: q.w / n, x: q.x / n, y: q.y / n, z: q.z / n };
+  }
+
+  quatFromArcballVectors(v0, v1) {
+    const dot = v0.x * v1.x + v0.y * v1.y + v0.z * v1.z;
+    const cx = v0.y * v1.z - v0.z * v1.y;
+    const cy = v0.z * v1.x - v0.x * v1.z;
+    const cz = v0.x * v1.y - v0.y * v1.x;
+    // When vectors are nearly opposite, 1+dot ~ 0; fall back to 180° around a stable axis.
+    if (dot < -0.999999) {
+      const ax = Math.abs(v0.x) < 0.9 ? 1 : 0;
+      const ay = Math.abs(v0.y) < 0.9 ? 1 : 0;
+      const az = 0;
+      // axis = normalize(v0 x a)
+      const rx = v0.y * az - v0.z * ay;
+      const ry = v0.z * ax - v0.x * az;
+      const rz = v0.x * ay - v0.y * ax;
+      const rn = Math.hypot(rx, ry, rz) || 1;
+      return { w: 0, x: rx / rn, y: ry / rn, z: rz / rn };
+    }
+    return this.quatNormalize({ w: 1 + dot, x: cx, y: cy, z: cz });
+  }
+
+  updateTrackballFromGesture() {
+    const gs = this.trackballGestureState;
+    if (!gs || !Array.isArray(gs.pointerIds) || gs.pointerIds.length < 2) {
+      return;
+    }
+    const s1 = this.pointerStates.get(gs.pointerIds[0]);
+    const s2 = this.pointerStates.get(gs.pointerIds[1]);
+    if (!s1 || !s2) {
+      return;
+    }
+    const midX = (s1.lastClientX + s2.lastClientX) / 2;
+    const midY = (s1.lastClientY + s2.lastClientY) / 2;
+    const v1 = this.mapClientPointToArcball(midX, midY);
+    const qArc = this.quatFromArcballVectors(gs.startVec, v1);
+
+    const ang = Math.atan2(s2.lastClientY - s1.lastClientY, s2.lastClientX - s1.lastClientX);
+    const twist = ang - gs.startTwist;
+    const qTwist = { w: Math.cos(twist / 2), x: 0, y: 0, z: Math.sin(twist / 2) };
+
+    const delta = this.quatMultiply(qTwist, qArc);
+    const next = this.quatNormalize(this.quatMultiply(delta, gs.startQuat));
+    this.setTrackballFromQuaternion(next);
   }
 
   updatePointerControlledFinger(state) {
@@ -2654,6 +2830,50 @@ export class ReflexCore {
       this.wGestureLatched = false;
     }
     const assignedPointerIds = new Set();
+
+    // Trackball override: when enabled, a two-finger gesture controls RA/RB by default.
+    // (Solo mode can disable this by setting trackballEnabled=false from the UI layer.)
+    if (this.trackballEnabled && pointerList.length >= 2) {
+      const p1 = pointerList[0];
+      const p2 = pointerList[1];
+      // Clear any in-progress W gesture.
+      this.wGestureState = null;
+      this.wGestureLatched = false;
+      // Assign roles.
+      pointerList.forEach((state) => {
+        state.prevRole = state.role;
+        state.prevSlot = state.slot;
+        state.role = null;
+        state.slot = null;
+        state.axis = null;
+      });
+      p1.role = 'trackball';
+      p2.role = 'trackball';
+      assignedPointerIds.add(p1.pointerId);
+      assignedPointerIds.add(p2.pointerId);
+
+      // Initialize gesture state once.
+      if (
+        !this.trackballGestureState ||
+        !Array.isArray(this.trackballGestureState.pointerIds) ||
+        this.trackballGestureState.pointerIds[0] !== p1.pointerId ||
+        this.trackballGestureState.pointerIds[1] !== p2.pointerId
+      ) {
+        const midX = (p1.lastClientX + p2.lastClientX) / 2;
+        const midY = (p1.lastClientY + p2.lastClientY) / 2;
+        const startVec = this.mapClientPointToArcball(midX, midY);
+        const startTwist = Math.atan2(p2.lastClientY - p1.lastClientY, p2.lastClientX - p1.lastClientX);
+        this.trackballGestureState = {
+          pointerIds: [p1.pointerId, p2.pointerId],
+          startVec,
+          startTwist,
+          startQuat: { ...this._trackballQuat },
+        };
+      }
+      // Trackball owns the gesture; do not assign other roles.
+      return;
+    }
+    this.trackballGestureState = null;
 
     // Reset roles before reassigning.
     pointerList.forEach((state) => {

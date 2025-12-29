@@ -266,8 +266,13 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
         }
       }
       return fingerSlotToLatex(node.slot);
-    case 'DeviceOrientation':
-      return latexIdentifierWithMetadata(node.axis || '?', identifierHighlights(node));
+    case 'DeviceRotation':
+    case 'TrackballRotation': {
+      // Show the token as written (QA/QB/RA/RB) when available.
+      const slot = node.slot || '?';
+      const prefix = node.kind === 'DeviceRotation' ? 'Q' : 'R';
+      return latexIdentifierWithMetadata(`${prefix}${slot}`, identifierHighlights(node));
+    }
 
     case 'Pow': {
       const baseLatex = nodeToLatex(node.base, precedence(node), options);

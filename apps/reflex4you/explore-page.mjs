@@ -79,12 +79,21 @@ try {
 // ---------------------------------------------------------------------------
 
 const FINGER_LABEL_REGEX = /^(?:[FD]\d+|W[012])$/;
+const ROTATION_LABELS = ['RA', 'RB'];
 const ALL_W_FINGER_LABELS = ['W0', 'W1', 'W2'];
 const W_PAIR_ZERO = ['W0', 'W1'];
 const W_PAIR_LEGACY = ['W1', 'W2'];
 
 function isFingerLabel(label) {
   return typeof label === 'string' && FINGER_LABEL_REGEX.test(label);
+}
+
+function isRotationLabel(label) {
+  return label === 'RA' || label === 'RB';
+}
+
+function isSoloLabel(label) {
+  return isFingerLabel(label) || isRotationLabel(label);
 }
 
 function parseSecondsFromQuery(raw) {
@@ -141,7 +150,7 @@ function parseSolosParam(raw) {
     .filter(Boolean);
   const set = new Set();
   for (const label of parts) {
-    if (isFingerLabel(label)) {
+    if (isSoloLabel(label)) {
       set.add(label);
     }
   }
@@ -300,22 +309,24 @@ function analyzeFingerUsage(ast) {
     fixed: new Set(),
     dynamic: new Set(),
     w: new Set(),
+    rotation: new Set(),
   };
   const axisBuckets = new Map();
   if (!ast) {
     return { usage, axisConstraints: new Map() };
   }
   visitAst(ast, (node, meta) => {
-    if (node?.kind !== 'FingerOffset') {
-      return;
+    if (node?.kind === 'FingerOffset') {
+      const slot = node.slot;
+      const family = slot.startsWith('F') ? 'fixed' : slot.startsWith('D') ? 'dynamic' : 'w';
+      usage[family].add(slot);
+      const axisKind = resolveAxisContext(meta.parent, node);
+      const bucket = axisBuckets.get(slot) || new Set();
+      bucket.add(axisKind);
+      axisBuckets.set(slot, bucket);
+    } else if (node?.kind === 'TrackballRotation') {
+      usage.rotation.add(node.slot === 'A' ? 'RA' : 'RB');
     }
-    const slot = node.slot;
-    const family = slot.startsWith('F') ? 'fixed' : slot.startsWith('D') ? 'dynamic' : 'w';
-    usage[family].add(slot);
-    const axisKind = resolveAxisContext(meta.parent, node);
-    const bucket = axisBuckets.get(slot) || new Set();
-    bucket.add(axisKind);
-    axisBuckets.set(slot, bucket);
   });
   const axisConstraints = new Map();
   axisBuckets.forEach((bucket, slot) => {
@@ -331,6 +342,7 @@ function analyzeFingerUsage(ast) {
 function deriveFingerState(analysis) {
   const fixedSlots = sortedLabels(Array.from(analysis.usage.fixed));
   const dynamicSlots = sortedLabels(Array.from(analysis.usage.dynamic));
+  const rotationSlots = (Array.from(analysis.usage.rotation || [])).slice().sort();
   const usesW0 = analysis.usage.w.has('W0');
   const usesW2 = analysis.usage.w.has('W2');
   if (usesW0 && usesW2) {
@@ -359,7 +371,7 @@ function deriveFingerState(analysis) {
       axisConstraints.set(label, analysis.axisConstraints.get(label));
     }
   });
-  return { mode, fixedSlots, dynamicSlots, wSlots, axisConstraints };
+  return { mode, fixedSlots, dynamicSlots, wSlots, rotationSlots, axisConstraints };
 }
 
 // ---------------------------------------------------------------------------
@@ -1385,11 +1397,15 @@ async function bootstrap() {
     return arr.filter((l) => soloLabelSet.has(l));
   };
 
+  const rotationSlots = Array.isArray(fingerState.rotationSlots) ? fingerState.rotationSlots : [];
+  const trackballEnabled = rotationSlots.length > 0 && (!solosPresent || rotationSlots.some((l) => soloLabelSet.has(l)));
+
   activeFingerConfig = {
     fixedSlots: filterBySolos(fingerState.fixedSlots),
     dynamicSlots: filterBySolos(fingerState.dynamicSlots),
     wSlots: filterBySolos(fingerState.wSlots),
     axisConstraints: fingerState.axisConstraints,
+    trackballEnabled,
   };
   activeAxisConstraints = fingerState.axisConstraints;
   activeLabels = sortedLabels([
@@ -1408,6 +1424,15 @@ async function bootstrap() {
     const parsedValue = parseComplexString(raw);
     if (parsedValue) {
       topCore.setFingerValue(label, parsedValue.x, parsedValue.y, { triggerRender: false });
+    }
+  }
+
+  // Apply trackball SU(2) values (RA/RB) when present.
+  if ((fingerState.rotationSlots || []).length) {
+    const aParsed = parseComplexString(params.get('RA'));
+    const bParsed = parseComplexString(params.get('RB'));
+    if (aParsed && bParsed) {
+      topCore.setTrackballFromSU2({ x: aParsed.x, y: aParsed.y }, { x: bParsed.x, y: bParsed.y }, { triggerRender: false });
     }
   }
 

@@ -25,7 +25,7 @@ import {
   Ln,
   oo,
   FingerOffset,
-  DeviceOrientation,
+  DeviceRotation,
   LessThan,
   GreaterThan,
   LessThanOrEqual,
@@ -180,10 +180,10 @@ test('W0 maps to the W2 uniform slot in shaders', () => {
 });
 
 test('device orientation primitives read from scalar uniforms', () => {
-  const ast = DeviceOrientation('RY');
+  const ast = DeviceRotation('A');
   const fragment = buildFragmentSourceFromAST(ast);
-  assert.match(fragment, /uniform float u_deviceRy;/);
-  assert.match(fragment, /return vec2\(u_deviceRy, 0\.0\);/);
+  assert.match(fragment, /uniform vec2 u_qA;/);
+  assert.match(fragment, /return u_qA;/);
 });
 
 test('VarX and VarY nodes project components', () => {

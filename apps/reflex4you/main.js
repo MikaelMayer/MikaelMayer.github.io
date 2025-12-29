@@ -86,9 +86,18 @@ const ALL_W_FINGER_LABELS = ['W0', 'W1', 'W2'];
 const W_PAIR_ZERO = ['W0', 'W1'];
 const W_PAIR_LEGACY = ['W1', 'W2'];
 const FINGER_LABEL_REGEX = /^(?:[FD]\d+|W[012])$/;
+const ROTATION_LABELS = ['RA', 'RB'];
 
 function isFingerLabel(label) {
   return typeof label === 'string' && FINGER_LABEL_REGEX.test(label);
+}
+
+function isRotationLabel(label) {
+  return label === 'RA' || label === 'RB';
+}
+
+function isSoloLabel(label) {
+  return isFingerLabel(label) || isRotationLabel(label);
 }
 
 function fingerFamily(label) {
@@ -141,11 +150,40 @@ function sortFingerLabels(labels) {
     });
 }
 
+function sortSoloLabels(labels) {
+  return (labels || [])
+    .slice()
+    .filter((label) => isSoloLabel(label))
+    .sort((a, b) => {
+      const aRot = isRotationLabel(a);
+      const bRot = isRotationLabel(b);
+      if (aRot !== bRot) {
+        // Put rotation controls between F/D and W.
+        if (aRot) return 1;
+        return -1;
+      }
+      if (aRot && bRot) {
+        return a.localeCompare(b);
+      }
+      return sortFingerLabels([a, b])[0] === a ? -1 : 1;
+    });
+}
+
 const fingerDots = new Map();
 const fingerLastSerialized = {};
 const latestOffsets = {};
 const knownFingerLabels = new Set();
 const fingerUnsubscribers = new Map();
+
+const latestRotations = {
+  RA: { x: 1, y: 0 },
+  RB: { x: 0, y: 0 },
+};
+const rotationLastSerialized = { RA: null, RB: null };
+let trackballUnsubscribe = null;
+let trackballOverlayCanvas = null;
+let trackballOverlayCtx = null;
+let trackballQuatForUI = { w: 1, x: 0, y: 0, z: 0 };
 
 let fingerSoloButton = null;
 let fingerSoloDropdown = null;
@@ -278,9 +316,11 @@ function createEmptyFingerState() {
     fixedSlots: [],
     dynamicSlots: [],
     wSlots: [],
+    rotationSlots: [],
     axisConstraints: new Map(),
     allSlots: [],
     activeLabelSet: new Set(),
+    activeSoloLabelSet: new Set(),
   };
 }
 
@@ -294,7 +334,7 @@ function parseSolosParam(raw) {
     .filter(Boolean);
   const set = new Set();
   for (const label of parts) {
-    if (isFingerLabel(label)) {
+    if (isSoloLabel(label)) {
       set.add(label);
     }
   }
@@ -302,7 +342,7 @@ function parseSolosParam(raw) {
 }
 
 function serializeSolosParam(labels) {
-  const list = sortFingerLabels(Array.from(labels || []).filter((l) => isFingerLabel(l)));
+  const list = sortSoloLabels(Array.from(labels || []).filter((l) => isSoloLabel(l)));
   return list.length ? list.join(',') : null;
 }
 
@@ -467,6 +507,130 @@ function ensureFingerSoloUI() {
   fingerSoloAnimDurationButton = animTime;
 }
 
+function ensureTrackballOverlay() {
+  if (!rootElement || typeof document === 'undefined') {
+    return;
+  }
+  if (!trackballOverlayCanvas) {
+    const style = document.createElement('style');
+    style.textContent = `
+      .trackball-overlay {
+        position: fixed;
+        right: 14px;
+        bottom: 14px;
+        width: 140px;
+        height: 140px;
+        z-index: 50;
+        pointer-events: none;
+        opacity: 0.9;
+        filter: drop-shadow(0 2px 10px rgba(0,0,0,0.35));
+      }
+    `;
+    document.head.appendChild(style);
+
+    const canvasEl = document.createElement('canvas');
+    canvasEl.className = 'trackball-overlay';
+    canvasEl.width = 280;
+    canvasEl.height = 280;
+    document.body.appendChild(canvasEl);
+    trackballOverlayCanvas = canvasEl;
+    trackballOverlayCtx = canvasEl.getContext('2d');
+  }
+}
+
+function quatNormalize(q) {
+  const n = Math.hypot(q.w, q.x, q.y, q.z);
+  if (!(n > 0) || !Number.isFinite(n)) return { w: 1, x: 0, y: 0, z: 0 };
+  return { w: q.w / n, x: q.x / n, y: q.y / n, z: q.z / n };
+}
+
+function quatRotateVec(qRaw, v) {
+  const q = quatNormalize(qRaw);
+  // v' = q * (0,v) * q_conj
+  const w = q.w, x = q.x, y = q.y, z = q.z;
+  const vx = v.x, vy = v.y, vz = v.z;
+  // t = 2 * cross(q.xyz, v)
+  const tx = 2 * (y * vz - z * vy);
+  const ty = 2 * (z * vx - x * vz);
+  const tz = 2 * (x * vy - y * vx);
+  // v' = v + w*t + cross(q.xyz, t)
+  return {
+    x: vx + w * tx + (y * tz - z * ty),
+    y: vy + w * ty + (z * tx - x * tz),
+    z: vz + w * tz + (x * ty - y * tx),
+  };
+}
+
+function drawTrackballOverlay() {
+  if (!(activeFingerState?.rotationSlots || []).length) {
+    if (trackballOverlayCanvas) {
+      trackballOverlayCanvas.style.display = 'none';
+    }
+    return;
+  }
+  ensureTrackballOverlay();
+  if (!trackballOverlayCanvas || !trackballOverlayCtx) return;
+  trackballOverlayCanvas.style.display = 'block';
+  const ctx = trackballOverlayCtx;
+  const w = trackballOverlayCanvas.width;
+  const h = trackballOverlayCanvas.height;
+  ctx.clearRect(0, 0, w, h);
+  const cx = w / 2;
+  const cy = h / 2;
+  const r = Math.min(w, h) * 0.44;
+
+  // Sphere fill
+  const grad = ctx.createRadialGradient(cx - r * 0.25, cy - r * 0.25, r * 0.15, cx, cy, r);
+  grad.addColorStop(0, 'rgba(255,255,255,0.22)');
+  grad.addColorStop(0.55, 'rgba(255,255,255,0.08)');
+  grad.addColorStop(1, 'rgba(0,0,0,0.10)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Rim
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Axes markers (rotated basis vectors)
+  const q = trackballQuatForUI;
+  const axes = [
+    { v: { x: 1, y: 0, z: 0 }, color: 'rgba(255,80,80,0.9)' },
+    { v: { x: 0, y: 1, z: 0 }, color: 'rgba(80,255,140,0.9)' },
+    { v: { x: 0, y: 0, z: 1 }, color: 'rgba(120,160,255,0.95)' },
+  ];
+  for (const axis of axes) {
+    const p = quatRotateVec(q, axis.v);
+    const px = cx + r * p.x;
+    const py = cy - r * p.y;
+    const alpha = 0.35 + 0.65 * Math.max(0, p.z);
+    ctx.fillStyle = axis.color.replace(/0\.\d+\)$/, `${alpha})`);
+    ctx.beginPath();
+    ctx.arc(px, py, 7, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Identity cue
+  const qn = quatNormalize(q);
+  const angle = 2 * Math.acos(Math.max(-1, Math.min(1, qn.w)));
+  if (angle < 0.08) {
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Label
+  ctx.fillStyle = 'rgba(255,255,255,0.65)';
+  ctx.font = '18px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('RA/RB', cx, cy + r + 24);
+}
+
 function getSoloModeEnabled() {
   const activeCount = activeFingerState?.activeLabelSet?.size ?? 0;
   return soloLabelSet.size > 0 && activeCount > 1;
@@ -521,7 +685,41 @@ function applyFingerValueFromEditor(label, raw) {
   return { ok: true };
 }
 
+function formatRotationValueForEditor(label) {
+  const latest = latestRotations?.[label] || (label === 'RA' ? { x: 1, y: 0 } : { x: 0, y: 0 });
+  return formatComplexForQuery(latest.x, latest.y) || (label === 'RA' ? '1+0i' : '0+0i');
+}
+
 function buildInlineFingerValueEditor(label) {
+  if (isRotationLabel(label)) {
+    const wrap = document.createElement('div');
+    wrap.className = 'finger-solo-row__value-wrap';
+
+    const display = document.createElement('div');
+    display.className = 'finger-solo-row__value finger-solo-row__value--readonly';
+    display.title = 'Trackball rotation (drag with two fingers when enabled)';
+
+    const resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.className = 'finger-solo-row__anim-action';
+    resetBtn.textContent = 'Reset';
+    resetBtn.title = 'Reset trackball rotation to identity';
+    resetBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      reflexCore?.resetTrackball?.();
+    });
+
+    function refresh() {
+      display.textContent = formatRotationValueForEditor(label);
+    }
+    refresh();
+
+    wrap.appendChild(display);
+    wrap.appendChild(resetBtn);
+    return { element: wrap, refresh };
+  }
+
   const wrap = document.createElement('div');
   wrap.className = 'finger-solo-row__value-wrap';
 
@@ -969,7 +1167,7 @@ function rebuildFingerSoloList() {
   fingerSoloList.innerHTML = '';
   fingerSoloValueRefreshers = [];
 
-  const activeLabels = sortFingerLabels(Array.from(activeFingerState.activeLabelSet));
+  const activeLabels = sortSoloLabels(Array.from(activeFingerState.activeSoloLabelSet || []));
   if (!activeLabels.length) {
     const empty = document.createElement('div');
     empty.className = 'finger-solo-dropdown__hint';
@@ -1039,7 +1237,7 @@ function rebuildFingerSoloList() {
       }
       soloLabelSet = next;
       // Keep only labels that are actually in the current formula.
-      soloLabelSet = new Set(Array.from(soloLabelSet).filter((l) => activeFingerState.activeLabelSet.has(l)));
+      soloLabelSet = new Set(Array.from(soloLabelSet).filter((l) => activeFingerState.activeSoloLabelSet.has(l)));
       updateSolosQueryParam(soloLabelSet);
       applySoloFilterToRenderer();
       rebuildFingerSoloList();
@@ -1087,6 +1285,9 @@ function applySoloFilterToRenderer() {
   const fixedSlots = filterSlots(activeFingerState.fixedSlots);
   const dynamicSlots = filterSlots(activeFingerState.dynamicSlots);
   const wSlots = filterSlots(activeFingerState.wSlots);
+  const rotationSlots = filterSlots(activeFingerState.rotationSlots || []);
+  const trackballPresent = (activeFingerState.rotationSlots || []).length > 0;
+  const trackballEnabled = trackballPresent && (!soloMode || rotationSlots.length > 0);
 
   // Also update which dots are shown: only capturable labels when in solo mode.
   const visibleSet = new Set(soloMode ? [...fixedSlots, ...dynamicSlots, ...wSlots] : activeFingerState.allSlots);
@@ -1097,6 +1298,7 @@ function applySoloFilterToRenderer() {
     dynamicSlots,
     wSlots,
     axisConstraints,
+    trackballEnabled,
   });
 }
 
@@ -1739,6 +1941,63 @@ function handleFingerValueChange(label, offset) {
   }
 }
 
+function applyTrackballValuesFromQuery() {
+  if (!reflexCore) {
+    return;
+  }
+  const params = new URLSearchParams(window.location.search);
+  const aRaw = params.get('RA');
+  const bRaw = params.get('RB');
+  const aParsed = parseComplexString(aRaw);
+  const bParsed = parseComplexString(bRaw);
+  if (aParsed && bParsed) {
+    // Normalize to a unit quaternion in the renderer.
+    reflexCore.setTrackballFromSU2(
+      { x: aParsed.x, y: aParsed.y },
+      { x: bParsed.x, y: bParsed.y },
+      { triggerRender: false },
+    );
+    latestRotations.RA = { x: aParsed.x, y: aParsed.y };
+    latestRotations.RB = { x: bParsed.x, y: bParsed.y };
+    rotationLastSerialized.RA = formatComplexForQuery(aParsed.x, aParsed.y);
+    rotationLastSerialized.RB = formatComplexForQuery(bParsed.x, bParsed.y);
+  }
+}
+
+function handleTrackballChange(su2) {
+  if (!su2 || !su2.A || !su2.B) {
+    return;
+  }
+  latestRotations.RA = { x: su2.A.x, y: su2.A.y };
+  latestRotations.RB = { x: su2.B.x, y: su2.B.y };
+  trackballQuatForUI = { w: su2.A.x, z: su2.A.y, x: su2.B.x, y: su2.B.y };
+  drawTrackballOverlay();
+
+  // Refresh solo UI values if visible.
+  for (const refresh of fingerSoloValueRefreshers || []) {
+    try {
+      refresh();
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  if (!suppressFingerQueryUpdates) {
+    const params = new URLSearchParams(window.location.search);
+    const ra = formatComplexForQuery(su2.A.x, su2.A.y);
+    const rb = formatComplexForQuery(su2.B.x, su2.B.y);
+    if (ra && ra !== rotationLastSerialized.RA) {
+      rotationLastSerialized.RA = ra;
+      params.set('RA', ra);
+    }
+    if (rb && rb !== rotationLastSerialized.RB) {
+      rotationLastSerialized.RB = rb;
+      params.set('RB', rb);
+    }
+    replaceUrlSearch(params);
+  }
+}
+
 function showError(msg) {
   if (fatalErrorActive) {
     return;
@@ -2130,22 +2389,24 @@ function analyzeFingerUsage(ast) {
     fixed: new Set(),
     dynamic: new Set(),
     w: new Set(),
+    rotation: new Set(),
   };
   const axisBuckets = new Map();
   if (!ast) {
     return { usage, axisConstraints: new Map() };
   }
   visitAst(ast, (node, meta) => {
-    if (node.kind !== 'FingerOffset') {
-      return;
+    if (node.kind === 'FingerOffset') {
+      const slot = node.slot;
+      const family = slot.startsWith('F') ? 'fixed' : slot.startsWith('D') ? 'dynamic' : 'w';
+      usage[family].add(slot);
+      const axisKind = resolveAxisContext(meta.parent, node);
+      const bucket = axisBuckets.get(slot) || new Set();
+      bucket.add(axisKind);
+      axisBuckets.set(slot, bucket);
+    } else if (node.kind === 'TrackballRotation') {
+      usage.rotation.add(node.slot === 'A' ? 'RA' : 'RB');
     }
-    const slot = node.slot;
-    const family = slot.startsWith('F') ? 'fixed' : slot.startsWith('D') ? 'dynamic' : 'w';
-    usage[family].add(slot);
-    const axisKind = resolveAxisContext(meta.parent, node);
-    const bucket = axisBuckets.get(slot) || new Set();
-    bucket.add(axisKind);
-    axisBuckets.set(slot, bucket);
   });
   const axisConstraints = new Map();
   axisBuckets.forEach((bucket, slot) => {
@@ -2174,6 +2435,7 @@ function resolveAxisContext(parent, node) {
 function deriveFingerState(analysis) {
   const fixedSlots = sortFingerLabels(Array.from(analysis.usage.fixed));
   const dynamicSlots = sortFingerLabels(Array.from(analysis.usage.dynamic));
+  const rotationSlots = sortSoloLabels(Array.from(analysis.usage.rotation || []));
   const usesW0 = analysis.usage.w.has('W0');
   const usesW2 = analysis.usage.w.has('W2');
   if (usesW0 && usesW2) {
@@ -2212,6 +2474,7 @@ function deriveFingerState(analysis) {
     fixedSlots,
     dynamicSlots,
     wSlots,
+    rotationSlots,
     axisConstraints,
   };
 }
@@ -2226,6 +2489,7 @@ function syncFingerUI() {
 function applyFingerState(state) {
   const previousActiveLabelSet =
     activeFingerState?.activeLabelSet instanceof Set ? new Set(activeFingerState.activeLabelSet) : new Set();
+  const previousHadRotation = Boolean((activeFingerState?.rotationSlots || []).length);
 
   const axisConstraints = state.axisConstraints instanceof Map ? state.axisConstraints : new Map();
   const allSlots = [
@@ -2239,15 +2503,21 @@ function applyFingerState(state) {
     fixedSlots: state.fixedSlots || [],
     dynamicSlots: state.dynamicSlots || [],
     wSlots: state.wSlots || [],
+    rotationSlots: state.rotationSlots || [],
     axisConstraints,
     allSlots,
     activeLabelSet: new Set(allSlots),
+    activeSoloLabelSet: new Set([...allSlots, ...(state.rotationSlots || [])]),
   };
+
+  if (!previousHadRotation && (activeFingerState.rotationSlots || []).length) {
+    applyTrackballValuesFromQuery();
+  }
 
   // Read solos from the URL and normalize to current active labels.
   const paramsForSolos = new URLSearchParams(window.location.search);
   const parsedSolos = parseSolosParam(paramsForSolos.get(SOLOS_PARAM));
-  soloLabelSet = new Set(Array.from(parsedSolos).filter((l) => activeFingerState.activeLabelSet.has(l)));
+  soloLabelSet = new Set(Array.from(parsedSolos).filter((l) => activeFingerState.activeSoloLabelSet.has(l)));
 
   let solosChanged = serializeSolosParam(parsedSolos) !== serializeSolosParam(soloLabelSet);
 
@@ -2255,8 +2525,11 @@ function applyFingerState(state) {
   // Do this only after the first apply, otherwise reloads would incorrectly
   // expand solos to include everything.
   if (hasAppliedFingerStateOnce && soloLabelSet.size > 0) {
-    for (const label of activeFingerState.activeLabelSet) {
-      if (!previousActiveLabelSet.has(label) && !soloLabelSet.has(label)) {
+    for (const label of activeFingerState.activeSoloLabelSet) {
+      if (
+        (!previousActiveLabelSet.has(label) && !soloLabelSet.has(label)) ||
+        (isRotationLabel(label) && !soloLabelSet.has(label) && !parsedSolos.has(label))
+      ) {
         soloLabelSet.add(label);
         solosChanged = true;
       }
@@ -2288,6 +2561,7 @@ function applyFingerState(state) {
   // Apply capture restrictions (and dot visibility) based on solos.
   applySoloFilterToRenderer();
   updateFingerSoloButtonText();
+  drawTrackballOverlay();
 
   // Keep the URL in sync with the *current formula's* active finger set.
   // When fingers disappear from the formula, we must remove both:
@@ -2301,6 +2575,16 @@ function applyFingerState(state) {
     animationSuffix: ANIMATION_SUFFIX,
     animationTimeParam: ANIMATION_TIME_PARAM,
   });
+
+  // Trackball params (RA/RB) are not regular finger labels, but still shareable.
+  if (!(activeFingerState.rotationSlots || []).includes('RA')) {
+    params.delete('RA');
+    rotationLastSerialized.RA = null;
+  }
+  if (!(activeFingerState.rotationSlots || []).includes('RB')) {
+    params.delete('RB');
+    rotationLastSerialized.RB = null;
+  }
 
   // Reset per-finger serialized cache for any now-inactive labels.
   Array.from(knownFingerLabels).forEach((label) => {
@@ -2322,6 +2606,28 @@ function applyFingerState(state) {
       params.set(label, serialized);
     } else {
       params.delete(label);
+    }
+  }
+
+  // Write trackball SU(2) values when present.
+  if ((activeFingerState.rotationSlots || []).includes('RA')) {
+    const latest = latestRotations.RA;
+    const serialized = formatComplexForQuery(latest.x, latest.y);
+    rotationLastSerialized.RA = serialized;
+    if (serialized) {
+      params.set('RA', serialized);
+    } else {
+      params.delete('RA');
+    }
+  }
+  if ((activeFingerState.rotationSlots || []).includes('RB')) {
+    const latest = latestRotations.RB;
+    const serialized = formatComplexForQuery(latest.x, latest.y);
+    rotationLastSerialized.RB = serialized;
+    if (serialized) {
+      params.set('RB', serialized);
+    } else {
+      params.delete('RB');
     }
   }
   replaceUrlSearch(params);
@@ -2446,6 +2752,16 @@ async function bootstrapReflexApplication() {
       ];
     ensureFingerSubscriptions(initialActiveLabels);
     applyFingerValuesFromQuery(initialActiveLabels);
+
+    if (trackballUnsubscribe) {
+      try {
+        trackballUnsubscribe();
+      } catch (_) {
+        // ignore
+      }
+    }
+    trackballUnsubscribe = reflexCore.onTrackballChange((su2) => handleTrackballChange(su2));
+    applyTrackballValuesFromQuery();
   }
 
   if (initialFingerState.mode !== 'invalid') {

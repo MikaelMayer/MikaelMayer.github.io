@@ -49,7 +49,8 @@ import {
   oo,
   If,
   FingerOffset,
-  DeviceOrientation,
+  DeviceRotation,
+  TrackballRotation,
   SetBindingNode,
   SetRef,
 } from './core-engine.mjs';
@@ -385,17 +386,22 @@ const fingerLiteralParser = createParser('FingerLiteral', (input) => {
   withSyntax(withSpan(FingerOffset(label), result.span), label),
 );
 
-const deviceOrientationPrimitiveParser = Choice([
-  keywordLiteral('RX', { ctor: 'DeviceRX', caseSensitive: false }).Map((token, result) =>
-    attachIdentifierMeta(withSyntax(withSpan(DeviceOrientation('RX'), result.span), token.text), token),
+const su2RotationPrimitiveParser = Choice([
+  // Device (relative) SU(2) rotation (QA/QB)
+  keywordLiteral('QA', { ctor: 'DeviceQA', caseSensitive: false }).Map((token, result) =>
+    attachIdentifierMeta(withSyntax(withSpan(DeviceRotation('A'), result.span), token.text), token),
   ),
-  keywordLiteral('RY', { ctor: 'DeviceRY', caseSensitive: false }).Map((token, result) =>
-    attachIdentifierMeta(withSyntax(withSpan(DeviceOrientation('RY'), result.span), token.text), token),
+  keywordLiteral('QB', { ctor: 'DeviceQB', caseSensitive: false }).Map((token, result) =>
+    attachIdentifierMeta(withSyntax(withSpan(DeviceRotation('B'), result.span), token.text), token),
   ),
-  keywordLiteral('RZ', { ctor: 'DeviceRZ', caseSensitive: false }).Map((token, result) =>
-    attachIdentifierMeta(withSyntax(withSpan(DeviceOrientation('RZ'), result.span), token.text), token),
+  // Trackball (draggable) SU(2) rotation (RA/RB)
+  keywordLiteral('RA', { ctor: 'TrackballRA', caseSensitive: false }).Map((token, result) =>
+    attachIdentifierMeta(withSyntax(withSpan(TrackballRotation('A'), result.span), token.text), token),
   ),
-], { ctor: 'DeviceOrientationPrimitive' });
+  keywordLiteral('RB', { ctor: 'TrackballRB', caseSensitive: false }).Map((token, result) =>
+    attachIdentifierMeta(withSyntax(withSpan(TrackballRotation('B'), result.span), token.text), token),
+  ),
+], { ctor: 'SU2RotationPrimitive' });
 
 const RESERVED_BINDING_NAMES = new Set([
   'set',
@@ -430,12 +436,14 @@ const RESERVED_BINDING_NAMES = new Set([
   'real',
   'imag',
   'z',
-  'RX',
-  'RY',
-  'RZ',
-  'rx',
-  'ry',
-  'rz',
+  'QA',
+  'QB',
+  'RA',
+  'RB',
+  'qa',
+  'qb',
+  'ra',
+  'rb',
   'j',
   ITERATION_VARIABLE_NAME,
 ]);
@@ -505,7 +513,7 @@ const primitiveParser = Choice([
   keywordLiteral('z', { ctor: 'VarZ' }).Map((token, result) =>
     attachIdentifierMeta(withSpan(VarZ(), result.span), token),
   ),
-  deviceOrientationPrimitiveParser,
+  su2RotationPrimitiveParser,
   fingerLiteralParser,
   iterationVariableLiteral,
   identifierReferenceParser,
@@ -1164,7 +1172,8 @@ function substitutePlaceholder(node, placeholder, replacement) {
     case 'VarX':
     case 'VarY':
     case 'FingerOffset':
-    case 'DeviceOrientation':
+    case 'DeviceRotation':
+    case 'TrackballRotation':
     case 'Identifier':
     case 'SetRef':
       return cloneAst(node);
@@ -1267,7 +1276,8 @@ function cloneAst(node) {
     case 'VarX':
     case 'VarY':
     case 'FingerOffset':
-    case 'DeviceOrientation':
+    case 'DeviceRotation':
+    case 'TrackballRotation':
     case 'PlaceholderVar':
     case 'Identifier':
     case 'SetRef':
@@ -1375,7 +1385,8 @@ function substituteIdentifierWithClone(node, targetName, replacement) {
     case 'VarX':
     case 'VarY':
     case 'FingerOffset':
-    case 'DeviceOrientation':
+    case 'DeviceRotation':
+    case 'TrackballRotation':
     case 'PlaceholderVar':
     case 'SetRef':
       return cloneAst(node);
@@ -1737,7 +1748,8 @@ function resolveSetReferences(ast, input) {
       case 'VarX':
       case 'VarY':
       case 'FingerOffset':
-      case 'DeviceOrientation':
+      case 'DeviceRotation':
+      case 'TrackballRotation':
       case 'PlaceholderVar':
       case 'SetRef':
         return null;
@@ -2002,7 +2014,8 @@ function resolveRepeatPlaceholders(ast, parseOptions, input) {
       case 'VarX':
       case 'VarY':
       case 'FingerOffset':
-      case 'DeviceOrientation':
+      case 'DeviceRotation':
+      case 'TrackballRotation':
       case 'PlaceholderVar':
         return null;
       case 'Pow':
@@ -2182,8 +2195,9 @@ function evaluateConstantNode(node, context, scope = {}, localBindings = []) {
       return { re: node.re, im: node.im };
     case 'FingerOffset':
       return getFingerValueFromContext(node.slot, context.fingerValues);
-    case 'DeviceOrientation':
-      // Orientation values are runtime-provided and are not constant-folded.
+    case 'DeviceRotation':
+    case 'TrackballRotation':
+      // Rotation values are runtime-provided and are not constant-folded.
       return null;
     case 'Var':
       return scope.z ? { re: scope.z.re, im: scope.z.im } : null;

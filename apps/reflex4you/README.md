@@ -53,20 +53,50 @@ Formulas can reference special complex constants that you edit directly on the c
 | `D0`, `D1`, `D2`, `D3` | Dynamic handles | Touch the handle closest to the complex point you want to move. (`D0` is supported as an alias of `D1`.) |
 | `W0`, `W1` | Workspace frame | Gestures update both values together. One finger pans; two fingers capture the full similarity transform (pan, zoom, rotate) so you can navigate like Google Maps. |
 
-### Device orientation (`RX`, `RY`, `RZ`)
+### 3D rotations via SU(2): device (`QA`/`QB`) + trackball (`RA`/`RB`)
 
-On devices that expose motion sensors, formulas can also read **live orientation angles** (in **radians**) via three read-only parameters:
+Reflex4You works in the complex plane, but many demos want **true 3D rotations** (e.g. rotating a function on the Riemann sphere). For that, the app exposes rotations as **SU(2) elements**: a pair of complex numbers \((A,B)\) with \(|A|^2 + |B|^2 = 1\).
 
-| Token | Meaning | Notes |
+| Token | Meaning | Serialized? |
 | --- | --- | --- |
-| `RY` | **Yaw / heading**: rotation around the vertical axis, measured **relative to the device heading when the app loaded**. This heading is computed against **north**, then zeroed at load time. | `RY = 0` at load. Turning left/right changes `RY`. |
-| `RX` | **Pitch**: rotation relative to the **horizontal** plane. | `RX = 0` means the phone is horizontal (lying flat). |
-| `RZ` | **Roll**: rotation of the phone around the screen-normal axis (“twist”). | `RZ = 0` at load. Twisting the phone changes `RZ`. |
+| `QA`, `QB` | **Device rotation** as a *relative* SU(2) element (baseline captured on the first valid sensor reading after load / permission). | No |
+| `RA`, `RB` | **Draggable trackball rotation** (two-finger gesture by default). | Yes (`RA=...&RB=...`) |
 
-Practical notes:
+Notes:
 
-- These parameters are **not draggable** and are **not serialized into the URL** (they’re sensor readings, not saved handles).
-- Availability depends on browser/device permissions (notably iOS Safari requires a user gesture to grant motion access). When unavailable, the angles behave like constants (typically `0`).
+- **Identity rotation** is `A = 1+0i`, `B = 0+0i` (so “zero rotation” is `(1, 0)`, not `(0, 0)`).
+- On iOS Safari, motion access requires a user gesture; the viewer requests permission on first touch.
+- `QA/QB` are never written to the URL. `RA/RB` *are* shareable, like other parameters.
+
+#### Rotate a complex sphere coordinate (Möbius action)
+
+Under stereographic projection, SU(2) acts by a Möbius transform. If your sphere coordinate is `u` (a complex number), then rotating by `(A,B)` is:
+
+```text
+u_rot = (A*u + B) / (-(B.conj)*u + A.conj)
+```
+
+(`A.conj` means `conj(A)` via dot-composition.)
+
+#### Compose two rotations (e.g. device ∘ trackball)
+
+If you want to combine device rotation `(QA,QB)` with trackball rotation `(RA,RB)`, form a composed pair `(A,B)`:
+
+```text
+set A = QA*RA - QB*(RB.conj) in
+set B = QA*RB + QB*(RA.conj) in
+...
+```
+
+Swap the order if you want trackball ∘ device instead.
+
+#### Recover yaw/pitch/roll (optional)
+
+If you really need Euler-style angles, derive them from `(A,B)` by first converting to a quaternion:
+
+- `w = A.x`, `z = A.y`, `x = B.x`, `y = B.y`
+
+Then apply your preferred yaw/pitch/roll convention. (Euler angles always have singularities; SU(2) is the recommended default.)
 
 Rules of thumb:
 
@@ -81,7 +111,7 @@ The input accepts succinct expressions with complex arithmetic, composition, and
 
 - **Variables:** `z`, `x`, `y`, `real`, `imag`.
 - **Finger tokens:** `F0`‑`F3`, `D0`‑`D3`, `W0`, `W1`.
-- **Device orientation:** `RX`, `RY`, `RZ` (live sensor angles, in radians).
+- **3D rotations (SU(2))**: `QA`, `QB` (device), `RA`, `RB` (trackball).
 - **Literals:** `1.25`, `-3.5`, `2+3i`, `0,1`, `i`, `-i`, `j` (for `-½ + √3/2 i`).
 - **Operators:** `+`, `-`, `*`, `/`, power (`^` with integer exponents), composition (`o(f, g)` or `f $ g`), repeated composition (`oo(f, n)` or `f $$ n`).
 - **Functions:** `exp`, `sin`, `cos`, `tan`, `atan`, `ln`, `sqrt`, `abs`/`modulus`, `floor`, `conj`, `heav`. `sqrt(z, k)` desugars to `exp(0.5 * ln(z, k))`, so the optional second argument shifts the log branch; `heav(x)` evaluates to `1` when `x > 0` and `0` otherwise.

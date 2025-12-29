@@ -261,21 +261,27 @@ test('parses W0 as a workspace finger primitive', () => {
   assert.equal(result.value.right.slot, 'W1');
 });
 
-test('parses device orientation primitives (RX/RY/RZ)', () => {
-  const result = parseFormulaInput('RX + RY + RZ');
+test('parses SU(2) rotation primitives (QA/QB/RA/RB)', () => {
+  const result = parseFormulaInput('QA + QB + RA + RB');
   assert.equal(result.ok, true);
-  assert.equal(result.value.kind, 'Add');
-  assert.equal(result.value.left.kind, 'Add');
-  assert.equal(result.value.left.left.kind, 'DeviceOrientation');
-  assert.equal(result.value.left.left.axis, 'RX');
-  assert.equal(result.value.left.right.kind, 'DeviceOrientation');
-  assert.equal(result.value.left.right.axis, 'RY');
-  assert.equal(result.value.right.kind, 'DeviceOrientation');
-  assert.equal(result.value.right.axis, 'RZ');
+  const seen = [];
+  (function walk(node) {
+    if (!node || typeof node !== 'object') return;
+    if (node.kind === 'DeviceRotation' || node.kind === 'TrackballRotation') {
+      seen.push(`${node.kind}:${node.slot}`);
+      return;
+    }
+    if (node.left) walk(node.left);
+    if (node.right) walk(node.right);
+  })(result.value);
+  assert.deepEqual(
+    seen.sort(),
+    ['DeviceRotation:A', 'DeviceRotation:B', 'TrackballRotation:A', 'TrackballRotation:B'].sort(),
+  );
 });
 
-test('rejects binding device orientation names with set', () => {
-  const result = parseFormulaInput('set RX = 1 in RX');
+test('rejects binding SU(2) rotation names with set', () => {
+  const result = parseFormulaInput('set QA = 1 in QA');
   assert.equal(result.ok, false);
   assert.match(result.message, /reserved identifier/i);
 });
