@@ -2685,12 +2685,10 @@ export class ReflexCore {
     const q0inv = quatConj(this._deviceRotationBaselineQuat);
     const qRel = quatNormalize(quatMultiply(q0inv, q));
 
-    // Coordinate convention adjustment:
-    // The browser's deviceorientation Euler angles are reported in a device-centric frame
-    // that doesn't always match our "screen-facing user" intuition. Empirically:
-    // - swap x/y to align tilt-left and tilt-up with sphere left/right and up/down
-    // - flip the mapped x sign so the x direction matches the y direction convention
-    const qMapped = { w: qRel.w, x: -qRel.y, y: qRel.x, z: qRel.z };
+    // Expose the relative rotation in the same screen-aligned basis as the trackball.
+    // (Any fixed quarter-turn basis tweaks should be handled consistently in the user's
+    // formula, not only for QA/QB.)
+    const qMapped = qRel;
 
     this._deviceSU2 = {
       A: { x: qMapped.w, y: qMapped.z }, // w + i z
