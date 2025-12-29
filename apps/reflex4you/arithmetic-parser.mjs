@@ -388,17 +388,17 @@ const fingerLiteralParser = createParser('FingerLiteral', (input) => {
 
 const su2RotationPrimitiveParser = Choice([
   // Device (relative) SU(2) rotation (QA/QB)
-  keywordLiteral('QA', { ctor: 'DeviceQA', caseSensitive: false }).Map((token, result) =>
+  keywordLiteral('QA', { ctor: 'DeviceQA', caseSensitive: true }).Map((token, result) =>
     attachIdentifierMeta(withSyntax(withSpan(DeviceRotation('A'), result.span), token.text), token),
   ),
-  keywordLiteral('QB', { ctor: 'DeviceQB', caseSensitive: false }).Map((token, result) =>
+  keywordLiteral('QB', { ctor: 'DeviceQB', caseSensitive: true }).Map((token, result) =>
     attachIdentifierMeta(withSyntax(withSpan(DeviceRotation('B'), result.span), token.text), token),
   ),
   // Trackball (draggable) SU(2) rotation (RA/RB)
-  keywordLiteral('RA', { ctor: 'TrackballRA', caseSensitive: false }).Map((token, result) =>
+  keywordLiteral('RA', { ctor: 'TrackballRA', caseSensitive: true }).Map((token, result) =>
     attachIdentifierMeta(withSyntax(withSpan(TrackballRotation('A'), result.span), token.text), token),
   ),
-  keywordLiteral('RB', { ctor: 'TrackballRB', caseSensitive: false }).Map((token, result) =>
+  keywordLiteral('RB', { ctor: 'TrackballRB', caseSensitive: true }).Map((token, result) =>
     attachIdentifierMeta(withSyntax(withSpan(TrackballRotation('B'), result.span), token.text), token),
   ),
 ], { ctor: 'SU2RotationPrimitive' });
@@ -440,10 +440,6 @@ const RESERVED_BINDING_NAMES = new Set([
   'QB',
   'RA',
   'RB',
-  'qa',
-  'qb',
-  'ra',
-  'rb',
   'j',
   ITERATION_VARIABLE_NAME,
 ]);
