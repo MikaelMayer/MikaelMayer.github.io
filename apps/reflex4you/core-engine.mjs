@@ -2845,8 +2845,8 @@ export class ReflexCore {
     // Dragging by one full screen width corresponds to ~one full turn.
     const k = (2 * Math.PI) / minDim;
 
-    const yaw = deltaX * k;     // left/right drag
-    const pitch = -deltaY * k;  // up/down drag (flip sign so "drag up" rotates up)
+    const yaw = deltaX * k;    // left/right drag
+    const pitch = deltaY * k;  // up/down drag (deltaY is already "screen-up positive")
 
     const qYaw = { w: Math.cos(yaw / 2), x: 0, y: Math.sin(yaw / 2), z: 0 };
     const qPitch = { w: Math.cos(pitch / 2), x: Math.sin(pitch / 2), y: 0, z: 0 };
