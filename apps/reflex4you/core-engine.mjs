@@ -2814,17 +2814,8 @@ export class ReflexCore {
     const twist = ang - gs.startTwist;
     const qTwist = { w: Math.cos(twist / 2), x: 0, y: 0, z: Math.sin(twist / 2) };
 
-    // The arcball delta is computed in a screen-centric frame (x=right, y=up).
-    // Map it into the app frame so that horizontal drags produce left/right rotations
-    // on the rendered sphere (matching QA/QB semantics).
     const deltaScreen = this.quatMultiply(qTwist, qArc);
-    const deltaApp = this.quatNormalize({
-      w: deltaScreen.w,
-      x: -deltaScreen.y,
-      y: deltaScreen.x,
-      z: deltaScreen.z,
-    });
-    const next = this.quatNormalize(this.quatMultiply(deltaApp, gs.startQuat));
+    const next = this.quatNormalize(this.quatMultiply(deltaScreen, gs.startQuat));
     this.setTrackballFromQuaternion(next);
   }
 
