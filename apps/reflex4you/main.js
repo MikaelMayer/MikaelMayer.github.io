@@ -132,10 +132,17 @@ function sortFingerLabels(labels) {
     .sort((a, b) => {
       const fa = fingerFamily(a);
       const fb = fingerFamily(b);
-      if (fa !== fb) {
-        // Keep fixed/dynamic ahead of workspace.
-        if (fa === 'w') return 1;
-        if (fb === 'w') return -1;
+      // Group by family: fixed (F*) first, then dynamic (D*), then workspace (W*).
+      const rank = (family) => {
+        if (family === 'fixed') return 0;
+        if (family === 'dynamic') return 1;
+        if (family === 'w') return 2;
+        return 3;
+      };
+      const ra = rank(fa);
+      const rb = rank(fb);
+      if (ra !== rb) {
+        return ra - rb;
       }
       return fingerIndex(a) - fingerIndex(b);
     });
@@ -650,7 +657,6 @@ function buildInlineFingerValueEditor(label) {
       Boolean(globalEffectiveTrackLabelSet?.has?.(label));
     const previewPlayingThis =
       Boolean(animated) &&
-      Boolean(previewController?.isPlaying?.()) &&
       Boolean(previewLabelSet && previewLabelSet.has(label));
     const playing = globalPlayingThis || previewPlayingThis;
     playBtn.textContent = playing ? '⏸' : '▶';
@@ -875,7 +881,11 @@ function buildInlineFingerValueEditor(label) {
     if (!interval) return;
     // If a global URL animation controller exists, this toggles participation
     // for this label (mute/unmute). Otherwise, it plays this label as a preview loop.
-    if (animationController || globalAllTrackLabelSet.has(label)) {
+    //
+    // Important: do NOT treat "has an interval in the URL" as "global playback is active".
+    // Users expect the per-parameter ▶ button to start playback immediately; global playback
+    // is controlled via the footer's "▶ Anim" button.
+    if (animationController) {
       const currentlyActive = globalEffectiveTrackLabelSet.has(label);
       setGlobalLabelMuted(label, currentlyActive);
       refresh();
@@ -887,9 +897,35 @@ function buildInlineFingerValueEditor(label) {
     refresh();
   });
 
+  // On some mobile browsers, focus transitions triggered by tapping a button can
+  // dispatch `focusout` with `relatedTarget === null`, which we previously treated
+  // as "focus left the editor" and closed it before the button's click handler ran.
+  // Track pointer interaction inside the editor so we don't prematurely close.
+  let suppressCloseOnFocusout = false;
+  wrap.addEventListener(
+    'pointerdown',
+    (event) => {
+      if (!wrap.contains(event.target)) {
+        return;
+      }
+      suppressCloseOnFocusout = true;
+      try {
+        window.setTimeout(() => {
+          suppressCloseOnFocusout = false;
+        }, 0);
+      } catch (_) {
+        suppressCloseOnFocusout = false;
+      }
+    },
+    true,
+  );
+
   // Close editor + push a single undo frame when focus leaves this control.
   wrap.addEventListener('focusout', (event) => {
     const next = event.relatedTarget;
+    if (!next && suppressCloseOnFocusout) {
+      return;
+    }
     if (next && wrap.contains(next)) {
       return;
     }
