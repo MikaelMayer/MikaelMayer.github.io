@@ -190,6 +190,12 @@ export function Atan(value) {
   return { kind: "Atan", value };
 }
 
+// arg(z, [k]): argument/phase of a complex number (returns a real angle as a complex with imag=0).
+// If k is provided, it is forwarded to ln(z, k) to control the branch cut (Arg = imag(ln)).
+export function Arg(value, branch = null) {
+  return { kind: "Arg", value, branch };
+}
+
 export function Asin(value) {
   return { kind: "Asin", value };
 }
@@ -271,6 +277,12 @@ function analyzeFingerUniformCounts(ast) {
       case "Conjugate":
       case "IsNaN":
         visit(node.value);
+        return;
+      case "Arg":
+        visit(node.value);
+        if (node.branch) {
+          visit(node.branch);
+        }
         return;
       case "Ln":
         visit(node.value);
@@ -467,6 +479,12 @@ function materializeComposeMultiples(ast) {
       case "IsNaN":
         visit(node.value, node, "value");
         return;
+      case "Arg":
+        visit(node.value, node, "value");
+        if (node.branch) {
+          visit(node.branch, node, "branch");
+        }
+        return;
       case "Ln":
         visit(node.value, node, "value");
         if (node.branch) {
@@ -573,6 +591,8 @@ function prepareAstForGpu(ast) {
       case 'Conjugate':
       case 'IsNaN':
         return { ...node, value: lower(node.value) };
+      case 'Arg':
+        return { ...node, value: lower(node.value), branch: node.branch ? lower(node.branch) : null };
       case 'Ln':
         return { ...node, value: lower(node.value), branch: node.branch ? lower(node.branch) : null };
       case 'Sub':
@@ -681,6 +701,7 @@ const formulaGlobals = Object.freeze({
   Cos,
   Tan,
   Atan,
+  Arg,
   Asin,
   Acos,
   Ln,
@@ -752,6 +773,12 @@ function assignNodeIds(ast) {
     case "Conjugate":
     case "IsNaN":
       assignNodeIds(ast.value);
+      return;
+    case "Arg":
+      assignNodeIds(ast.value);
+      if (ast.branch) {
+        assignNodeIds(ast.branch);
+      }
       return;
     case "Ln":
       assignNodeIds(ast.value);
@@ -834,6 +861,12 @@ function collectNodesPostOrder(ast, out) {
     case "Conjugate":
     case "IsNaN":
       collectNodesPostOrder(ast.value, out);
+      break;
+    case "Arg":
+      collectNodesPostOrder(ast.value, out);
+      if (ast.branch) {
+        collectNodesPostOrder(ast.branch, out);
+      }
       break;
     case "Ln":
       collectNodesPostOrder(ast.value, out);
@@ -1256,6 +1289,26 @@ vec2 ${name}(vec2 z) {
 vec2 ${name}(vec2 z) {
     vec2 v = ${valueName}(z);
     return c_atan(v);
+}`.trim();
+  }
+
+  if (ast.kind === "Arg") {
+    const valueName = functionName(ast.value);
+    if (ast.branch) {
+      const branchName = functionName(ast.branch);
+      return `
+vec2 ${name}(vec2 z) {
+    vec2 v = ${valueName}(z);
+    vec2 branchShift = ${branchName}(z);
+    vec2 lv = c_ln_branch(v, branchShift.x);
+    return vec2(lv.y, 0.0);
+}`.trim();
+    }
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 v = ${valueName}(z);
+    vec2 lv = c_ln(v);
+    return vec2(lv.y, 0.0);
 }`.trim();
   }
 

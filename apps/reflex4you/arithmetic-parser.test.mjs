@@ -151,6 +151,28 @@ test('parses tan and atan calls', () => {
   assert.equal(result.value.value.kind, 'Atan');
 });
 
+test('parses arg(z) and argument(z) calls', () => {
+  const argResult = parseFormulaInput('arg(z)');
+  assert.equal(argResult.ok, true);
+  assert.equal(argResult.value.kind, 'Arg');
+  assert.equal(argResult.value.value.kind, 'Var');
+  assert.equal(argResult.value.branch, null);
+
+  const argumentResult = parseFormulaInput('argument(z)');
+  assert.equal(argumentResult.ok, true);
+  assert.equal(argumentResult.value.kind, 'Arg');
+  assert.equal(argumentResult.value.value.kind, 'Var');
+  assert.equal(argumentResult.value.branch, null);
+});
+
+test('arg(z, k) forwards the branch argument (like ln)', () => {
+  const result = parseFormulaInput('arg(z, x + 1)');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Arg');
+  assert.equal(result.value.value.kind, 'Var');
+  assert.equal(result.value.branch.kind, 'Add');
+});
+
 test('parses arc trig aliases', () => {
   const asinResult = parseFormulaInput('asin(z)');
   assert.equal(asinResult.ok, true);
@@ -522,6 +544,30 @@ test('tracks syntax labels for axis primitives', () => {
   assert.equal(imagResult.ok, true);
   assert.equal(imagResult.value.kind, 'VarY');
   assert.equal(imagResult.value.syntaxLabel, 'imag');
+
+  const reResult = parseFormulaInput('re');
+  assert.equal(reResult.ok, true);
+  assert.equal(reResult.value.kind, 'VarX');
+  assert.equal(reResult.value.syntaxLabel, 're');
+
+  const imResult = parseFormulaInput('im');
+  assert.equal(imResult.ok, true);
+  assert.equal(imResult.value.kind, 'VarY');
+  assert.equal(imResult.value.syntaxLabel, 'im');
+});
+
+test('re(z) and im(z) behave like real(z) and imag(z)', () => {
+  const reCall = parseFormulaInput('re(z)');
+  assert.equal(reCall.ok, true);
+  assert.equal(reCall.value.kind, 'Compose');
+  assert.equal(reCall.value.f.kind, 'VarX');
+  assert.equal(reCall.value.g.kind, 'Var');
+
+  const imCall = parseFormulaInput('im(z)');
+  assert.equal(imCall.ok, true);
+  assert.equal(imCall.value.kind, 'Compose');
+  assert.equal(imCall.value.f.kind, 'VarY');
+  assert.equal(imCall.value.g.kind, 'Var');
 });
 
 test('explicit composition accepts built-in literals', () => {
