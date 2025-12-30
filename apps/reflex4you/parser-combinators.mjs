@@ -511,11 +511,59 @@ export function Regex(regex, { ctor = 'Regex', transform, allowEmpty = false } =
 }
 
 export function WS({ ctor = 'WS' } = {}) {
-  return Regex(/[ \t\r\n]*/y, { ctor, allowEmpty: true, transform: (match) => match[0] });
+  return createParser(ctor, (input) => {
+    let cursor = input;
+    while (true) {
+      // Consume normal whitespace.
+      while (true) {
+        const ch = cursor.peek();
+        if (ch === ' ' || ch === '\t' || ch === '\r' || ch === '\n') {
+          cursor = cursor.advance(1);
+          continue;
+        }
+        break;
+      }
+
+      // Consume single-line comments: `# ...` until end-of-line (or end-of-input).
+      // Comments are treated as whitespace and can appear wherever whitespace is allowed.
+      if (cursor.peek() === '#') {
+        cursor = cursor.advance(1);
+        while (true) {
+          const ch = cursor.peek();
+          if (ch == null || ch === '\n') {
+            break;
+          }
+          cursor = cursor.advance(1);
+        }
+        continue;
+      }
+
+      break;
+    }
+
+    const consumedLength = input.length - cursor.length;
+    const value = input.buffer.slice(input.start, input.start + consumedLength);
+    return makeSuccess(ctor, input, cursor, value);
+  });
 }
 
 export function WS1({ ctor = 'WS1' } = {}) {
-  return Regex(/[ \t\r\n]+/y, { ctor, allowEmpty: false, transform: (match) => match[0] });
+  return createParser(ctor, (input) => {
+    const result = WS({ ctor: `${ctor}:base` }).runNormalized(input);
+    if (!result.ok) {
+      return result;
+    }
+    if (!result.value || result.value.length === 0) {
+      return makeFailure({
+        ctor,
+        input,
+        message: 'Expected whitespace',
+        severity: ParseSeverity.recoverable,
+        expected: 'whitespace',
+      });
+    }
+    return makeSuccess(ctor, input, result.next, result.value);
+  });
 }
 
 export function lazy(factory, { ctor = 'Lazy' } = {}) {

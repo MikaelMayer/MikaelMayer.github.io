@@ -38,6 +38,26 @@ test('parses primitives z, x, y, F1', () => {
   assert.equal(add.right.slot, 'F1');
 });
 
+test('supports # single-line comments anywhere whitespace is allowed', () => {
+  const source = `# leading comment
+z# inline comment
++ 1 # trailing comment`;
+  const result = parseFormulaInput(source);
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Add');
+  assert.equal(result.value.left.kind, 'Var');
+  assert.equal(result.value.right.kind, 'Const');
+  assert.equal(result.value.right.re, 1);
+  assert.equal(result.value.right.im, 0);
+});
+
+test('treats comment-only input as empty', () => {
+  const result = parseFormulaInput(`# just a comment
+# another comment`);
+  assert.equal(result.ok, false);
+  assert.equal(result.message, 'Formula cannot be empty');
+});
+
 test('parses power operator with integer exponent', () => {
   const result = parseFormulaInput('z ^ 3');
   assert.equal(result.ok, true);

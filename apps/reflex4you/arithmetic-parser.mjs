@@ -2933,7 +2933,8 @@ expressionParser = createParser('Expression', (input) => {
 export function parseFormulaInput(input, options = {}) {
   const parseOptions = normalizeParseOptions(options);
   const normalized = ParserInput.from(input ?? '');
-  if (normalized.toString().trim().length === 0) {
+  const leading = WS({ ctor: 'LeadingWS' }).runNormalized(normalized);
+  if (leading.next.isEmpty()) {
     return new ParseFailure({
       ctor: 'Expression',
       message: 'Formula cannot be empty',
