@@ -49,6 +49,7 @@ async function expectNoRendererError(page) {
 }
 
 const SIMPLE_FORMULA = '(z - 1) * (z + 1)';
+const COMMENT_FORMULA = 'z # comment about z\n+ 1';
 const SEEDED_FORMULA = 'z + 2';
 const DYNAMIC_SET_FORMULA = 'set c = sin(z $ D1) in (1 - c + c * z) / (c + (1 - c) * z)';
 const FIXED_SET_FORMULA = 'set c = sin(z + F1) in (z - c) * (z + c)';
@@ -131,6 +132,31 @@ test('reflex4you updates formula query param after successful apply', async ({ p
   }
 
   await expect(textarea).toHaveValue(SIMPLE_FORMULA);
+});
+
+test('reflex4you preserves # comments in share URLs (not kept in AST, but encoded)', async ({ page }) => {
+  await page.goto('/index.html');
+  await waitForReflexReady(page);
+
+  const textarea = page.locator('#formula');
+  await expect(textarea).toBeVisible();
+
+  await textarea.fill(COMMENT_FORMULA);
+  await expectNoRendererError(page);
+
+  const params = await page.evaluate(() => {
+    const url = new URL(window.location.href);
+    return {
+      base64: url.searchParams.get('formulab64'),
+      legacy: url.searchParams.get('formula'),
+    };
+  });
+
+  if (params.base64) {
+    expect(decodeFormulab64(params.base64)).toBe(COMMENT_FORMULA);
+  } else {
+    expect(params.legacy).toBe(COMMENT_FORMULA);
+  }
 });
 
 test('undo restores the previous formula after an edit', async ({ page }) => {
