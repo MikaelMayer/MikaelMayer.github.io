@@ -26,6 +26,7 @@ const PRECACHE_URLS = [
   './formula.html',
   './explore.html',
   './manifest.json',
+  './orientation-lock.js',
   './icon-192.png',
   './icon-512.png',
   './Screenshot_20251213-082055.png',
@@ -240,10 +241,21 @@ self.addEventListener('fetch', (event) => {
   }
 
   const path = (url.pathname || '').toLowerCase();
+  const isManifest =
+    request.destination === 'manifest' ||
+    path.endsWith('/manifest.json') ||
+    path.endsWith('manifest.json');
   const isJsModule =
     request.destination === 'script' ||
     path.endsWith('.js') ||
     path.endsWith('.mjs');
+
+  // Manifest updates are important for install metadata (including orientation).
+  // Prefer network-first so updates take effect without "reinstall" friction.
+  if (isManifest) {
+    event.respondWith(networkFirst(request, { timeoutMs: 1500 }));
+    return;
+  }
 
   // For code assets, prefer network-first so PR previews update quickly even if a
   // previous service worker version is still controlling the scope.
