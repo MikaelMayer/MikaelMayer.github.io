@@ -37,7 +37,7 @@ import {
   Cos,
   Tan,
   Atan,
-  Atan2,
+  Arg,
   Asin,
   Acos,
   Ln,
@@ -172,6 +172,8 @@ const BUILTIN_FUNCTION_DEFINITIONS = [
   { name: 'tan', factory: Tan },
   { name: 'atan', factory: Atan },
   { name: 'arctan', factory: Atan },
+  { name: 'arg', factory: (value) => Arg(value, null) },
+  { name: 'argument', factory: (value) => Arg(value, null) },
   { name: 'asin', factory: Asin },
   { name: 'arcsin', factory: Asin },
   { name: 'acos', factory: Acos },
@@ -415,7 +417,8 @@ const RESERVED_BINDING_NAMES = new Set([
   'cos',
   'tan',
   'atan',
-  'atan2',
+  'arg',
+  'argument',
   'asin',
   'acos',
   'arcsin',
@@ -715,6 +718,51 @@ function createUnaryFunctionParsers(names, factory) {
   return names.map((name) => createUnaryFunctionParser(name, factory));
 }
 
+function createArgParser(name) {
+  return createParser(`${name}Call`, (input) => {
+    const keyword = keywordLiteral(name, { ctor: `${name}Keyword` }).runNormalized(input);
+    if (!keyword.ok) {
+      return keyword;
+    }
+    const open = wsLiteral('(', { ctor: `${name}Open` }).runNormalized(keyword.next);
+    if (!open.ok) {
+      return open;
+    }
+    const valueResult = expressionRef.runNormalized(open.next);
+    if (!valueResult.ok) {
+      return valueResult;
+    }
+
+    let cursor = valueResult.next;
+    let branchNode = null;
+    const comma = wsLiteral(',', { ctor: `${name}Comma` }).runNormalized(cursor);
+    if (comma.ok) {
+      const branchResult = expressionRef.runNormalized(comma.next);
+      if (!branchResult.ok) {
+        return branchResult;
+      }
+      branchNode = branchResult.value;
+      cursor = branchResult.next;
+    } else if (comma.severity === ParseSeverity.error) {
+      return comma;
+    }
+
+    const close = wsLiteral(')', { ctor: `${name}Close` }).runNormalized(cursor);
+    if (!close.ok) {
+      return close;
+    }
+
+    const span = spanBetween(input, close.next);
+    const node = withSyntax(withSpan(Arg(valueResult.value, branchNode), span), name);
+    return new ParseSuccess({
+      ctor: `${name}Call`,
+      value: attachIdentifierMeta(node, keyword.value),
+      span,
+      next: close.next,
+    });
+  });
+}
+
 const lnParser = createParser('LnCall', (input) => {
   const keyword = keywordLiteral('ln', { ctor: 'lnKeyword' }).runNormalized(input);
   if (!keyword.ok) {
@@ -799,7 +847,6 @@ const sqrtParser = createParser('SqrtCall', (input) => {
 const elementaryFunctionParser = Choice([
   createBinaryFunctionParser('ifnan', (value, fallback) => IfNaN(value, fallback)),
   createBinaryFunctionParser('iferror', (value, fallback) => IfNaN(value, fallback)),
-  createBinaryFunctionParser('atan2', (y, x) => Atan2(y, x)),
   ...createUnaryFunctionParsers(['exp'], Exp),
   ...createUnaryFunctionParsers(['sin'], Sin),
   ...createUnaryFunctionParsers(['cos'], Cos),
@@ -807,6 +854,8 @@ const elementaryFunctionParser = Choice([
   ...createUnaryFunctionParsers(['atan', 'arctan'], Atan),
   ...createUnaryFunctionParsers(['asin', 'arcsin'], Asin),
   ...createUnaryFunctionParsers(['acos', 'arccos'], Acos),
+  createArgParser('arg'),
+  createArgParser('argument'),
   lnParser,
   sqrtParser,
   ...createUnaryFunctionParsers(['abs', 'modulus'], Abs),
@@ -1189,7 +1238,6 @@ function substitutePlaceholder(node, placeholder, replacement) {
     case 'Cos':
     case 'Tan':
     case 'Atan':
-    case 'Atan2':
     case 'Asin':
     case 'Acos':
     case 'Abs':
@@ -1197,15 +1245,15 @@ function substitutePlaceholder(node, placeholder, replacement) {
     case 'Floor':
     case 'Conjugate':
     case 'IsNaN':
-      if (node.kind === 'Atan2') {
-        return {
-          ...node,
-          y: substitutePlaceholder(node.y, placeholder, replacement),
-          x: substitutePlaceholder(node.x, placeholder, replacement),
-        };
-      }
       return { ...node, value: substitutePlaceholder(node.value, placeholder, replacement) };
     case 'Ln': {
+      const nextValue = substitutePlaceholder(node.value, placeholder, replacement);
+      const nextBranch = node.branch
+        ? substitutePlaceholder(node.branch, placeholder, replacement)
+        : null;
+      return { ...node, value: nextValue, branch: nextBranch };
+    }
+    case 'Arg': {
       const nextValue = substitutePlaceholder(node.value, placeholder, replacement);
       const nextBranch = node.branch
         ? substitutePlaceholder(node.branch, placeholder, replacement)
@@ -1308,7 +1356,6 @@ function cloneAst(node) {
     case 'Cos':
     case 'Tan':
     case 'Atan':
-    case 'Atan2':
     case 'Asin':
     case 'Acos':
     case 'Abs':
@@ -1316,11 +1363,14 @@ function cloneAst(node) {
     case 'Floor':
     case 'Conjugate':
     case 'IsNaN':
-      if (node.kind === 'Atan2') {
-        return { ...node, y: cloneAst(node.y), x: cloneAst(node.x) };
-      }
       return { ...node, value: cloneAst(node.value) };
     case 'Ln':
+      return {
+        ...node,
+        value: cloneAst(node.value),
+        branch: node.branch ? cloneAst(node.branch) : null,
+      };
+    case 'Arg':
       return {
         ...node,
         value: cloneAst(node.value),
@@ -1420,7 +1470,6 @@ function substituteIdentifierWithClone(node, targetName, replacement) {
     case 'Cos':
     case 'Tan':
     case 'Atan':
-    case 'Atan2':
     case 'Asin':
     case 'Acos':
     case 'Abs':
@@ -1428,15 +1477,15 @@ function substituteIdentifierWithClone(node, targetName, replacement) {
     case 'Floor':
     case 'Conjugate':
     case 'IsNaN':
-      if (node.kind === 'Atan2') {
-        return {
-          ...node,
-          y: substituteIdentifierWithClone(node.y, targetName, replacement),
-          x: substituteIdentifierWithClone(node.x, targetName, replacement),
-        };
-      }
       return { ...node, value: substituteIdentifierWithClone(node.value, targetName, replacement) };
     case 'Ln': {
+      const nextValue = substituteIdentifierWithClone(node.value, targetName, replacement);
+      const nextBranch = node.branch
+        ? substituteIdentifierWithClone(node.branch, targetName, replacement)
+        : null;
+      return { ...node, value: nextValue, branch: nextBranch };
+    }
+    case 'Arg': {
       const nextValue = substituteIdentifierWithClone(node.value, targetName, replacement);
       const nextBranch = node.branch
         ? substituteIdentifierWithClone(node.branch, targetName, replacement)
@@ -1532,21 +1581,17 @@ function findFirstPlaceholderNode(ast) {
       case 'Cos':
       case 'Tan':
       case 'Atan':
-      case 'Atan2':
       case 'Asin':
       case 'Acos':
       case 'Ln':
+      case 'Arg':
       case 'Abs':
       case 'Abs2':
       case 'Floor':
       case 'Conjugate':
       case 'IsNaN':
-        if (node.kind === 'Atan2') {
-          stack.push(node.y, node.x);
-          break;
-        }
         stack.push(node.value);
-        if (node.kind === 'Ln' && node.branch) {
+        if ((node.kind === 'Ln' || node.kind === 'Arg') && node.branch) {
           stack.push(node.branch);
         }
         break;
@@ -1617,21 +1662,17 @@ function findFirstLetBinding(ast) {
       case 'Cos':
       case 'Tan':
       case 'Atan':
-      case 'Atan2':
       case 'Asin':
       case 'Acos':
       case 'Ln':
+      case 'Arg':
       case 'Abs':
       case 'Abs2':
       case 'Floor':
       case 'Conjugate':
       case 'IsNaN':
-        if (node.kind === 'Atan2') {
-          stack.push(node.y, node.x);
-          break;
-        }
         stack.push(node.value);
-        if (node.kind === 'Ln' && node.branch) {
+        if ((node.kind === 'Ln' || node.kind === 'Arg') && node.branch) {
           stack.push(node.branch);
         }
         break;
@@ -1789,21 +1830,26 @@ function resolveSetReferences(ast, input) {
       case 'Cos':
       case 'Tan':
       case 'Atan':
-      case 'Atan2':
       case 'Asin':
       case 'Acos':
+      case 'Arg':
       case 'Abs':
       case 'Abs2':
       case 'Conjugate':
       case 'Floor':
       case 'IsNaN':
-        if (node.kind === 'Atan2') {
-          const yErr = visit(node.y);
-          if (yErr) return yErr;
-          return visit(node.x);
-        }
         return visit(node.value);
       case 'Ln': {
+        const valueErr = visit(node.value);
+        if (valueErr) {
+          return valueErr;
+        }
+        if (node.branch) {
+          return visit(node.branch);
+        }
+        return null;
+      }
+      case 'Arg': {
         const valueErr = visit(node.value);
         if (valueErr) {
           return valueErr;
@@ -2075,21 +2121,26 @@ function resolveRepeatPlaceholders(ast, parseOptions, input) {
       case 'Cos':
       case 'Tan':
       case 'Atan':
-      case 'Atan2':
       case 'Asin':
       case 'Acos':
+      case 'Arg':
       case 'Abs':
       case 'Abs2':
       case 'Floor':
       case 'Conjugate':
       case 'IsNaN':
-        if (node.kind === 'Atan2') {
-          const yErr = visit(node.y, node, 'y');
-          if (yErr) return yErr;
-          return visit(node.x, node, 'x');
-        }
         return visit(node.value, node, 'value');
       case 'Ln': {
+        const valueErr = visit(node.value, node, 'value');
+        if (valueErr) {
+          return valueErr;
+        }
+        if (node.branch) {
+          return visit(node.branch, node, 'branch');
+        }
+        return null;
+      }
+      case 'Arg': {
         const valueErr = visit(node.value, node, 'value');
         if (valueErr) {
           return valueErr;
@@ -2317,17 +2368,6 @@ function evaluateConstantNode(node, context, scope = {}, localBindings = []) {
       const value = evaluateConstantNode(node.value, context, scope, localBindings);
       return value ? complexAtan(value) : null;
     }
-    case 'Atan2': {
-      const y = evaluateConstantNode(node.y, context, scope, localBindings);
-      if (!y) {
-        return null;
-      }
-      const x = evaluateConstantNode(node.x, context, scope, localBindings);
-      if (!x) {
-        return null;
-      }
-      return { re: Math.atan2(y.re, x.re), im: 0 };
-    }
     case 'Asin': {
       const value = evaluateConstantNode(node.value, context, scope, localBindings);
       return value ? complexAsin(value) : null;
@@ -2350,6 +2390,25 @@ function evaluateConstantNode(node, context, scope = {}, localBindings = []) {
         center = branchValue.re;
       }
       return complexLn(value, center);
+    }
+    case 'Arg': {
+      const value = evaluateConstantNode(node.value, context, scope, localBindings);
+      if (!value) {
+        return null;
+      }
+      let center = 0;
+      if (node.branch) {
+        const branchValue = evaluateConstantNode(node.branch, context, scope, localBindings);
+        if (!branchValue) {
+          return null;
+        }
+        center = branchValue.re;
+      }
+      const lnValue = complexLn(value, center);
+      if (!lnValue) {
+        return null;
+      }
+      return { re: lnValue.im, im: 0 };
     }
     case 'Abs': {
       const value = evaluateConstantNode(node.value, context, scope, localBindings);

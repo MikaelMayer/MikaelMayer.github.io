@@ -20,7 +20,7 @@ import {
   Cos,
   Tan,
   Atan,
-  Atan2,
+  Arg,
   Asin,
   Acos,
   Ln,
@@ -225,11 +225,14 @@ test('tan and atan nodes emit their helpers', () => {
   assert.match(fragment, /c_atan/);
 });
 
-test('atan2 nodes emit GLSL atan(y, x) on real parts', () => {
-  const ast = Atan2(VarY(), VarX());
-  const fragment = buildFragmentSourceFromAST(ast);
-  assert.match(fragment, /atan\(yv\.x, xv\.x\)/);
-  assert.match(fragment, /vec2\(angle, 0\.0\)/);
+test('Arg nodes emit imag(ln) and support branch shifts', () => {
+  const fragment = buildFragmentSourceFromAST(Arg(VarZ()));
+  assert.match(fragment, /vec2 lv = c_ln\(v\);/);
+  assert.match(fragment, /return vec2\(lv\.y, 0\.0\);/);
+
+  const fragmentWithBranch = buildFragmentSourceFromAST(Arg(VarZ(), VarX()));
+  assert.match(fragmentWithBranch, /c_ln_branch\(v, branchShift\.x\)/);
+  assert.match(fragmentWithBranch, /return vec2\(lv\.y, 0\.0\);/);
 });
 
 test('asin and acos nodes emit their helpers', () => {

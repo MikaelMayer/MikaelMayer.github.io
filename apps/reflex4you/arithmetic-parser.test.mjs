@@ -131,12 +131,26 @@ test('parses tan and atan calls', () => {
   assert.equal(result.value.value.kind, 'Atan');
 });
 
-test('parses atan2(y, x) calls', () => {
-  const result = parseFormulaInput('atan2(1, -1)');
+test('parses arg(z) and argument(z) calls', () => {
+  const argResult = parseFormulaInput('arg(z)');
+  assert.equal(argResult.ok, true);
+  assert.equal(argResult.value.kind, 'Arg');
+  assert.equal(argResult.value.value.kind, 'Var');
+  assert.equal(argResult.value.branch, null);
+
+  const argumentResult = parseFormulaInput('argument(z)');
+  assert.equal(argumentResult.ok, true);
+  assert.equal(argumentResult.value.kind, 'Arg');
+  assert.equal(argumentResult.value.value.kind, 'Var');
+  assert.equal(argumentResult.value.branch, null);
+});
+
+test('arg(z, k) forwards the branch argument (like ln)', () => {
+  const result = parseFormulaInput('arg(z, x + 1)');
   assert.equal(result.ok, true);
-  assert.equal(result.value.kind, 'Atan2');
-  assert.equal(result.value.y.kind, 'Const');
-  assert.equal(result.value.x.kind, 'Const');
+  assert.equal(result.value.kind, 'Arg');
+  assert.equal(result.value.value.kind, 'Var');
+  assert.equal(result.value.branch.kind, 'Add');
 });
 
 test('parses arc trig aliases', () => {

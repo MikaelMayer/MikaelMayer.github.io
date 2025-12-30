@@ -302,8 +302,22 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
       return `${identifierHighlights(node).length ? operatorNameWithMetadata('tan', identifierHighlights(node)) : '\\tan'}\\left(${nodeToLatex(node.value, 0, options)}\\right)`;
     case 'Atan':
       return `${identifierHighlights(node).length ? operatorNameWithMetadata('atan', identifierHighlights(node)) : '\\arctan'}\\left(${nodeToLatex(node.value, 0, options)}\\right)`;
-    case 'Atan2':
-      return functionCallLatex('atan2', [node.y, node.x], options, identifierHighlights(node));
+    case 'Arg': {
+      const value = nodeToLatex(node.value, 0, options);
+      const label = String(node.syntaxLabel || 'arg');
+      const meta = identifierHighlights(node);
+      const op =
+        meta.length
+          ? operatorNameWithMetadata(label, meta)
+          : label === 'arg'
+            ? '\\arg'
+            : `\\operatorname{${escapeLatexIdentifier(label)}}`;
+      if (node.branch) {
+        const branch = nodeToLatex(node.branch, 0, options);
+        return `${op}_{${branch}}\\left(${value}\\right)`;
+      }
+      return `${op}\\left(${value}\\right)`;
+    }
     case 'Asin':
       return `${identifierHighlights(node).length ? operatorNameWithMetadata('asin', identifierHighlights(node)) : '\\arcsin'}\\left(${nodeToLatex(node.value, 0, options)}\\right)`;
     case 'Acos':

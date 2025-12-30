@@ -190,9 +190,10 @@ export function Atan(value) {
   return { kind: "Atan", value };
 }
 
-// atan2(y, x): two-argument arctangent using real parts (matches JS Math.atan2 and GLSL atan(y, x)).
-export function Atan2(y, x) {
-  return { kind: "Atan2", y, x };
+// arg(z, [k]): argument/phase of a complex number (returns a real angle as a complex with imag=0).
+// If k is provided, it is forwarded to ln(z, k) to control the branch cut (Arg = imag(ln)).
+export function Arg(value, branch = null) {
+  return { kind: "Arg", value, branch };
 }
 
 export function Asin(value) {
@@ -268,7 +269,6 @@ function analyzeFingerUniformCounts(ast) {
       case "Cos":
       case "Tan":
       case "Atan":
-      case "Atan2":
       case "Asin":
       case "Acos":
       case "Abs":
@@ -276,12 +276,13 @@ function analyzeFingerUniformCounts(ast) {
       case "Floor":
       case "Conjugate":
       case "IsNaN":
-        if (node.kind === "Atan2") {
-          visit(node.y);
-          visit(node.x);
-          return;
-        }
         visit(node.value);
+        return;
+      case "Arg":
+        visit(node.value);
+        if (node.branch) {
+          visit(node.branch);
+        }
         return;
       case "Ln":
         visit(node.value);
@@ -469,7 +470,6 @@ function materializeComposeMultiples(ast) {
       case "Cos":
       case "Tan":
       case "Atan":
-      case "Atan2":
       case "Asin":
       case "Acos":
       case "Abs":
@@ -477,12 +477,13 @@ function materializeComposeMultiples(ast) {
       case "Floor":
       case "Conjugate":
       case "IsNaN":
-        if (node.kind === "Atan2") {
-          visit(node.y, node, "y");
-          visit(node.x, node, "x");
-          return;
-        }
         visit(node.value, node, "value");
+        return;
+      case "Arg":
+        visit(node.value, node, "value");
+        if (node.branch) {
+          visit(node.branch, node, "branch");
+        }
         return;
       case "Ln":
         visit(node.value, node, "value");
@@ -582,7 +583,6 @@ function prepareAstForGpu(ast) {
       case 'Cos':
       case 'Tan':
       case 'Atan':
-      case 'Atan2':
       case 'Asin':
       case 'Acos':
       case 'Abs':
@@ -590,10 +590,9 @@ function prepareAstForGpu(ast) {
       case 'Floor':
       case 'Conjugate':
       case 'IsNaN':
-        if (node.kind === 'Atan2') {
-          return { ...node, y: lower(node.y), x: lower(node.x) };
-        }
         return { ...node, value: lower(node.value) };
+      case 'Arg':
+        return { ...node, value: lower(node.value), branch: node.branch ? lower(node.branch) : null };
       case 'Ln':
         return { ...node, value: lower(node.value), branch: node.branch ? lower(node.branch) : null };
       case 'Sub':
@@ -702,7 +701,7 @@ const formulaGlobals = Object.freeze({
   Cos,
   Tan,
   Atan,
-  Atan2,
+  Arg,
   Asin,
   Acos,
   Ln,
@@ -766,7 +765,6 @@ function assignNodeIds(ast) {
     case "Cos":
     case "Tan":
     case "Atan":
-    case "Atan2":
     case "Asin":
     case "Acos":
     case "Abs":
@@ -774,12 +772,13 @@ function assignNodeIds(ast) {
     case "Floor":
     case "Conjugate":
     case "IsNaN":
-      if (ast.kind === "Atan2") {
-        assignNodeIds(ast.y);
-        assignNodeIds(ast.x);
-        return;
-      }
       assignNodeIds(ast.value);
+      return;
+    case "Arg":
+      assignNodeIds(ast.value);
+      if (ast.branch) {
+        assignNodeIds(ast.branch);
+      }
       return;
     case "Ln":
       assignNodeIds(ast.value);
@@ -854,7 +853,6 @@ function collectNodesPostOrder(ast, out) {
     case "Cos":
     case "Tan":
     case "Atan":
-    case "Atan2":
     case "Asin":
     case "Acos":
     case "Abs":
@@ -862,12 +860,13 @@ function collectNodesPostOrder(ast, out) {
     case "Floor":
     case "Conjugate":
     case "IsNaN":
-      if (ast.kind === "Atan2") {
-        collectNodesPostOrder(ast.y, out);
-        collectNodesPostOrder(ast.x, out);
-        break;
-      }
       collectNodesPostOrder(ast.value, out);
+      break;
+    case "Arg":
+      collectNodesPostOrder(ast.value, out);
+      if (ast.branch) {
+        collectNodesPostOrder(ast.branch, out);
+      }
       break;
     case "Ln":
       collectNodesPostOrder(ast.value, out);
@@ -1293,15 +1292,23 @@ vec2 ${name}(vec2 z) {
 }`.trim();
   }
 
-  if (ast.kind === "Atan2") {
-    const yName = functionName(ast.y);
-    const xName = functionName(ast.x);
+  if (ast.kind === "Arg") {
+    const valueName = functionName(ast.value);
+    if (ast.branch) {
+      const branchName = functionName(ast.branch);
+      return `
+vec2 ${name}(vec2 z) {
+    vec2 v = ${valueName}(z);
+    vec2 branchShift = ${branchName}(z);
+    vec2 lv = c_ln_branch(v, branchShift.x);
+    return vec2(lv.y, 0.0);
+}`.trim();
+    }
     return `
 vec2 ${name}(vec2 z) {
-    vec2 yv = ${yName}(z);
-    vec2 xv = ${xName}(z);
-    float angle = atan(yv.x, xv.x);
-    return vec2(angle, 0.0);
+    vec2 v = ${valueName}(z);
+    vec2 lv = c_ln(v);
+    return vec2(lv.y, 0.0);
 }`.trim();
   }
 
