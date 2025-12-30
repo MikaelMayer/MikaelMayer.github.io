@@ -44,6 +44,47 @@ const rootElement = typeof document !== 'undefined' ? document.documentElement :
 
 let fatalErrorActive = false;
 
+// Best-effort portrait lock:
+// - The real fix is the PWA manifest's `"orientation": "portrait"` (works when installed).
+// - Some browsers also allow a runtime lock, but usually only in installed/standalone mode
+//   and only after a user gesture. We try once and ignore failures.
+function setupPortraitOrientationLock() {
+  if (typeof window === 'undefined') return;
+  const screenOrientation = typeof screen !== 'undefined' ? screen.orientation : null;
+  const canLock =
+    screenOrientation && typeof screenOrientation.lock === 'function';
+  if (!canLock) return;
+
+  function isStandaloneDisplayMode() {
+    try {
+      return (
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(display-mode: standalone)').matches
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
+  async function lockOnce() {
+    if (!isStandaloneDisplayMode()) return;
+    try {
+      // "portrait" allows either portrait-primary or portrait-secondary (no landscape).
+      await screenOrientation.lock('portrait');
+    } catch (_) {
+      // Ignore (unsupported, denied, not allowed, etc.).
+    }
+  }
+
+  window.addEventListener('pointerdown', lockOnce, {
+    once: true,
+    capture: true,
+    passive: true,
+  });
+}
+
+setupPortraitOrientationLock();
+
 function setCompileOverlayVisible(visible, message = null) {
   if (!compileOverlay) {
     return;

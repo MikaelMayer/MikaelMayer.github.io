@@ -13,7 +13,7 @@
     "client_mode": ["navigate-existing", "auto"]
   },
   "handle_links": "preferred",
-  "orientation": "any",
+  "orientation": "portrait",
   "background_color": "#000000",
   "theme_color": "#000000",
   "categories": ["utilities", "education"],
