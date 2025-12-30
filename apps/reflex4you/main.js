@@ -57,7 +57,7 @@ function setCompileOverlayVisible(visible, message = null) {
 // Show a cold-start loading indicator by default; hide it once we have a first render.
 setCompileOverlayVisible(true, 'Loading…');
 
-const APP_VERSION = 28;
+const APP_VERSION = 29;
 const CONTEXT_LOSS_RELOAD_KEY = `reflex4you:contextLossReloaded:v${APP_VERSION}`;
 const RESUME_RELOAD_KEY = `reflex4you:resumeReloaded:v${APP_VERSION}`;
 const LAST_HIDDEN_AT_KEY = `reflex4you:lastHiddenAtMs:v${APP_VERSION}`;
@@ -4011,7 +4011,7 @@ function triggerImageDownload(url, filename, shouldRevoke) {
 
 if ('serviceWorker' in navigator) {
   // Version the SW script URL so updates can't get stuck behind a cached SW script.
-  const SW_URL = './service-worker.js?sw=28.15';
+  const SW_URL = './service-worker.js?sw=29.0';
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(SW_URL).then((registration) => {
       // Auto-activate updated workers so cache/version bumps take effect quickly.
