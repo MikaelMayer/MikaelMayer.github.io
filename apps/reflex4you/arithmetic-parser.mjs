@@ -438,6 +438,8 @@ const RESERVED_BINDING_NAMES = new Set([
   'o',
   'x',
   'y',
+  're',
+  'im',
   'real',
   'imag',
   'z',
@@ -503,6 +505,12 @@ const primitiveParser = Choice([
     attachIdentifierMeta(withSyntax(withSpan(VarX(), result.span), token.text), token),
   ),
   keywordLiteral('y', { ctor: 'VarY' }).Map((token, result) =>
+    attachIdentifierMeta(withSyntax(withSpan(VarY(), result.span), token.text), token),
+  ),
+  keywordLiteral('re', { ctor: 'VarRe' }).Map((token, result) =>
+    attachIdentifierMeta(withSyntax(withSpan(VarX(), result.span), token.text), token),
+  ),
+  keywordLiteral('im', { ctor: 'VarIm' }).Map((token, result) =>
     attachIdentifierMeta(withSyntax(withSpan(VarY(), result.span), token.text), token),
   ),
   keywordLiteral('real', { ctor: 'VarReal' }).Map((token, result) =>

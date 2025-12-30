@@ -524,6 +524,30 @@ test('tracks syntax labels for axis primitives', () => {
   assert.equal(imagResult.ok, true);
   assert.equal(imagResult.value.kind, 'VarY');
   assert.equal(imagResult.value.syntaxLabel, 'imag');
+
+  const reResult = parseFormulaInput('re');
+  assert.equal(reResult.ok, true);
+  assert.equal(reResult.value.kind, 'VarX');
+  assert.equal(reResult.value.syntaxLabel, 're');
+
+  const imResult = parseFormulaInput('im');
+  assert.equal(imResult.ok, true);
+  assert.equal(imResult.value.kind, 'VarY');
+  assert.equal(imResult.value.syntaxLabel, 'im');
+});
+
+test('re(z) and im(z) behave like real(z) and imag(z)', () => {
+  const reCall = parseFormulaInput('re(z)');
+  assert.equal(reCall.ok, true);
+  assert.equal(reCall.value.kind, 'Compose');
+  assert.equal(reCall.value.f.kind, 'VarX');
+  assert.equal(reCall.value.g.kind, 'Var');
+
+  const imCall = parseFormulaInput('im(z)');
+  assert.equal(imCall.ok, true);
+  assert.equal(imCall.value.kind, 'Compose');
+  assert.equal(imCall.value.f.kind, 'VarY');
+  assert.equal(imCall.value.g.kind, 'Var');
 });
 
 test('explicit composition accepts built-in literals', () => {
