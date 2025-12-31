@@ -1512,21 +1512,9 @@ float c_is_error(vec2 z) {
 }
 
 // Integer power helper used by Pow nodes.
-vec2 c_pow_int(vec2 base, int exp) {
-  // Reflex4You uses Pow only for small integer exponents (|exp| <= 10),
-  // so implement this without loops/bitwise ops for maximum WebGL2 driver compatibility.
-  // (Some mobile GLSL compilers are picky about dynamic loops even in unused functions.)
+vec2 c_pow_pos_int(vec2 base, int exp) {
+  // exp must be in [0..10]
   switch (exp) {
-    case -10: return c_inv(c_pow_int(base, 10));
-    case -9: return c_inv(c_pow_int(base, 9));
-    case -8: return c_inv(c_pow_int(base, 8));
-    case -7: return c_inv(c_pow_int(base, 7));
-    case -6: return c_inv(c_pow_int(base, 6));
-    case -5: return c_inv(c_pow_int(base, 5));
-    case -4: return c_inv(c_pow_int(base, 4));
-    case -3: return c_inv(c_pow_int(base, 3));
-    case -2: return c_inv(c_pow_int(base, 2));
-    case -1: return c_inv(base);
     case 0: return vec2(1.0, 0.0);
     case 1: return base;
     case 2: return c_mul(base, base);
@@ -1538,9 +1526,18 @@ vec2 c_pow_int(vec2 base, int exp) {
     case 8: { vec2 b2 = c_mul(base, base); vec2 b4 = c_mul(b2, b2); return c_mul(b4, b4); }
     case 9: { vec2 b2 = c_mul(base, base); vec2 b4 = c_mul(b2, b2); vec2 b8 = c_mul(b4, b4); return c_mul(b8, base); }
     case 10:{ vec2 b2 = c_mul(base, base); vec2 b4 = c_mul(b2, b2); vec2 b8 = c_mul(b4, b4); return c_mul(b8, b2); }
-    default:
-      return vec2(1e10, 1e10);
+    default: return vec2(1e10, 1e10);
   }
+}
+
+vec2 c_pow_int(vec2 base, int exp) {
+  // Reflex4You uses Pow only for small integer exponents (|exp| <= 10),
+  // so implement this without loops/bitwise ops/recursion for maximum WebGL2 driver compatibility.
+  if (exp < 0) {
+    int e = -exp; // safe for our exp range
+    return c_inv(c_pow_pos_int(base, e));
+  }
+  return c_pow_pos_int(base, exp);
 }
 
 /*FORMULA_FUNCS*/
