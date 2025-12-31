@@ -14,6 +14,14 @@ export function visitAst(root, visitor) {
     for (let i = children.length - 1; i >= 0; i -= 1) {
       const [childKey, childNode] = children[i];
       if (!childNode) continue;
+      if (Array.isArray(childNode)) {
+        for (let j = childNode.length - 1; j >= 0; j -= 1) {
+          const entry = childNode[j];
+          if (!entry) continue;
+          stack.push({ node: entry, parent: node, key: `${childKey}[${j}]` });
+        }
+        continue;
+      }
       stack.push({ node: childNode, parent: node, key: childKey });
     }
   }
@@ -104,9 +112,15 @@ export function childEntries(node) {
         ['value', node.value],
         ['body', node.body],
       ];
+    case 'Call':
+      return [
+        ['callee', node.callee],
+        ['args', Array.isArray(node.args) ? node.args : []],
+      ];
     case 'SetRef':
     case 'Identifier':
     case 'PlaceholderVar':
+    case 'ParamRef':
     case 'Const':
     case 'Var':
     case 'VarX':
@@ -151,7 +165,11 @@ export function cloneAst(root, { preserveBindings = true } = {}) {
     const cloned = { ...node };
     const entries = childEntries(node);
     for (const [key, child] of entries) {
-      cloned[key] = cloneNode(child);
+      if (Array.isArray(child)) {
+        cloned[key] = child.map((entry) => cloneNode(entry));
+      } else {
+        cloned[key] = cloneNode(child);
+      }
     }
 
     if (preserveBindings && cloned.kind === 'SetRef' && cloned.binding && bindingMap.has(cloned.binding)) {

@@ -542,14 +542,189 @@ function prepareAstForGpu(ast) {
   }
   const root = cloneAst(ast, { preserveBindings: true });
   const letStack = [];
+  let nextInternalBindingId = 0;
 
-  function lookupLet(name) {
+  function lookupLetEntry(name) {
     for (let i = letStack.length - 1; i >= 0; i -= 1) {
       if (letStack[i].name === name) {
-        return letStack[i].value;
+        return letStack[i];
       }
     }
     return null;
+  }
+
+  function createInternalSetBinding(valueExpr) {
+    const id = nextInternalBindingId++;
+    // Intentionally choose a name that users can't type accidentally (and that won't
+    // collide with typical set names). This is only used in the GPU AST.
+    const name = `__arg_${id}`;
+    return SetBindingNode(name, valueExpr, null);
+  }
+
+  function rewriteTemplateWithBindings(template, { paramBindingMap, zBinding }) {
+    const zRef = zBinding ? SetRef('z', zBinding) : null;
+
+    function rewrite(node) {
+      if (!node || typeof node !== 'object') {
+        return node;
+      }
+      switch (node.kind) {
+        case 'ParamRef': {
+          const binding = paramBindingMap.get(node.name);
+          if (!binding) {
+            return node;
+          }
+          const ref = SetRef(node.name, binding);
+          if (node.span) {
+            ref.span = node.span;
+            ref.input = node.input;
+          }
+          ref.__identifierMeta = node.__identifierMeta;
+          return ref;
+        }
+        case 'Var': {
+          if (node.name === 'z' && zRef) {
+            const ref = SetRef('z', zBinding);
+            if (node.span) {
+              ref.span = node.span;
+              ref.input = node.input;
+            }
+            ref.__identifierMeta = node.__identifierMeta;
+            return ref;
+          }
+          return node;
+        }
+        case 'VarX':
+        case 'VarY': {
+          if (!zRef) {
+            return node;
+          }
+          const composed = Compose(node, zRef);
+          if (node.span) {
+            composed.span = node.span;
+            composed.input = node.input;
+          }
+          return composed;
+        }
+        case 'Call':
+          return {
+            ...node,
+            callee: rewrite(node.callee),
+            args: Array.isArray(node.args) ? node.args.map((arg) => rewrite(arg)) : [],
+          };
+        case 'LetBinding':
+          return { ...node, value: rewrite(node.value), body: rewrite(node.body) };
+        case 'SetBinding':
+          // Preserve object identity so SetRef(binding) pointers remain valid.
+          node.value = rewrite(node.value);
+          node.body = rewrite(node.body);
+          return node;
+        case 'Pow':
+          return { ...node, base: rewrite(node.base) };
+        case 'Exp':
+        case 'Sin':
+        case 'Cos':
+        case 'Tan':
+        case 'Atan':
+        case 'Asin':
+        case 'Acos':
+        case 'Abs':
+        case 'Abs2':
+        case 'Floor':
+        case 'Conjugate':
+        case 'IsNaN':
+          return { ...node, value: rewrite(node.value) };
+        case 'Arg':
+        case 'Ln':
+          return { ...node, value: rewrite(node.value), branch: node.branch ? rewrite(node.branch) : null };
+        case 'Sub':
+        case 'Mul':
+        case 'Op':
+        case 'Add':
+        case 'Div':
+        case 'LessThan':
+        case 'GreaterThan':
+        case 'LessThanOrEqual':
+        case 'GreaterThanOrEqual':
+        case 'Equal':
+        case 'LogicalAnd':
+        case 'LogicalOr':
+          return { ...node, left: rewrite(node.left), right: rewrite(node.right) };
+        case 'Compose':
+          return { ...node, f: rewrite(node.f), g: rewrite(node.g) };
+        case 'ComposeMultiple':
+          return {
+            ...node,
+            base: rewrite(node.base),
+            countExpression: node.countExpression ? rewrite(node.countExpression) : null,
+          };
+        case 'If':
+          return {
+            ...node,
+            condition: rewrite(node.condition),
+            thenBranch: rewrite(node.thenBranch),
+            elseBranch: rewrite(node.elseBranch),
+          };
+        case 'IfNaN':
+          return { ...node, value: rewrite(node.value), fallback: rewrite(node.fallback) };
+        case 'RepeatComposePlaceholder':
+          return { ...node, base: rewrite(node.base), countExpression: rewrite(node.countExpression) };
+        case 'SetRef':
+        case 'Identifier':
+        case 'Const':
+        case 'FingerOffset':
+        case 'DeviceRotation':
+        case 'TrackballRotation':
+        case 'PlaceholderVar':
+          return node;
+        default:
+          return node;
+      }
+    }
+
+    return rewrite(template);
+  }
+
+  function expandLetCall(entry, callNode, args) {
+    const params = Array.isArray(entry.params) ? entry.params : [];
+    const k = params.length;
+    if (!Array.isArray(args)) {
+      throw new Error(`Invalid call args for ${entry.name}`);
+    }
+    if (!(args.length === k || args.length === k + 1)) {
+      throw new Error(`Function "${entry.name}" expects ${k} or ${k + 1} arguments, got ${args.length}`);
+    }
+    const zOverrideExpr = args.length === k + 1 ? args[args.length - 1] : null;
+    const paramArgs = args.slice(0, k);
+
+    // Create bindings up-front so SetRef nodes can point at stable identities.
+    const paramBindingMap = new Map();
+    for (let i = 0; i < k; i += 1) {
+      paramBindingMap.set(params[i], createInternalSetBinding(paramArgs[i]));
+    }
+    const zBinding = zOverrideExpr ? createInternalSetBinding(zOverrideExpr) : null;
+
+    const clonedTemplate = cloneAst(entry.value, { preserveBindings: true });
+    const rewrittenBody = rewriteTemplateWithBindings(clonedTemplate, { paramBindingMap, zBinding });
+
+    // Now stitch binding bodies from inside-out:
+    let current = rewrittenBody;
+    if (zBinding) {
+      zBinding.body = current;
+      current = zBinding;
+    }
+    for (let i = k - 1; i >= 0; i -= 1) {
+      const binding = paramBindingMap.get(params[i]);
+      binding.body = current;
+      current = binding;
+    }
+
+    // Preserve span metadata when present.
+    if (callNode?.span && current && typeof current === 'object') {
+      current.span = callNode.span;
+      current.input = callNode.input;
+    }
+    return current;
   }
 
   function lower(node) {
@@ -559,17 +734,39 @@ function prepareAstForGpu(ast) {
     switch (node.kind) {
       case 'LetBinding': {
         const valueLowered = lower(node.value);
-        letStack.push({ name: node.name, value: valueLowered });
+        letStack.push({ name: node.name, params: Array.isArray(node.params) ? node.params : [], value: valueLowered });
         const bodyLowered = lower(node.body);
         letStack.pop();
         return bodyLowered;
       }
       case 'Identifier': {
-        const resolved = lookupLet(node.name);
-        if (!resolved) {
+        const entry = lookupLetEntry(node.name);
+        if (!entry) {
           throw new Error(`Unresolved identifier during GPU lowering: ${node.name}`);
         }
-        return resolved;
+        if (Array.isArray(entry.params) && entry.params.length > 0) {
+          throw new Error(`Function "${node.name}" requires ${entry.params.length} extra argument(s)`);
+        }
+        return entry.value;
+      }
+      case 'Call': {
+        // Special-case: calling a let-bound function with extra parameters.
+        const callee = node.callee;
+        const rawArgs = Array.isArray(node.args) ? node.args : [];
+        if (callee && typeof callee === 'object' && callee.kind === 'Identifier') {
+          const entry = lookupLetEntry(callee.name);
+          if (entry) {
+            const loweredArgs = rawArgs.map((arg) => lower(arg));
+            const expanded = expandLetCall(entry, node, loweredArgs);
+            // After expansion, lower again to eliminate any nested calls/identifiers.
+            return lower(expanded);
+          }
+        }
+        // Generic call: only unary applications are allowed; they lower to composition.
+        if (rawArgs.length !== 1) {
+          throw new Error(`Only unary calls are supported here (got ${rawArgs.length} args)`);
+        }
+        return { kind: 'Compose', f: lower(node.callee), g: lower(rawArgs[0]) };
       }
       case 'SetBinding':
         // Preserve object identity so SetRef(binding) pointers remain valid.
@@ -640,6 +837,7 @@ function prepareAstForGpu(ast) {
       case 'TrackballRotation':
       case 'Const':
       case 'PlaceholderVar':
+      case 'ParamRef':
         return node;
       default:
         // If new node kinds are added, update this lowering function.
