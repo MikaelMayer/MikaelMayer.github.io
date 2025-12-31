@@ -261,6 +261,16 @@ function analyzeFingerUniformCounts(ast) {
       return;
     }
     switch (node.kind) {
+      case "Call":
+        visit(node.callee);
+        if (Array.isArray(node.args)) {
+          node.args.forEach((arg) => visit(arg));
+        }
+        return;
+      case "LetBinding":
+        visit(node.value);
+        visit(node.body);
+        return;
       case "Pow":
         visit(node.base);
         return;
@@ -341,6 +351,8 @@ function analyzeFingerUniformCounts(ast) {
         visit(node.body);
         return;
       case "SetRef":
+      case "ParamRef":
+      case "Identifier":
       case "Var":
       case "VarX":
       case "VarY":
@@ -532,320 +544,9 @@ function materializeComposeMultiples(ast) {
 }
 
 function prepareAstForGpu(ast) {
-  // Lower top-level let-bindings for GPU compilation only.
-  // Key goals:
-  // - Preserve the original AST for rendering/export (so `let ... in ...` remains visible).
-  // - Avoid "inlining" by cloning per reference: a `let`-bound function should compile as a shared subtree.
-  // - Keep `SetBinding` semantics intact (SetRef slots are preserved via cloneAst's preserveBindings).
-  if (!ast || typeof ast !== 'object') {
-    return ast;
-  }
-  const root = cloneAst(ast, { preserveBindings: true });
-  const letStack = [];
-  let nextInternalBindingId = 0;
-
-  function lookupLetEntry(name) {
-    for (let i = letStack.length - 1; i >= 0; i -= 1) {
-      if (letStack[i].name === name) {
-        return letStack[i];
-      }
-    }
-    return null;
-  }
-
-  function createInternalSetBinding(valueExpr) {
-    const id = nextInternalBindingId++;
-    // Intentionally choose a name that users can't type accidentally (and that won't
-    // collide with typical set names). This is only used in the GPU AST.
-    const name = `__arg_${id}`;
-    return SetBindingNode(name, valueExpr, null);
-  }
-
-  function rewriteTemplateWithBindings(template, { paramBindingMap, zBinding }) {
-    const zRef = zBinding ? SetRef('z', zBinding) : null;
-
-    function rewrite(node) {
-      if (!node || typeof node !== 'object') {
-        return node;
-      }
-      switch (node.kind) {
-        case 'ParamRef': {
-          const binding = paramBindingMap.get(node.name);
-          if (!binding) {
-            return node;
-          }
-          const ref = SetRef(node.name, binding);
-          if (node.span) {
-            ref.span = node.span;
-            ref.input = node.input;
-          }
-          ref.__identifierMeta = node.__identifierMeta;
-          return ref;
-        }
-        case 'Var': {
-          if (node.name === 'z' && zRef) {
-            const ref = SetRef('z', zBinding);
-            if (node.span) {
-              ref.span = node.span;
-              ref.input = node.input;
-            }
-            ref.__identifierMeta = node.__identifierMeta;
-            return ref;
-          }
-          return node;
-        }
-        case 'VarX':
-        case 'VarY': {
-          if (!zRef) {
-            return node;
-          }
-          const composed = Compose(node, zRef);
-          if (node.span) {
-            composed.span = node.span;
-            composed.input = node.input;
-          }
-          return composed;
-        }
-        case 'Call':
-          return {
-            ...node,
-            callee: rewrite(node.callee),
-            args: Array.isArray(node.args) ? node.args.map((arg) => rewrite(arg)) : [],
-          };
-        case 'LetBinding':
-          return { ...node, value: rewrite(node.value), body: rewrite(node.body) };
-        case 'SetBinding':
-          // Preserve object identity so SetRef(binding) pointers remain valid.
-          node.value = rewrite(node.value);
-          node.body = rewrite(node.body);
-          return node;
-        case 'Pow':
-          return { ...node, base: rewrite(node.base) };
-        case 'Exp':
-        case 'Sin':
-        case 'Cos':
-        case 'Tan':
-        case 'Atan':
-        case 'Asin':
-        case 'Acos':
-        case 'Abs':
-        case 'Abs2':
-        case 'Floor':
-        case 'Conjugate':
-        case 'IsNaN':
-          return { ...node, value: rewrite(node.value) };
-        case 'Arg':
-        case 'Ln':
-          return { ...node, value: rewrite(node.value), branch: node.branch ? rewrite(node.branch) : null };
-        case 'Sub':
-        case 'Mul':
-        case 'Op':
-        case 'Add':
-        case 'Div':
-        case 'LessThan':
-        case 'GreaterThan':
-        case 'LessThanOrEqual':
-        case 'GreaterThanOrEqual':
-        case 'Equal':
-        case 'LogicalAnd':
-        case 'LogicalOr':
-          return { ...node, left: rewrite(node.left), right: rewrite(node.right) };
-        case 'Compose':
-          return { ...node, f: rewrite(node.f), g: rewrite(node.g) };
-        case 'ComposeMultiple':
-          return {
-            ...node,
-            base: rewrite(node.base),
-            countExpression: node.countExpression ? rewrite(node.countExpression) : null,
-          };
-        case 'If':
-          return {
-            ...node,
-            condition: rewrite(node.condition),
-            thenBranch: rewrite(node.thenBranch),
-            elseBranch: rewrite(node.elseBranch),
-          };
-        case 'IfNaN':
-          return { ...node, value: rewrite(node.value), fallback: rewrite(node.fallback) };
-        case 'RepeatComposePlaceholder':
-          return { ...node, base: rewrite(node.base), countExpression: rewrite(node.countExpression) };
-        case 'SetRef':
-        case 'Identifier':
-        case 'Const':
-        case 'FingerOffset':
-        case 'DeviceRotation':
-        case 'TrackballRotation':
-        case 'PlaceholderVar':
-          return node;
-        default:
-          return node;
-      }
-    }
-
-    return rewrite(template);
-  }
-
-  function expandLetCall(entry, callNode, args) {
-    const params = Array.isArray(entry.params) ? entry.params : [];
-    const k = params.length;
-    if (!Array.isArray(args)) {
-      throw new Error(`Invalid call args for ${entry.name}`);
-    }
-    if (!(args.length === k || args.length === k + 1)) {
-      throw new Error(`Function "${entry.name}" expects ${k} or ${k + 1} arguments, got ${args.length}`);
-    }
-    const zOverrideExpr = args.length === k + 1 ? args[args.length - 1] : null;
-    const paramArgs = args.slice(0, k);
-
-    // Create bindings up-front so SetRef nodes can point at stable identities.
-    const paramBindingMap = new Map();
-    for (let i = 0; i < k; i += 1) {
-      paramBindingMap.set(params[i], createInternalSetBinding(paramArgs[i]));
-    }
-    const zBinding = zOverrideExpr ? createInternalSetBinding(zOverrideExpr) : null;
-
-    const clonedTemplate = cloneAst(entry.value, { preserveBindings: true });
-    const rewrittenBody = rewriteTemplateWithBindings(clonedTemplate, { paramBindingMap, zBinding });
-
-    // Now stitch binding bodies from inside-out:
-    let current = rewrittenBody;
-    if (zBinding) {
-      zBinding.body = current;
-      current = zBinding;
-    }
-    for (let i = k - 1; i >= 0; i -= 1) {
-      const binding = paramBindingMap.get(params[i]);
-      binding.body = current;
-      current = binding;
-    }
-
-    // Preserve span metadata when present.
-    if (callNode?.span && current && typeof current === 'object') {
-      current.span = callNode.span;
-      current.input = callNode.input;
-    }
-    return current;
-  }
-
-  function lower(node) {
-    if (!node || typeof node !== 'object') {
-      return node;
-    }
-    switch (node.kind) {
-      case 'LetBinding': {
-        const valueLowered = lower(node.value);
-        letStack.push({ name: node.name, params: Array.isArray(node.params) ? node.params : [], value: valueLowered });
-        const bodyLowered = lower(node.body);
-        letStack.pop();
-        return bodyLowered;
-      }
-      case 'Identifier': {
-        const entry = lookupLetEntry(node.name);
-        if (!entry) {
-          throw new Error(`Unresolved identifier during GPU lowering: ${node.name}`);
-        }
-        if (Array.isArray(entry.params) && entry.params.length > 0) {
-          throw new Error(`Function "${node.name}" requires ${entry.params.length} extra argument(s)`);
-        }
-        return entry.value;
-      }
-      case 'Call': {
-        // Special-case: calling a let-bound function with extra parameters.
-        const callee = node.callee;
-        const rawArgs = Array.isArray(node.args) ? node.args : [];
-        if (callee && typeof callee === 'object' && callee.kind === 'Identifier') {
-          const entry = lookupLetEntry(callee.name);
-          if (entry) {
-            const loweredArgs = rawArgs.map((arg) => lower(arg));
-            const expanded = expandLetCall(entry, node, loweredArgs);
-            // After expansion, lower again to eliminate any nested calls/identifiers.
-            return lower(expanded);
-          }
-        }
-        // Generic call: only unary applications are allowed; they lower to composition.
-        if (rawArgs.length !== 1) {
-          throw new Error(`Only unary calls are supported here (got ${rawArgs.length} args)`);
-        }
-        return { kind: 'Compose', f: lower(node.callee), g: lower(rawArgs[0]) };
-      }
-      case 'SetBinding':
-        // Preserve object identity so SetRef(binding) pointers remain valid.
-        node.value = lower(node.value);
-        node.body = lower(node.body);
-        return node;
-      case 'Pow':
-        return { ...node, base: lower(node.base) };
-      case 'Exp':
-      case 'Sin':
-      case 'Cos':
-      case 'Tan':
-      case 'Atan':
-      case 'Asin':
-      case 'Acos':
-      case 'Abs':
-      case 'Abs2':
-      case 'Floor':
-      case 'Conjugate':
-      case 'IsNaN':
-        return { ...node, value: lower(node.value) };
-      case 'Arg':
-        return { ...node, value: lower(node.value), branch: node.branch ? lower(node.branch) : null };
-      case 'Ln':
-        return { ...node, value: lower(node.value), branch: node.branch ? lower(node.branch) : null };
-      case 'Sub':
-      case 'Mul':
-      case 'Op':
-      case 'Add':
-      case 'Div':
-      case 'LessThan':
-      case 'GreaterThan':
-      case 'LessThanOrEqual':
-      case 'GreaterThanOrEqual':
-      case 'Equal':
-      case 'LogicalAnd':
-      case 'LogicalOr':
-        return { ...node, left: lower(node.left), right: lower(node.right) };
-      case 'Compose':
-        return { ...node, f: lower(node.f), g: lower(node.g) };
-      case 'ComposeMultiple':
-        return {
-          ...node,
-          base: lower(node.base),
-          countExpression: node.countExpression ? lower(node.countExpression) : null,
-        };
-      case 'If':
-        return {
-          ...node,
-          condition: lower(node.condition),
-          thenBranch: lower(node.thenBranch),
-          elseBranch: lower(node.elseBranch),
-        };
-      case 'IfNaN':
-        return { ...node, value: lower(node.value), fallback: lower(node.fallback) };
-      case 'RepeatComposePlaceholder':
-        return {
-          ...node,
-          base: lower(node.base),
-          countExpression: lower(node.countExpression),
-        };
-      case 'SetRef':
-      case 'Var':
-      case 'VarX':
-      case 'VarY':
-      case 'FingerOffset':
-      case 'DeviceRotation':
-      case 'TrackballRotation':
-      case 'Const':
-      case 'PlaceholderVar':
-      case 'ParamRef':
-        return node;
-      default:
-        // If new node kinds are added, update this lowering function.
-        throw new Error(`Unknown AST node kind in prepareAstForGpu: ${node.kind}`);
-    }
-  }
-
-  return lower(root);
+  // GPU compilation now does explicit environment passing (no global slots),
+  // so we only need a stable, non-mutating clone that preserves SetRef graphs.
+  return cloneAst(ast, { preserveBindings: true });
 }
 
 export function SetBindingNode(name, value, body) {
@@ -1810,11 +1511,35 @@ float c_is_error(vec2 z) {
   return (m > 1.0e10 || !(m <= 1.0e10)) ? 1.0 : 0.0;
 }
 
-/*NODE_FUNCS*/
-
-vec2 f(vec2 z) {
-  return /*TOP_FUNC*/(z);
+// Integer power helper used by Pow nodes.
+vec2 c_pow_int(vec2 base, int exp) {
+  if (exp == 0) {
+    return vec2(1.0, 0.0);
+  }
+  int e = exp;
+  vec2 b = base;
+  if (e < 0) {
+    // Avoid overflow on INT_MIN by early return (rare / unreachable for our parser).
+    if (e == -2147483648) {
+      return vec2(1e10, 1e10);
+    }
+    e = -e;
+    b = c_inv(b);
+  }
+  vec2 acc = vec2(1.0, 0.0);
+  while (e > 0) {
+    if ((e & 1) == 1) {
+      acc = c_mul(acc, b);
+    }
+    e = e >> 1;
+    if (e > 0) {
+      b = c_mul(b, b);
+    }
+  }
+  return acc;
 }
+
+/*FORMULA_FUNCS*/
 
 vec3 reflexColor(vec2 w) {
   float re = w.x;
@@ -1913,20 +1638,937 @@ export function buildFragmentSourceFromAST(ast) {
   return compileFormulaForGpu(ast).fragmentSource;
 }
 
+function formatFloatLiteral(value) {
+  if (!Number.isFinite(value)) {
+    return '0.0';
+  }
+  // Ensure we always print a decimal to avoid GLSL interpreting as int.
+  const normalized = Object.is(value, -0) ? 0 : value;
+  const text = String(normalized);
+  return text.includes('.') || text.includes('e') || text.includes('E') ? text : `${text}.0`;
+}
+
+function formatVec2Literal(re, im) {
+  return `vec2(${formatFloatLiteral(re)}, ${formatFloatLiteral(im)})`;
+}
+
+function compileFormulaFunctionsSSA(rootAst) {
+  const letInfoByBinding = new Map(); // LetBinding node -> { glslName, params, captures, compiled, source }
+  let nextLetId = 0;
+
+  function nextLetGlslName() {
+    const id = nextLetId++;
+    return `let_fn_${id}`;
+  }
+
+  function resolveLetBindingByName(name, letStack) {
+    const target = String(name || '');
+    for (let i = (letStack?.length || 0) - 1; i >= 0; i -= 1) {
+      const entry = letStack[i];
+      if (entry && typeof entry === 'object' && entry.kind === 'LetBinding' && entry.name === target) {
+        return entry;
+      }
+    }
+    return null;
+  }
+
+  function collectFreeValueVars(expr, boundParamNames = new Set(), boundSetBindings = new Set()) {
+    const freeParams = new Set();
+    const freeSets = new Set();
+
+    function walk(node, localParamNames, localSetBindings) {
+      if (!node || typeof node !== 'object') {
+        return;
+      }
+      switch (node.kind) {
+        case 'ParamRef':
+          if (!localParamNames.has(node.name)) {
+            freeParams.add(node.name);
+          }
+          return;
+        case 'SetRef':
+          if (node.binding && !localSetBindings.has(node.binding)) {
+            freeSets.add(node.binding);
+          }
+          return;
+        case 'SetBinding': {
+          // value sees the current bindings, body sees the binding as in-scope
+          walk(node.value, localParamNames, localSetBindings);
+          const nextSetBindings = new Set(localSetBindings);
+          nextSetBindings.add(node);
+          walk(node.body, localParamNames, nextSetBindings);
+          return;
+        }
+        case 'LetBinding': {
+          // Only traverse the value and body; nested lets will be compiled separately,
+          // but their free variables must still be discovered.
+          const ownParams = Array.isArray(node.params) ? node.params : [];
+          const nextParamNames = new Set(localParamNames);
+          ownParams.forEach((p) => nextParamNames.add(p));
+          walk(node.value, nextParamNames, localSetBindings);
+          walk(node.body, localParamNames, localSetBindings);
+          return;
+        }
+        case 'Call':
+          walk(node.callee, localParamNames, localSetBindings);
+          if (Array.isArray(node.args)) {
+            node.args.forEach((arg) => walk(arg, localParamNames, localSetBindings));
+          }
+          return;
+        case 'Pow':
+          walk(node.base, localParamNames, localSetBindings);
+          return;
+        case 'Exp':
+        case 'Sin':
+        case 'Cos':
+        case 'Tan':
+        case 'Atan':
+        case 'Asin':
+        case 'Acos':
+        case 'Abs':
+        case 'Abs2':
+        case 'Floor':
+        case 'Conjugate':
+        case 'IsNaN':
+          walk(node.value, localParamNames, localSetBindings);
+          return;
+        case 'Ln':
+        case 'Arg':
+          walk(node.value, localParamNames, localSetBindings);
+          if (node.branch) {
+            walk(node.branch, localParamNames, localSetBindings);
+          }
+          return;
+        case 'Sub':
+        case 'Mul':
+        case 'Op':
+        case 'Add':
+        case 'Div':
+        case 'LessThan':
+        case 'GreaterThan':
+        case 'LessThanOrEqual':
+        case 'GreaterThanOrEqual':
+        case 'Equal':
+        case 'LogicalAnd':
+        case 'LogicalOr':
+        case 'Compose':
+          walk(node.left ?? node.f, localParamNames, localSetBindings);
+          walk(node.right ?? node.g, localParamNames, localSetBindings);
+          return;
+        case 'If':
+          walk(node.condition, localParamNames, localSetBindings);
+          walk(node.thenBranch, localParamNames, localSetBindings);
+          walk(node.elseBranch, localParamNames, localSetBindings);
+          return;
+        case 'IfNaN':
+          walk(node.value, localParamNames, localSetBindings);
+          walk(node.fallback, localParamNames, localSetBindings);
+          return;
+        case 'ComposeMultiple':
+          walk(node.base, localParamNames, localSetBindings);
+          if (node.countExpression) {
+            walk(node.countExpression, localParamNames, localSetBindings);
+          }
+          return;
+        case 'RepeatComposePlaceholder':
+          walk(node.base, localParamNames, localSetBindings);
+          if (node.countExpression) {
+            walk(node.countExpression, localParamNames, localSetBindings);
+          }
+          return;
+        default:
+          return;
+      }
+    }
+
+    const initialParamNames = new Set(boundParamNames);
+    const initialSetBindings = new Set(boundSetBindings);
+    walk(expr, initialParamNames, initialSetBindings);
+    return { freeParams, freeSets };
+  }
+
+  function createEmitter({ indent = '  ' } = {}) {
+    return {
+      indent,
+      tempIndex: 0,
+      lines: [],
+      push(line) {
+        this.lines.push(line);
+      },
+      freshTemp(prefix = 't') {
+        const name = `_${prefix}${this.tempIndex++}`;
+        return name;
+      },
+    };
+  }
+
+  function uniformExprForFinger(slot) {
+    const label = String(slot || '');
+    const index = fingerIndexFromLabel(label);
+    if (label[0] === 'F') {
+      return `u_fixedOffsets[${index}]`;
+    }
+    if (label[0] === 'D') {
+      return `u_dynamicOffsets[${index}]`;
+    }
+    // W0 maps to the W2 uniform slot (index 1).
+    return `u_wOffsets[${index}]`;
+  }
+
+  function ensureLetCompiled(letNode, definingEnv, definingLetStack) {
+    if (!letNode || typeof letNode !== 'object' || letNode.kind !== 'LetBinding') {
+      throw new Error('ensureLetCompiled expects a LetBinding node');
+    }
+    let info = letInfoByBinding.get(letNode);
+    if (!info) {
+      info = {
+        glslName: nextLetGlslName(),
+        params: Array.isArray(letNode.params) ? letNode.params : [],
+        captures: [],
+        compiled: false,
+        source: '',
+      };
+      letInfoByBinding.set(letNode, info);
+    }
+    if (info.compiled) {
+      return info;
+    }
+
+    const boundParams = new Set(info.params);
+    const { freeParams, freeSets } = collectFreeValueVars(letNode.value, boundParams, new Set());
+
+    // Deterministic capture ordering:
+    // - captured params (sorted)
+    // - captured set bindings (stable by insertion order in the Set of objects -> sort by name as best-effort)
+    const capturedParams = Array.from(freeParams).sort();
+    const capturedSets = Array.from(freeSets).sort((a, b) => {
+      const an = String(a?.name || '');
+      const bn = String(b?.name || '');
+      return an.localeCompare(bn);
+    });
+
+    info.captures = [
+      ...capturedParams.map((name) => ({ kind: 'param', name })),
+      ...capturedSets.map((binding) => ({ kind: 'set', binding })),
+    ];
+
+    const emitter = createEmitter();
+    const glslParams = [];
+    glslParams.push('vec2 z');
+    const paramNameToVar = new Map();
+    info.params.forEach((p) => {
+      const v = `p_${p}`;
+      glslParams.push(`vec2 ${v}`);
+      paramNameToVar.set(p, v);
+    });
+    const captureKeyToVar = new Map();
+    info.captures.forEach((cap, idx) => {
+      if (cap.kind === 'param') {
+        const v = `cap_p_${cap.name}`;
+        glslParams.push(`vec2 ${v}`);
+        captureKeyToVar.set(`param:${cap.name}`, v);
+        return;
+      }
+      const v = `cap_s_${idx}`;
+      glslParams.push(`vec2 ${v}`);
+      captureKeyToVar.set(`set:${idx}`, v);
+    });
+    info.glslParams = glslParams.slice();
+
+    const fnEnv = {
+      paramValues: new Map(),
+      setValues: new Map(),
+    };
+    // Own params.
+    paramNameToVar.forEach((v, k) => fnEnv.paramValues.set(k, v));
+    // Captured params.
+    info.captures.forEach((cap, idx) => {
+      if (cap.kind === 'param') {
+        fnEnv.paramValues.set(cap.name, captureKeyToVar.get(`param:${cap.name}`));
+      } else {
+        fnEnv.setValues.set(cap.binding, captureKeyToVar.get(`set:${idx}`));
+      }
+    });
+
+    function emitExpr(node, zVar, env, letStack, indentLevel = 1) {
+      const ind = emitter.indent.repeat(indentLevel);
+      if (!node || typeof node !== 'object') {
+        const t = emitter.freshTemp('c');
+        emitter.push(`${ind}vec2 ${t} = vec2(0.0, 0.0);`);
+        return t;
+      }
+
+      switch (node.kind) {
+        case 'Const': {
+          const t = emitter.freshTemp('c');
+          emitter.push(`${ind}vec2 ${t} = ${formatVec2Literal(node.re, node.im)};`);
+          return t;
+        }
+        case 'Var':
+          return zVar;
+        case 'VarX': {
+          const t = emitter.freshTemp('x');
+          emitter.push(`${ind}vec2 ${t} = vec2(${zVar}.x, 0.0);`);
+          return t;
+        }
+        case 'VarY': {
+          const t = emitter.freshTemp('y');
+          emitter.push(`${ind}vec2 ${t} = vec2(${zVar}.y, 0.0);`);
+          return t;
+        }
+        case 'FingerOffset': {
+          const t = emitter.freshTemp('f');
+          emitter.push(`${ind}vec2 ${t} = ${uniformExprForFinger(node.slot)};`);
+          return t;
+        }
+        case 'DeviceRotation': {
+          const uniform = node.slot === 'A' ? 'u_qA' : 'u_qB';
+          const t = emitter.freshTemp('q');
+          emitter.push(`${ind}vec2 ${t} = ${uniform};`);
+          return t;
+        }
+        case 'TrackballRotation': {
+          const uniform = node.slot === 'A' ? 'u_rA' : 'u_rB';
+          const t = emitter.freshTemp('r');
+          emitter.push(`${ind}vec2 ${t} = ${uniform};`);
+          return t;
+        }
+        case 'ParamRef': {
+          const v = env.paramValues.get(node.name);
+          if (!v) {
+            throw new Error(`Unresolved ParamRef during GPU compilation: ${node.name}`);
+          }
+          return v;
+        }
+        case 'SetRef': {
+          const v = env.setValues.get(node.binding);
+          if (!v) {
+            throw new Error(`Unresolved SetRef during GPU compilation: ${node.name}`);
+          }
+          return v;
+        }
+        case 'LetBinding': {
+          // Nested let inside a function body: compile it with the current env.
+          ensureLetCompiled(node, env, letStack);
+          const nextLetStack = Array.isArray(letStack) ? [...letStack, node] : [node];
+          return emitExpr(node.body, zVar, env, nextLetStack, indentLevel);
+        }
+        case 'Identifier': {
+          const binding = resolveLetBindingByName(node.name, letStack);
+          if (!binding) {
+            throw new Error(`Unresolved Identifier during GPU compilation: ${node.name}`);
+          }
+          const calleeInfo = ensureLetCompiled(binding, env, letStack);
+          if (calleeInfo.params.length > 0) {
+            throw new Error(`Function "${node.name}" requires ${calleeInfo.params.length} extra argument(s)`);
+          }
+          const argList = [];
+          argList.push(zVar);
+          calleeInfo.params.forEach(() => {});
+          calleeInfo.captures.forEach((cap) => {
+            if (cap.kind === 'param') {
+              const v = env.paramValues.get(cap.name);
+              if (!v) throw new Error(`Missing captured param "${cap.name}" for ${node.name}`);
+              argList.push(v);
+            } else {
+              const v = env.setValues.get(cap.binding);
+              if (!v) throw new Error(`Missing captured set "${cap.binding?.name || '?'}" for ${node.name}`);
+              argList.push(v);
+            }
+          });
+          const t = emitter.freshTemp('id');
+          emitter.push(`${ind}vec2 ${t} = ${calleeInfo.glslName}(${argList.join(', ')});`);
+          return t;
+        }
+        case 'Call': {
+          const args = Array.isArray(node.args) ? node.args : [];
+          // Multi-arg let call fast path.
+          if (node.callee && typeof node.callee === 'object' && node.callee.kind === 'Identifier') {
+            const binding = resolveLetBindingByName(node.callee.name, letStack);
+            if (binding) {
+              const calleeInfo = ensureLetCompiled(binding, env, letStack);
+            const k = calleeInfo.params.length;
+            if (!(args.length === k || args.length === k + 1)) {
+              throw new Error(`Function "${node.callee.name}" expects ${k} or ${k + 1} arguments, got ${args.length}`);
+            }
+            const argVars = [];
+            for (let i = 0; i < k; i += 1) {
+              argVars.push(emitExpr(args[i], zVar, env, letStack, indentLevel));
+            }
+            const zUsed = args.length === k + 1 ? emitExpr(args[args.length - 1], zVar, env, letStack, indentLevel) : zVar;
+            const callArgs = [zUsed, ...argVars];
+            calleeInfo.captures.forEach((cap) => {
+              if (cap.kind === 'param') {
+                const v = env.paramValues.get(cap.name);
+                if (!v) throw new Error(`Missing captured param "${cap.name}" for ${node.callee.name}`);
+                callArgs.push(v);
+              } else {
+                const v = env.setValues.get(cap.binding);
+                if (!v) throw new Error(`Missing captured set "${cap.binding?.name || '?'}" for ${node.callee.name}`);
+                callArgs.push(v);
+              }
+            });
+            const t = emitter.freshTemp('call');
+            emitter.push(`${ind}vec2 ${t} = ${calleeInfo.glslName}(${callArgs.join(', ')});`);
+            return t;
+            }
+          }
+          // Generic unary call: evaluate arg at caller z, then evaluate callee at z=arg.
+          if (args.length !== 1) {
+            throw new Error(`Only unary calls are supported here (got ${args.length} args)`);
+          }
+          const argVar = emitExpr(args[0], zVar, env, letStack, indentLevel);
+          return emitExpr(node.callee, argVar, env, letStack, indentLevel);
+        }
+        case 'Compose': {
+          const inner = emitExpr(node.g, zVar, env, letStack, indentLevel);
+          return emitExpr(node.f, inner, env, letStack, indentLevel);
+        }
+        case 'SetBinding': {
+          const valueVar = emitExpr(node.value, zVar, env, letStack, indentLevel);
+          const localName = emitter.freshTemp(`set_${node.name || 'v'}`);
+          emitter.push(`${ind}vec2 ${localName} = ${valueVar};`);
+          const nextEnv = { paramValues: env.paramValues, setValues: new Map(env.setValues) };
+          nextEnv.setValues.set(node, localName);
+          return emitExpr(node.body, zVar, nextEnv, letStack, indentLevel);
+        }
+        case 'Pow': {
+          const baseVar = emitExpr(node.base, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('pow');
+          emitter.push(`${ind}vec2 ${t} = c_pow_int(${baseVar}, ${Number(node.exponent) | 0});`);
+          return t;
+        }
+        case 'Add':
+        case 'Sub':
+        case 'Mul':
+        case 'Div': {
+          const left = emitExpr(node.left, zVar, env, letStack, indentLevel);
+          const right = emitExpr(node.right, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp(node.kind.toLowerCase());
+          const expr =
+            node.kind === 'Add'
+              ? `${left} + ${right}`
+              : node.kind === 'Sub'
+                ? `${left} - ${right}`
+                : node.kind === 'Mul'
+                  ? `c_mul(${left}, ${right})`
+                  : `c_div(${left}, ${right})`;
+          emitter.push(`${ind}vec2 ${t} = ${expr};`);
+          return t;
+        }
+        case 'LessThan':
+        case 'GreaterThan':
+        case 'LessThanOrEqual':
+        case 'GreaterThanOrEqual':
+        case 'Equal': {
+          const left = emitExpr(node.left, zVar, env, letStack, indentLevel);
+          const right = emitExpr(node.right, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('cmp');
+          const op =
+            node.kind === 'LessThan'
+              ? '<'
+              : node.kind === 'GreaterThan'
+                ? '>'
+                : node.kind === 'LessThanOrEqual'
+                  ? '<='
+                  : node.kind === 'GreaterThanOrEqual'
+                    ? '>='
+                    : '==';
+          emitter.push(`${ind}float ${t}_flag = ${left}.x ${op} ${right}.x ? 1.0 : 0.0;`);
+          emitter.push(`${ind}vec2 ${t} = vec2(${t}_flag, 0.0);`);
+          return t;
+        }
+        case 'LogicalAnd':
+        case 'LogicalOr': {
+          const left = emitExpr(node.left, zVar, env, letStack, indentLevel);
+          const right = emitExpr(node.right, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('log');
+          emitter.push(`${ind}bool ${t}_l = (${left}.x != 0.0 || ${left}.y != 0.0);`);
+          emitter.push(`${ind}bool ${t}_r = (${right}.x != 0.0 || ${right}.y != 0.0);`);
+          const expr = node.kind === 'LogicalAnd' ? `${t}_l && ${t}_r` : `${t}_l || ${t}_r`;
+          emitter.push(`${ind}vec2 ${t} = vec2((${expr}) ? 1.0 : 0.0, 0.0);`);
+          return t;
+        }
+        case 'Exp':
+        case 'Sin':
+        case 'Cos':
+        case 'Tan':
+        case 'Atan':
+        case 'Asin':
+        case 'Acos': {
+          const value = emitExpr(node.value, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp(node.kind.toLowerCase());
+          const fn =
+            node.kind === 'Exp'
+              ? 'c_exp'
+              : node.kind === 'Sin'
+                ? 'c_sin'
+                : node.kind === 'Cos'
+                  ? 'c_cos'
+                  : node.kind === 'Tan'
+                    ? 'c_tan'
+                    : node.kind === 'Atan'
+                      ? 'c_atan'
+                      : node.kind === 'Asin'
+                        ? 'c_asin'
+                        : 'c_acos';
+          emitter.push(`${ind}vec2 ${t} = ${fn}(${value});`);
+          return t;
+        }
+        case 'Ln': {
+          const value = emitExpr(node.value, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('ln');
+          if (node.branch) {
+            const branch = emitExpr(node.branch, zVar, env, letStack, indentLevel);
+            emitter.push(`${ind}vec2 ${t} = c_ln_branch(${value}, ${branch}.x);`);
+            return t;
+          }
+          emitter.push(`${ind}vec2 ${t} = c_ln(${value});`);
+          return t;
+        }
+        case 'Arg': {
+          const value = emitExpr(node.value, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('arg');
+          if (node.branch) {
+            const branch = emitExpr(node.branch, zVar, env, letStack, indentLevel);
+            emitter.push(`${ind}vec2 ${t}_ln = c_ln_branch(${value}, ${branch}.x);`);
+          } else {
+            emitter.push(`${ind}vec2 ${t}_ln = c_ln(${value});`);
+          }
+          emitter.push(`${ind}vec2 ${t} = vec2(${t}_ln.y, 0.0);`);
+          return t;
+        }
+        case 'Abs': {
+          const value = emitExpr(node.value, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('abs');
+          emitter.push(`${ind}vec2 ${t} = vec2(length(${value}), 0.0);`);
+          return t;
+        }
+        case 'Abs2': {
+          const value = emitExpr(node.value, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('abs2');
+          emitter.push(`${ind}vec2 ${t} = vec2(dot(${value}, ${value}), 0.0);`);
+          return t;
+        }
+        case 'Floor': {
+          const value = emitExpr(node.value, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('floor');
+          emitter.push(`${ind}vec2 ${t} = floor(${value});`);
+          return t;
+        }
+        case 'Conjugate': {
+          const value = emitExpr(node.value, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('conj');
+          emitter.push(`${ind}vec2 ${t} = vec2(${value}.x, -${value}.y);`);
+          return t;
+        }
+        case 'IsNaN': {
+          const value = emitExpr(node.value, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('isnan');
+          emitter.push(`${ind}vec2 ${t} = vec2(c_is_error(${value}), 0.0);`);
+          return t;
+        }
+        case 'If': {
+          const cond = emitExpr(node.condition, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('if');
+          emitter.push(`${ind}vec2 ${t};`);
+          emitter.push(`${ind}bool ${t}_sel = (${cond}.x != 0.0 || ${cond}.y != 0.0);`);
+          emitter.push(`${ind}if (${t}_sel) {`);
+          const thenEnv = { paramValues: env.paramValues, setValues: new Map(env.setValues) };
+          const thenValue = emitExpr(node.thenBranch, zVar, thenEnv, letStack, indentLevel + 1);
+          emitter.push(`${ind}${emitter.indent}${t} = ${thenValue};`);
+          emitter.push(`${ind}} else {`);
+          const elseEnv = { paramValues: env.paramValues, setValues: new Map(env.setValues) };
+          const elseValue = emitExpr(node.elseBranch, zVar, elseEnv, letStack, indentLevel + 1);
+          emitter.push(`${ind}${emitter.indent}${t} = ${elseValue};`);
+          emitter.push(`${ind}}`);
+          return t;
+        }
+        case 'IfNaN': {
+          const value = emitExpr(node.value, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('ifnan');
+          emitter.push(`${ind}vec2 ${t};`);
+          emitter.push(`${ind}float ${t}_flag = c_is_error(${value});`);
+          emitter.push(`${ind}if (${t}_flag > 0.5) {`);
+          const fbEnv = { paramValues: env.paramValues, setValues: new Map(env.setValues) };
+          const fallback = emitExpr(node.fallback, zVar, fbEnv, letStack, indentLevel + 1);
+          emitter.push(`${ind}${emitter.indent}${t} = ${fallback};`);
+          emitter.push(`${ind}} else {`);
+          emitter.push(`${ind}${emitter.indent}${t} = ${value};`);
+          emitter.push(`${ind}}`);
+          return t;
+        }
+        default: {
+          const t = emitter.freshTemp('u');
+          emitter.push(`${ind}vec2 ${t} = vec2(0.0, 0.0);`);
+          return t;
+        }
+      }
+    }
+
+    // Compile let body as a function.
+    emitter.push(`vec2 ${info.glslName}(${glslParams.join(', ')}) {`);
+    const resultVar = emitExpr(letNode.value, 'z', fnEnv, definingLetStack || [], 1);
+    emitter.push(`${emitter.indent}return ${resultVar};`);
+    emitter.push(`}`);
+
+    info.source = emitter.lines.join('\n');
+    info.compiled = true;
+    return info;
+  }
+
+  // Compile the top-level f(z).
+  const mainEmitter = createEmitter();
+  const topEnv = { paramValues: new Map(), setValues: new Map() };
+  const topLetStack = [];
+
+  // Emit f(z) by reusing the same expression emitter as above (with no params).
+  function emitTop(node) {
+    // Reuse ensureLetCompiled's internal emitter/emitExpr by compiling a synthetic let wrapper.
+    // We'll implement a tiny local emitter for the top-level instead.
+    const emitter = mainEmitter;
+
+    function emitExpr(node2, zVar, env, letStack, indentLevel = 1) {
+      // Delegate by creating a temporary fake let and using ensureLetCompiled's emitter is too messy;
+      // replicate the logic by calling ensureLetCompiled then inlining calls to its glslName.
+      const ind = emitter.indent.repeat(indentLevel);
+      if (!node2 || typeof node2 !== 'object') {
+        const t = emitter.freshTemp('c');
+        emitter.push(`${ind}vec2 ${t} = vec2(0.0, 0.0);`);
+        return t;
+      }
+
+      // The implementation mirrors the inner emitExpr above; keep in sync.
+      switch (node2.kind) {
+        case 'Const': {
+          const t = emitter.freshTemp('c');
+          emitter.push(`${ind}vec2 ${t} = ${formatVec2Literal(node2.re, node2.im)};`);
+          return t;
+        }
+        case 'Var':
+          return zVar;
+        case 'VarX': {
+          const t = emitter.freshTemp('x');
+          emitter.push(`${ind}vec2 ${t} = vec2(${zVar}.x, 0.0);`);
+          return t;
+        }
+        case 'VarY': {
+          const t = emitter.freshTemp('y');
+          emitter.push(`${ind}vec2 ${t} = vec2(${zVar}.y, 0.0);`);
+          return t;
+        }
+        case 'FingerOffset': {
+          const t = emitter.freshTemp('f');
+          emitter.push(`${ind}vec2 ${t} = ${uniformExprForFinger(node2.slot)};`);
+          return t;
+        }
+        case 'DeviceRotation': {
+          const uniform = node2.slot === 'A' ? 'u_qA' : 'u_qB';
+          const t = emitter.freshTemp('q');
+          emitter.push(`${ind}vec2 ${t} = ${uniform};`);
+          return t;
+        }
+        case 'TrackballRotation': {
+          const uniform = node2.slot === 'A' ? 'u_rA' : 'u_rB';
+          const t = emitter.freshTemp('r');
+          emitter.push(`${ind}vec2 ${t} = ${uniform};`);
+          return t;
+        }
+        case 'ParamRef': {
+          const v = env.paramValues.get(node2.name);
+          if (!v) throw new Error(`Unresolved ParamRef during GPU compilation: ${node2.name}`);
+          return v;
+        }
+        case 'SetRef': {
+          const v = env.setValues.get(node2.binding);
+          if (!v) throw new Error(`Unresolved SetRef during GPU compilation: ${node2.name}`);
+          return v;
+        }
+        case 'LetBinding': {
+          ensureLetCompiled(node2, env, letStack);
+          const nextLetStack = Array.isArray(letStack) ? [...letStack, node2] : [node2];
+          return emitExpr(node2.body, zVar, env, nextLetStack, indentLevel);
+        }
+        case 'Identifier': {
+          const binding = resolveLetBindingByName(node2.name, letStack);
+          if (!binding) throw new Error(`Unresolved Identifier during GPU compilation: ${node2.name}`);
+          const calleeInfo = ensureLetCompiled(binding, env, letStack);
+          if (calleeInfo.params.length > 0) {
+            throw new Error(`Function "${node2.name}" requires ${calleeInfo.params.length} extra argument(s)`);
+          }
+          const argList = [zVar];
+          calleeInfo.captures.forEach((cap) => {
+            if (cap.kind === 'param') {
+              const v = env.paramValues.get(cap.name);
+              if (!v) throw new Error(`Missing captured param "${cap.name}" for ${node2.name}`);
+              argList.push(v);
+            } else {
+              const v = env.setValues.get(cap.binding);
+              if (!v) throw new Error(`Missing captured set "${cap.binding?.name || '?'}" for ${node2.name}`);
+              argList.push(v);
+            }
+          });
+          const t = emitter.freshTemp('id');
+          emitter.push(`${ind}vec2 ${t} = ${calleeInfo.glslName}(${argList.join(', ')});`);
+          return t;
+        }
+        case 'Call': {
+          const args = Array.isArray(node2.args) ? node2.args : [];
+          if (node2.callee && typeof node2.callee === 'object' && node2.callee.kind === 'Identifier') {
+            const binding = resolveLetBindingByName(node2.callee.name, letStack);
+            if (binding) {
+              const calleeInfo = ensureLetCompiled(binding, env, letStack);
+            const k = calleeInfo.params.length;
+            if (!(args.length === k || args.length === k + 1)) {
+              throw new Error(`Function "${node2.callee.name}" expects ${k} or ${k + 1} arguments, got ${args.length}`);
+            }
+            const argVars = [];
+            for (let i = 0; i < k; i += 1) {
+                argVars.push(emitExpr(args[i], zVar, env, letStack, indentLevel));
+            }
+              const zUsed = args.length === k + 1 ? emitExpr(args[args.length - 1], zVar, env, letStack, indentLevel) : zVar;
+            const callArgs = [zUsed, ...argVars];
+            calleeInfo.captures.forEach((cap) => {
+              if (cap.kind === 'param') {
+                const v = env.paramValues.get(cap.name);
+                if (!v) throw new Error(`Missing captured param "${cap.name}" for ${node2.callee.name}`);
+                callArgs.push(v);
+              } else {
+                const v = env.setValues.get(cap.binding);
+                if (!v) throw new Error(`Missing captured set "${cap.binding?.name || '?'}" for ${node2.callee.name}`);
+                callArgs.push(v);
+              }
+            });
+            const t = emitter.freshTemp('call');
+            emitter.push(`${ind}vec2 ${t} = ${calleeInfo.glslName}(${callArgs.join(', ')});`);
+            return t;
+            }
+          }
+          if (args.length !== 1) throw new Error(`Only unary calls are supported here (got ${args.length} args)`);
+          const argVar = emitExpr(args[0], zVar, env, letStack, indentLevel);
+          return emitExpr(node2.callee, argVar, env, letStack, indentLevel);
+        }
+        case 'Compose': {
+          const inner = emitExpr(node2.g, zVar, env, letStack, indentLevel);
+          return emitExpr(node2.f, inner, env, letStack, indentLevel);
+        }
+        case 'SetBinding': {
+          const valueVar = emitExpr(node2.value, zVar, env, letStack, indentLevel);
+          const localName = emitter.freshTemp(`set_${node2.name || 'v'}`);
+          emitter.push(`${ind}vec2 ${localName} = ${valueVar};`);
+          const nextEnv = { paramValues: env.paramValues, setValues: new Map(env.setValues) };
+          nextEnv.setValues.set(node2, localName);
+          return emitExpr(node2.body, zVar, nextEnv, letStack, indentLevel);
+        }
+        case 'Pow': {
+          const baseVar = emitExpr(node2.base, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('pow');
+          emitter.push(`${ind}vec2 ${t} = c_pow_int(${baseVar}, ${Number(node2.exponent) | 0});`);
+          return t;
+        }
+        case 'Add':
+        case 'Sub':
+        case 'Mul':
+        case 'Div': {
+          const left = emitExpr(node2.left, zVar, env, letStack, indentLevel);
+          const right = emitExpr(node2.right, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp(node2.kind.toLowerCase());
+          const expr =
+            node2.kind === 'Add'
+              ? `${left} + ${right}`
+              : node2.kind === 'Sub'
+                ? `${left} - ${right}`
+                : node2.kind === 'Mul'
+                  ? `c_mul(${left}, ${right})`
+                  : `c_div(${left}, ${right})`;
+          emitter.push(`${ind}vec2 ${t} = ${expr};`);
+          return t;
+        }
+        case 'LessThan':
+        case 'GreaterThan':
+        case 'LessThanOrEqual':
+        case 'GreaterThanOrEqual':
+        case 'Equal': {
+          const left = emitExpr(node2.left, zVar, env, letStack, indentLevel);
+          const right = emitExpr(node2.right, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('cmp');
+          const op =
+            node2.kind === 'LessThan'
+              ? '<'
+              : node2.kind === 'GreaterThan'
+                ? '>'
+                : node2.kind === 'LessThanOrEqual'
+                  ? '<='
+                  : node2.kind === 'GreaterThanOrEqual'
+                    ? '>='
+                    : '==';
+          emitter.push(`${ind}float ${t}_flag = ${left}.x ${op} ${right}.x ? 1.0 : 0.0;`);
+          emitter.push(`${ind}vec2 ${t} = vec2(${t}_flag, 0.0);`);
+          return t;
+        }
+        case 'LogicalAnd':
+        case 'LogicalOr': {
+          const left = emitExpr(node2.left, zVar, env, letStack, indentLevel);
+          const right = emitExpr(node2.right, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('log');
+          emitter.push(`${ind}bool ${t}_l = (${left}.x != 0.0 || ${left}.y != 0.0);`);
+          emitter.push(`${ind}bool ${t}_r = (${right}.x != 0.0 || ${right}.y != 0.0);`);
+          const expr = node2.kind === 'LogicalAnd' ? `${t}_l && ${t}_r` : `${t}_l || ${t}_r`;
+          emitter.push(`${ind}vec2 ${t} = vec2((${expr}) ? 1.0 : 0.0, 0.0);`);
+          return t;
+        }
+        case 'Exp':
+        case 'Sin':
+        case 'Cos':
+        case 'Tan':
+        case 'Atan':
+        case 'Asin':
+        case 'Acos': {
+          const value = emitExpr(node2.value, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp(node2.kind.toLowerCase());
+          const fn =
+            node2.kind === 'Exp'
+              ? 'c_exp'
+              : node2.kind === 'Sin'
+                ? 'c_sin'
+                : node2.kind === 'Cos'
+                  ? 'c_cos'
+                  : node2.kind === 'Tan'
+                    ? 'c_tan'
+                    : node2.kind === 'Atan'
+                      ? 'c_atan'
+                      : node2.kind === 'Asin'
+                        ? 'c_asin'
+                        : 'c_acos';
+          emitter.push(`${ind}vec2 ${t} = ${fn}(${value});`);
+          return t;
+        }
+        case 'Ln': {
+          const value = emitExpr(node2.value, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('ln');
+          if (node2.branch) {
+            const branch = emitExpr(node2.branch, zVar, env, letStack, indentLevel);
+            emitter.push(`${ind}vec2 ${t} = c_ln_branch(${value}, ${branch}.x);`);
+            return t;
+          }
+          emitter.push(`${ind}vec2 ${t} = c_ln(${value});`);
+          return t;
+        }
+        case 'Arg': {
+          const value = emitExpr(node2.value, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('arg');
+          if (node2.branch) {
+            const branch = emitExpr(node2.branch, zVar, env, letStack, indentLevel);
+            emitter.push(`${ind}vec2 ${t}_ln = c_ln_branch(${value}, ${branch}.x);`);
+          } else {
+            emitter.push(`${ind}vec2 ${t}_ln = c_ln(${value});`);
+          }
+          emitter.push(`${ind}vec2 ${t} = vec2(${t}_ln.y, 0.0);`);
+          return t;
+        }
+        case 'Abs': {
+          const value = emitExpr(node2.value, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('abs');
+          emitter.push(`${ind}vec2 ${t} = vec2(length(${value}), 0.0);`);
+          return t;
+        }
+        case 'Abs2': {
+          const value = emitExpr(node2.value, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('abs2');
+          emitter.push(`${ind}vec2 ${t} = vec2(dot(${value}, ${value}), 0.0);`);
+          return t;
+        }
+        case 'Floor': {
+          const value = emitExpr(node2.value, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('floor');
+          emitter.push(`${ind}vec2 ${t} = floor(${value});`);
+          return t;
+        }
+        case 'Conjugate': {
+          const value = emitExpr(node2.value, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('conj');
+          emitter.push(`${ind}vec2 ${t} = vec2(${value}.x, -${value}.y);`);
+          return t;
+        }
+        case 'IsNaN': {
+          const value = emitExpr(node2.value, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('isnan');
+          emitter.push(`${ind}vec2 ${t} = vec2(c_is_error(${value}), 0.0);`);
+          return t;
+        }
+        case 'If': {
+          const cond = emitExpr(node2.condition, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('if');
+          emitter.push(`${ind}vec2 ${t};`);
+          emitter.push(`${ind}bool ${t}_sel = (${cond}.x != 0.0 || ${cond}.y != 0.0);`);
+          emitter.push(`${ind}if (${t}_sel) {`);
+          const thenEnv = { paramValues: env.paramValues, setValues: new Map(env.setValues) };
+          const thenValue = emitExpr(node2.thenBranch, zVar, thenEnv, letStack, indentLevel + 1);
+          emitter.push(`${ind}${emitter.indent}${t} = ${thenValue};`);
+          emitter.push(`${ind}} else {`);
+          const elseEnv = { paramValues: env.paramValues, setValues: new Map(env.setValues) };
+          const elseValue = emitExpr(node2.elseBranch, zVar, elseEnv, letStack, indentLevel + 1);
+          emitter.push(`${ind}${emitter.indent}${t} = ${elseValue};`);
+          emitter.push(`${ind}}`);
+          return t;
+        }
+        case 'IfNaN': {
+          const value = emitExpr(node2.value, zVar, env, letStack, indentLevel);
+          const t = emitter.freshTemp('ifnan');
+          emitter.push(`${ind}vec2 ${t};`);
+          emitter.push(`${ind}float ${t}_flag = c_is_error(${value});`);
+          emitter.push(`${ind}if (${t}_flag > 0.5) {`);
+          const fbEnv = { paramValues: env.paramValues, setValues: new Map(env.setValues) };
+          const fallback = emitExpr(node2.fallback, zVar, fbEnv, letStack, indentLevel + 1);
+          emitter.push(`${ind}${emitter.indent}${t} = ${fallback};`);
+          emitter.push(`${ind}} else {`);
+          emitter.push(`${ind}${emitter.indent}${t} = ${value};`);
+          emitter.push(`${ind}}`);
+          return t;
+        }
+        default: {
+          const t = emitter.freshTemp('u');
+          emitter.push(`${ind}vec2 ${t} = vec2(0.0, 0.0);`);
+          return t;
+        }
+      }
+    }
+
+    emitter.push('vec2 f(vec2 z) {');
+    const out = emitExpr(node, 'z', topEnv, topLetStack, 1);
+    emitter.push(`${emitter.indent}return ${out};`);
+    emitter.push('}');
+  }
+
+  emitTop(rootAst);
+
+  // Emit let functions (in order of creation).
+  const letPrototypes = [];
+  const letSources = [];
+  for (const info of letInfoByBinding.values()) {
+    if (info.compiled && info.source && Array.isArray(info.glslParams)) {
+      letPrototypes.push(`vec2 ${info.glslName}(${info.glslParams.join(', ')});`);
+      letSources.push(info.source);
+    }
+  }
+  const mainSource = mainEmitter.lines.join('\n');
+  const protoBlock = letPrototypes.length ? `${letPrototypes.join('\n')}\n\n` : '';
+  const bodyBlock = letSources.length ? `${letSources.join('\n\n')}\n\n` : '';
+  return `${protoBlock}${bodyBlock}${mainSource}`;
+}
+
 export function compileFormulaForGpu(ast) {
-  const lowered = prepareAstForGpu(ast);
-  const preparedAst = materializeComposeMultiples(lowered);
-  // Compute uniform counts *before* materializing `ComposeMultiple`, because
-  // repeat count expressions can reference fingers and must reserve uniform
-  // slots even though the shader uses only the resolved repeat count.
-  const uniformCounts = analyzeFingerUniformCounts(lowered);
-  const { funcs, topName } = buildNodeFunctionsAndTop(preparedAst);
+  const gpuAst = prepareAstForGpu(ast);
+  const preparedAst = materializeComposeMultiples(gpuAst);
+  // Compute uniform counts on the pre-materialized AST so repeat count expressions
+  // still contribute any finger usage to uniform sizing.
+  const uniformCounts = analyzeFingerUniformCounts(gpuAst);
+  const funcs = compileFormulaFunctionsSSA(preparedAst);
   const fragmentSource = fragmentTemplate
     .replace("/*FIXED_OFFSETS_COUNT*/", String(uniformCounts.fixedCount))
     .replace("/*DYNAMIC_OFFSETS_COUNT*/", String(uniformCounts.dynamicCount))
-    .replace("/*NODE_FUNCS*/", funcs)
-    .replace("/*TOP_FUNC*/", topName);
-  return { fragmentSource, uniformCounts, gpuAst: lowered };
+    .replace("/*FORMULA_FUNCS*/", funcs);
+  return { fragmentSource, uniformCounts, gpuAst };
 }
 
 // =========================

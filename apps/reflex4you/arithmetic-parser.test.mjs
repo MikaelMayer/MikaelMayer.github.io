@@ -742,7 +742,7 @@ test('top-level let is preserved for rendering and lowered for GPU compilation',
   // GPU compilation must still succeed.
   assert.doesNotThrow(() => {
     const fragment = buildFragmentSourceFromAST(ast);
-    assert.match(fragment, /vec2 node\d+\(vec2 z\)/);
+    assert.match(fragment, /vec2 f\(vec2 z\)/);
   });
 });
 
@@ -809,7 +809,7 @@ test('nested let bindings are allowed (let lifting happens in GPU lowering)', ()
   // GPU compilation must still succeed.
   assert.doesNotThrow(() => {
     const fragment = buildFragmentSourceFromAST(ast);
-    assert.match(fragment, /vec2 node\d+\(vec2 z\)/);
+    assert.match(fragment, /vec2 f\(vec2 z\)/);
   });
 });
 
