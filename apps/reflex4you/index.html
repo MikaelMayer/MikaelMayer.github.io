@@ -786,7 +786,8 @@
     html.viewer-mode #formula-panel,
     html.viewer-mode #finger-indicator-stack,
     html.viewer-mode #finger-overlay,
-    html.viewer-mode #error {
+    /* Keep #error visible so black-screen failures are debuggable. */
+    html.viewer-mode #error:not([data-error-severity]) {
       display: none !important;
       visibility: hidden !important;
       pointer-events: none !important;
