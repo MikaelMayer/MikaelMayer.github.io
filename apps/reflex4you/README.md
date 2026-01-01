@@ -236,7 +236,11 @@ The input accepts succinct expressions with complex arithmetic, composition, and
 - **Operators:** `+`, `-`, `*`, `/`, power (`^` with integer exponents), composition (`o(f, g)` or `f $ g`), repeated composition (`oo(f, n)` or `f $$ n`).
 - **Functions:** `exp`, `sin`, `cos`, `tan`, `atan`/`arctan`, `arg`/`argument`, `asin`/`arcsin`, `acos`/`arccos`, `ln`, `sqrt`, `abs`/`modulus`, `abs2`, `floor`, `conj`, `heav`, `isnan`, `ifnan`/`iferror`. `sqrt(z, k)` desugars to `exp(0.5 * ln(z, k))`, so the optional second argument shifts the log branch; `heav(x)` evaluates to `1` when `x > 0` and `0` otherwise.
 - **Conditionals:** comparisons (`<`, `<=`, `>`, `>=`, `==`), logical ops (`&&`, `||`), and `if(cond, then, else)`.
-- **Bindings:** `set name = value in body` introduces reusable values (serialized with the formula when shared).
+- **Bindings:**
+  - `set name = value in body` introduces a **value** (evaluated once at the binding site; it can “capture” the current `z`).
+  - `let name = expr in body` introduces a **function** (not evaluated until used; it always receives the ambient `z`).
+    - You can also define extra parameters: `let name(p1, p2, ...) = expr in body`.
+    - `z` is reserved and cannot be used as a parameter name.
 
 Examples:
 
@@ -246,6 +250,33 @@ sin $ z - D1                  # manual handle for offsetting input
 set c = abs(z) in c / (1 + c) # temporary value
 if(real < 0, conj(z), z)      # axis-aware interaction
 ```
+
+### Functions (`let`) and calls
+
+Reflex formulas are **functions of `z`**, so a `let` binding defines a reusable function expression.
+
+- **Unary functions (no extra params)**:
+  - Define: `let f = z^2 + 1 in ...`
+  - Use at the current `z`: `f` (shorthand for “apply to ambient `z`”).
+  - Use at a specific input: `f(expr)` (equivalently `f $ expr`).
+
+- **Multi-argument functions (extra params)**:
+  - Define: `let max(w) = if(z < w, w, z) in ...`
+  - Call with explicit arguments:
+    - `max(a)` binds `w = a` and uses the current `z`.
+    - `max(a, z0)` binds `w = a` and uses `z0` **instead of** the ambient `z` (the optional final argument overrides `z`).
+  - If you reference a function that requires extra parameters without supplying them, it is a compile-time error.
+
+- **Repeated composition (`$$`)** works inside `let` bodies as well:
+  - `f $$ n` repeats `f` exactly `n` times (same as `oo(f, n)`).
+  - Example:
+
+```text
+let fn = z^2 + 0.1 $$ 4 in
+fn
+```
+
+This means apply \(z \mapsto z^2 + 0.1\) four times.
 
 Tips:
 
