@@ -474,6 +474,10 @@ function materializeComposeMultiples(ast) {
       return;
     }
     switch (node.kind) {
+      case "LetBinding":
+        visit(node.value, node, "value");
+        visit(node.body, node, "body");
+        return;
       case "Pow":
         visit(node.base, node, "base");
         return;

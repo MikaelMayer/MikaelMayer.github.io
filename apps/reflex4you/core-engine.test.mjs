@@ -109,6 +109,15 @@ test('buildFragmentSourceFromAST does not mutate repeat-composition (ComposeMult
   assert.equal(latexAfter, latexBefore);
 });
 
+test('repeat composition inside let bindings compiles (let fn = z $$ 2 in fn)', () => {
+  const parsed = parseFormulaInput('let fn = z $$ 2 in fn');
+  assert.equal(parsed.ok, true);
+  const fragment = buildFragmentSourceFromAST(parsed.value);
+  // Regression: materializeComposeMultiples must traverse into LetBinding.value.
+  // If it doesn't, SSA compilation will see an unhandled ComposeMultiple and emit 0.
+  assert.match(fragment, /vec2 let_fn_0\(vec2 z\)\s*\{\s*return z;\s*\}/);
+});
+
 test('buildFragmentSourceFromAST does not silently drop legacy RepeatComposePlaceholder nodes', () => {
   // This node kind should normally be resolved during parsing, but shader generation
   // must not compile it as just the base when the count is a literal.
