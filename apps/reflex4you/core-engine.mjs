@@ -1677,15 +1677,48 @@ function compileFormulaFunctionsSSA(rootAst) {
     return null;
   }
 
-  function collectFreeValueVars(expr, boundParamNames = new Set(), boundSetBindings = new Set()) {
+  function collectFreeValueVars(
+    expr,
+    boundParamNames = new Set(),
+    boundSetBindings = new Set(),
+    letStack = [],
+  ) {
     const freeParams = new Set();
     const freeSets = new Set();
 
-    function walk(node, localParamNames, localSetBindings) {
+    function walk(node, localParamNames, localSetBindings, localLetStack) {
       if (!node || typeof node !== 'object') {
         return;
       }
       switch (node.kind) {
+        case 'Identifier': {
+          // Identifiers are compiled as calls to let-bound functions (with no extra args),
+          // so if we reference a let-bound function that itself captures values, we must
+          // also capture those values here in order to be able to pass them through.
+          const binding = resolveLetBindingByName(node.name, localLetStack);
+          if (!binding) {
+            return;
+          }
+
+          // Ensure the referenced let is compiled so we know its captures.
+          // Use a stack that excludes the binding itself to approximate its defining scope.
+          const bindingStack =
+            Array.isArray(localLetStack) && localLetStack.length > 0
+              ? localLetStack.filter((entry) => entry !== binding)
+              : [];
+          const calleeInfo = ensureLetCompiled(binding, { paramValues: new Map(), setValues: new Map() }, bindingStack);
+
+          calleeInfo.captures.forEach((cap) => {
+            if (cap.kind === 'param') {
+              if (!localParamNames.has(cap.name)) {
+                freeParams.add(cap.name);
+              }
+            } else if (cap.binding && !localSetBindings.has(cap.binding)) {
+              freeSets.add(cap.binding);
+            }
+          });
+          return;
+        }
         case 'ParamRef':
           if (!localParamNames.has(node.name)) {
             freeParams.add(node.name);
@@ -1698,10 +1731,10 @@ function compileFormulaFunctionsSSA(rootAst) {
           return;
         case 'SetBinding': {
           // value sees the current bindings, body sees the binding as in-scope
-          walk(node.value, localParamNames, localSetBindings);
+          walk(node.value, localParamNames, localSetBindings, localLetStack);
           const nextSetBindings = new Set(localSetBindings);
           nextSetBindings.add(node);
-          walk(node.body, localParamNames, nextSetBindings);
+          walk(node.body, localParamNames, nextSetBindings, localLetStack);
           return;
         }
         case 'LetBinding': {
@@ -1710,18 +1743,19 @@ function compileFormulaFunctionsSSA(rootAst) {
           const ownParams = Array.isArray(node.params) ? node.params : [];
           const nextParamNames = new Set(localParamNames);
           ownParams.forEach((p) => nextParamNames.add(p));
-          walk(node.value, nextParamNames, localSetBindings);
-          walk(node.body, localParamNames, localSetBindings);
+          walk(node.value, nextParamNames, localSetBindings, localLetStack);
+          const nextLetStack = Array.isArray(localLetStack) ? [...localLetStack, node] : [node];
+          walk(node.body, localParamNames, localSetBindings, nextLetStack);
           return;
         }
         case 'Call':
-          walk(node.callee, localParamNames, localSetBindings);
+          walk(node.callee, localParamNames, localSetBindings, localLetStack);
           if (Array.isArray(node.args)) {
-            node.args.forEach((arg) => walk(arg, localParamNames, localSetBindings));
+            node.args.forEach((arg) => walk(arg, localParamNames, localSetBindings, localLetStack));
           }
           return;
         case 'Pow':
-          walk(node.base, localParamNames, localSetBindings);
+          walk(node.base, localParamNames, localSetBindings, localLetStack);
           return;
         case 'Exp':
         case 'Sin':
@@ -1735,13 +1769,13 @@ function compileFormulaFunctionsSSA(rootAst) {
         case 'Floor':
         case 'Conjugate':
         case 'IsNaN':
-          walk(node.value, localParamNames, localSetBindings);
+          walk(node.value, localParamNames, localSetBindings, localLetStack);
           return;
         case 'Ln':
         case 'Arg':
-          walk(node.value, localParamNames, localSetBindings);
+          walk(node.value, localParamNames, localSetBindings, localLetStack);
           if (node.branch) {
-            walk(node.branch, localParamNames, localSetBindings);
+            walk(node.branch, localParamNames, localSetBindings, localLetStack);
           }
           return;
         case 'Sub':
@@ -1757,28 +1791,28 @@ function compileFormulaFunctionsSSA(rootAst) {
         case 'LogicalAnd':
         case 'LogicalOr':
         case 'Compose':
-          walk(node.left ?? node.f, localParamNames, localSetBindings);
-          walk(node.right ?? node.g, localParamNames, localSetBindings);
+          walk(node.left ?? node.f, localParamNames, localSetBindings, localLetStack);
+          walk(node.right ?? node.g, localParamNames, localSetBindings, localLetStack);
           return;
         case 'If':
-          walk(node.condition, localParamNames, localSetBindings);
-          walk(node.thenBranch, localParamNames, localSetBindings);
-          walk(node.elseBranch, localParamNames, localSetBindings);
+          walk(node.condition, localParamNames, localSetBindings, localLetStack);
+          walk(node.thenBranch, localParamNames, localSetBindings, localLetStack);
+          walk(node.elseBranch, localParamNames, localSetBindings, localLetStack);
           return;
         case 'IfNaN':
-          walk(node.value, localParamNames, localSetBindings);
-          walk(node.fallback, localParamNames, localSetBindings);
+          walk(node.value, localParamNames, localSetBindings, localLetStack);
+          walk(node.fallback, localParamNames, localSetBindings, localLetStack);
           return;
         case 'ComposeMultiple':
-          walk(node.base, localParamNames, localSetBindings);
+          walk(node.base, localParamNames, localSetBindings, localLetStack);
           if (node.countExpression) {
-            walk(node.countExpression, localParamNames, localSetBindings);
+            walk(node.countExpression, localParamNames, localSetBindings, localLetStack);
           }
           return;
         case 'RepeatComposePlaceholder':
-          walk(node.base, localParamNames, localSetBindings);
+          walk(node.base, localParamNames, localSetBindings, localLetStack);
           if (node.countExpression) {
-            walk(node.countExpression, localParamNames, localSetBindings);
+            walk(node.countExpression, localParamNames, localSetBindings, localLetStack);
           }
           return;
         default:
@@ -1788,7 +1822,7 @@ function compileFormulaFunctionsSSA(rootAst) {
 
     const initialParamNames = new Set(boundParamNames);
     const initialSetBindings = new Set(boundSetBindings);
-    walk(expr, initialParamNames, initialSetBindings);
+    walk(expr, initialParamNames, initialSetBindings, Array.isArray(letStack) ? letStack : []);
     return { freeParams, freeSets };
   }
 
@@ -1840,7 +1874,12 @@ function compileFormulaFunctionsSSA(rootAst) {
     }
 
     const boundParams = new Set(info.params);
-    const { freeParams, freeSets } = collectFreeValueVars(letNode.value, boundParams, new Set());
+    const { freeParams, freeSets } = collectFreeValueVars(
+      letNode.value,
+      boundParams,
+      new Set(),
+      Array.isArray(definingLetStack) ? definingLetStack : [],
+    );
 
     // Deterministic capture ordering:
     // - captured params (sorted)
