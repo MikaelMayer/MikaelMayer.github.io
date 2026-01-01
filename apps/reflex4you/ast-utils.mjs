@@ -14,6 +14,14 @@ export function visitAst(root, visitor) {
     for (let i = children.length - 1; i >= 0; i -= 1) {
       const [childKey, childNode] = children[i];
       if (!childNode) continue;
+      if (Array.isArray(childNode)) {
+        for (let j = childNode.length - 1; j >= 0; j -= 1) {
+          const entry = childNode[j];
+          if (!entry) continue;
+          stack.push({ node: entry, parent: node, key: `${childKey}[${j}]` });
+        }
+        continue;
+      }
       stack.push({ node: childNode, parent: node, key: childKey });
     }
   }
@@ -104,9 +112,15 @@ export function childEntries(node) {
         ['value', node.value],
         ['body', node.body],
       ];
+    case 'Call':
+      return [
+        ['callee', node.callee],
+        ['args', Array.isArray(node.args) ? node.args : []],
+      ];
     case 'SetRef':
     case 'Identifier':
     case 'PlaceholderVar':
+    case 'ParamRef':
     case 'Const':
     case 'Var':
     case 'VarX':
@@ -129,7 +143,12 @@ export function cloneAst(root, { preserveBindings = true } = {}) {
 
   // `SetRef` nodes refer to a `SetBinding` by object identity. When cloning,
   // preserve that graph by remapping references to the cloned binding node.
-  const bindingMap = preserveBindings ? new Map() : null;
+  const setBindingMap = preserveBindings ? new Map() : null;
+  // `Identifier` nodes refer to a `LetBinding` via `__letBinding` identity.
+  // Preserve that graph too (critical for GPU-only transforms like
+  // materializeComposeMultiples, which clones and then expects `__letBinding`
+  // to point into the cloned tree).
+  const letBindingMap = preserveBindings ? new Map() : null;
 
   function cloneNode(node) {
     if (!node || typeof node !== 'object') {
@@ -137,12 +156,24 @@ export function cloneAst(root, { preserveBindings = true } = {}) {
     }
 
     if (preserveBindings && node.kind === 'SetBinding') {
-      if (bindingMap.has(node)) {
-        return bindingMap.get(node);
+      if (setBindingMap.has(node)) {
+        return setBindingMap.get(node);
       }
       // Create the clone first (with empty children), then fill in children.
       const cloned = { ...node, value: null, body: null };
-      bindingMap.set(node, cloned);
+      setBindingMap.set(node, cloned);
+      cloned.value = cloneNode(node.value);
+      cloned.body = cloneNode(node.body);
+      return cloned;
+    }
+
+    if (preserveBindings && node.kind === 'LetBinding') {
+      if (letBindingMap.has(node)) {
+        return letBindingMap.get(node);
+      }
+      // Create the clone first (with empty children), then fill in children.
+      const cloned = { ...node, value: null, body: null };
+      letBindingMap.set(node, cloned);
       cloned.value = cloneNode(node.value);
       cloned.body = cloneNode(node.body);
       return cloned;
@@ -151,11 +182,19 @@ export function cloneAst(root, { preserveBindings = true } = {}) {
     const cloned = { ...node };
     const entries = childEntries(node);
     for (const [key, child] of entries) {
-      cloned[key] = cloneNode(child);
+      if (Array.isArray(child)) {
+        cloned[key] = child.map((entry) => cloneNode(entry));
+      } else {
+        cloned[key] = cloneNode(child);
+      }
     }
 
-    if (preserveBindings && cloned.kind === 'SetRef' && cloned.binding && bindingMap.has(cloned.binding)) {
-      cloned.binding = bindingMap.get(cloned.binding);
+    if (preserveBindings && cloned.kind === 'SetRef' && cloned.binding && setBindingMap.has(cloned.binding)) {
+      cloned.binding = setBindingMap.get(cloned.binding);
+    }
+
+    if (preserveBindings && cloned.kind === 'Identifier' && cloned.__letBinding && letBindingMap.has(cloned.__letBinding)) {
+      cloned.__letBinding = letBindingMap.get(cloned.__letBinding);
     }
     return cloned;
   }

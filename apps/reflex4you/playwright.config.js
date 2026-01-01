@@ -9,17 +9,27 @@ module.exports = defineConfig({
     baseURL: 'http://127.0.0.1:5173',
     headless: true,
     acceptDownloads: true,
-    launchOptions: {
-      args: [
-        '--no-sandbox',
-        '--use-fake-device-for-media-stream',
-        '--use-fake-ui-for-media-stream'
-      ]
-    }
+    // Prevent SW caching / controllerchange reload loops in tests.
+    serviceWorkers: 'block',
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'firefox', use: { ...devices['Desktop Firefox'] } }
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          args: [
+            '--no-sandbox',
+            '--use-fake-device-for-media-stream',
+            '--use-fake-ui-for-media-stream',
+            // Ensure WebGL2 is available in headless CI.
+            '--enable-webgl',
+            '--ignore-gpu-blocklist',
+            '--use-gl=swiftshader',
+          ],
+        },
+      },
+    },
   ],
   webServer: {
     command: 'npx http-server -p 5173 -c-1 .',

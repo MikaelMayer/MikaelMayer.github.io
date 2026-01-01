@@ -559,15 +559,17 @@ test('tracks syntax labels for axis primitives', () => {
 test('re(z) and im(z) behave like real(z) and imag(z)', () => {
   const reCall = parseFormulaInput('re(z)');
   assert.equal(reCall.ok, true);
-  assert.equal(reCall.value.kind, 'Compose');
-  assert.equal(reCall.value.f.kind, 'VarX');
-  assert.equal(reCall.value.g.kind, 'Var');
+  assert.equal(reCall.value.kind, 'Call');
+  assert.equal(reCall.value.callee.kind, 'VarX');
+  assert.equal(reCall.value.args.length, 1);
+  assert.equal(reCall.value.args[0].kind, 'Var');
 
   const imCall = parseFormulaInput('im(z)');
   assert.equal(imCall.ok, true);
-  assert.equal(imCall.value.kind, 'Compose');
-  assert.equal(imCall.value.f.kind, 'VarY');
-  assert.equal(imCall.value.g.kind, 'Var');
+  assert.equal(imCall.value.kind, 'Call');
+  assert.equal(imCall.value.callee.kind, 'VarY');
+  assert.equal(imCall.value.args.length, 1);
+  assert.equal(imCall.value.args[0].kind, 'Var');
 });
 
 test('explicit composition accepts built-in literals', () => {
@@ -638,11 +640,13 @@ test('user-defined functions support call syntax f(z)', () => {
   assert.equal(ast.kind, 'LetBinding');
   assert.equal(ast.name, 'f');
   assert.equal(ast.value.kind, 'Add');
-  assert.equal(ast.body.kind, 'Compose');
-  assert.equal(ast.body.g.kind, 'Var');
-  assert.equal(ast.body.f.kind, 'Identifier');
-  assert.equal(ast.body.f.name, 'f');
-  assert.equal(Boolean(ast.body.f.__letBinding), true);
+  assert.equal(ast.body.kind, 'Call');
+  assert.equal(ast.body.callee.kind, 'Identifier');
+  assert.equal(ast.body.callee.name, 'f');
+  assert.equal(Boolean(ast.body.callee.__letBinding), true);
+  assert.equal(Array.isArray(ast.body.args), true);
+  assert.equal(ast.body.args.length, 1);
+  assert.equal(ast.body.args[0].kind, 'Var');
 });
 
 test('missing "in" after let binding does not backtrack', () => {
@@ -650,6 +654,45 @@ test('missing "in" after let binding does not backtrack', () => {
   assert.equal(result.ok, false);
   assert.equal(result.ctor, 'SetInKeyword');
   assert.equal(result.expected, 'in');
+});
+
+test('multi-argument let bindings parse and call with extra args (z remains ambient)', () => {
+  const source = `
+let customif(thn, els) = if(z, thn, els) in
+customif(sin, cos)
+`.trim();
+  const result = parseFormulaInput(source);
+  assert.equal(result.ok, true);
+  const ast = result.value;
+  assert.equal(ast.kind, 'LetBinding');
+  assert.equal(ast.name, 'customif');
+  assert.deepEqual(ast.params, ['thn', 'els']);
+  assert.equal(ast.body.kind, 'Call');
+  assert.equal(ast.body.callee.kind, 'Identifier');
+  assert.equal(ast.body.callee.name, 'customif');
+  assert.equal(ast.body.args.length, 2);
+  assert.equal(ast.body.args[0].kind, 'Sin');
+  assert.equal(ast.body.args[1].kind, 'Cos');
+});
+
+test('multi-argument let calls can override z with a final argument (z-last)', () => {
+  const source = `
+let customif(thn, els) = if(z, thn, els) in
+customif(sin, cos, z)
+`.trim();
+  const result = parseFormulaInput(source);
+  assert.equal(result.ok, true);
+  const ast = result.value;
+  assert.equal(ast.kind, 'LetBinding');
+  assert.equal(ast.body.kind, 'Call');
+  assert.equal(ast.body.args.length, 3);
+  assert.equal(ast.body.args[2].kind, 'Var');
+});
+
+test('multi-argument let functions are not first-class values (must be called)', () => {
+  const result = parseFormulaInput('let max(w) = if(z < w, w, z) in max');
+  assert.equal(result.ok, false);
+  assert.match(result.message, /requires 1 extra argument/i);
 });
 
 test('set bindings associate weaker than $$ and $', () => {
@@ -699,7 +742,7 @@ test('top-level let is preserved for rendering and lowered for GPU compilation',
   // GPU compilation must still succeed.
   assert.doesNotThrow(() => {
     const fragment = buildFragmentSourceFromAST(ast);
-    assert.match(fragment, /vec2 node\d+\(vec2 z\)/);
+    assert.match(fragment, /vec2 f\(vec2 z\)/);
   });
 });
 
@@ -766,7 +809,7 @@ test('nested let bindings are allowed (let lifting happens in GPU lowering)', ()
   // GPU compilation must still succeed.
   assert.doesNotThrow(() => {
     const fragment = buildFragmentSourceFromAST(ast);
-    assert.match(fragment, /vec2 node\d+\(vec2 z\)/);
+    assert.match(fragment, /vec2 f\(vec2 z\)/);
   });
 });
 

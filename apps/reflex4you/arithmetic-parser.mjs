@@ -105,6 +105,10 @@ function createPlaceholderVar(name) {
   return { kind: 'PlaceholderVar', name };
 }
 
+function createParamRef(name) {
+  return { kind: 'ParamRef', name };
+}
+
 function createIdentifier(name, meta = null) {
   const node = { kind: 'Identifier', name };
   return attachIdentifierMeta(node, meta);
@@ -915,7 +919,37 @@ const prefixRef = lazy(() => prefixParser, { ctor: 'PrefixRef' });
 const functionCallSuffixParser = Sequence(
   [
     wsLiteral('(', { ctor: 'CallOpen' }),
-    expressionRef,
+    // Parse 1+ arguments, separated by commas.
+    createParser('CallArgs', (input) => {
+      const first = expressionRef.runNormalized(input);
+      if (!first.ok) {
+        return first;
+      }
+      const args = [first.value];
+      let cursor = first.next;
+      while (true) {
+        const comma = wsLiteral(',', { ctor: 'CallComma' }).runNormalized(cursor);
+        if (!comma.ok) {
+          if (comma.severity === ParseSeverity.error) {
+            return comma;
+          }
+          break;
+        }
+        const nextArg = expressionRef.runNormalized(comma.next);
+        if (!nextArg.ok) {
+          return nextArg;
+        }
+        args.push(nextArg.value);
+        cursor = nextArg.next;
+      }
+      const span = spanBetween(input, cursor);
+      return new ParseSuccess({
+        ctor: 'CallArgs',
+        value: args,
+        span,
+        next: cursor,
+      });
+    }),
     wsLiteral(')', { ctor: 'CallClose' }),
   ],
   {
@@ -940,12 +974,17 @@ const callExpressionParser = createParser('CallExpression', (input) => {
       break;
     }
     const span = spanBetween(input, suffix.next);
-    const applied = applyFunctionLiteral(node, suffix.value);
-    if (applied) {
-      node = withSpan(applied, span);
-    } else {
-      node = withSpan(Compose(node, suffix.value), span);
+    const args = suffix.value;
+    // Keep the built-in literal fast path for unary application.
+    if (Array.isArray(args) && args.length === 1) {
+      const applied = applyFunctionLiteral(node, args[0]);
+      if (applied) {
+        node = withSpan(applied, span);
+        cursor = suffix.next;
+        continue;
+      }
     }
+    node = withSpan({ kind: 'Call', callee: node, args: Array.isArray(args) ? args : [] }, span);
     cursor = suffix.next;
   }
   const span = spanBetween(input, cursor);
@@ -1231,8 +1270,17 @@ function substitutePlaceholder(node, placeholder, replacement) {
     case 'DeviceRotation':
     case 'TrackballRotation':
     case 'Identifier':
+    case 'ParamRef':
     case 'SetRef':
       return cloneAst(node);
+    case 'Call':
+      return {
+        ...node,
+        callee: substitutePlaceholder(node.callee, placeholder, replacement),
+        args: Array.isArray(node.args)
+          ? node.args.map((arg) => substitutePlaceholder(arg, placeholder, replacement))
+          : [],
+      };
     case 'LetBinding':
       return {
         ...node,
@@ -1343,8 +1391,15 @@ function cloneAst(node) {
     case 'TrackballRotation':
     case 'PlaceholderVar':
     case 'Identifier':
+    case 'ParamRef':
     case 'SetRef':
       return { ...node };
+    case 'Call':
+      return {
+        ...node,
+        callee: cloneAst(node.callee),
+        args: Array.isArray(node.args) ? node.args.map((arg) => cloneAst(arg)) : [],
+      };
     case 'LetBinding':
       return {
         ...node,
@@ -1457,8 +1512,17 @@ function substituteIdentifierWithClone(node, targetName, replacement) {
     case 'DeviceRotation':
     case 'TrackballRotation':
     case 'PlaceholderVar':
+    case 'ParamRef':
     case 'SetRef':
       return cloneAst(node);
+    case 'Call':
+      return {
+        ...node,
+        callee: substituteIdentifierWithClone(node.callee, targetName, replacement),
+        args: Array.isArray(node.args)
+          ? node.args.map((arg) => substituteIdentifierWithClone(arg, targetName, replacement))
+          : [],
+      };
     case 'LetBinding': {
       const nextValue = substituteIdentifierWithClone(node.value, targetName, replacement);
       const nextBody =
@@ -1581,6 +1645,21 @@ function findFirstPlaceholderNode(ast) {
       return node;
     }
     switch (node.kind) {
+      case 'Call':
+        if (node.callee) {
+          stack.push(node.callee);
+        }
+        if (Array.isArray(node.args)) {
+          for (let i = 0; i < node.args.length; i += 1) {
+            if (node.args[i]) {
+              stack.push(node.args[i]);
+            }
+          }
+        }
+        break;
+      case 'LetBinding':
+        stack.push(node.value, node.body);
+        break;
       case 'Pow':
         stack.push(node.base);
         break;
@@ -1757,6 +1836,7 @@ function eliminateTopLevelLets(ast, input) {
 function resolveSetReferences(ast, input) {
   const setEnv = [];
   const letEnv = [];
+  const paramEnv = [];
 
   function findLetBindingForName(name) {
     for (let i = letEnv.length - 1; i >= 0; i -= 1) {
@@ -1767,35 +1847,49 @@ function resolveSetReferences(ast, input) {
     return null;
   }
 
-  function visit(node) {
+  function visit(node, parent = null, key = null) {
     if (!node || typeof node !== 'object') {
       return null;
     }
     switch (node.kind) {
       case 'LetBinding': {
-        // `let name = value in body`
+        // `let name(params...) = value in body`
         // - `name` is in scope only for `body`
         // - nested `let` is handled by a separate top-level validation step; still traverse.
-        const valueErr = visit(node.value);
+        paramEnv.push(new Set(Array.isArray(node.params) ? node.params : []));
+        const valueErr = visit(node.value, node, 'value');
+        paramEnv.pop();
         if (valueErr) {
           return valueErr;
         }
         letEnv.push(node);
-        const bodyErr = visit(node.body);
+        const bodyErr = visit(node.body, node, 'body');
         letEnv.pop();
         return bodyErr;
       }
       case 'SetBinding': {
-        const valueErr = visit(node.value);
+        const valueErr = visit(node.value, node, 'value');
         if (valueErr) {
           return valueErr;
         }
         setEnv.push(node);
-        const bodyErr = visit(node.body);
+        const bodyErr = visit(node.body, node, 'body');
         setEnv.pop();
         return bodyErr;
       }
       case 'Identifier': {
+        // Let-parameter references (first-order placeholders).
+        for (let i = paramEnv.length - 1; i >= 0; i -= 1) {
+          if (paramEnv[i].has(node.name)) {
+            const resolved = createParamRef(node.name);
+            resolved.span = node.span;
+            resolved.input = node.input;
+            resolved.__identifierMeta = node.__identifierMeta;
+            Object.assign(node, resolved);
+            return null;
+          }
+        }
+
         const binding = findBindingForName(setEnv, node.name);
         if (binding) {
           const resolved = SetRef(node.name, binding);
@@ -1806,6 +1900,21 @@ function resolveSetReferences(ast, input) {
         }
         const letBinding = findLetBindingForName(node.name);
         if (letBinding) {
+          const paramCount = Array.isArray(letBinding.params) ? letBinding.params.length : 0;
+          if (paramCount > 0) {
+            const isCallCallee = parent && typeof parent === 'object' && parent.kind === 'Call' && key === 'callee';
+            if (!isCallCallee) {
+              const span = node.span ?? input.createSpan(0, 0);
+              return new ParseFailure({
+                ctor: 'Identifier',
+                message: `Function "${node.name}" requires ${paramCount} extra argument${paramCount === 1 ? '' : 's'}`,
+                severity: ParseSeverity.error,
+                expected: 'function call',
+                span,
+                input: span.input || input,
+              });
+            }
+          }
           // Keep the identifier node (so the renderer can still show the name),
           // but tag it so GPU lowering can resolve it later.
           node.__letBinding = letBinding;
@@ -1821,6 +1930,20 @@ function resolveSetReferences(ast, input) {
           input: span.input || input,
         });
       }
+      case 'Call': {
+        const calleeErr = visit(node.callee, node, 'callee');
+        if (calleeErr) {
+          return calleeErr;
+        }
+        const args = Array.isArray(node.args) ? node.args : [];
+        for (let i = 0; i < args.length; i += 1) {
+          const err = visit(args[i], node, `args[${i}]`);
+          if (err) {
+            return err;
+          }
+        }
+        return null;
+      }
       case 'Const':
       case 'Var':
       case 'VarX':
@@ -1829,10 +1952,11 @@ function resolveSetReferences(ast, input) {
       case 'DeviceRotation':
       case 'TrackballRotation':
       case 'PlaceholderVar':
+      case 'ParamRef':
       case 'SetRef':
         return null;
       case 'Pow':
-        return visit(node.base);
+        return visit(node.base, node, 'base');
       case 'Exp':
       case 'Sin':
       case 'Cos':
@@ -1846,24 +1970,24 @@ function resolveSetReferences(ast, input) {
       case 'Conjugate':
       case 'Floor':
       case 'IsNaN':
-        return visit(node.value);
+        return visit(node.value, node, 'value');
       case 'Ln': {
-        const valueErr = visit(node.value);
+        const valueErr = visit(node.value, node, 'value');
         if (valueErr) {
           return valueErr;
         }
         if (node.branch) {
-          return visit(node.branch);
+          return visit(node.branch, node, 'branch');
         }
         return null;
       }
       case 'Arg': {
-        const valueErr = visit(node.value);
+        const valueErr = visit(node.value, node, 'value');
         if (valueErr) {
           return valueErr;
         }
         if (node.branch) {
-          return visit(node.branch);
+          return visit(node.branch, node, 'branch');
         }
         return null;
       }
@@ -1879,62 +2003,62 @@ function resolveSetReferences(ast, input) {
       case 'Equal':
       case 'LogicalAnd':
       case 'LogicalOr': {
-        const leftErr = visit(node.left);
+        const leftErr = visit(node.left, node, 'left');
         if (leftErr) {
           return leftErr;
         }
-        return visit(node.right);
+        return visit(node.right, node, 'right');
       }
       case 'Compose': {
-        const fErr = visit(node.f);
+        const fErr = visit(node.f, node, 'f');
         if (fErr) {
           return fErr;
         }
-        return visit(node.g);
+        return visit(node.g, node, 'g');
       }
       case 'ComposeMultiple': {
-        const baseErr = visit(node.base);
+        const baseErr = visit(node.base, node, 'base');
         if (baseErr) {
           return baseErr;
         }
         if (node.countExpression) {
-          return visit(node.countExpression);
+          return visit(node.countExpression, node, 'countExpression');
         }
         return null;
       }
       case 'RepeatComposePlaceholder': {
-        const baseErr = visit(node.base);
+        const baseErr = visit(node.base, node, 'base');
         if (baseErr) {
           return baseErr;
         }
         if (node.countExpression) {
-          return visit(node.countExpression);
+          return visit(node.countExpression, node, 'countExpression');
         }
         return null;
       }
       case 'If': {
-        const condErr = visit(node.condition);
+        const condErr = visit(node.condition, node, 'condition');
         if (condErr) {
           return condErr;
         }
-        const thenErr = visit(node.thenBranch);
+        const thenErr = visit(node.thenBranch, node, 'thenBranch');
         if (thenErr) {
           return thenErr;
         }
-        return visit(node.elseBranch);
+        return visit(node.elseBranch, node, 'elseBranch');
       }
       case 'IfNaN': {
-        const valueErr = visit(node.value);
+        const valueErr = visit(node.value, node, 'value');
         if (valueErr) {
           return valueErr;
         }
-        return visit(node.fallback);
+        return visit(node.fallback, node, 'fallback');
       }
       default:
         return null;
     }
   }
-  return visit(ast);
+  return visit(ast, null, null);
 }
 
 function validateLetBindingsTopLevelOnly(ast, input) {
@@ -2993,6 +3117,60 @@ const setBindingParser = createParser('SetBinding', (input) => {
 const letKeyword = keywordLiteral('let', { ctor: 'LetKeyword' });
 const letEqualsLiteral = wsLiteral('=', { ctor: 'LetEquals' });
 
+const letParamListParser = createParser('LetParamList', (input) => {
+  const open = wsLiteral('(', { ctor: 'LetParamOpen' }).runNormalized(input);
+  if (!open.ok) {
+    return open;
+  }
+  // Allow explicit empty lists `let f() = ...` as a synonym of `let f = ...`.
+  const closeImmediate = wsLiteral(')', { ctor: 'LetParamCloseEmpty' }).runNormalized(open.next);
+  if (closeImmediate.ok) {
+    const span = spanBetween(input, closeImmediate.next);
+    return new ParseSuccess({
+      ctor: 'LetParamList',
+      value: [],
+      span,
+      next: closeImmediate.next,
+    });
+  }
+  if (closeImmediate.severity === ParseSeverity.error) {
+    return closeImmediate;
+  }
+
+  const first = bindingIdentifierParser.runNormalized(open.next);
+  if (!first.ok) {
+    return first;
+  }
+  const params = [first.value];
+  let cursor = first.next;
+  while (true) {
+    const comma = wsLiteral(',', { ctor: 'LetParamComma' }).runNormalized(cursor);
+    if (!comma.ok) {
+      if (comma.severity === ParseSeverity.error) {
+        return comma;
+      }
+      break;
+    }
+    const nextParam = bindingIdentifierParser.runNormalized(comma.next);
+    if (!nextParam.ok) {
+      return nextParam;
+    }
+    params.push(nextParam.value);
+    cursor = nextParam.next;
+  }
+  const close = wsLiteral(')', { ctor: 'LetParamClose' }).runNormalized(cursor);
+  if (!close.ok) {
+    return close;
+  }
+  const span = spanBetween(input, close.next);
+  return new ParseSuccess({
+    ctor: 'LetParamList',
+    value: params,
+    span,
+    next: close.next,
+  });
+});
+
 const letBindingParser = createParser('LetBinding', (input) => {
   const keyword = letKeyword.runNormalized(input);
   if (!keyword.ok) {
@@ -3002,7 +3180,17 @@ const letBindingParser = createParser('LetBinding', (input) => {
   if (!nameResult.ok) {
     return nameResult;
   }
-  const equalsResult = letEqualsLiteral.runNormalized(nameResult.next);
+  let params = [];
+  let cursor = nameResult.next;
+  const paramList = letParamListParser.runNormalized(cursor);
+  if (paramList.ok) {
+    params = paramList.value;
+    cursor = paramList.next;
+  } else if (paramList.severity === ParseSeverity.error) {
+    return paramList;
+  }
+
+  const equalsResult = letEqualsLiteral.runNormalized(cursor);
   if (!equalsResult.ok) {
     return equalsResult;
   }
@@ -3022,6 +3210,7 @@ const letBindingParser = createParser('LetBinding', (input) => {
   const value = {
     kind: 'LetBinding',
     name: nameResult.value,
+    params,
     value: valueResult.value,
     body: bodyResult.value,
     span,
@@ -3140,4 +3329,5 @@ export const __internal = {
   letBindingParser,
   letKeyword,
   letEqualsLiteral,
+  letParamListParser,
 };

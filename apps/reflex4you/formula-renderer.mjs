@@ -11,6 +11,8 @@ const DEFAULT_MATHJAX_LOAD_TIMEOUT_MS = 9000;
 function precedence(node) {
   if (!node || typeof node !== 'object') return 100;
   switch (node.kind) {
+    case 'Call':
+      return 9;
     case 'SetBinding':
     case 'If':
     case 'IfNaN':
@@ -257,7 +259,18 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
       return latexIdentifierWithMetadata('y', identifierHighlights(node));
     case 'Identifier':
     case 'SetRef':
+    case 'ParamRef':
       return latexIdentifierWithMetadata(node.name || '?', identifierHighlights(node));
+    case 'Call': {
+      const args = Array.isArray(node.args) ? node.args : [];
+      const callee = node.callee;
+      if (callee && typeof callee === 'object' && (callee.kind === 'Identifier' || callee.kind === 'SetRef')) {
+        return functionCallLatex(callee.name || '?', args, options, identifierHighlights(callee));
+      }
+      const calleeLatex = nodeToLatex(callee, precedence(node), options);
+      const renderedArgs = args.map((arg) => nodeToLatex(arg, 0, options));
+      return `${wrapParensLatex(calleeLatex)}\\left(${renderedArgs.join(', ')}\\right)`;
+    }
     case 'FingerOffset':
       if (options && options.inlineFingerConstants) {
         const resolved = resolveFingerValue(node.slot, options);
