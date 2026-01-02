@@ -118,6 +118,18 @@ test('repeat composition inside let bindings compiles (let fn = z $$ 2 in fn)', 
   assert.match(fragment, /vec2 let_fn_0\(vec2 z\)\s*\{\s*return z;\s*\}/);
 });
 
+test('let alias preserves captured set bindings (set d = 1 in let f = z + d in let g = f in g)', () => {
+  const parsed = parseFormulaInput('set d = 1 in let f = z + d in let g = f in g');
+  assert.equal(parsed.ok, true);
+  let fragment = '';
+  assert.doesNotThrow(() => {
+    fragment = buildFragmentSourceFromAST(parsed.value);
+  });
+  // At least one let-bound function should capture a set binding.
+  assert.match(fragment, /cap_s_/);
+  assert.doesNotMatch(fragment, /undefined/);
+});
+
 test('buildFragmentSourceFromAST does not silently drop legacy RepeatComposePlaceholder nodes', () => {
   // This node kind should normally be resolved during parsing, but shader generation
   // must not compile it as just the base when the count is a literal.
