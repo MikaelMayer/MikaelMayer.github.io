@@ -119,7 +119,6 @@ export function childEntries(node) {
       ];
     case 'SetRef':
     case 'Identifier':
-    case 'PlaceholderVar':
     case 'ParamRef':
     case 'Const':
     case 'Var':

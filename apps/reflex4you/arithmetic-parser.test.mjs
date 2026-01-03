@@ -850,29 +850,19 @@ test('parses conj() calls as conjugate nodes', () => {
   assert.equal(node.value.kind, 'Var');
 });
 
-test('comp(...) expands iterative compositions', () => {
-  const result = parseFormulaInput('comp(v^2+z, v, 0, 2)');
+test('v is available as a normal identifier (bindable via set)', () => {
+  const result = parseFormulaInput('set v = 1 in v + 2');
   assert.equal(result.ok, true);
   const ast = result.value;
-  assert.equal(ast.kind, 'Add');
-  assert.equal(ast.left.kind, 'Pow');
-  assert.equal(ast.left.base.kind, 'Add');
-  assert.equal(ast.left.exponent, 2);
-  assert.equal(ast.left.base.right.kind, 'Var');
-  assert.equal(ast.right.kind, 'Var');
+  assert.equal(ast.kind, 'SetBinding');
+  assert.equal(ast.name, 'v');
+  assert.equal(ast.body.kind, 'Add');
 });
 
-test('comp with zero iterations returns the seed expression', () => {
-  const result = parseFormulaInput('comp(v+1, v, z, 0)');
-  assert.equal(result.ok, true);
-  const ast = result.value;
-  assert.equal(ast.kind, 'Var');
-});
-
-test('standalone iteration variables are rejected', () => {
+test('unbound v behaves like any unknown identifier', () => {
   const result = parseFormulaInput('v + 1');
   assert.equal(result.ok, false);
-  assert.match(result.message, /comp/i);
+  assert.match(result.message, /Unknown variable "v"/);
 });
 
 test('underscore-marked identifiers record highlight metadata and render as Huge letters (LEON)', () => {
@@ -887,12 +877,4 @@ test('underscore-marked identifiers record highlight metadata and render as Huge
   assert.ok(latex.indexOf('{\\Huge L}') < latex.indexOf('{\\Huge E}'));
   assert.ok(latex.indexOf('{\\Huge E}') < latex.indexOf('{\\Huge O}'));
   assert.ok(latex.indexOf('{\\Huge O}') < latex.indexOf('{\\Huge N}'));
-});
-
-test('comp(...) can clone floor(...) nodes (cloneAst supports Floor)', () => {
-  assert.doesNotThrow(() => {
-    const result = parseFormulaInput('comp(v+1, v, floor(z), 0)');
-    assert.equal(result.ok, true);
-    assert.equal(result.value.kind, 'Floor');
-  });
 });
