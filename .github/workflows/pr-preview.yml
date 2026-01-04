@@ -23,9 +23,9 @@ jobs:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Inject build id into Reflex4You HTML (cache-bust JS)
+      - name: Inject build id into Reflex4You HTML/JS (cache-bust + build sync)
         run: |
-          node -e "const fs=require('fs'); const build=process.env.BUILD_ID; const files=['apps/reflex4you/index.html','apps/reflex4you/formula.html','apps/reflex4you/explore.html']; for (const f of files){ const s=fs.readFileSync(f,'utf8'); fs.writeFileSync(f, s.replace(/__REFLEX_BUILD_ID__/g, build)); }"
+          node -e "const fs=require('fs'); const build=process.env.BUILD_ID; const files=['apps/reflex4you/index.html','apps/reflex4you/formula.html','apps/reflex4you/explore.html','apps/reflex4you/main.js']; for (const f of files){ const s=fs.readFileSync(f,'utf8'); fs.writeFileSync(f, s.replace(/__REFLEX_BUILD_ID__/g, build)); }"
         env:
           BUILD_ID: pr${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
 

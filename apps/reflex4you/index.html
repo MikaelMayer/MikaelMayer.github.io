@@ -1055,6 +1055,14 @@
     const bootOverlayMessage = document.getElementById('boot-overlay-message');
     const bootOverlayReload = document.getElementById('boot-overlay-reload');
     const key = 'reflex4you:bootReloadedOnce';
+    const bootfix =
+      (function () {
+        try {
+          return new URL(location.href).searchParams.get('bootfix') || '';
+        } catch (_) {
+          return '';
+        }
+      })();
 
     function showBootError(msg) {
       const withBuild = `${msg}\n\nHTML build: ${HTML_BUILD_ID}`;
@@ -1118,7 +1126,24 @@
       // IMPORTANT: PR previews often update HTML faster than JS due to browser/SW caching.
       // Cache-bust the module URL using a per-deploy build id injected by CI.
       window.__reflexHtmlBuildId = HTML_BUILD_ID;
-      await import(`./main.js?build=${encodeURIComponent(HTML_BUILD_ID)}`);
+      const moduleUrl = `./main.js?build=${encodeURIComponent(HTML_BUILD_ID)}${bootfix ? `&bootfix=${encodeURIComponent(bootfix)}` : ''}`;
+      await import(moduleUrl);
+
+      // If CI injects a build id into both HTML and JS, a mismatch here is a strong
+      // indicator of stale caching (HTML updated before JS). Reload once to recover.
+      try {
+        const jsBuild = window.__reflexJsBuildId;
+        if (
+          typeof jsBuild === 'string' &&
+          jsBuild &&
+          jsBuild !== `js-v${document.getElementById('app-version-pill')?.getAttribute('data-version') || ''}` &&
+          jsBuild !== HTML_BUILD_ID
+        ) {
+          reloadOnce('html-js-build-mismatch');
+        }
+      } catch (_) {
+        // ignore mismatch checks
+      }
       clearTimeout(bootTimer);
     } catch (e) {
       clearTimeout(bootTimer);
