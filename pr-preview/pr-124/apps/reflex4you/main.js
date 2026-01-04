@@ -60,7 +60,7 @@ setCompileOverlayVisible(true, 'Loading…');
 const APP_VERSION = 33;
 // CI replaces this placeholder during deploy (see .github/workflows/*).
 // It allows debugging and recovery from HTML/JS cache skew on GitHub Pages.
-const JS_BUILD_ID = 'pr124-e1c42abf03d297dae28fb14223cda984fd0e41bb';
+const JS_BUILD_ID = 'pr124-aafd9d899552b3c1fa680f30466d3eb0ab44bf71';
 const CONTEXT_LOSS_RELOAD_KEY = `reflex4you:contextLossReloaded:v${APP_VERSION}`;
 const RESUME_RELOAD_KEY = `reflex4you:resumeReloaded:v${APP_VERSION}`;
 const LAST_HIDDEN_AT_KEY = `reflex4you:lastHiddenAtMs:v${APP_VERSION}`;
@@ -76,7 +76,7 @@ if (versionPill) {
 
 // Expose a JS build marker to help debug HTML/JS cache mismatches (PR previews).
 if (typeof window !== 'undefined') {
-  window.__reflexJsBuildId = JS_BUILD_ID && JS_BUILD_ID !== 'pr124-e1c42abf03d297dae28fb14223cda984fd0e41bb' ? JS_BUILD_ID : `js-v${APP_VERSION}`;
+  window.__reflexJsBuildId = JS_BUILD_ID && JS_BUILD_ID !== 'pr124-aafd9d899552b3c1fa680f30466d3eb0ab44bf71' ? JS_BUILD_ID : `js-v${APP_VERSION}`;
 }
 
 const EDIT_PARAM = 'edit';
