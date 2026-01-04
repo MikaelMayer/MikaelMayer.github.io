@@ -7,7 +7,7 @@
 // PR previews under `/pr-preview/...`). If we use a single global cache name, different
 // deployments can overwrite each other and serve stale/mismatched assets.
 // Include the service worker registration scope in cache keys to isolate deployments.
-const CACHE_MINOR = '33.0';
+const CACHE_MINOR = '33.1';
 const SCOPE =
   typeof self !== 'undefined' && self.registration && typeof self.registration.scope === 'string'
     ? self.registration.scope
@@ -213,6 +213,15 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Requests that include explicit build/cache-busting params should NOT be stored in
+  // the runtime cache. During GitHub Pages deploy propagation, HTML can update before
+  // JS modules are served consistently; caching the "wrong" JS under a build URL can
+  // prolong the mismatch. Treat these as network-only (best effort).
+  const hasBuildBuster =
+    url.searchParams.has('build') ||
+    url.searchParams.has('bootfix') ||
+    url.searchParams.has('initfix');
+
   const isNavigation =
     request.mode === 'navigate' ||
     request.destination === 'document' ||
@@ -261,6 +270,22 @@ self.addEventListener('fetch', (event) => {
   // For code assets, prefer network-first so PR previews update quickly even if a
   // previous service worker version is still controlling the scope.
   if (isJsModule) {
+    if (hasBuildBuster) {
+      // Network-only: do not write these into the runtime cache.
+      event.respondWith(
+        (async () => {
+          try {
+            return await fetch(request);
+          } catch (_) {
+            // Fall back to whatever we already have if offline.
+            const cached = await matchFromNamedCaches(request);
+            if (cached) return cached;
+            throw _;
+          }
+        })(),
+      );
+      return;
+    }
     event.respondWith(networkFirst(request, { timeoutMs: 1500 }));
     return;
   }
