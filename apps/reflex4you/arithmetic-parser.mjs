@@ -63,7 +63,6 @@ const IDENTIFIER_CHAR = /[A-Za-z0-9_]/;
 const IDENTIFIER_LETTER_CHAR = /[A-Za-z]/;
 const NUMBER_REGEX = /[+-]?(?:\d+\.\d+|\d+|\.\d+)(?:[eE][+-]?\d+)?/y;
 const SQRT3_OVER_2 = Math.sqrt(3) / 2;
-const ITERATION_VARIABLE_NAME = 'v';
 const IDENTIFIER_REGEX = /[A-Za-z_][A-Za-z0-9_]*/y;
 
 function normalizeIdentifierWithHighlights(raw) {
@@ -99,10 +98,6 @@ function attachIdentifierMeta(node, meta) {
   }
   node.__identifierMeta = { highlights: meta.highlights.map((h) => ({ index: h.index, letter: h.letter })) };
   return node;
-}
-
-function createPlaceholderVar(name) {
-  return { kind: 'PlaceholderVar', name };
 }
 
 function createParamRef(name) {
@@ -438,7 +433,6 @@ const RESERVED_BINDING_NAMES = new Set([
   'isnan',
   'heav',
   'oo',
-  'comp',
   'o',
   'x',
   'y',
@@ -452,14 +446,7 @@ const RESERVED_BINDING_NAMES = new Set([
   'RA',
   'RB',
   'j',
-  ITERATION_VARIABLE_NAME,
 ]);
-
-const iterationVariableLiteral = keywordLiteral(ITERATION_VARIABLE_NAME, { ctor: 'IterationVar' })
-  .Map((_, result) => withSpan(createPlaceholderVar(ITERATION_VARIABLE_NAME), result.span));
-
-const iterationVariableNameParser = keywordLiteral(ITERATION_VARIABLE_NAME, { ctor: 'IterationName' })
-  .Map(() => ITERATION_VARIABLE_NAME);
 
 const identifierToken = wsRegex(IDENTIFIER_REGEX, {
   ctor: 'IdentifierToken',
@@ -528,7 +515,6 @@ const primitiveParser = Choice([
   ),
   su2RotationPrimitiveParser,
   fingerLiteralParser,
-  iterationVariableLiteral,
   identifierReferenceParser,
 ], { ctor: 'Primitive' });
 
@@ -595,67 +581,6 @@ const explicitRepeatComposeParser = createParser('ExplicitRepeatCompose', (input
   return new ParseSuccess({
     ctor: 'ExplicitRepeatCompose',
     value: attachIdentifierMeta(withSpan(oo(fnResult.value, validatedCount), span), keyword.value),
-    span,
-    next: close.next,
-  });
-});
-
-const compParser = createParser('CompCall', (input) => {
-  const keyword = keywordLiteral('comp', { ctor: 'CompKeyword' }).runNormalized(input);
-  if (!keyword.ok) {
-    return keyword;
-  }
-  const open = wsLiteral('(', { ctor: 'CompOpen' }).runNormalized(keyword.next);
-  if (!open.ok) {
-    return open;
-  }
-  const bodyResult = expressionRef.runNormalized(open.next);
-  if (!bodyResult.ok) {
-    return bodyResult;
-  }
-  const comma1 = wsLiteral(',', { ctor: 'CompComma1' }).runNormalized(bodyResult.next);
-  if (!comma1.ok) {
-    return comma1;
-  }
-  const nameResult = iterationVariableNameParser.runNormalized(comma1.next);
-  if (!nameResult.ok) {
-    return nameResult;
-  }
-  const comma2 = wsLiteral(',', { ctor: 'CompComma2' }).runNormalized(nameResult.next);
-  if (!comma2.ok) {
-    return comma2;
-  }
-  const seedResult = expressionRef.runNormalized(comma2.next);
-  if (!seedResult.ok) {
-    return seedResult;
-  }
-  const comma3 = wsLiteral(',', { ctor: 'CompComma3' }).runNormalized(seedResult.next);
-  if (!comma3.ok) {
-    return comma3;
-  }
-  const countResult = numberToken.runNormalized(comma3.next);
-  if (!countResult.ok) {
-    return countResult;
-  }
-  const validatedCount = validateCompIterationCount(countResult.value, countResult.span);
-  if (validatedCount instanceof ParseFailure) {
-    return validatedCount;
-  }
-  const close = wsLiteral(')', { ctor: 'CompClose' }).runNormalized(countResult.next);
-  if (!close.ok) {
-    return close;
-  }
-  const span = spanBetween(input, close.next);
-  const value = buildCompAST({
-    body: bodyResult.value,
-    placeholder: nameResult.value,
-    seed: seedResult.value,
-    iterations: validatedCount,
-    span,
-  });
-  return new ParseSuccess({
-    ctor: 'CompCall',
-    value,
     span,
     next: close.next,
   });
@@ -902,7 +827,6 @@ const builtinFunctionLiteralParser = Choice(
 
 const primaryParser = Choice([
   explicitRepeatComposeParser,
-  compParser,
   explicitComposeParser,
   elementaryFunctionParser,
   builtinFunctionLiteralParser,
@@ -1239,144 +1163,6 @@ function createComposeMultipleNode({ base, countExpression, countSpan, span, res
   return node;
 }
 
-function buildCompAST({ body, placeholder, seed, iterations, span }) {
-  let current = cloneAst(seed);
-  for (let i = 0; i < iterations; i += 1) {
-    current = substitutePlaceholder(body, placeholder, current);
-  }
-  if (span) {
-    current.span = span;
-    current.input = span.input;
-  }
-  return current;
-}
-
-function substitutePlaceholder(node, placeholder, replacement) {
-  if (!node || typeof node !== 'object') {
-    return node;
-  }
-  if (node.kind === 'PlaceholderVar') {
-    if (node.name === placeholder) {
-      return cloneAst(replacement);
-    }
-    return cloneAst(node);
-  }
-  switch (node.kind) {
-    case 'Const':
-    case 'Var':
-    case 'VarX':
-    case 'VarY':
-    case 'FingerOffset':
-    case 'DeviceRotation':
-    case 'TrackballRotation':
-    case 'Identifier':
-    case 'ParamRef':
-    case 'SetRef':
-      return cloneAst(node);
-    case 'Call':
-      return {
-        ...node,
-        callee: substitutePlaceholder(node.callee, placeholder, replacement),
-        args: Array.isArray(node.args)
-          ? node.args.map((arg) => substitutePlaceholder(arg, placeholder, replacement))
-          : [],
-      };
-    case 'LetBinding':
-      return {
-        ...node,
-        value: substitutePlaceholder(node.value, placeholder, replacement),
-        body: substitutePlaceholder(node.body, placeholder, replacement),
-      };
-    case 'Pow':
-      return { ...node, base: substitutePlaceholder(node.base, placeholder, replacement) };
-    case 'Exp':
-    case 'Sin':
-    case 'Cos':
-    case 'Tan':
-    case 'Atan':
-    case 'Asin':
-    case 'Acos':
-    case 'Abs':
-    case 'Abs2':
-    case 'Floor':
-    case 'Conjugate':
-    case 'IsNaN':
-      return { ...node, value: substitutePlaceholder(node.value, placeholder, replacement) };
-    case 'Ln': {
-      const nextValue = substitutePlaceholder(node.value, placeholder, replacement);
-      const nextBranch = node.branch
-        ? substitutePlaceholder(node.branch, placeholder, replacement)
-        : null;
-      return { ...node, value: nextValue, branch: nextBranch };
-    }
-    case 'Arg': {
-      const nextValue = substitutePlaceholder(node.value, placeholder, replacement);
-      const nextBranch = node.branch
-        ? substitutePlaceholder(node.branch, placeholder, replacement)
-        : null;
-      return { ...node, value: nextValue, branch: nextBranch };
-    }
-    case 'Sub':
-    case 'Mul':
-    case 'Op':
-    case 'Add':
-    case 'Div':
-    case 'LessThan':
-    case 'GreaterThan':
-    case 'LessThanOrEqual':
-    case 'GreaterThanOrEqual':
-    case 'Equal':
-    case 'LogicalAnd':
-    case 'LogicalOr':
-      return {
-        ...node,
-        left: substitutePlaceholder(node.left, placeholder, replacement),
-        right: substitutePlaceholder(node.right, placeholder, replacement),
-      };
-    case 'Compose':
-      return {
-        ...node,
-        f: substitutePlaceholder(node.f, placeholder, replacement),
-        g: substitutePlaceholder(node.g, placeholder, replacement),
-      };
-    case 'ComposeMultiple':
-      return {
-        ...node,
-        base: substitutePlaceholder(node.base, placeholder, replacement),
-        countExpression: node.countExpression
-          ? substitutePlaceholder(node.countExpression, placeholder, replacement)
-          : null,
-      };
-    case 'RepeatComposePlaceholder':
-      return {
-        ...node,
-        base: substitutePlaceholder(node.base, placeholder, replacement),
-        countExpression: substitutePlaceholder(node.countExpression, placeholder, replacement),
-      };
-    case 'If':
-      return {
-        ...node,
-        condition: substitutePlaceholder(node.condition, placeholder, replacement),
-        thenBranch: substitutePlaceholder(node.thenBranch, placeholder, replacement),
-        elseBranch: substitutePlaceholder(node.elseBranch, placeholder, replacement),
-      };
-    case 'IfNaN':
-      return {
-        ...node,
-        value: substitutePlaceholder(node.value, placeholder, replacement),
-        fallback: substitutePlaceholder(node.fallback, placeholder, replacement),
-      };
-    case 'SetBinding':
-      return {
-        ...node,
-        value: substitutePlaceholder(node.value, placeholder, replacement),
-        body: substitutePlaceholder(node.body, placeholder, replacement),
-      };
-    default:
-      return cloneAst(node);
-  }
-}
-
 function cloneAst(node) {
   if (!node || typeof node !== 'object') {
     return node;
@@ -1389,7 +1175,6 @@ function cloneAst(node) {
     case 'FingerOffset':
     case 'DeviceRotation':
     case 'TrackballRotation':
-    case 'PlaceholderVar':
     case 'Identifier':
     case 'ParamRef':
     case 'SetRef':
@@ -1511,7 +1296,6 @@ function substituteIdentifierWithClone(node, targetName, replacement) {
     case 'FingerOffset':
     case 'DeviceRotation':
     case 'TrackballRotation':
-    case 'PlaceholderVar':
     case 'ParamRef':
     case 'SetRef':
       return cloneAst(node);
@@ -1629,102 +1413,6 @@ function substituteIdentifierWithClone(node, targetName, replacement) {
     default:
       return cloneAst(node);
   }
-}
-
-function findFirstPlaceholderNode(ast) {
-  if (!ast || typeof ast !== 'object') {
-    return null;
-  }
-  const stack = [ast];
-  while (stack.length) {
-    const node = stack.pop();
-    if (!node || typeof node !== 'object') {
-      continue;
-    }
-    if (node.kind === 'PlaceholderVar') {
-      return node;
-    }
-    switch (node.kind) {
-      case 'Call':
-        if (node.callee) {
-          stack.push(node.callee);
-        }
-        if (Array.isArray(node.args)) {
-          for (let i = 0; i < node.args.length; i += 1) {
-            if (node.args[i]) {
-              stack.push(node.args[i]);
-            }
-          }
-        }
-        break;
-      case 'LetBinding':
-        stack.push(node.value, node.body);
-        break;
-      case 'Pow':
-        stack.push(node.base);
-        break;
-      case 'Exp':
-      case 'Sin':
-      case 'Cos':
-      case 'Tan':
-      case 'Atan':
-      case 'Asin':
-      case 'Acos':
-      case 'Ln':
-      case 'Arg':
-      case 'Abs':
-      case 'Abs2':
-      case 'Floor':
-      case 'Conjugate':
-      case 'IsNaN':
-        stack.push(node.value);
-        if ((node.kind === 'Ln' || node.kind === 'Arg') && node.branch) {
-          stack.push(node.branch);
-        }
-        break;
-      case 'Sub':
-      case 'Mul':
-      case 'Op':
-      case 'Add':
-      case 'Div':
-      case 'LessThan':
-      case 'GreaterThan':
-      case 'LessThanOrEqual':
-      case 'GreaterThanOrEqual':
-      case 'Equal':
-      case 'LogicalAnd':
-      case 'LogicalOr':
-        stack.push(node.left, node.right);
-        break;
-      case 'If':
-        stack.push(node.condition, node.thenBranch, node.elseBranch);
-        break;
-      case 'IfNaN':
-        stack.push(node.value, node.fallback);
-        break;
-      case 'Compose':
-        stack.push(node.f, node.g);
-        break;
-      case 'ComposeMultiple':
-        stack.push(node.base);
-        if (node.countExpression) {
-          stack.push(node.countExpression);
-        }
-        break;
-      case 'RepeatComposePlaceholder':
-        stack.push(node.base);
-        if (node.countExpression) {
-          stack.push(node.countExpression);
-        }
-        break;
-      case 'SetBinding':
-        stack.push(node.value, node.body);
-        break;
-      default:
-        break;
-    }
-  }
-  return null;
 }
 
 function findFirstLetBinding(ast) {
@@ -1951,7 +1639,6 @@ function resolveSetReferences(ast, input) {
       case 'FingerOffset':
       case 'DeviceRotation':
       case 'TrackballRotation':
-      case 'PlaceholderVar':
       case 'ParamRef':
       case 'SetRef':
         return null;
@@ -2229,7 +1916,6 @@ function resolveRepeatPlaceholders(ast, parseOptions, input) {
       case 'FingerOffset':
       case 'DeviceRotation':
       case 'TrackballRotation':
-      case 'PlaceholderVar':
         return null;
       case 'Pow':
         return visit(node.base, node, 'base');
@@ -2914,20 +2600,6 @@ function validateRepeatCount(value, span) {
   return value;
 }
 
-function validateCompIterationCount(value, span) {
-  if (!Number.isInteger(value) || value < 0) {
-    return new ParseFailure({
-      ctor: 'CompIterations',
-      message: 'comp iteration count must be a non-negative integer',
-      severity: ParseSeverity.error,
-      expected: 'non-negative integer iteration count',
-      span,
-      input: span.input,
-    });
-  }
-  return value;
-}
-
 const powerSuffixParser = createParser('PowerSuffix', (input) => {
   const caret = wsLiteral('^', { ctor: 'PowerOp' }).runNormalized(input);
   if (!caret.ok) {
@@ -3289,18 +2961,6 @@ export function parseFormulaInput(input, options = {}) {
     return repeatResolved;
   }
   parsed.value = repeatResolved;
-  const placeholderNode = findFirstPlaceholderNode(parsed.value);
-  if (placeholderNode) {
-    const span = placeholderNode.span ?? normalized.createSpan(0, 0);
-    return new ParseFailure({
-      ctor: 'PlaceholderVar',
-      message: `Placeholder variable "${placeholderNode.name}" is only allowed inside comp(...)`,
-      severity: ParseSeverity.error,
-      expected: 'comp(...) placeholder usage',
-      span,
-      input: span.input || normalized,
-    });
-  }
   return parsed;
 }
 
