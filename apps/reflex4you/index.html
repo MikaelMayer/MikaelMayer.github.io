@@ -1054,15 +1054,15 @@
     const bootOverlay = document.getElementById('boot-overlay');
     const bootOverlayMessage = document.getElementById('boot-overlay-message');
     const bootOverlayReload = document.getElementById('boot-overlay-reload');
-    const key = 'reflex4you:bootReloadedOnce';
-    const bootfix =
-      (function () {
-        try {
-          return new URL(location.href).searchParams.get('bootfix') || '';
-        } catch (_) {
-          return '';
-        }
-      })();
+    const reloadCountKey = 'reflex4you:bootReloadCount';
+    const maxReloads = 5;
+    const bootfix = (function () {
+      try {
+        return new URL(location.href).searchParams.get('bootfix') || '';
+      } catch (_) {
+        return '';
+      }
+    })();
 
     function showBootError(msg) {
       const withBuild = `${msg}\n\nHTML build: ${HTML_BUILD_ID}`;
@@ -1080,10 +1080,12 @@
 
     function reloadOnce(reason) {
       try {
-        if (sessionStorage.getItem(key)) return false;
-        sessionStorage.setItem(key, String(Date.now()));
+        const raw = sessionStorage.getItem(reloadCountKey) || '0';
+        const count = Number(raw) || 0;
+        if (count >= maxReloads) return false;
+        sessionStorage.setItem(reloadCountKey, String(count + 1));
       } catch (_) {
-        // If sessionStorage is unavailable, still try once (best effort).
+        // If sessionStorage is unavailable, still try (best effort).
       }
       try {
         const url = new URL(location.href);
@@ -1095,6 +1097,25 @@
         try { location.reload(); } catch (_) {}
         return true;
       }
+    }
+
+    function buildMainModuleUrl() {
+      // Use bootfix as an extra nonce so "mismatched JS during deploy propagation"
+      // doesn't get cached under the same URL.
+      const suffix = bootfix ? `&bootfix=${encodeURIComponent(bootfix)}` : '';
+      return `./main.js?build=${encodeURIComponent(HTML_BUILD_ID)}${suffix}`;
+    }
+
+    async function probeMainJsBuildId(moduleUrl) {
+      // Use no-store to avoid populating HTTP caches with a transiently-wrong JS file
+      // when GitHub Pages has updated HTML but not yet served the matching JS.
+      const res = await fetch(moduleUrl, { cache: 'no-store' });
+      if (!res.ok) {
+        throw new Error(`Unable to fetch ${moduleUrl} (${res.status})`);
+      }
+      const text = await res.text();
+      const m = /const\s+JS_BUILD_ID\s*=\s*'([^']+)'/.exec(text);
+      return m ? m[1] : null;
     }
 
     // If we don’t finish boot quickly, show a message and try a one-time reload.
@@ -1126,23 +1147,26 @@
       // IMPORTANT: PR previews often update HTML faster than JS due to browser/SW caching.
       // Cache-bust the module URL using a per-deploy build id injected by CI.
       window.__reflexHtmlBuildId = HTML_BUILD_ID;
-      const moduleUrl = `./main.js?build=${encodeURIComponent(HTML_BUILD_ID)}${bootfix ? `&bootfix=${encodeURIComponent(bootfix)}` : ''}`;
+      const moduleUrl = buildMainModuleUrl();
+
+      // Preflight check: do not import (and thus do not risk caching) a JS file
+      // whose embedded build id doesn't match this HTML.
+      const jsBuildId = await probeMainJsBuildId(moduleUrl);
+      if (jsBuildId && jsBuildId !== HTML_BUILD_ID) {
+        if (!reloadOnce('html-js-build-mismatch')) {
+          throw new Error(`Build mismatch: HTML=${HTML_BUILD_ID} JS=${jsBuildId}`);
+        }
+        return;
+      }
+
       await import(moduleUrl);
 
-      // If CI injects a build id into both HTML and JS, a mismatch here is a strong
-      // indicator of stale caching (HTML updated before JS). Reload once to recover.
-      try {
-        const jsBuild = window.__reflexJsBuildId;
-        if (
-          typeof jsBuild === 'string' &&
-          jsBuild &&
-          jsBuild !== `js-v${document.getElementById('app-version-pill')?.getAttribute('data-version') || ''}` &&
-          jsBuild !== HTML_BUILD_ID
-        ) {
-          reloadOnce('html-js-build-mismatch');
+      // Post-import check: if CI injected a build id into JS, it must match HTML.
+      if (window.__reflexJsBuildId && window.__reflexJsBuildId !== `js-v33` && window.__reflexJsBuildId !== HTML_BUILD_ID) {
+        if (!reloadOnce('html-js-build-mismatch-post')) {
+          throw new Error(`Build mismatch after import: HTML=${HTML_BUILD_ID} JS=${window.__reflexJsBuildId}`);
         }
-      } catch (_) {
-        // ignore mismatch checks
+        return;
       }
       clearTimeout(bootTimer);
     } catch (e) {
