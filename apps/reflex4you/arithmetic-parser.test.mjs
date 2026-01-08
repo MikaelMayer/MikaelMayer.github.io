@@ -878,3 +878,214 @@ test('underscore-marked identifiers record highlight metadata and render as Huge
   assert.ok(latex.indexOf('{\\Huge E}') < latex.indexOf('{\\Huge O}'));
   assert.ok(latex.indexOf('{\\Huge O}') < latex.indexOf('{\\Huge N}'));
 });
+
+function complexAdd(a, b) {
+  return { re: a.re + b.re, im: a.im + b.im };
+}
+function complexSub(a, b) {
+  return { re: a.re - b.re, im: a.im - b.im };
+}
+function complexMul(a, b) {
+  return { re: a.re * b.re - a.im * b.im, im: a.re * b.im + a.im * b.re };
+}
+function complexDiv(a, b) {
+  const denom = b.re * b.re + b.im * b.im;
+  if (denom < 1e-12) {
+    return { re: NaN, im: NaN };
+  }
+  return { re: (a.re * b.re + a.im * b.im) / denom, im: (a.im * b.re - a.re * b.im) / denom };
+}
+
+function evaluateAstComplex(root, { z = { re: 0, im: 0 } } = {}) {
+  const setEnv = new Map(); // SetBinding node -> complex value
+  const letEnv = []; // stack of { name, params, expr, capturedSetEnv, capturedLetEnv }
+  const paramEnv = new Map(); // param name -> complex value
+
+  function lookupLet(name, envStack) {
+    for (let i = envStack.length - 1; i >= 0; i -= 1) {
+      if (envStack[i].name === name) return envStack[i];
+    }
+    return null;
+  }
+
+  function evalNode(node, zLocal, localParamEnv, localSetEnv, localLetEnv) {
+    if (!node || typeof node !== 'object') return { re: 0, im: 0 };
+    switch (node.kind) {
+      case 'Const':
+        return { re: node.re, im: node.im };
+      case 'Var':
+        return { re: zLocal.re, im: zLocal.im };
+      case 'VarX':
+        return { re: zLocal.re, im: 0 };
+      case 'VarY':
+        return { re: zLocal.im, im: 0 };
+      case 'ParamRef': {
+        const v = localParamEnv.get(node.name);
+        if (!v) throw new Error(`Unbound ParamRef: ${node.name}`);
+        return v;
+      }
+      case 'SetRef': {
+        const v = localSetEnv.get(node.binding);
+        if (!v) throw new Error(`Unbound SetRef: ${node.name}`);
+        return v;
+      }
+      case 'Add':
+        return complexAdd(evalNode(node.left, zLocal, localParamEnv, localSetEnv, localLetEnv), evalNode(node.right, zLocal, localParamEnv, localSetEnv, localLetEnv));
+      case 'Sub':
+        return complexSub(evalNode(node.left, zLocal, localParamEnv, localSetEnv, localLetEnv), evalNode(node.right, zLocal, localParamEnv, localSetEnv, localLetEnv));
+      case 'Mul':
+        return complexMul(evalNode(node.left, zLocal, localParamEnv, localSetEnv, localLetEnv), evalNode(node.right, zLocal, localParamEnv, localSetEnv, localLetEnv));
+      case 'Div':
+        return complexDiv(evalNode(node.left, zLocal, localParamEnv, localSetEnv, localLetEnv), evalNode(node.right, zLocal, localParamEnv, localSetEnv, localLetEnv));
+      case 'SetBinding': {
+        const value = evalNode(node.value, zLocal, localParamEnv, localSetEnv, localLetEnv);
+        const nextSetEnv = new Map(localSetEnv);
+        nextSetEnv.set(node, value);
+        return evalNode(node.body, zLocal, localParamEnv, nextSetEnv, localLetEnv);
+      }
+      case 'LetBinding': {
+        const params = Array.isArray(node.params) ? node.params : [];
+        const closure = {
+          name: node.name,
+          params,
+          expr: node.value,
+          capturedSetEnv: new Map(localSetEnv),
+          capturedLetEnv: localLetEnv.slice(),
+        };
+        const nextLetEnv = localLetEnv.slice();
+        nextLetEnv.push(closure);
+        return evalNode(node.body, zLocal, localParamEnv, localSetEnv, nextLetEnv);
+      }
+      case 'Call': {
+        // Only implement the multi-arg let call path (enough for repeat tests).
+        if (!node.callee || node.callee.kind !== 'Identifier') {
+          throw new Error('Unsupported Call form in test interpreter');
+        }
+        const callee = lookupLet(node.callee.name, localLetEnv);
+        if (!callee) {
+          throw new Error(`Unknown function: ${node.callee.name}`);
+        }
+        const params = Array.isArray(callee.params) ? callee.params : [];
+        const args = Array.isArray(node.args) ? node.args : [];
+        if (!(args.length === params.length || args.length === params.length + 1)) {
+          throw new Error(`Arity mismatch for ${callee.name}: got ${args.length}`);
+        }
+        const argValues = [];
+        for (let i = 0; i < params.length; i += 1) {
+          argValues.push(evalNode(args[i], zLocal, localParamEnv, localSetEnv, localLetEnv));
+        }
+        const zForBody =
+          args.length === params.length + 1
+            ? evalNode(args[args.length - 1], zLocal, localParamEnv, localSetEnv, localLetEnv)
+            : zLocal;
+        const nextParamEnv = new Map();
+        for (let i = 0; i < params.length; i += 1) {
+          nextParamEnv.set(params[i], argValues[i]);
+        }
+        return evalNode(callee.expr, zForBody, nextParamEnv, callee.capturedSetEnv, callee.capturedLetEnv);
+      }
+      default:
+        throw new Error(`Unsupported node kind in test interpreter: ${node.kind}`);
+    }
+  }
+
+  return evalNode(root, z, paramEnv, setEnv, letEnv);
+}
+
+test('repeat: single register increments', () => {
+  const source = `
+let step(i, r) = r + 1 in
+repeat 3 from 0 by step
+`.trim();
+  const ast = parseFormulaToAST(source);
+  const value = evaluateAstComplex(ast);
+  assert.equal(value.re, 3);
+  assert.equal(value.im, 0);
+});
+
+test('repeat: loop index is zero-based', () => {
+  const source = `
+let step(i, r) = r + i in
+repeat 5 from 0 by step
+`.trim();
+  const ast = parseFormulaToAST(source);
+  const value = evaluateAstComplex(ast);
+  assert.equal(value.re, 10);
+  assert.equal(value.im, 0);
+});
+
+test('repeat: multiple registers (Fibonacci)', () => {
+  const source = `
+let fa(i, a, b) = b in
+let fb(i, a, b) = a + b in
+repeat 10 from 0, 1 by fa, fb
+`.trim();
+  const ast = parseFormulaToAST(source);
+  const value = evaluateAstComplex(ast);
+  assert.equal(value.re, 55);
+  assert.equal(value.im, 0);
+});
+
+test('repeat: zero iterations returns a1', () => {
+  const source = `
+let step(i, r) = r + 1 in
+repeat 0 from 7 by step
+`.trim();
+  const ast = parseFormulaToAST(source);
+  const value = evaluateAstComplex(ast);
+  assert.equal(value.re, 7);
+  assert.equal(value.im, 0);
+});
+
+test('repeat: n can be a compile-time expression (floor)', () => {
+  const source = `
+let step(i, r) = r + 1 in
+repeat floor(3.9) from 0 by step
+`.trim();
+  const ast = parseFormulaToAST(source);
+  const value = evaluateAstComplex(ast);
+  assert.equal(value.re, 3);
+  assert.equal(value.im, 0);
+});
+
+test('repeat: rejects mismatched lengths between from and by', () => {
+  const result = parseFormulaInput(`
+let step(i, r) = r + 1 in
+repeat 3 from 0, 1 by step
+`.trim());
+  assert.equal(result.ok, false);
+  assert.match(result.message, /requires exactly 2/i);
+});
+
+test('repeat: rejects unresolved step function identifiers', () => {
+  const result = parseFormulaInput('repeat 3 from 0 by missing');
+  assert.equal(result.ok, false);
+  assert.match(result.message, /not a user-defined function in scope/i);
+});
+
+test('repeat: rejects incorrect step function arity', () => {
+  const result = parseFormulaInput(`
+let step(i) = i in
+repeat 3 from 0 by step
+`.trim());
+  assert.equal(result.ok, false);
+  assert.match(result.message, /must have exactly 2 parameter/i);
+});
+
+test('repeat: rejects n that is not compile-time evaluable', () => {
+  const result = parseFormulaInput(`
+let step(i, r) = r + 1 in
+repeat x from 0 by step
+`.trim());
+  assert.equal(result.ok, false);
+  assert.match(result.message, /compile time/i);
+});
+
+test('repeat: rejects non-integer n', () => {
+  const result = parseFormulaInput(`
+let step(i, r) = r + 1 in
+repeat 1.5 from 0 by step
+`.trim());
+  assert.equal(result.ok, false);
+  assert.match(result.message, /integer iteration count/i);
+});

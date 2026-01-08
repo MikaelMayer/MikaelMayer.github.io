@@ -339,7 +339,6 @@ const jLiteral = keywordLiteral('j', { ctor: 'ConstJ', caseSensitive: false })
 
 const literalParser = Choice([
   imagFromNumber,
-  unitImagLiteral,
   numberLiteral,
   jLiteral,
 ], { ctor: 'Literal' });
@@ -409,6 +408,9 @@ const RESERVED_BINDING_NAMES = new Set([
   'set',
   'in',
   'if',
+  'repeat',
+  'from',
+  'by',
   'ifnan',
   'iferror',
   'exp',
@@ -521,6 +523,7 @@ const primitiveParser = Choice([
 let expressionParser;
 const expressionRef = lazy(() => expressionParser, { ctor: 'ExpressionRef' });
 const setBindingRef = lazy(() => setBindingParser, { ctor: 'SetBindingRef' });
+const repeatBindingRef = lazy(() => repeatBindingParser, { ctor: 'RepeatBindingRef' });
 
 const groupedParser = Sequence([
   wsLiteral('(', { ctor: 'GroupOpen' }),
@@ -831,6 +834,7 @@ const primaryParser = Choice([
   elementaryFunctionParser,
   builtinFunctionLiteralParser,
   ifParser,
+  repeatBindingRef,
   setBindingRef,
   groupedParser,
   literalParser,
@@ -1268,6 +1272,13 @@ function cloneAst(node) {
         base: cloneAst(node.base),
         countExpression: cloneAst(node.countExpression),
       };
+    case 'Repeat':
+      return {
+        ...node,
+        countExpression: node.countExpression ? cloneAst(node.countExpression) : null,
+        fromExpressions: Array.isArray(node.fromExpressions) ? node.fromExpressions.map((expr) => cloneAst(expr)) : [],
+        byIdentifiers: Array.isArray(node.byIdentifiers) ? node.byIdentifiers.slice() : [],
+      };
     default:
       throw new Error(`Unknown AST kind in cloneAst: ${node.kind}`);
   }
@@ -1410,6 +1421,17 @@ function substituteIdentifierWithClone(node, targetName, replacement) {
         base: substituteIdentifierWithClone(node.base, targetName, replacement),
         countExpression: substituteIdentifierWithClone(node.countExpression, targetName, replacement),
       };
+    case 'Repeat':
+      return {
+        ...node,
+        countExpression: node.countExpression
+          ? substituteIdentifierWithClone(node.countExpression, targetName, replacement)
+          : null,
+        fromExpressions: Array.isArray(node.fromExpressions)
+          ? node.fromExpressions.map((expr) => substituteIdentifierWithClone(expr, targetName, replacement))
+          : [],
+        byIdentifiers: Array.isArray(node.byIdentifiers) ? node.byIdentifiers.slice() : [],
+      };
     default:
       return cloneAst(node);
   }
@@ -1487,6 +1509,16 @@ function findFirstLetBinding(ast) {
         stack.push(node.base);
         if (node.countExpression) {
           stack.push(node.countExpression);
+        }
+        break;
+      case 'Repeat':
+        if (node.countExpression) {
+          stack.push(node.countExpression);
+        }
+        if (Array.isArray(node.fromExpressions)) {
+          for (let i = 0; i < node.fromExpressions.length; i += 1) {
+            stack.push(node.fromExpressions[i]);
+          }
         }
         break;
       default:
@@ -1608,6 +1640,19 @@ function resolveSetReferences(ast, input) {
           node.__letBinding = letBinding;
           return null;
         }
+
+        // Special-case the imaginary unit: treat an unbound `i`/`I` as 0+1i.
+        // This preserves legacy formulas like `z + i`, while still allowing a
+        // parameter named `i` (it will be resolved above as ParamRef).
+        if (typeof node.name === 'string' && node.name.toLowerCase() === 'i') {
+          const resolved = Const(0, 1);
+          resolved.span = node.span;
+          resolved.input = node.input;
+          resolved.__identifierMeta = node.__identifierMeta;
+          Object.assign(node, resolved);
+          return null;
+        }
+
         const span = node.span ?? input.createSpan(0, 0);
         return new ParseFailure({
           ctor: 'Identifier',
@@ -1626,6 +1671,20 @@ function resolveSetReferences(ast, input) {
         const args = Array.isArray(node.args) ? node.args : [];
         for (let i = 0; i < args.length; i += 1) {
           const err = visit(args[i], node, `args[${i}]`);
+          if (err) {
+            return err;
+          }
+        }
+        return null;
+      }
+      case 'Repeat': {
+        const countErr = visit(node.countExpression, node, 'countExpression');
+        if (countErr) {
+          return countErr;
+        }
+        const initExprs = Array.isArray(node.fromExpressions) ? node.fromExpressions : [];
+        for (let i = 0; i < initExprs.length; i += 1) {
+          const err = visit(initExprs[i], node, `fromExpressions[${i}]`);
           if (err) {
             return err;
           }
@@ -1678,7 +1737,35 @@ function resolveSetReferences(ast, input) {
         }
         return null;
       }
-      case 'Sub':
+      case 'Sub': {
+        const leftErr = visit(node.left, node, 'left');
+        if (leftErr) {
+          return leftErr;
+        }
+        const rightErr = visit(node.right, node, 'right');
+        if (rightErr) {
+          return rightErr;
+        }
+        // Small constant fold: improves legacy `-i` / `0 - <const>` rendering and
+        // avoids leaving constant-only unary negatives as Sub trees.
+        if (
+          node.left &&
+          node.right &&
+          node.left.kind === 'Const' &&
+          node.right.kind === 'Const'
+        ) {
+          const span = node.span ?? node.left.span ?? node.right.span ?? null;
+          const folded = span
+            ? withSpan(Const(node.left.re - node.right.re, node.left.im - node.right.im), span)
+            : Const(node.left.re - node.right.re, node.left.im - node.right.im);
+          folded.__identifierMeta = node.__identifierMeta;
+          Object.assign(node, folded);
+          delete node.left;
+          delete node.right;
+          return null;
+        }
+        return null;
+      }
       case 'Mul':
       case 'Op':
       case 'Add':
@@ -1907,6 +1994,20 @@ function resolveRepeatPlaceholders(ast, parseOptions, input) {
         context.bindingStack.pop();
         return bodyErr;
       }
+      case 'Repeat': {
+        const countErr = node.countExpression ? visit(node.countExpression, node, 'countExpression') : null;
+        if (countErr) {
+          return countErr;
+        }
+        const initExprs = Array.isArray(node.fromExpressions) ? node.fromExpressions : [];
+        for (let i = 0; i < initExprs.length; i += 1) {
+          const err = visit(initExprs[i], node, `fromExpressions[${i}]`);
+          if (err) {
+            return err;
+          }
+        }
+        return null;
+      }
       case 'SetRef':
       case 'Identifier':
       case 'Const':
@@ -2020,6 +2121,429 @@ function resolveRepeatPlaceholders(ast, parseOptions, input) {
     return error;
   }
   return ast;
+}
+
+function resolveLetBindingByName(name, letStack) {
+  const target = String(name || '');
+  for (let i = (letStack?.length || 0) - 1; i >= 0; i -= 1) {
+    const node = letStack[i];
+    if (node && typeof node === 'object' && node.kind === 'LetBinding' && node.name === target) {
+      return node;
+    }
+  }
+  return null;
+}
+
+function evaluateRepeatIterationCountExpression(node, span, context) {
+  const value = evaluateConstantNode(node, context);
+  if (!value) {
+    return new ParseFailure({
+      ctor: 'RepeatIterationCount',
+      message: 'repeat requires an integer iteration count evaluable at compile time',
+      severity: ParseSeverity.error,
+      expected: 'constant integer',
+      span,
+      input: span.input,
+    });
+  }
+  if (Math.abs(value.im) > REPEAT_COUNT_TOLERANCE) {
+    return new ParseFailure({
+      ctor: 'RepeatIterationCount',
+      message: 'repeat requires an integer iteration count (real value expected)',
+      severity: ParseSeverity.error,
+      expected: 'real integer constant',
+      span,
+      input: span.input,
+    });
+  }
+  if (!Number.isFinite(value.re)) {
+    return new ParseFailure({
+      ctor: 'RepeatIterationCount',
+      message: 'repeat requires a finite integer iteration count',
+      severity: ParseSeverity.error,
+      expected: 'finite integer constant',
+      span,
+      input: span.input,
+    });
+  }
+  const rounded = Math.round(value.re);
+  if (Math.abs(value.re - rounded) > REPEAT_COUNT_TOLERANCE) {
+    return new ParseFailure({
+      ctor: 'RepeatIterationCount',
+      message: 'repeat requires an integer iteration count',
+      severity: ParseSeverity.error,
+      expected: 'integer constant',
+      span,
+      input: span.input,
+    });
+  }
+  return rounded;
+}
+
+function materializeRepeatExpressions(ast, parseOptions, input) {
+  const context = {
+    fingerValues: parseOptions.fingerValues,
+    bindingStack: [],
+  };
+  const letStack = [];
+  let nextRepeatId = 0;
+
+  function freshPrefix() {
+    const id = nextRepeatId++;
+    return `r4yRepeat${id}`;
+  }
+
+  function visit(node) {
+    if (!node || typeof node !== 'object') {
+      return node;
+    }
+    switch (node.kind) {
+      case 'LetBinding': {
+        // `let name(params...) = value in body`
+        // - name is NOT in scope for value
+        // - name IS in scope for body
+        const nextValue = visit(node.value);
+        if (nextValue instanceof ParseFailure) {
+          return nextValue;
+        }
+        node.value = nextValue;
+        letStack.push(node);
+        const nextBody = visit(node.body);
+        letStack.pop();
+        if (nextBody instanceof ParseFailure) {
+          return nextBody;
+        }
+        node.body = nextBody;
+        return node;
+      }
+      case 'SetBinding': {
+        const nextValue = visit(node.value);
+        if (nextValue instanceof ParseFailure) {
+          return nextValue;
+        }
+        node.value = nextValue;
+        const constantValue = evaluateConstantNode(node.value, context);
+        context.bindingStack.push({ binding: node, value: constantValue });
+        const nextBody = visit(node.body);
+        context.bindingStack.pop();
+        if (nextBody instanceof ParseFailure) {
+          return nextBody;
+        }
+        node.body = nextBody;
+        return node;
+      }
+      case 'Repeat': {
+        const span = node.span ?? input.createSpan(0, 0);
+        const nextCountExpr = node.countExpression ? visit(node.countExpression) : null;
+        if (nextCountExpr instanceof ParseFailure) {
+          return nextCountExpr;
+        }
+        node.countExpression = nextCountExpr;
+
+        const initExprs = Array.isArray(node.fromExpressions) ? node.fromExpressions : [];
+        for (let i = 0; i < initExprs.length; i += 1) {
+          const nextInit = visit(initExprs[i]);
+          if (nextInit instanceof ParseFailure) {
+            return nextInit;
+          }
+          initExprs[i] = nextInit;
+        }
+        node.fromExpressions = initExprs;
+
+        const countSpan = node.countExpression?.span ?? span;
+        const n = evaluateRepeatIterationCountExpression(node.countExpression, countSpan, context);
+        if (n instanceof ParseFailure) {
+          return n;
+        }
+
+        const k = initExprs.length;
+        if (k < 1) {
+          return new ParseFailure({
+            ctor: 'RepeatBinding',
+            message: 'repeat requires at least one initial value after "from"',
+            severity: ParseSeverity.error,
+            expected: 'one or more expressions',
+            span,
+            input: span.input || input,
+          });
+        }
+
+        const byNames = Array.isArray(node.byIdentifiers) ? node.byIdentifiers : [];
+        if (byNames.length !== k) {
+          return new ParseFailure({
+            ctor: 'RepeatBinding',
+            message: `repeat requires exactly ${k} step function name${k === 1 ? '' : 's'} after "by" (got ${byNames.length})`,
+            severity: ParseSeverity.error,
+            expected: `${k} identifiers`,
+            span,
+            input: span.input || input,
+          });
+        }
+
+        const stepBindings = [];
+        for (let j = 0; j < k; j += 1) {
+          const name = byNames[j];
+          const binding = resolveLetBindingByName(name, letStack);
+          if (!binding) {
+            return new ParseFailure({
+              ctor: 'RepeatBinding',
+              message: `repeat step function "${name}" is not a user-defined function in scope`,
+              severity: ParseSeverity.error,
+              expected: 'let-bound function identifier',
+              span,
+              input: span.input || input,
+            });
+          }
+          const arity = Array.isArray(binding.params) ? binding.params.length : 0;
+          if (arity !== k + 1) {
+            return new ParseFailure({
+              ctor: 'RepeatBinding',
+              message: `repeat step function "${name}" must have exactly ${k + 1} parameter${k + 1 === 1 ? '' : 's'} (i and ${k} register${k === 1 ? '' : 's'}), got ${arity}`,
+              severity: ParseSeverity.error,
+              expected: `${k + 1} parameters`,
+              span: binding.span ?? span,
+              input: (binding.span?.input ?? span.input) || input,
+            });
+          }
+          stepBindings.push(binding);
+        }
+
+        // If n <= 0: return a1, and avoid evaluating a2..ak.
+        if (n <= 0) {
+          return initExprs[0];
+        }
+
+        const prefix = freshPrefix();
+        const bindings = [];
+
+        function makeBinding(name, valueExpr) {
+          const b = SetBindingNode(name, valueExpr, null);
+          if (span) {
+            b.span = span;
+            b.input = span.input;
+          }
+          bindings.push(b);
+          return b;
+        }
+
+        const regBindingByJI = Array.from({ length: k }, () => []);
+        const tempBindingByJI = Array.from({ length: k }, () => []);
+
+        // Initial registers r_j,0 = a_j
+        for (let j = 0; j < k; j += 1) {
+          const name = `${prefix}R${j + 1}I0`;
+          const b = makeBinding(name, initExprs[j]);
+          regBindingByJI[j][0] = b;
+        }
+
+        // Unrolled loop
+        for (let i = 0; i < n; i += 1) {
+          const iConst = createConstNode(i, 0, span);
+          // Temporaries t_j,i = f_j(i, r_1,i, ..., r_k,i)
+          for (let j = 0; j < k; j += 1) {
+            const tName = `${prefix}T${j + 1}I${i}`;
+            const args = [iConst];
+            for (let r = 0; r < k; r += 1) {
+              const rBinding = regBindingByJI[r][i];
+              args.push(withSpan(SetRef(rBinding.name, rBinding), span));
+            }
+            const callNode = withSpan(
+              { kind: 'Call', callee: withSpan(createIdentifier(byNames[j]), span), args },
+              span,
+            );
+            const tBinding = makeBinding(tName, callNode);
+            tempBindingByJI[j][i] = tBinding;
+          }
+          // Next registers r_j,i+1 = t_j,i
+          for (let j = 0; j < k; j += 1) {
+            const rName = `${prefix}R${j + 1}I${i + 1}`;
+            const tBinding = tempBindingByJI[j][i];
+            const rValue = withSpan(SetRef(tBinding.name, tBinding), span);
+            const rBinding = makeBinding(rName, rValue);
+            regBindingByJI[j][i + 1] = rBinding;
+          }
+        }
+
+        const finalBinding = regBindingByJI[0][n];
+        const finalExpr = withSpan(SetRef(finalBinding.name, finalBinding), span);
+        for (let idx = 0; idx < bindings.length; idx += 1) {
+          bindings[idx].body = idx + 1 < bindings.length ? bindings[idx + 1] : finalExpr;
+        }
+        return bindings[0];
+      }
+      case 'Call': {
+        const nextCallee = visit(node.callee);
+        if (nextCallee instanceof ParseFailure) {
+          return nextCallee;
+        }
+        node.callee = nextCallee;
+        if (Array.isArray(node.args)) {
+          for (let i = 0; i < node.args.length; i += 1) {
+            const nextArg = visit(node.args[i]);
+            if (nextArg instanceof ParseFailure) {
+              return nextArg;
+            }
+            node.args[i] = nextArg;
+          }
+        }
+        return node;
+      }
+      case 'Pow':
+        {
+          const nextBase = visit(node.base);
+          if (nextBase instanceof ParseFailure) {
+            return nextBase;
+          }
+          node.base = nextBase;
+          return node;
+        }
+      case 'Exp':
+      case 'Sin':
+      case 'Cos':
+      case 'Tan':
+      case 'Atan':
+      case 'Asin':
+      case 'Acos':
+      case 'Arg':
+      case 'Abs':
+      case 'Abs2':
+      case 'Floor':
+      case 'Conjugate':
+      case 'IsNaN':
+        {
+          const nextValue = visit(node.value);
+          if (nextValue instanceof ParseFailure) {
+            return nextValue;
+          }
+          node.value = nextValue;
+          return node;
+        }
+      case 'Ln':
+        {
+          const nextValue = visit(node.value);
+          if (nextValue instanceof ParseFailure) {
+            return nextValue;
+          }
+          node.value = nextValue;
+          if (node.branch) {
+            const nextBranch = visit(node.branch);
+            if (nextBranch instanceof ParseFailure) {
+              return nextBranch;
+            }
+            node.branch = nextBranch;
+          }
+          return node;
+        }
+      case 'Sub':
+      case 'Mul':
+      case 'Op':
+      case 'Add':
+      case 'Div':
+      case 'LessThan':
+      case 'GreaterThan':
+      case 'LessThanOrEqual':
+      case 'GreaterThanOrEqual':
+      case 'Equal':
+      case 'LogicalAnd':
+      case 'LogicalOr':
+        {
+          const nextLeft = visit(node.left);
+          if (nextLeft instanceof ParseFailure) {
+            return nextLeft;
+          }
+          const nextRight = visit(node.right);
+          if (nextRight instanceof ParseFailure) {
+            return nextRight;
+          }
+          node.left = nextLeft;
+          node.right = nextRight;
+          return node;
+        }
+      case 'Compose':
+        {
+          const nextF = visit(node.f);
+          if (nextF instanceof ParseFailure) {
+            return nextF;
+          }
+          const nextG = visit(node.g);
+          if (nextG instanceof ParseFailure) {
+            return nextG;
+          }
+          node.f = nextF;
+          node.g = nextG;
+          return node;
+        }
+      case 'If':
+        {
+          const nextCond = visit(node.condition);
+          if (nextCond instanceof ParseFailure) {
+            return nextCond;
+          }
+          const nextThen = visit(node.thenBranch);
+          if (nextThen instanceof ParseFailure) {
+            return nextThen;
+          }
+          const nextElse = visit(node.elseBranch);
+          if (nextElse instanceof ParseFailure) {
+            return nextElse;
+          }
+          node.condition = nextCond;
+          node.thenBranch = nextThen;
+          node.elseBranch = nextElse;
+          return node;
+        }
+      case 'IfNaN':
+        {
+          const nextValue = visit(node.value);
+          if (nextValue instanceof ParseFailure) {
+            return nextValue;
+          }
+          const nextFallback = visit(node.fallback);
+          if (nextFallback instanceof ParseFailure) {
+            return nextFallback;
+          }
+          node.value = nextValue;
+          node.fallback = nextFallback;
+          return node;
+        }
+      case 'ComposeMultiple':
+        {
+          const nextBase = visit(node.base);
+          if (nextBase instanceof ParseFailure) {
+            return nextBase;
+          }
+          node.base = nextBase;
+          if (node.countExpression) {
+            const nextCount = visit(node.countExpression);
+            if (nextCount instanceof ParseFailure) {
+              return nextCount;
+            }
+            node.countExpression = nextCount;
+          }
+          return node;
+        }
+      case 'RepeatComposePlaceholder':
+        {
+          const nextBase = visit(node.base);
+          if (nextBase instanceof ParseFailure) {
+            return nextBase;
+          }
+          node.base = nextBase;
+          if (node.countExpression) {
+            const nextCount = visit(node.countExpression);
+            if (nextCount instanceof ParseFailure) {
+              return nextCount;
+            }
+            node.countExpression = nextCount;
+          }
+          return node;
+        }
+      default:
+        return node;
+    }
+  }
+
+  return visit(ast);
 }
 
 function maybeReducePowerExpression(node, parent, key, context) {
@@ -2744,6 +3268,153 @@ const logicalOrOperator = wsLiteral('||', { ctor: 'LogicalOrOp' }).Map(
 const logicalAndParser = leftAssociative(comparisonParser, logicalAndOperator, 'LogicalAnd');
 const logicalOrParser = leftAssociative(logicalAndParser, logicalOrOperator, 'LogicalOr');
 
+const repeatKeyword = keywordLiteral('repeat', { ctor: 'RepeatKeyword' });
+const repeatFromKeyword = keywordLiteral('from', { ctor: 'RepeatFromKeyword' });
+const repeatByKeyword = keywordLiteral('by', { ctor: 'RepeatByKeyword' });
+
+const repeatByIdentifierParser = createParser('RepeatByIdentifier', (input) => {
+  const identifier = identifierToken.runNormalized(input);
+  if (!identifier.ok) {
+    return identifier;
+  }
+  const normalized = normalizeIdentifierWithHighlights(identifier.value);
+  return new ParseSuccess({
+    ctor: 'RepeatByIdentifier',
+    value: normalized.name,
+    span: identifier.span,
+    next: identifier.next,
+  });
+});
+
+const repeatIdentListParser = createParser('RepeatIdentList', (input) => {
+  const first = repeatByIdentifierParser.runNormalized(input);
+  if (!first.ok) {
+    return first;
+  }
+  const names = [first.value];
+  let cursor = first.next;
+  while (true) {
+    const comma = wsLiteral(',', { ctor: 'RepeatByComma' }).runNormalized(cursor);
+    if (!comma.ok) {
+      if (comma.severity === ParseSeverity.error) {
+        return comma;
+      }
+      break;
+    }
+    const nextName = repeatByIdentifierParser.runNormalized(comma.next);
+    if (!nextName.ok) {
+      return nextName;
+    }
+    names.push(nextName.value);
+    cursor = nextName.next;
+  }
+  const span = spanBetween(input, cursor);
+  return new ParseSuccess({
+    ctor: 'RepeatIdentList',
+    value: names,
+    span,
+    next: cursor,
+  });
+});
+
+const repeatExprListParser = createParser('RepeatExprList', (input) => {
+  const first = expressionRef.runNormalized(input);
+  if (!first.ok) {
+    return first;
+  }
+  const exprs = [first.value];
+  let cursor = first.next;
+  while (true) {
+    const comma = wsLiteral(',', { ctor: 'RepeatFromComma' }).runNormalized(cursor);
+    if (!comma.ok) {
+      if (comma.severity === ParseSeverity.error) {
+        return comma;
+      }
+      break;
+    }
+    const nextExpr = expressionRef.runNormalized(comma.next);
+    if (!nextExpr.ok) {
+      return nextExpr;
+    }
+    exprs.push(nextExpr.value);
+    cursor = nextExpr.next;
+  }
+  const span = spanBetween(input, cursor);
+  return new ParseSuccess({
+    ctor: 'RepeatExprList',
+    value: exprs,
+    span,
+    next: cursor,
+  });
+});
+
+const repeatFromListParser = createParser('RepeatFromList', (input) => {
+  const open = wsLiteral('(', { ctor: 'RepeatFromOpen' }).runNormalized(input);
+  if (open.ok) {
+    const list = repeatExprListParser.runNormalized(open.next);
+    if (!list.ok) {
+      return list;
+    }
+    const close = wsLiteral(')', { ctor: 'RepeatFromClose' }).runNormalized(list.next);
+    if (!close.ok) {
+      return close;
+    }
+    const span = spanBetween(input, close.next);
+    return new ParseSuccess({
+      ctor: 'RepeatFromList',
+      value: list.value,
+      span,
+      next: close.next,
+    });
+  }
+  if (open.severity === ParseSeverity.error) {
+    return open;
+  }
+  return repeatExprListParser.runNormalized(input);
+});
+
+const repeatBindingParser = createParser('RepeatBinding', (input) => {
+  const keyword = repeatKeyword.runNormalized(input);
+  if (!keyword.ok) {
+    return keyword;
+  }
+  const countResult = expressionRef.runNormalized(keyword.next);
+  if (!countResult.ok) {
+    return countResult;
+  }
+  const fromResult = repeatFromKeyword.runNormalized(countResult.next);
+  if (!fromResult.ok) {
+    return fromResult;
+  }
+  const initList = repeatFromListParser.runNormalized(fromResult.next);
+  if (!initList.ok) {
+    return initList;
+  }
+  const byResult = repeatByKeyword.runNormalized(initList.next);
+  if (!byResult.ok) {
+    return byResult;
+  }
+  const idents = repeatIdentListParser.runNormalized(byResult.next);
+  if (!idents.ok) {
+    return idents;
+  }
+  const span = spanBetween(input, idents.next);
+  const node = {
+    kind: 'Repeat',
+    countExpression: countResult.value,
+    fromExpressions: Array.isArray(initList.value) ? initList.value : [],
+    byIdentifiers: Array.isArray(idents.value) ? idents.value : [],
+    span,
+    input: span.input,
+  };
+  return new ParseSuccess({
+    ctor: 'RepeatBinding',
+    value: node,
+    span,
+    next: idents.next,
+  });
+});
+
 const setKeyword = keywordLiteral('set', { ctor: 'SetKeyword' });
 const inKeyword = keywordLiteral('in', { ctor: 'SetInKeyword' });
 const setEqualsLiteral = wsLiteral('=', { ctor: 'SetEquals' });
@@ -2960,7 +3631,11 @@ export function parseFormulaInput(input, options = {}) {
   if (repeatResolved instanceof ParseFailure) {
     return repeatResolved;
   }
-  parsed.value = repeatResolved;
+  const loopsMaterialized = materializeRepeatExpressions(repeatResolved, parseOptions, normalized);
+  if (loopsMaterialized instanceof ParseFailure) {
+    return loopsMaterialized;
+  }
+  parsed.value = loopsMaterialized;
   return parsed;
 }
 
