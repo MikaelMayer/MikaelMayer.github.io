@@ -107,6 +107,11 @@ export function childEntries(node) {
         ['base', node.base],
         ['countExpression', node.countExpression],
       ];
+    case 'Repeat':
+      return [
+        ['countExpression', node.countExpression],
+        ['fromExpressions', Array.isArray(node.fromExpressions) ? node.fromExpressions : []],
+      ];
     case 'LetBinding':
       return [
         ['value', node.value],

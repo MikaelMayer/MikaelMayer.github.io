@@ -547,6 +547,236 @@ function materializeComposeMultiples(ast) {
   return root;
 }
 
+function materializeRepeatLoops(ast) {
+  // Like materializeComposeMultiples: GPU-only lowering that must not mutate the
+  // original AST (UI rendering should keep `Repeat` intact).
+  let root = cloneAst(ast, { preserveBindings: true });
+
+  let nextRepeatId = 0;
+  const nextPrefix = () => `r4y_repeat_${nextRepeatId++}`;
+
+  function resolveLetBindingByName(name, letStack) {
+    const target = String(name || '');
+    for (let i = (letStack?.length || 0) - 1; i >= 0; i -= 1) {
+      const entry = letStack[i];
+      if (entry && typeof entry === 'object' && entry.kind === 'LetBinding' && entry.name === target) {
+        return entry;
+      }
+    }
+    return null;
+  }
+
+  function visit(node, parent, key, letStack = []) {
+    if (!node || typeof node !== 'object') {
+      return;
+    }
+
+    if (node.kind === 'Repeat') {
+      const span = node.span ?? null;
+      const n = typeof node.resolvedCount === 'number' ? node.resolvedCount : null;
+      if (n === null || !Number.isInteger(n)) {
+        throw new Error('Repeat iteration count must be resolved to an integer at compile time');
+      }
+
+      const fromExprs = Array.isArray(node.fromExpressions) ? node.fromExpressions : [];
+      const k = fromExprs.length;
+      if (k < 1) {
+        throw new Error('Repeat requires at least one initial register value');
+      }
+      const byNames = Array.isArray(node.byIdentifiers) ? node.byIdentifiers : [];
+      if (byNames.length !== k) {
+        throw new Error(`Repeat requires ${k} step functions (got ${byNames.length})`);
+      }
+
+      // Validate step function existence/arity defensively (parser should have done this).
+      for (let j = 0; j < k; j += 1) {
+        const binding = resolveLetBindingByName(byNames[j], letStack);
+        if (!binding) {
+          throw new Error(`Repeat step function "${byNames[j]}" is not in scope`);
+        }
+        const arity = Array.isArray(binding.params) ? binding.params.length : 0;
+        if (arity !== k + 1) {
+          throw new Error(`Repeat step function "${byNames[j]}" must have arity ${k + 1} (got ${arity})`);
+        }
+      }
+
+      // n <= 0 => zero iterations => return a1 (and do not evaluate a2..ak)
+      if (n <= 0) {
+        const replacement = fromExprs[0] ?? Const(0, 0);
+        if (span && replacement && typeof replacement === 'object') {
+          replacement.span = span;
+          replacement.input = node.input;
+        }
+        if (parent && key) {
+          parent[key] = replacement;
+          visit(parent[key], parent, key, letStack);
+        } else {
+          root = replacement;
+          visit(root, null, null, letStack);
+        }
+        return;
+      }
+
+      const prefix = nextPrefix();
+      const bindings = [];
+
+      function makeBinding(name, valueExpr) {
+        const b = SetBindingNode(name, valueExpr, null);
+        if (span) {
+          b.span = span;
+          b.input = node.input;
+        }
+        bindings.push(b);
+        return b;
+      }
+
+      const regBindingByJI = Array.from({ length: k }, () => []);
+      const tempBindingByJI = Array.from({ length: k }, () => []);
+
+      // Initial registers r_j,0 = a_j (a_j not evaluated unless used)
+      for (let j = 0; j < k; j += 1) {
+        const name = `${prefix}_r${j + 1}_i0`;
+        const b = makeBinding(name, fromExprs[j]);
+        regBindingByJI[j][0] = b;
+      }
+
+      for (let i = 0; i < n; i += 1) {
+        const iConst = Const(i, 0);
+        if (span) {
+          iConst.span = span;
+          iConst.input = node.input;
+        }
+
+        // Temporaries from previous iteration's registers
+        for (let j = 0; j < k; j += 1) {
+          const tName = `${prefix}_t${j + 1}_i${i}`;
+          const args = [iConst];
+          for (let r = 0; r < k; r += 1) {
+            const rBinding = regBindingByJI[r][i];
+            args.push(SetRef(rBinding.name, rBinding));
+          }
+          const callNode = { kind: 'Call', callee: { kind: 'Identifier', name: byNames[j] }, args };
+          if (span) {
+            callNode.span = span;
+            callNode.input = node.input;
+            callNode.callee.span = span;
+            callNode.callee.input = node.input;
+          }
+          const tBinding = makeBinding(tName, callNode);
+          tempBindingByJI[j][i] = tBinding;
+        }
+
+        // Next registers from temporaries
+        for (let j = 0; j < k; j += 1) {
+          const rName = `${prefix}_r${j + 1}_i${i + 1}`;
+          const tBinding = tempBindingByJI[j][i];
+          const rValue = SetRef(tBinding.name, tBinding);
+          const rBinding = makeBinding(rName, rValue);
+          regBindingByJI[j][i + 1] = rBinding;
+        }
+      }
+
+      const finalBinding = regBindingByJI[0][n];
+      const finalExpr = SetRef(finalBinding.name, finalBinding);
+      if (span) {
+        finalExpr.span = span;
+        finalExpr.input = node.input;
+      }
+
+      for (let idx = 0; idx < bindings.length; idx += 1) {
+        bindings[idx].body = idx + 1 < bindings.length ? bindings[idx + 1] : finalExpr;
+      }
+
+      const replacement = bindings[0] ?? finalExpr;
+      if (parent && key) {
+        parent[key] = replacement;
+        visit(parent[key], parent, key, letStack);
+      } else {
+        root = replacement;
+        visit(root, null, null, letStack);
+      }
+      return;
+    }
+
+    switch (node.kind) {
+      case 'LetBinding': {
+        // value sees current letStack; body sees the binding in scope
+        visit(node.value, node, 'value', letStack);
+        const nextStack = Array.isArray(letStack) ? [...letStack, node] : [node];
+        visit(node.body, node, 'body', nextStack);
+        return;
+      }
+      case 'SetBinding':
+        visit(node.value, node, 'value', letStack);
+        visit(node.body, node, 'body', letStack);
+        return;
+      case 'Pow':
+        visit(node.base, node, 'base', letStack);
+        return;
+      case 'Exp':
+      case 'Sin':
+      case 'Cos':
+      case 'Tan':
+      case 'Atan':
+      case 'Asin':
+      case 'Acos':
+      case 'Arg':
+      case 'Abs':
+      case 'Abs2':
+      case 'Floor':
+      case 'Conjugate':
+      case 'IsNaN':
+        visit(node.value, node, 'value', letStack);
+        return;
+      case 'Ln':
+        visit(node.value, node, 'value', letStack);
+        if (node.branch) visit(node.branch, node, 'branch', letStack);
+        return;
+      case 'Sub':
+      case 'Mul':
+      case 'Op':
+      case 'Add':
+      case 'Div':
+      case 'LessThan':
+      case 'GreaterThan':
+      case 'LessThanOrEqual':
+      case 'GreaterThanOrEqual':
+      case 'Equal':
+      case 'LogicalAnd':
+      case 'LogicalOr':
+        visit(node.left, node, 'left', letStack);
+        visit(node.right, node, 'right', letStack);
+        return;
+      case 'Compose':
+        visit(node.f, node, 'f', letStack);
+        visit(node.g, node, 'g', letStack);
+        return;
+      case 'If':
+        visit(node.condition, node, 'condition', letStack);
+        visit(node.thenBranch, node, 'thenBranch', letStack);
+        visit(node.elseBranch, node, 'elseBranch', letStack);
+        return;
+      case 'IfNaN':
+        visit(node.value, node, 'value', letStack);
+        visit(node.fallback, node, 'fallback', letStack);
+        return;
+      case 'ComposeMultiple':
+        visit(node.base, node, 'base', letStack);
+        if (node.countExpression) visit(node.countExpression, node, 'countExpression', letStack);
+        return;
+      case 'RepeatComposePlaceholder':
+        visit(node.base, node, 'base', letStack);
+        if (node.countExpression) visit(node.countExpression, node, 'countExpression', letStack);
+        return;
+      default:
+        return;
+    }
+  }
+
+  visit(root, null, null, []);
+  return root;
+}
+
 function prepareAstForGpu(ast) {
   // GPU compilation now does explicit environment passing (no global slots),
   // so we only need a stable, non-mutating clone that preserves SetRef graphs.
@@ -733,6 +963,15 @@ function assignNodeIds(ast) {
         assignNodeIds(ast.countExpression);
       }
       return;
+    case "Repeat":
+      // Should be materialized away before GLSL generation.
+      if (ast.countExpression) {
+        assignNodeIds(ast.countExpression);
+      }
+      if (Array.isArray(ast.fromExpressions)) {
+        ast.fromExpressions.forEach((expr) => assignNodeIds(expr));
+      }
+      return;
     case "RepeatComposePlaceholder":
       // Intermediate node kind that should be resolved during parsing. Keep the
       // traversal robust in case it leaks through.
@@ -815,6 +1054,14 @@ function collectNodesPostOrder(ast, out) {
       collectNodesPostOrder(ast.base, out);
       if (ast.countExpression) {
         collectNodesPostOrder(ast.countExpression, out);
+      }
+      break;
+    case "Repeat":
+      if (ast.countExpression) {
+        collectNodesPostOrder(ast.countExpression, out);
+      }
+      if (Array.isArray(ast.fromExpressions)) {
+        ast.fromExpressions.forEach((expr) => collectNodesPostOrder(expr, out));
       }
       break;
     case "RepeatComposePlaceholder":
@@ -2603,7 +2850,8 @@ function compileFormulaFunctionsSSA(rootAst) {
 
 export function compileFormulaForGpu(ast) {
   const gpuAst = prepareAstForGpu(ast);
-  const preparedAst = materializeComposeMultiples(gpuAst);
+  const loopLowered = materializeRepeatLoops(gpuAst);
+  const preparedAst = materializeComposeMultiples(loopLowered);
   // Compute uniform counts on the pre-materialized AST so repeat count expressions
   // still contribute any finger usage to uniform sizing.
   const uniformCounts = analyzeFingerUniformCounts(gpuAst);

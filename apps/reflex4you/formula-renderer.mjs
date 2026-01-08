@@ -14,6 +14,7 @@ function precedence(node) {
     case 'Call':
       return 9;
     case 'SetBinding':
+    case 'Repeat':
     case 'If':
     case 'IfNaN':
       return 1;
@@ -448,6 +449,16 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
       const value = nodeToLatex(node.value, 0, options);
       const body = nodeToLatex(node.body, 0, options);
       return `\\left(\\begin{aligned}\\mathrm{set}\\;${name} &= ${value}\\\\&${body}\\end{aligned}\\right)`;
+    }
+
+    case 'Repeat': {
+      // Keep `repeat ... from ... by ...` as a first-class construct in rendering.
+      const n = node.countExpression ? nodeToLatex(node.countExpression, 0, options) : '?';
+      const fromExprs = Array.isArray(node.fromExpressions) ? node.fromExpressions : [];
+      const fromLatex = fromExprs.length ? fromExprs.map((e) => nodeToLatex(e, 0, options)).join(', ') : '?';
+      const byNames = Array.isArray(node.byIdentifiers) ? node.byIdentifiers : [];
+      const byLatex = byNames.length ? byNames.map((name) => escapeLatexIdentifier(name)).join(', ') : '?';
+      return `\\left(\\begin{aligned}\\mathrm{repeat}\\;${n}\\\\\\mathrm{from}\\;${fromLatex}\\\\\\mathrm{by}\\;${byLatex}\\end{aligned}\\right)`;
     }
 
     default:
