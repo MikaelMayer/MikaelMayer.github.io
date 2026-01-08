@@ -831,18 +831,30 @@ const builtinFunctionLiteralParser = Choice(
   { ctor: 'BuiltinFunctionLiteral' },
 );
 
-const primaryParser = Choice([
+const primaryParserNonRepeat = Choice([
   explicitRepeatComposeParser,
   explicitComposeParser,
   elementaryFunctionParser,
   builtinFunctionLiteralParser,
   ifParser,
-  repeatBindingRef,
   setBindingRef,
   groupedParser,
   literalParser,
   primitiveParser,
 ], { ctor: 'Primary' });
+
+const primaryParser = createParser('Primary', (input) => {
+  // Commit specifically for `repeat ...`: if we see `repeat` and then fail later,
+  // do not backtrack and treat `repeat` as an Identifier.
+  const repeatResult = repeatBindingRef.runNormalized(input);
+  if (repeatResult.ok) {
+    return repeatResult;
+  }
+  if (repeatResult.severity === ParseSeverity.error || failureAdvancedPastInput(repeatResult, input)) {
+    return repeatResult;
+  }
+  return primaryParserNonRepeat.runNormalized(input);
+});
 
 let prefixParser;
 const prefixRef = lazy(() => prefixParser, { ctor: 'PrefixRef' });
@@ -1024,11 +1036,43 @@ const unaryPositive = Sequence([
   projector: (values) => values[1],
 }).Map((expr, result) => withSpan(expr, result.span));
 
-prefixParser = Choice([
-  powerParser,
-  unaryNegative,
-  unaryPositive,
-], { ctor: 'Prefix' });
+prefixParser = createParser('Prefix', (input) => {
+  // Avoid masking useful errors (e.g. `repeat` missing its count) behind the
+  // generic `Choice` message "No alternatives matched.".
+  const leading = WS({ ctor: 'PrefixLeadingWS' }).runNormalized(input);
+  const headInput = leading.ok ? leading.next : input;
+  const headChar = headInput.peek();
+  const startsWithSign = headChar === '-' || headChar === '+';
+
+  const power = powerParser.runNormalized(input);
+  if (power.ok) {
+    return power;
+  }
+  // If the input begins with an explicit sign, prefer giving unary +/- a chance
+  // even if the `power` attempt consumed the sign while speculating about a
+  // signed literal (e.g. `-i`). This preserves `-z^4` parsing.
+  if (!startsWithSign && (power.severity === ParseSeverity.error || failureAdvancedPastInput(power, input))) {
+    return power;
+  }
+
+  const neg = unaryNegative.runNormalized(input);
+  if (neg.ok) {
+    return neg;
+  }
+  if (neg.severity === ParseSeverity.error || failureAdvancedPastInput(neg, input)) {
+    return neg;
+  }
+
+  const pos = unaryPositive.runNormalized(input);
+  if (pos.ok) {
+    return pos;
+  }
+  if (pos.severity === ParseSeverity.error || failureAdvancedPastInput(pos, input)) {
+    return pos;
+  }
+
+  return power;
+});
 
 function createPowerApplication(baseNode, exponentNode, span) {
   const literal = extractSmallIntegerExponent(exponentNode);
@@ -1134,7 +1178,10 @@ function failureContainsStartPastOrigin(node, originStart) {
     const source = spanInput?.buffer;
     if (source) {
       const deltaSlice = source.slice(originStart, node.span.start);
-      if (deltaSlice.trim().length === 0) {
+      // Treat `# ...` comments like whitespace for "commit" checks.
+      // (WS consumes them, so they shouldn't cause an early commit.)
+      const deltaWithoutComments = deltaSlice.replace(/#[^\n]*/g, '');
+      if (deltaWithoutComments.trim().length === 0) {
         return false;
       }
     }
@@ -3280,7 +3327,16 @@ const repeatBindingParser = createParser('RepeatBinding', (input) => {
   }
   const countResult = expressionRef.runNormalized(keyword.next);
   if (!countResult.ok) {
-    return countResult;
+    // Commit once `repeat` is seen (prevents backtracking to Identifier("repeat")).
+    return new ParseFailure({
+      ctor: 'RepeatBinding',
+      message: 'repeat requires an iteration count expression',
+      severity: ParseSeverity.error,
+      expected: 'iteration count expression',
+      span: countResult.span ?? spanBetween(input, keyword.next),
+      input: (countResult.span?.input ?? input),
+      children: [countResult],
+    });
   }
   const fromResult = repeatFromKeyword.runNormalized(countResult.next);
   if (!fromResult.ok) {

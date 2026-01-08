@@ -1128,3 +1128,9 @@ repeat 1.5 from 0 by step
   assert.equal(result.ok, false);
   assert.match(result.message, /integer iteration count/i);
 });
+
+test('repeat keyword commits (repeat is not treated as an identifier)', () => {
+  const result = parseFormulaInput('repeat');
+  assert.equal(result.ok, false);
+  assert.match(result.message, /iteration count/i);
+});
