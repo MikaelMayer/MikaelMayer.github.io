@@ -236,7 +236,7 @@ The input accepts succinct expressions with complex arithmetic, composition, and
 - **Operators:** `+`, `-`, `*`, `/`, power (`^` with integer exponents), composition (`o(f, g)` or `f $ g`), repeated composition (`oo(f, n)` or `f $$ n`).
 - **Loops:** `repeat n from a1, a2, ..., ak by f1, f2, ..., fk` iterates a **k-register state** for `n` steps and returns the final `r1`.
   - `n` must be a **compile-time integer** (e.g. `10`, `floor(3.9)`); if `n <= 0` it performs zero iterations and returns `a1`.
-  - Each `fj` must be a **user-defined** `let` function with exactly `k+1` parameters: `fj(i, r1, ..., rk)`.
+  - Each `fj` must be a **user-defined** `let` function with exactly `k+1` parameters: `fj(k, r1, ..., rk)`.
   - Dot composition is equivalent: `f $ expr` is the same as `expr.f` (so `a.b` means `b(a(z))`).
 - **Functions:** `exp`, `sin`, `cos`, `tan`, `atan`/`arctan`, `arg`/`argument`, `asin`/`arcsin`, `acos`/`arccos`, `ln`, `sqrt`, `abs`/`modulus`, `abs2`, `floor`, `conj`, `heav`, `isnan`, `ifnan`/`iferror`. `sqrt(z, k)` desugars to `exp(0.5 * ln(z, k))`, so the optional second argument shifts the log branch; `heav(x)` evaluates to `1` when `x > 0` and `0` otherwise.
 - **Conditionals:** comparisons (`<`, `<=`, `>`, `>=`, `==`), logical ops (`&&`, `||`), and `if(cond, then, else)`.
@@ -288,27 +288,27 @@ All examples below return a **single complex value** (no tuples/arrays are intro
 
 ```text
 # Sum of integers: 0 + 1 + ... + 9 = 45
-let step(i, s) = s + i in
+let step(k, s) = s + k in
 repeat 10 from 0 by step
 
 # Sum of squares: 0^2 + 1^2 + ... + 9^2 = 285
-let step(i, s) = s + i*i in
+let step(k, s) = s + k*k in
 repeat 10 from 0 by step
 
 # Alternate sum of cubes: Σ (-1)^i * i^3 for i=0..9
-let fs(i, s, sign) = s + sign*(i^3) in
-let fsign(i, s, sign) = -sign in
+let fs(k, s, sign) = s + sign*(k^3) in
+let fsign(k, s, sign) = -sign in
 repeat 10 from 0, 1 by fs, fsign
 
 # Sum of fourth powers: Σ i^4 for i=0..9
-let step(i, s) = s + i^4 in
+let step(k, s) = s + k^4 in
 repeat 10 from 0 by step
 
 # Truncated exp series (n terms): Σ z^i / i! for i=0..n-1
 # Registers: (sum, term, zConst). Keep zConst unchanged across iterations.
-let fsum(i, sum, term, zc) = sum + term in
-let fterm(i, sum, term, zc) = term * zc / (i + 1) in
-let fz(i, sum, term, zc) = zc in
+let fsum(k, sum, term, zc) = sum + term in
+let fterm(k, sum, term, zc) = term * zc / (k + 1) in
+let fz(k, sum, term, zc) = zc in
 repeat 12 from 0, 1, z by fsum, fterm, fz
 ```
 

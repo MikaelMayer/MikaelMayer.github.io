@@ -984,6 +984,45 @@ function evaluateAstComplex(root, { z = { re: 0, im: 0 } } = {}) {
         }
         return evalNode(callee.expr, zForBody, nextParamEnv, callee.capturedSetEnv, callee.capturedLetEnv);
       }
+      case 'Repeat': {
+        const n = typeof node.resolvedCount === 'number' ? node.resolvedCount : null;
+        if (n === null) {
+          throw new Error('Repeat must have resolvedCount in tests');
+        }
+        const initExprs = Array.isArray(node.fromExpressions) ? node.fromExpressions : [];
+        if (initExprs.length < 1) {
+          return { re: 0, im: 0 };
+        }
+        const byNames = Array.isArray(node.byIdentifiers) ? node.byIdentifiers : [];
+        const kRegs = initExprs.length;
+        if (byNames.length !== kRegs) {
+          throw new Error('Repeat by/from length mismatch in tests');
+        }
+        if (n <= 0) {
+          return evalNode(initExprs[0], zLocal, localParamEnv, localSetEnv, localLetEnv);
+        }
+
+        // Evaluate initial registers (all of them) once to start the loop.
+        let regs = initExprs.map((expr) => evalNode(expr, zLocal, localParamEnv, localSetEnv, localLetEnv));
+
+        for (let i = 0; i < n; i += 1) {
+          const nextRegs = new Array(kRegs);
+          for (let j = 0; j < kRegs; j += 1) {
+            const step = lookupLet(byNames[j], localLetEnv);
+            if (!step) throw new Error(`Unknown repeat step: ${byNames[j]}`);
+            const params = Array.isArray(step.params) ? step.params : [];
+            if (params.length !== kRegs + 1) throw new Error(`Bad arity for repeat step: ${byNames[j]}`);
+            const stepParamEnv = new Map();
+            stepParamEnv.set(params[0], { re: i, im: 0 });
+            for (let r = 0; r < kRegs; r += 1) {
+              stepParamEnv.set(params[r + 1], regs[r]);
+            }
+            nextRegs[j] = evalNode(step.expr, zLocal, stepParamEnv, step.capturedSetEnv, step.capturedLetEnv);
+          }
+          regs = nextRegs;
+        }
+        return regs[0];
+      }
       default:
         throw new Error(`Unsupported node kind in test interpreter: ${node.kind}`);
     }
@@ -994,7 +1033,7 @@ function evaluateAstComplex(root, { z = { re: 0, im: 0 } } = {}) {
 
 test('repeat: single register increments', () => {
   const source = `
-let step(i, r) = r + 1 in
+let step(k, r) = r + 1 in
 repeat 3 from 0 by step
 `.trim();
   const ast = parseFormulaToAST(source);
@@ -1005,7 +1044,7 @@ repeat 3 from 0 by step
 
 test('repeat: loop index is zero-based', () => {
   const source = `
-let step(i, r) = r + i in
+let step(k, r) = r + k in
 repeat 5 from 0 by step
 `.trim();
   const ast = parseFormulaToAST(source);
@@ -1016,8 +1055,8 @@ repeat 5 from 0 by step
 
 test('repeat: multiple registers (Fibonacci)', () => {
   const source = `
-let fa(i, a, b) = b in
-let fb(i, a, b) = a + b in
+let fa(k, a, b) = b in
+let fb(k, a, b) = a + b in
 repeat 10 from 0, 1 by fa, fb
 `.trim();
   const ast = parseFormulaToAST(source);
@@ -1028,7 +1067,7 @@ repeat 10 from 0, 1 by fa, fb
 
 test('repeat: zero iterations returns a1', () => {
   const source = `
-let step(i, r) = r + 1 in
+let step(k, r) = r + 1 in
 repeat 0 from 7 by step
 `.trim();
   const ast = parseFormulaToAST(source);
@@ -1039,7 +1078,7 @@ repeat 0 from 7 by step
 
 test('repeat: n can be a compile-time expression (floor)', () => {
   const source = `
-let step(i, r) = r + 1 in
+let step(k, r) = r + 1 in
 repeat floor(3.9) from 0 by step
 `.trim();
   const ast = parseFormulaToAST(source);
@@ -1050,7 +1089,7 @@ repeat floor(3.9) from 0 by step
 
 test('repeat: rejects mismatched lengths between from and by', () => {
   const result = parseFormulaInput(`
-let step(i, r) = r + 1 in
+let step(k, r) = r + 1 in
 repeat 3 from 0, 1 by step
 `.trim());
   assert.equal(result.ok, false);
@@ -1065,7 +1104,7 @@ test('repeat: rejects unresolved step function identifiers', () => {
 
 test('repeat: rejects incorrect step function arity', () => {
   const result = parseFormulaInput(`
-let step(i) = i in
+let step(k) = k in
 repeat 3 from 0 by step
 `.trim());
   assert.equal(result.ok, false);
@@ -1074,7 +1113,7 @@ repeat 3 from 0 by step
 
 test('repeat: rejects n that is not compile-time evaluable', () => {
   const result = parseFormulaInput(`
-let step(i, r) = r + 1 in
+let step(k, r) = r + 1 in
 repeat x from 0 by step
 `.trim());
   assert.equal(result.ok, false);
@@ -1083,7 +1122,7 @@ repeat x from 0 by step
 
 test('repeat: rejects non-integer n', () => {
   const result = parseFormulaInput(`
-let step(i, r) = r + 1 in
+let step(k, r) = r + 1 in
 repeat 1.5 from 0 by step
 `.trim());
   assert.equal(result.ok, false);

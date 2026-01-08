@@ -339,6 +339,7 @@ const jLiteral = keywordLiteral('j', { ctor: 'ConstJ', caseSensitive: false })
 
 const literalParser = Choice([
   imagFromNumber,
+  unitImagLiteral,
   numberLiteral,
   jLiteral,
 ], { ctor: 'Literal' });
@@ -411,6 +412,8 @@ const RESERVED_BINDING_NAMES = new Set([
   'repeat',
   'from',
   'by',
+  'i',
+  'I',
   'ifnan',
   'iferror',
   'exp',
@@ -1641,18 +1644,6 @@ function resolveSetReferences(ast, input) {
           return null;
         }
 
-        // Special-case the imaginary unit: treat an unbound `i`/`I` as 0+1i.
-        // This preserves legacy formulas like `z + i`, while still allowing a
-        // parameter named `i` (it will be resolved above as ParamRef).
-        if (typeof node.name === 'string' && node.name.toLowerCase() === 'i') {
-          const resolved = Const(0, 1);
-          resolved.span = node.span;
-          resolved.input = node.input;
-          resolved.__identifierMeta = node.__identifierMeta;
-          Object.assign(node, resolved);
-          return null;
-        }
-
         const span = node.span ?? input.createSpan(0, 0);
         return new ParseFailure({
           ctor: 'Identifier',
@@ -1742,29 +1733,7 @@ function resolveSetReferences(ast, input) {
         if (leftErr) {
           return leftErr;
         }
-        const rightErr = visit(node.right, node, 'right');
-        if (rightErr) {
-          return rightErr;
-        }
-        // Small constant fold: improves legacy `-i` / `0 - <const>` rendering and
-        // avoids leaving constant-only unary negatives as Sub trees.
-        if (
-          node.left &&
-          node.right &&
-          node.left.kind === 'Const' &&
-          node.right.kind === 'Const'
-        ) {
-          const span = node.span ?? node.left.span ?? node.right.span ?? null;
-          const folded = span
-            ? withSpan(Const(node.left.re - node.right.re, node.left.im - node.right.im), span)
-            : Const(node.left.re - node.right.re, node.left.im - node.right.im);
-          folded.__identifierMeta = node.__identifierMeta;
-          Object.assign(node, folded);
-          delete node.left;
-          delete node.right;
-          return null;
-        }
-        return null;
+        return visit(node.right, node, 'right');
       }
       case 'Mul':
       case 'Op':
@@ -2180,18 +2149,12 @@ function evaluateRepeatIterationCountExpression(node, span, context) {
   return rounded;
 }
 
-function materializeRepeatExpressions(ast, parseOptions, input) {
+function validateRepeatExpressions(ast, parseOptions, input) {
   const context = {
     fingerValues: parseOptions.fingerValues,
     bindingStack: [],
   };
   const letStack = [];
-  let nextRepeatId = 0;
-
-  function freshPrefix() {
-    const id = nextRepeatId++;
-    return `r4yRepeat${id}`;
-  }
 
   function visit(node) {
     if (!node || typeof node !== 'object') {
@@ -2255,6 +2218,7 @@ function materializeRepeatExpressions(ast, parseOptions, input) {
         if (n instanceof ParseFailure) {
           return n;
         }
+        node.resolvedCount = n;
 
         const k = initExprs.length;
         if (k < 1) {
@@ -2280,7 +2244,6 @@ function materializeRepeatExpressions(ast, parseOptions, input) {
           });
         }
 
-        const stepBindings = [];
         for (let j = 0; j < k; j += 1) {
           const name = byNames[j];
           const binding = resolveLetBindingByName(name, letStack);
@@ -2298,78 +2261,15 @@ function materializeRepeatExpressions(ast, parseOptions, input) {
           if (arity !== k + 1) {
             return new ParseFailure({
               ctor: 'RepeatBinding',
-              message: `repeat step function "${name}" must have exactly ${k + 1} parameter${k + 1 === 1 ? '' : 's'} (i and ${k} register${k === 1 ? '' : 's'}), got ${arity}`,
+              message: `repeat step function "${name}" must have exactly ${k + 1} parameter${k + 1 === 1 ? '' : 's'} (index and ${k} register${k === 1 ? '' : 's'}), got ${arity}`,
               severity: ParseSeverity.error,
               expected: `${k + 1} parameters`,
               span: binding.span ?? span,
               input: (binding.span?.input ?? span.input) || input,
             });
           }
-          stepBindings.push(binding);
         }
-
-        // If n <= 0: return a1, and avoid evaluating a2..ak.
-        if (n <= 0) {
-          return initExprs[0];
-        }
-
-        const prefix = freshPrefix();
-        const bindings = [];
-
-        function makeBinding(name, valueExpr) {
-          const b = SetBindingNode(name, valueExpr, null);
-          if (span) {
-            b.span = span;
-            b.input = span.input;
-          }
-          bindings.push(b);
-          return b;
-        }
-
-        const regBindingByJI = Array.from({ length: k }, () => []);
-        const tempBindingByJI = Array.from({ length: k }, () => []);
-
-        // Initial registers r_j,0 = a_j
-        for (let j = 0; j < k; j += 1) {
-          const name = `${prefix}R${j + 1}I0`;
-          const b = makeBinding(name, initExprs[j]);
-          regBindingByJI[j][0] = b;
-        }
-
-        // Unrolled loop
-        for (let i = 0; i < n; i += 1) {
-          const iConst = createConstNode(i, 0, span);
-          // Temporaries t_j,i = f_j(i, r_1,i, ..., r_k,i)
-          for (let j = 0; j < k; j += 1) {
-            const tName = `${prefix}T${j + 1}I${i}`;
-            const args = [iConst];
-            for (let r = 0; r < k; r += 1) {
-              const rBinding = regBindingByJI[r][i];
-              args.push(withSpan(SetRef(rBinding.name, rBinding), span));
-            }
-            const callNode = withSpan(
-              { kind: 'Call', callee: withSpan(createIdentifier(byNames[j]), span), args },
-              span,
-            );
-            const tBinding = makeBinding(tName, callNode);
-            tempBindingByJI[j][i] = tBinding;
-          }
-          // Next registers r_j,i+1 = t_j,i
-          for (let j = 0; j < k; j += 1) {
-            const rName = `${prefix}R${j + 1}I${i + 1}`;
-            const tBinding = tempBindingByJI[j][i];
-            const rValue = withSpan(SetRef(tBinding.name, tBinding), span);
-            const rBinding = makeBinding(rName, rValue);
-            regBindingByJI[j][i + 1] = rBinding;
-          }
-        }
-
-        const finalBinding = regBindingByJI[0][n];
-        const finalExpr = withSpan(SetRef(finalBinding.name, finalBinding), span);
-        for (let idx = 0; idx < bindings.length; idx += 1) {
-          bindings[idx].body = idx + 1 < bindings.length ? bindings[idx + 1] : finalExpr;
-        }
-        return bindings[0];
+        return node;
       }
       case 'Call': {
         const nextCallee = visit(node.callee);
@@ -3631,11 +3531,11 @@ export function parseFormulaInput(input, options = {}) {
   if (repeatResolved instanceof ParseFailure) {
     return repeatResolved;
   }
-  const loopsMaterialized = materializeRepeatExpressions(repeatResolved, parseOptions, normalized);
-  if (loopsMaterialized instanceof ParseFailure) {
-    return loopsMaterialized;
+  const repeatValidated = validateRepeatExpressions(repeatResolved, parseOptions, normalized);
+  if (repeatValidated instanceof ParseFailure) {
+    return repeatValidated;
   }
-  parsed.value = loopsMaterialized;
+  parsed.value = repeatValidated;
   return parsed;
 }
 
