@@ -57,7 +57,7 @@ function setCompileOverlayVisible(visible, message = null) {
 // Show a cold-start loading indicator by default; hide it once we have a first render.
 setCompileOverlayVisible(true, 'Loading…');
 
-const APP_VERSION = 34;
+const APP_VERSION = 35;
 const CONTEXT_LOSS_RELOAD_KEY = `reflex4you:contextLossReloaded:v${APP_VERSION}`;
 const RESUME_RELOAD_KEY = `reflex4you:resumeReloaded:v${APP_VERSION}`;
 const LAST_HIDDEN_AT_KEY = `reflex4you:lastHiddenAtMs:v${APP_VERSION}`;
@@ -826,6 +826,33 @@ function buildInlineFingerValueEditor(label) {
   animControls.appendChild(toggleAnimBtn);
   animControls.appendChild(playBtn);
 
+  // Mobile browsers can dispatch `focusout` with `relatedTarget === null` when the user
+  // taps *inside* the editor (e.g. Start/End inputs or ⏸). Treating that as "left editor"
+  // makes the UI collapse unpredictably. Instead, close the editor only on a real
+  // outside pointer interaction (and on Enter/Escape keypresses).
+  let onDocPointerDownWhileEditing = null;
+
+  function updateEditingOutsideCloseListener() {
+    const isEditing = wrap.dataset.editing === 'true';
+    if (isEditing && !onDocPointerDownWhileEditing) {
+      onDocPointerDownWhileEditing = (event) => {
+        if (!wrap.contains(event.target)) {
+          closeAndCommitIfNeeded();
+        }
+      };
+      document.addEventListener('pointerdown', onDocPointerDownWhileEditing, true);
+      return;
+    }
+    if (!isEditing && onDocPointerDownWhileEditing) {
+      try {
+        document.removeEventListener('pointerdown', onDocPointerDownWhileEditing, true);
+      } catch (_) {
+        // ignore
+      }
+      onDocPointerDownWhileEditing = null;
+    }
+  }
+
   function refresh() {
     const formatted = formatFingerValueForEditor(label);
     display.textContent = formatted;
@@ -870,6 +897,7 @@ function buildInlineFingerValueEditor(label) {
     display.style.display = nextEditing ? 'none' : '';
     // Important: CSS default is `display: none`, so `''` would keep it hidden.
     editor.style.display = nextEditing ? 'flex' : 'none';
+    updateEditingOutsideCloseListener();
     if (nextEditing) {
       currentInput.value = formatFingerValueForEditor(label);
       currentInput.setCustomValidity('');
@@ -975,12 +1003,14 @@ function buildInlineFingerValueEditor(label) {
       try {
         currentInput.blur();
       } catch (_) {}
+      closeAndCommitIfNeeded();
     } else if (event.key === 'Escape') {
       event.preventDefault();
       event.stopPropagation();
       try {
         currentInput.blur();
       } catch (_) {}
+      closeAndCommitIfNeeded();
     }
   });
 
@@ -996,6 +1026,7 @@ function buildInlineFingerValueEditor(label) {
       event.preventDefault();
       event.stopPropagation();
       try { startInput.blur(); } catch (_) {}
+      closeAndCommitIfNeeded();
     }
   });
   endInput.addEventListener('keydown', (event) => {
@@ -1003,6 +1034,7 @@ function buildInlineFingerValueEditor(label) {
       event.preventDefault();
       event.stopPropagation();
       try { endInput.blur(); } catch (_) {}
+      closeAndCommitIfNeeded();
     }
   });
 
@@ -1095,39 +1127,12 @@ function buildInlineFingerValueEditor(label) {
     refresh();
   });
 
-  // On some mobile browsers, focus transitions triggered by tapping a button can
-  // dispatch `focusout` with `relatedTarget === null`, which we previously treated
-  // as "focus left the editor" and closed it before the button's click handler ran.
-  // Track pointer interaction inside the editor so we don't prematurely close.
-  let suppressCloseOnFocusout = false;
-  wrap.addEventListener(
-    'pointerdown',
-    (event) => {
-      if (!wrap.contains(event.target)) {
-        return;
-      }
-      suppressCloseOnFocusout = true;
-      try {
-        window.setTimeout(() => {
-          suppressCloseOnFocusout = false;
-        }, 0);
-      } catch (_) {
-        suppressCloseOnFocusout = false;
-      }
-    },
-    true,
-  );
-
-  // Close editor + push a single undo frame when focus leaves this control.
+  // Close editor when focus moves to a known target outside the editor (desktop/tabbing).
   wrap.addEventListener('focusout', (event) => {
     const next = event.relatedTarget;
-    if (!next && suppressCloseOnFocusout) {
-      return;
+    if (next && !wrap.contains(next)) {
+      closeAndCommitIfNeeded();
     }
-    if (next && wrap.contains(next)) {
-      return;
-    }
-    closeAndCommitIfNeeded();
   });
 
   wrap.appendChild(display);
@@ -1139,6 +1144,7 @@ function buildInlineFingerValueEditor(label) {
   editor.appendChild(animControls);
   wrap.appendChild(editor);
   setEditing(false);
+  updateEditingOutsideCloseListener();
   refresh();
   return { element: wrap, refresh };
 }
@@ -4011,7 +4017,7 @@ function triggerImageDownload(url, filename, shouldRevoke) {
 
 if ('serviceWorker' in navigator) {
   // Version the SW script URL so updates can't get stuck behind a cached SW script.
-  const SW_URL = './service-worker.js?sw=34.0';
+  const SW_URL = './service-worker.js?sw=35.0';
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(SW_URL).then((registration) => {
       // Auto-activate updated workers so cache/version bumps take effect quickly.
