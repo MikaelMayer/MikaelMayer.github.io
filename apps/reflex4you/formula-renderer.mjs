@@ -37,6 +37,7 @@ function precedence(node) {
     case 'Compose':
       return 7;
     case 'Pow':
+    case 'PowExpr':
     case 'ComposeMultiple':
       return 8;
     default:
@@ -292,6 +293,29 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
       const baseLatex = nodeToLatex(node.base, precedence(node), options);
       const baseWrapped = precedence(node.base) < precedence(node) ? wrapParensLatex(baseLatex) : baseLatex;
       return `${baseWrapped}^{${formatNumber(node.exponent)}}`;
+    }
+
+    case 'PowExpr': {
+      const baseLatex = nodeToLatex(node.base, precedence(node), options);
+      const baseWrapped = precedence(node.base) < precedence(node) ? wrapParensLatex(baseLatex) : baseLatex;
+      const expLatex = nodeToLatex(node.exponent, 0, options);
+      return `${baseWrapped}^{${expLatex}}`;
+    }
+
+    case 'Sum':
+    case 'Prod': {
+      const name = node.kind === 'Sum' ? 'sum' : 'prod';
+      const args = [
+        nodeToLatex(node.body, 0, options),
+        latexIdentifierWithMetadata(node.varName || '?', node.varMetaHighlights || null),
+        nodeToLatex(node.min, 0, options),
+        nodeToLatex(node.max, 0, options),
+      ];
+      const explicitStep = node.stepWasImplicit ? false : true;
+      if (explicitStep) {
+        args.push(nodeToLatex(node.step, 0, options));
+      }
+      return `\\operatorname{${escapeLatexIdentifier(name)}}\\left(${args.join(', ')}\\right)`;
     }
 
     case 'ComposeMultiple': {

@@ -33,6 +33,19 @@ export function childEntries(node) {
   switch (node.kind) {
     case 'Pow':
       return [['base', node.base]];
+    case 'PowExpr':
+      return [
+        ['base', node.base],
+        ['exponent', node.exponent],
+      ];
+    case 'Sum':
+    case 'Prod':
+      return [
+        ['body', node.body],
+        ['min', node.min],
+        ['max', node.max],
+        ['step', node.step],
+      ];
     case 'Exp':
     case 'Sin':
     case 'Cos':
