@@ -595,6 +595,8 @@ test('dot composition syntax treats a.b as (b $ a)', () => {
   assert.equal(node.g.kind, 'FingerOffset');
   assert.equal(node.g.slot, 'D1');
   assert.equal(node.f.kind, 'VarX');
+  // Dot syntax should be preserved for rendering decisions.
+  assert.equal(node.composeSyntax, 'dot');
 });
 
 test('dot composition chains associate left-to-right', () => {

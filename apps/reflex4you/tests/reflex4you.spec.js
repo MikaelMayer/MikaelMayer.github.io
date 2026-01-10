@@ -82,6 +82,16 @@ test('formula page does not double-parenthesize factors for multiplication', asy
   expect(latex).not.toContain('\\cdot');
 });
 
+test('formula page renders D1.x.floor without composition glyphs or black rectangles', async ({ page }) => {
+  await page.goto(`/formula.html?formula=${encodeURIComponent('D1.x.floor')}`);
+  const render = page.locator('#formula-render');
+  await expect(render).toBeVisible();
+  await expect.poll(async () => await render.getAttribute('data-latex')).toContain('\\left\\lfloor');
+  const latex = String(await render.getAttribute('data-latex') || '');
+  expect(latex).toContain('\\mathrm{D}_{1}.x');
+  expect(latex).not.toContain('\\circ');
+});
+
 test('formula page renders underscore-highlight metadata letters as Huge (LEON)', async ({ page }) => {
   const source = '_ln(_exp(_o(si_n, z*z)-3)-1)';
   await page.goto(`/formula.html?formula=${encodeURIComponent(source)}`);

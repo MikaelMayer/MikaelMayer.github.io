@@ -459,10 +459,56 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
     case 'GreaterThanOrEqual':
     case 'Equal':
     case 'LogicalAnd':
-    case 'LogicalOr':
-    case 'Compose':
-      // handled above
-      return '?';
+    case 'LogicalOr': {
+      const prec = precedence(node);
+      const leftNode = node.left;
+      const rightNode = node.right;
+      const left = nodeToLatex(leftNode, prec, options);
+      const right = nodeToLatex(rightNode, prec, options);
+
+      const leftWrapped = maybeWrapLatex(leftNode, left, prec, 'left', node.kind);
+      const rightWrapped = maybeWrapLatex(rightNode, right, prec, 'right', node.kind);
+
+      switch (node.kind) {
+        case 'Add': {
+          return `${leftWrapped} + ${rightWrapped}`;
+        }
+        case 'Sub': {
+          return `${leftWrapped} - ${rightWrapped}`;
+        }
+        case 'Mul': {
+          // Use a thin space instead of `\\cdot` for readability.
+          return `${leftWrapped}\\,${rightWrapped}`;
+        }
+        case 'Div': {
+          // Prefer fractions for readability; they behave as an "atomic" group in TeX.
+          return `\\frac{${left}}{${right}}`;
+        }
+        case 'LessThan': {
+          return `${leftWrapped} < ${rightWrapped}`;
+        }
+        case 'GreaterThan': {
+          return `${leftWrapped} > ${rightWrapped}`;
+        }
+        case 'LessThanOrEqual': {
+          return `${leftWrapped} \\le ${rightWrapped}`;
+        }
+        case 'GreaterThanOrEqual': {
+          return `${leftWrapped} \\ge ${rightWrapped}`;
+        }
+        case 'Equal': {
+          return `${leftWrapped} = ${rightWrapped}`;
+        }
+        case 'LogicalAnd': {
+          return `${leftWrapped} \\land ${rightWrapped}`;
+        }
+        case 'LogicalOr': {
+          return `${leftWrapped} \\lor ${rightWrapped}`;
+        }
+        default:
+          return '?';
+      }
+    }
 
     case 'If': {
       const cond = nodeToLatex(node.condition, 0, options);
