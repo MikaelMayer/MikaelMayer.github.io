@@ -37,6 +37,7 @@ function precedence(node) {
     case 'Compose':
       return 7;
     case 'Pow':
+    case 'PowExpr':
     case 'ComposeMultiple':
       return 8;
     default:
@@ -294,6 +295,49 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
       return `${baseWrapped}^{${formatNumber(node.exponent)}}`;
     }
 
+    case 'PowExpr': {
+      const baseLatex = nodeToLatex(node.base, precedence(node), options);
+      const baseWrapped = precedence(node.base) < precedence(node) ? wrapParensLatex(baseLatex) : baseLatex;
+      const expLatex = nodeToLatex(node.exponent, 0, options);
+      return `${baseWrapped}^{${expLatex}}`;
+    }
+
+    case 'Sum':
+    case 'Prod': {
+      const name = node.kind === 'Sum' ? 'sum' : 'prod';
+      const fnMeta = identifierHighlights(node);
+      const bodyLatex = nodeToLatex(node.body, 0, options);
+      const varLatex = latexIdentifierWithMetadata(node.varName || '?', node.varMetaHighlights || null);
+      const minLatex = nodeToLatex(node.min, 0, options);
+      const maxLatex = nodeToLatex(node.max, 0, options);
+
+      // If the user used underscore-highlight syntax like `_sum(...)`, keep the
+      // function-call rendering so highlighted letters can be shown.
+      if (fnMeta.length) {
+        const args = [bodyLatex, varLatex, minLatex, maxLatex];
+        if (!node.stepWasImplicit) {
+          args.push(nodeToLatex(node.step, 0, options));
+        }
+        return `${operatorNameWithMetadata(name, fnMeta)}\\left(${args.join(', ')}\\right)`;
+      }
+
+      // Prefer proper sigma/prod notation when the step is 1 (implicit or explicit).
+      const stepIsOne =
+        node.step &&
+        typeof node.step === 'object' &&
+        node.step.kind === 'Const' &&
+        node.step.im === 0 &&
+        node.step.re === 1;
+      if (node.stepWasImplicit || stepIsOne) {
+        const op = node.kind === 'Sum' ? '\\sum' : '\\prod';
+        return `${op}_{${varLatex}=${minLatex}}^{${maxLatex}}\\,${bodyLatex}`;
+      }
+
+      // Fallback: explicit step != 1 is rendered as a function call.
+      const args = [bodyLatex, varLatex, minLatex, maxLatex, nodeToLatex(node.step, 0, options)];
+      return `\\operatorname{${escapeLatexIdentifier(name)}}\\left(${args.join(', ')}\\right)`;
+    }
+
     case 'ComposeMultiple': {
       const baseLatex = nodeToLatex(node.base, precedence(node), options);
       const baseWrapped = precedence(node.base) < precedence(node) ? wrapParensLatex(baseLatex) : baseLatex;
@@ -356,6 +400,55 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
     case 'IsNaN':
       return functionCallLatex('isnan', [node.value], options, identifierHighlights(node));
 
+    case 'Compose': {
+      // Dot-syntax rendering (a.b): prefer a more "method call" look for common accessors,
+      // and especially avoid rendering chains like "⌊z⌋ ∘ x ∘ D1" for "D1.x.floor".
+      if (node.composeSyntax === 'dot') {
+        const gNode = node.g;
+        const fNode = node.f;
+
+        const gLatexRaw = nodeToLatex(gNode, 0, options);
+        const gLatex = precedence(gNode) < 9 ? wrapParensLatex(gLatexRaw) : gLatexRaw;
+
+        if (fNode && typeof fNode === 'object') {
+          if (fNode.kind === 'VarX') {
+            return `${gLatex}.x`;
+          }
+          if (fNode.kind === 'VarY') {
+            return `${gLatex}.y`;
+          }
+          const isIdentityZ = (n) => n && typeof n === 'object' && n.kind === 'Var' && n.name === 'z';
+          if (fNode.kind === 'Floor' && isIdentityZ(fNode.value)) {
+            return `\\left\\lfloor${gLatexRaw}\\right\\rfloor`;
+          }
+          if (fNode.kind === 'Abs' && isIdentityZ(fNode.value)) {
+            return `\\left|${gLatexRaw}\\right|`;
+          }
+          if (fNode.kind === 'Abs2' && isIdentityZ(fNode.value)) {
+            return `\\left|${gLatexRaw}\\right|^{2}`;
+          }
+          if (fNode.kind === 'Conjugate' && isIdentityZ(fNode.value)) {
+            return `\\overline{${gLatexRaw}}`;
+          }
+        }
+        // Fallback: keep explicit composition.
+      }
+
+      const prec = precedence(node);
+      const leftNode = node.f;
+      const rightNode = node.g;
+      const left = nodeToLatex(leftNode, prec, options);
+      const right = nodeToLatex(rightNode, prec, options);
+      const leftWrapped = maybeWrapLatex(leftNode, left, prec, 'left', node.kind);
+      const rightWrapped = maybeWrapLatex(rightNode, right, prec, 'right', node.kind);
+      const meta = identifierHighlights(node);
+      const injected =
+        meta.length
+          ? `{\\Huge ${escapeLatexTextChar(String(meta[0]?.letter || 'o')[0].toUpperCase())}}\\,`
+          : '';
+      return `${injected}${leftWrapped} \\circ ${rightWrapped}`;
+    }
+
     case 'Add':
     case 'Sub':
     case 'Mul':
@@ -366,11 +459,10 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
     case 'GreaterThanOrEqual':
     case 'Equal':
     case 'LogicalAnd':
-    case 'LogicalOr':
-    case 'Compose': {
+    case 'LogicalOr': {
       const prec = precedence(node);
-      const leftNode = node.left ?? node.f;
-      const rightNode = node.right ?? node.g;
+      const leftNode = node.left;
+      const rightNode = node.right;
       const left = nodeToLatex(leftNode, prec, options);
       const right = nodeToLatex(rightNode, prec, options);
 
@@ -412,14 +504,6 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
         }
         case 'LogicalOr': {
           return `${leftWrapped} \\lor ${rightWrapped}`;
-        }
-        case 'Compose': {
-          const meta = identifierHighlights(node);
-          const injected =
-            meta.length
-              ? `{\\Huge ${escapeLatexTextChar(String(meta[0]?.letter || 'o')[0].toUpperCase())}}\\,`
-              : '';
-          return `${injected}${leftWrapped} \\circ ${rightWrapped}`;
         }
         default:
           return '?';

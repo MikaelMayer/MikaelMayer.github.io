@@ -82,6 +82,16 @@ test('formula page does not double-parenthesize factors for multiplication', asy
   expect(latex).not.toContain('\\cdot');
 });
 
+test('formula page renders D1.x.floor without composition glyphs or black rectangles', async ({ page }) => {
+  await page.goto(`/formula.html?formula=${encodeURIComponent('D1.x.floor')}`);
+  const render = page.locator('#formula-render');
+  await expect(render).toBeVisible();
+  await expect.poll(async () => await render.getAttribute('data-latex')).toContain('\\left\\lfloor');
+  const latex = String(await render.getAttribute('data-latex') || '');
+  expect(latex).toContain('\\mathrm{D}_{1}.x');
+  expect(latex).not.toContain('\\circ');
+});
+
 test('formula page renders underscore-highlight metadata letters as Huge (LEON)', async ({ page }) => {
   const source = '_ln(_exp(_o(si_n, z*z)-3)-1)';
   await page.goto(`/formula.html?formula=${encodeURIComponent(source)}`);
@@ -97,6 +107,33 @@ test('formula page renders underscore-highlight metadata letters as Huge (LEON)'
   expect(value.indexOf('{\\Huge L}')).toBeLessThan(value.indexOf('{\\Huge E}'));
   expect(value.indexOf('{\\Huge E}')).toBeLessThan(value.indexOf('{\\Huge O}'));
   expect(value.indexOf('{\\Huge O}')).toBeLessThan(value.indexOf('{\\Huge N}'));
+});
+
+test('formula page renders sum(...) with fractional powers and $$ repeat composition', async ({ page }) => {
+  const source = 'sum(-(-1)^n*(z-D2)^n/n, n, 1, (D1.x*10).floor,1) $$ 8';
+  await page.goto(`/formula.html?formula=${encodeURIComponent(source)}`);
+  const render = page.locator('#formula-render');
+  await expect(render).toBeVisible();
+  await expect.poll(async () => await render.getAttribute('data-latex')).toContain('\\sum');
+  // Preserve power surface syntax for non-integer powers; in this formula, `^n` stays as a power
+  // in display (not lowered to exp/ln).
+  await expect.poll(async () => await render.getAttribute('data-latex')).not.toContain('\\exp');
+  await expect.poll(async () => await render.getAttribute('data-latex')).not.toContain('\\ln');
+  // $$ 8 renders as a repeat composition superscript.
+  await expect.poll(async () => await render.getAttribute('data-latex')).toContain('\\circ 8');
+});
+
+test('formula page keeps _sum(...) as function call so highlighted letters can render', async ({ page }) => {
+  const source = '_sum(z, n, 1, 2)';
+  await page.goto(`/formula.html?formula=${encodeURIComponent(source)}`);
+  const render = page.locator('#formula-render');
+  await expect(render).toBeVisible();
+  await expect.poll(async () => await render.getAttribute('data-latex')).not.toBeNull();
+  const latex = String(await render.getAttribute('data-latex') || '');
+  expect(latex).toContain('\\operatorname');
+  expect(latex).toContain('{\\Huge');
+  expect(latex).toContain('\\left(');
+  expect(latex).not.toContain('\\sum_{');
 });
 
 test('reflex4you updates formula query param after successful apply', async ({ page }) => {

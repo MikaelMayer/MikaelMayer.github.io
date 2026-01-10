@@ -6,7 +6,7 @@ import {
 } from './arithmetic-parser.mjs';
 import { visitAst } from './ast-utils.mjs';
 import { formulaAstToLatex } from './formula-renderer.mjs';
-import { buildFragmentSourceFromAST } from './core-engine.mjs';
+import { buildFragmentSourceFromAST, lowerHighLevelSugar } from './core-engine.mjs';
 
 test('parses additive and multiplicative precedence', () => {
   const result = parseFormulaInput('1 + 2 * 3');
@@ -90,51 +90,50 @@ test('parentheses can force (-z)^4', () => {
   assert.equal(result.value.base.kind, 'Sub');
 });
 
-test('non-integer exponents lower to exp form', () => {
+test('non-integer exponents preserve power surface syntax', () => {
   const result = parseFormulaInput('z ^ 1.5');
   assert.equal(result.ok, true);
-  assert.equal(result.value.kind, 'Exp');
-  assert.equal(result.value.value.kind, 'Mul');
-  assert.equal(result.value.value.left.kind, 'Const');
+  assert.equal(result.value.kind, 'PowExpr');
+  const latex = formulaAstToLatex(result.value);
+  assert.doesNotMatch(latex, /\\exp|\\ln/);
 });
 
-test('power expressions simplify to Pow when exponent is an integer expression', () => {
+test('power expressions preserve power surface syntax (even if exponent is constant-foldable)', () => {
   const result = parseFormulaInput('z ^ (1 + 1)');
   assert.equal(result.ok, true);
-  assert.equal(result.value.kind, 'Pow');
-  assert.equal(result.value.exponent, 2);
+  assert.equal(result.value.kind, 'PowExpr');
 });
 
-test('set-bound integer exponent resolves to Pow', () => {
+test('set-bound integer exponent remains a power expression (optimized later)', () => {
   const result = parseFormulaInput('set n = 3 in z ^ n');
   assert.equal(result.ok, true);
   const binding = result.value;
   assert.equal(binding.kind, 'SetBinding');
-  assert.equal(binding.body.kind, 'Pow');
-  assert.equal(binding.body.exponent, 3);
+  assert.equal(binding.body.kind, 'PowExpr');
+  assert.equal(binding.body.__resolvedIntExp, 3);
 });
 
-test('symbolic non-integer exponents remain in exp form', () => {
+test('symbolic non-integer exponents preserve power surface syntax', () => {
   const result = parseFormulaInput('z ^ x');
   assert.equal(result.ok, true);
-  assert.equal(result.value.kind, 'Exp');
+  assert.equal(result.value.kind, 'PowExpr');
 });
 
-test('power exponents beyond threshold fall back to exp form', () => {
+test('power exponents beyond Pow threshold remain power expressions', () => {
   const result = parseFormulaInput('z ^ 11');
   assert.equal(result.ok, true);
-  assert.equal(result.value.kind, 'Exp');
+  assert.equal(result.value.kind, 'PowExpr');
 });
 
-test('power exponents from finger-based constants collapse to Pow', () => {
+test('power exponents from finger-based constants remain power expressions (optimized later)', () => {
   const result = parseFormulaInput('z ^ (F1.x + 1)', {
     fingerValues: {
       F1: { x: 2, y: 0 },
     },
   });
   assert.equal(result.ok, true);
-  assert.equal(result.value.kind, 'Pow');
-  assert.equal(result.value.exponent, 3);
+  assert.equal(result.value.kind, 'PowExpr');
+  assert.equal(result.value.__resolvedIntExp, 3);
 });
 
 test('parses exp/sin/cos/ln calls', () => {
@@ -596,6 +595,8 @@ test('dot composition syntax treats a.b as (b $ a)', () => {
   assert.equal(node.g.kind, 'FingerOffset');
   assert.equal(node.g.slot, 'D1');
   assert.equal(node.f.kind, 'VarX');
+  // Dot syntax should be preserved for rendering decisions.
+  assert.equal(node.composeSyntax, 'dot');
 });
 
 test('dot composition chains associate left-to-right', () => {
@@ -937,6 +938,10 @@ function evaluateAstComplex(root, { z = { re: 0, im: 0 } } = {}) {
         return complexMul(evalNode(node.left, zLocal, localParamEnv, localSetEnv, localLetEnv), evalNode(node.right, zLocal, localParamEnv, localSetEnv, localLetEnv));
       case 'Div':
         return complexDiv(evalNode(node.left, zLocal, localParamEnv, localSetEnv, localLetEnv), evalNode(node.right, zLocal, localParamEnv, localSetEnv, localLetEnv));
+      case 'Floor': {
+        const v = evalNode(node.value, zLocal, localParamEnv, localSetEnv, localLetEnv);
+        return { re: Math.floor(v.re), im: 0 };
+      }
       case 'SetBinding': {
         const value = evalNode(node.value, zLocal, localParamEnv, localSetEnv, localLetEnv);
         const nextSetEnv = new Map(localSetEnv);
@@ -1029,6 +1034,12 @@ function evaluateAstComplex(root, { z = { re: 0, im: 0 } } = {}) {
   }
 
   return evalNode(root, z, paramEnv, setEnv, letEnv);
+}
+
+function evalLowered(source) {
+  const ast = parseFormulaToAST(source);
+  const lowered = lowerHighLevelSugar(ast);
+  return evaluateAstComplex(lowered);
 }
 
 test('repeat: single register increments', () => {
@@ -1133,4 +1144,88 @@ test('repeat keyword commits (repeat is not treated as an identifier)', () => {
   const result = parseFormulaInput('repeat');
   assert.equal(result.ok, false);
   assert.match(result.message, /iteration count/i);
+});
+
+test('sum/prod: display preserves sum/prod surface syntax', () => {
+  const sumResult = parseFormulaInput('sum(k, k, 0, 10)');
+  assert.equal(sumResult.ok, true);
+  assert.equal(sumResult.value.kind, 'Sum');
+  const sumLatex = formulaAstToLatex(sumResult.value);
+  assert.match(sumLatex, /\\sum/);
+  assert.doesNotMatch(sumLatex, /\\mathrm\{repeat\}/);
+
+  const prodResult = parseFormulaInput('prod(k, k, 0, 10)');
+  assert.equal(prodResult.ok, true);
+  assert.equal(prodResult.value.kind, 'Prod');
+  const prodLatex = formulaAstToLatex(prodResult.value);
+  assert.match(prodLatex, /\\prod/);
+  assert.doesNotMatch(prodLatex, /\\mathrm\{repeat\}/);
+});
+
+test('sum/prod: optional step is preserved in display', () => {
+  const result = parseFormulaInput('sum(k, k, 0, 10, 2)');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /\\operatorname\{sum\}/);
+  assert.match(latex, /, 2\\right\)/);
+});
+
+test('fractional powers stay as powers in display (including inside sum)', () => {
+  const result = parseFormulaInput('sum(z^0.5, n, 1, 2)');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /z\^\{0\.5\}/);
+  assert.doesNotMatch(latex, /\\exp|\\ln/);
+});
+
+test('sum/prod: semantic correctness via repeat lowering', () => {
+  const sum14 = evalLowered('sum(k, k, 1, 4)');
+  assert.equal(sum14.re, 10);
+  assert.equal(sum14.im, 0);
+
+  const prod14 = evalLowered('prod(k, k, 1, 4)');
+  assert.equal(prod14.re, 24);
+  assert.equal(prod14.im, 0);
+
+  const sumStep = evalLowered('sum(k, k, 1, 5, 2)');
+  assert.equal(sumStep.re, 9);
+  assert.equal(sumStep.im, 0);
+
+  const sumNeg = evalLowered('sum(k, k, 5, 1, -2)');
+  assert.equal(sumNeg.re, 9);
+  assert.equal(sumNeg.im, 0);
+});
+
+test('sum/prod: bound variable can be named acc/iter (no conflicts with lowering helpers)', () => {
+  const sumAcc = evalLowered('sum(acc, acc, 1, 3)');
+  assert.equal(sumAcc.re, 6);
+  assert.equal(sumAcc.im, 0);
+
+  const sumIter = evalLowered('sum(iter, iter, 1, 3)');
+  assert.equal(sumIter.re, 6);
+  assert.equal(sumIter.im, 0);
+});
+
+test('sum/prod: complex-valued body works (without using i as a variable)', () => {
+  const value = evalLowered('sum(k + i, k, 1, 2)');
+  assert.equal(value.re, 3);
+  assert.equal(value.im, 2);
+});
+
+test('sum/prod: scope/capture (bound var shadows outer set binding)', () => {
+  const value = evalLowered('set k = 999 in sum(k, k, 1, 3)');
+  assert.equal(value.re, 6);
+  assert.equal(value.im, 0);
+});
+
+test('sum/prod: nested sums reuse same bound name without capture', () => {
+  const value = evalLowered('sum(sum(k, k, 1, 2), k, 1, 2)');
+  assert.equal(value.re, 6);
+  assert.equal(value.im, 0);
+});
+
+test('sum/prod: rejects non-compile-time bounds (repeat-count rule)', () => {
+  const result = parseFormulaInput('sum(k, k, 1, x)');
+  assert.equal(result.ok, false);
+  assert.match(result.message, /compile time/i);
 });
