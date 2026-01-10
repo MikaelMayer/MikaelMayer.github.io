@@ -400,6 +400,55 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
     case 'IsNaN':
       return functionCallLatex('isnan', [node.value], options, identifierHighlights(node));
 
+    case 'Compose': {
+      // Dot-syntax rendering (a.b): prefer a more "method call" look for common accessors,
+      // and especially avoid rendering chains like "⌊z⌋ ∘ x ∘ D1" for "D1.x.floor".
+      if (node.composeSyntax === 'dot') {
+        const gNode = node.g;
+        const fNode = node.f;
+
+        const gLatexRaw = nodeToLatex(gNode, 0, options);
+        const gLatex = precedence(gNode) < 9 ? wrapParensLatex(gLatexRaw) : gLatexRaw;
+
+        if (fNode && typeof fNode === 'object') {
+          if (fNode.kind === 'VarX') {
+            return `${gLatex}.x`;
+          }
+          if (fNode.kind === 'VarY') {
+            return `${gLatex}.y`;
+          }
+          const isIdentityZ = (n) => n && typeof n === 'object' && n.kind === 'Var' && n.name === 'z';
+          if (fNode.kind === 'Floor' && isIdentityZ(fNode.value)) {
+            return `\\left\\lfloor${gLatexRaw}\\right\\rfloor`;
+          }
+          if (fNode.kind === 'Abs' && isIdentityZ(fNode.value)) {
+            return `\\left|${gLatexRaw}\\right|`;
+          }
+          if (fNode.kind === 'Abs2' && isIdentityZ(fNode.value)) {
+            return `\\left|${gLatexRaw}\\right|^{2}`;
+          }
+          if (fNode.kind === 'Conjugate' && isIdentityZ(fNode.value)) {
+            return `\\overline{${gLatexRaw}}`;
+          }
+        }
+        // Fallback: keep explicit composition.
+      }
+
+      const prec = precedence(node);
+      const leftNode = node.f;
+      const rightNode = node.g;
+      const left = nodeToLatex(leftNode, prec, options);
+      const right = nodeToLatex(rightNode, prec, options);
+      const leftWrapped = maybeWrapLatex(leftNode, left, prec, 'left', node.kind);
+      const rightWrapped = maybeWrapLatex(rightNode, right, prec, 'right', node.kind);
+      const meta = identifierHighlights(node);
+      const injected =
+        meta.length
+          ? `{\\Huge ${escapeLatexTextChar(String(meta[0]?.letter || 'o')[0].toUpperCase())}}\\,`
+          : '';
+      return `${injected}${leftWrapped} \\circ ${rightWrapped}`;
+    }
+
     case 'Add':
     case 'Sub':
     case 'Mul':
@@ -411,64 +460,9 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
     case 'Equal':
     case 'LogicalAnd':
     case 'LogicalOr':
-    case 'Compose': {
-      const prec = precedence(node);
-      const leftNode = node.left ?? node.f;
-      const rightNode = node.right ?? node.g;
-      const left = nodeToLatex(leftNode, prec, options);
-      const right = nodeToLatex(rightNode, prec, options);
-
-      const leftWrapped = maybeWrapLatex(leftNode, left, prec, 'left', node.kind);
-      const rightWrapped = maybeWrapLatex(rightNode, right, prec, 'right', node.kind);
-
-      switch (node.kind) {
-        case 'Add': {
-          return `${leftWrapped} + ${rightWrapped}`;
-        }
-        case 'Sub': {
-          return `${leftWrapped} - ${rightWrapped}`;
-        }
-        case 'Mul': {
-          // Use a thin space instead of `\\cdot` for readability.
-          return `${leftWrapped}\\,${rightWrapped}`;
-        }
-        case 'Div': {
-          // Prefer fractions for readability; they behave as an "atomic" group in TeX.
-          return `\\frac{${left}}{${right}}`;
-        }
-        case 'LessThan': {
-          return `${leftWrapped} < ${rightWrapped}`;
-        }
-        case 'GreaterThan': {
-          return `${leftWrapped} > ${rightWrapped}`;
-        }
-        case 'LessThanOrEqual': {
-          return `${leftWrapped} \\le ${rightWrapped}`;
-        }
-        case 'GreaterThanOrEqual': {
-          return `${leftWrapped} \\ge ${rightWrapped}`;
-        }
-        case 'Equal': {
-          return `${leftWrapped} = ${rightWrapped}`;
-        }
-        case 'LogicalAnd': {
-          return `${leftWrapped} \\land ${rightWrapped}`;
-        }
-        case 'LogicalOr': {
-          return `${leftWrapped} \\lor ${rightWrapped}`;
-        }
-        case 'Compose': {
-          const meta = identifierHighlights(node);
-          const injected =
-            meta.length
-              ? `{\\Huge ${escapeLatexTextChar(String(meta[0]?.letter || 'o')[0].toUpperCase())}}\\,`
-              : '';
-          return `${injected}${leftWrapped} \\circ ${rightWrapped}`;
-        }
-        default:
-          return '?';
-      }
-    }
+    case 'Compose':
+      // handled above
+      return '?';
 
     case 'If': {
       const cond = nodeToLatex(node.condition, 0, options);

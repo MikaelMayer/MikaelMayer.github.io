@@ -1101,6 +1101,8 @@ const dotExpressionParser = createParser('DotExpression', (input) => {
     }
     const span = spanBetween(input, suffix.next);
     node = withSpan(Compose(suffix.value, node), span);
+    // Preserve dot syntax for rendering decisions.
+    node.composeSyntax = 'dot';
     cursor = suffix.next;
   }
   const span = spanBetween(input, cursor);
