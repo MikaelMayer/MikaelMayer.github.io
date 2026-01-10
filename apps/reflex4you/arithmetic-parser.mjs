@@ -439,6 +439,8 @@ const RESERVED_BINDING_NAMES = new Set([
   'heav',
   'oo',
   'o',
+  'sum',
+  'prod',
   'x',
   'y',
   're',
@@ -491,6 +493,38 @@ const bindingIdentifierParser = createParser('BindingIdentifier', (input) => {
   return new ParseSuccess({
     ctor: 'BindingIdentifier',
     value: normalized.name,
+    span: identifier.span,
+    next: identifier.next,
+  });
+});
+
+// Like BindingIdentifier, but returns both the raw name and highlight metadata (used by sum/prod).
+const boundIdentifierParser = createParser('BoundIdentifier', (input) => {
+  const identifier = identifierToken.runNormalized(input);
+  if (!identifier.ok) {
+    return identifier;
+  }
+  const normalized = normalizeIdentifierWithHighlights(identifier.value);
+  // Disallow reserved names and finger labels (same constraints as `let`/`set` bindings),
+  // plus a couple internal names used by repeat helpers.
+  if (
+    RESERVED_BINDING_NAMES.has(normalized.name) ||
+    isFingerLabel(normalized.name) ||
+    normalized.name === 'iter' ||
+    normalized.name === 'acc'
+  ) {
+    return new ParseFailure({
+      ctor: 'BoundIdentifier',
+      message: `"${normalized.name}" is a reserved identifier and cannot be bound here`,
+      severity: ParseSeverity.error,
+      expected: 'non-reserved identifier',
+      span: identifier.span,
+      input: identifier.span.input,
+    });
+  }
+  return new ParseSuccess({
+    ctor: 'BoundIdentifier',
+    value: { name: normalized.name, meta: normalized },
     span: identifier.span,
     next: identifier.next,
   });
@@ -787,9 +821,103 @@ const sqrtParser = createParser('SqrtCall', (input) => {
   });
 });
 
+function createSumOrProdParser(name, kind) {
+  return createParser(`${name}Call`, (input) => {
+    const keyword = keywordLiteral(name, { ctor: `${name}Keyword` }).runNormalized(input);
+    if (!keyword.ok) {
+      return keyword;
+    }
+    const open = wsLiteral('(', { ctor: `${name}Open` }).runNormalized(keyword.next);
+    if (!open.ok) {
+      return open;
+    }
+
+    const bodyResult = expressionRef.runNormalized(open.next);
+    if (!bodyResult.ok) {
+      return bodyResult;
+    }
+    const comma1 = wsLiteral(',', { ctor: `${name}Comma1` }).runNormalized(bodyResult.next);
+    if (!comma1.ok) {
+      return comma1;
+    }
+
+    const varResult = boundIdentifierParser.runNormalized(comma1.next);
+    if (!varResult.ok) {
+      return varResult;
+    }
+    const comma2 = wsLiteral(',', { ctor: `${name}Comma2` }).runNormalized(varResult.next);
+    if (!comma2.ok) {
+      return comma2;
+    }
+
+    const minResult = expressionRef.runNormalized(comma2.next);
+    if (!minResult.ok) {
+      return minResult;
+    }
+    const comma3 = wsLiteral(',', { ctor: `${name}Comma3` }).runNormalized(minResult.next);
+    if (!comma3.ok) {
+      return comma3;
+    }
+
+    const maxResult = expressionRef.runNormalized(comma3.next);
+    if (!maxResult.ok) {
+      return maxResult;
+    }
+
+    let cursor = maxResult.next;
+    let stepNode = null;
+    let stepWasImplicit = true;
+    const comma4 = wsLiteral(',', { ctor: `${name}Comma4` }).runNormalized(cursor);
+    if (comma4.ok) {
+      const stepResult = expressionRef.runNormalized(comma4.next);
+      if (!stepResult.ok) {
+        return stepResult;
+      }
+      stepNode = stepResult.value;
+      stepWasImplicit = false;
+      cursor = stepResult.next;
+    } else if (comma4.severity === ParseSeverity.error) {
+      return comma4;
+    }
+
+    const close = wsLiteral(')', { ctor: `${name}Close` }).runNormalized(cursor);
+    if (!close.ok) {
+      return close;
+    }
+    const span = spanBetween(input, close.next);
+
+    const stepFinal =
+      stepNode ??
+      createConstNode(1, 0, span);
+
+    const node = {
+      kind,
+      body: bodyResult.value,
+      varName: varResult.value.name,
+      varMetaHighlights: varResult.value.meta?.highlights || null,
+      min: minResult.value,
+      max: maxResult.value,
+      step: stepFinal,
+      stepWasImplicit,
+      span,
+      input: span.input,
+      // resolvedCount is computed later (validateRepeatExpressions) using compile-time evaluation.
+      resolvedCount: null,
+    };
+    return new ParseSuccess({
+      ctor: `${name}Call`,
+      value: attachIdentifierMeta(node, keyword.value),
+      span,
+      next: close.next,
+    });
+  });
+}
+
 const elementaryFunctionParser = Choice([
   createBinaryFunctionParser('ifnan', (value, fallback) => IfNaN(value, fallback)),
   createBinaryFunctionParser('iferror', (value, fallback) => IfNaN(value, fallback)),
+  createSumOrProdParser('sum', 'Sum'),
+  createSumOrProdParser('prod', 'Prod'),
   ...createUnaryFunctionParsers(['exp'], Exp),
   ...createUnaryFunctionParsers(['sin'], Sin),
   ...createUnaryFunctionParsers(['cos'], Cos),
@@ -1075,19 +1203,13 @@ prefixParser = createParser('Prefix', (input) => {
 });
 
 function createPowerApplication(baseNode, exponentNode, span) {
+  // Preserve exponentiation in the surface AST (for display and roundtrips).
+  // Integer-literal exponents within the small Pow range still compile to a Pow node.
   const literal = extractSmallIntegerExponent(exponentNode);
-  if (literal !== null) {
+  if (literal !== null && exponentNode && typeof exponentNode === 'object' && exponentNode.kind === 'Const') {
     return withSpan(Pow(baseNode, literal), span);
   }
-  const lnSpan = baseNode?.span || span;
-  const lnNode = withSpan(Ln(baseNode, null), lnSpan);
-  const mulNode = withSpan(Mul(exponentNode, lnNode), span);
-  const expNode = withSpan(Exp(mulNode), span);
-  expNode.__powerExpression = {
-    base: baseNode,
-    exponent: exponentNode,
-  };
-  return expNode;
+  return withSpan({ kind: 'PowExpr', base: baseNode, exponent: exponentNode }, span);
 }
 
 function extractSmallIntegerExponent(node, contextOverride = null) {
@@ -1729,6 +1851,22 @@ function resolveSetReferences(ast, input) {
         }
         return null;
       }
+      case 'Sum':
+      case 'Prod': {
+        // Bind the loop variable name only for the body expression.
+        // (min/max/step are evaluated in the outer environment)
+        const minErr = visit(node.min, node, 'min');
+        if (minErr) return minErr;
+        const maxErr = visit(node.max, node, 'max');
+        if (maxErr) return maxErr;
+        const stepErr = visit(node.step, node, 'step');
+        if (stepErr) return stepErr;
+        const loopName = String(node.varName || '');
+        paramEnv.push(new Set(loopName ? [loopName] : []));
+        const bodyErr = visit(node.body, node, 'body');
+        paramEnv.pop();
+        return bodyErr;
+      }
       case 'Const':
       case 'Var':
       case 'VarX':
@@ -1739,6 +1877,11 @@ function resolveSetReferences(ast, input) {
       case 'ParamRef':
       case 'SetRef':
         return null;
+      case 'PowExpr': {
+        const baseErr = visit(node.base, node, 'base');
+        if (baseErr) return baseErr;
+        return visit(node.exponent, node, 'exponent');
+      }
       case 'Pow':
         return visit(node.base, node, 'base');
       case 'Exp':
@@ -2036,6 +2179,21 @@ function resolveRepeatPlaceholders(ast, parseOptions, input) {
         return null;
       case 'Pow':
         return visit(node.base, node, 'base');
+      case 'PowExpr': {
+        const baseErr = visit(node.base, node, 'base');
+        if (baseErr) return baseErr;
+        return visit(node.exponent, node, 'exponent');
+      }
+      case 'Sum':
+      case 'Prod': {
+        const bodyErr = visit(node.body, node, 'body');
+        if (bodyErr) return bodyErr;
+        const minErr = visit(node.min, node, 'min');
+        if (minErr) return minErr;
+        const maxErr = visit(node.max, node, 'max');
+        if (maxErr) return maxErr;
+        return visit(node.step, node, 'step');
+      }
       case 'Exp': {
         const valueErr = visit(node.value, node, 'value');
         if (valueErr) {
@@ -2318,6 +2476,67 @@ function validateRepeatExpressions(ast, parseOptions, input) {
         }
         return node;
       }
+      case 'Sum':
+      case 'Prod': {
+        // Inclusive bounds (for both positive and negative step):
+        // v_t = min + t*step, for t = 0..N-1, where
+        // N = floor((max - min)/step) + 1.
+        //
+        // If N <= 0, the loop performs zero iterations (sum -> 0, prod -> 1).
+        const nextMin = visit(node.min);
+        if (nextMin instanceof ParseFailure) return nextMin;
+        node.min = nextMin;
+
+        const nextMax = visit(node.max);
+        if (nextMax instanceof ParseFailure) return nextMax;
+        node.max = nextMax;
+
+        const nextStep = visit(node.step);
+        if (nextStep instanceof ParseFailure) return nextStep;
+        node.step = nextStep;
+
+        const nextBody = visit(node.body);
+        if (nextBody instanceof ParseFailure) return nextBody;
+        node.body = nextBody;
+
+        const span = node.span ?? input.createSpan(0, 0);
+        const minVal = evaluateNodeToRealScalar(node.min, context);
+        const maxVal = evaluateNodeToRealScalar(node.max, context);
+        const stepVal = evaluateNodeToRealScalar(node.step, context);
+        if (minVal === null || maxVal === null || stepVal === null) {
+          return new ParseFailure({
+            ctor: node.kind,
+            message: `${node.kind.toLowerCase()} requires min/max/step evaluable at compile time`,
+            severity: ParseSeverity.error,
+            expected: 'compile-time constants',
+            span,
+            input: span.input,
+          });
+        }
+        if (!Number.isFinite(stepVal) || Math.abs(stepVal) <= 0) {
+          return new ParseFailure({
+            ctor: node.kind,
+            message: `${node.kind.toLowerCase()} step must be a non-zero finite real number`,
+            severity: ParseSeverity.error,
+            expected: 'non-zero real step',
+            span,
+            input: span.input,
+          });
+        }
+        const nRaw = Math.floor((maxVal - minVal) / stepVal) + 1;
+        if (!Number.isFinite(nRaw) || !Number.isSafeInteger(nRaw)) {
+          return new ParseFailure({
+            ctor: node.kind,
+            message: `${node.kind.toLowerCase()} requires a finite, safe integer iteration count`,
+            severity: ParseSeverity.error,
+            expected: 'finite integer iteration count',
+            span,
+            input: span.input,
+          });
+        }
+        node.resolvedCount = nRaw;
+        return node;
+      }
       case 'Call': {
         const nextCallee = visit(node.callee);
         if (nextCallee instanceof ParseFailure) {
@@ -2342,6 +2561,26 @@ function validateRepeatExpressions(ast, parseOptions, input) {
             return nextBase;
           }
           node.base = nextBase;
+          return node;
+        }
+      case 'PowExpr':
+        {
+          const nextBase = visit(node.base);
+          if (nextBase instanceof ParseFailure) {
+            return nextBase;
+          }
+          node.base = nextBase;
+          const nextExp = visit(node.exponent);
+          if (nextExp instanceof ParseFailure) {
+            return nextExp;
+          }
+          node.exponent = nextExp;
+          const integerExponent = extractSmallIntegerExponent(node.exponent, context);
+          if (integerExponent === null) {
+            delete node.__resolvedIntExp;
+          } else {
+            node.__resolvedIntExp = integerExponent;
+          }
           return node;
         }
       case 'Exp':

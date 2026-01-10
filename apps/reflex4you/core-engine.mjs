@@ -779,8 +779,233 @@ function materializeRepeatLoops(ast) {
 
 function prepareAstForGpu(ast) {
   // GPU compilation now does explicit environment passing (no global slots),
-  // so we only need a stable, non-mutating clone that preserves SetRef graphs.
-  return cloneAst(ast, { preserveBindings: true });
+  // but we also need a stable, non-mutating clone that preserves SetRef graphs
+  // AND a late lowering phase for high-level surface sugar (sum/prod, PowExpr).
+  const cloned = cloneAst(ast, { preserveBindings: true });
+  return lowerHighLevelSugar(cloned);
+}
+
+// =========================
+// Late lowering (GPU-only)
+// =========================
+//
+// IMPORTANT:
+// - This pass runs on the GPU AST only (a clone). The UI keeps the original AST
+//   so the formula renderer can preserve user-entered syntax like `sum(...)` and `z^0.5`.
+// - `Repeat` nodes must have `resolvedCount` populated (parser responsibility).
+export function lowerHighLevelSugar(ast) {
+  let root = ast;
+  let nextId = 0;
+
+  function collectLetNames(letStack) {
+    const out = new Set();
+    (Array.isArray(letStack) ? letStack : []).forEach((n) => {
+      if (n && typeof n.name === 'string' && n.name) {
+        out.add(n.name);
+      }
+    });
+    return out;
+  }
+
+  function freshName(prefix, letStack) {
+    const taken = collectLetNames(letStack);
+    while (true) {
+      const candidate = `${prefix}_${nextId++}`;
+      if (!taken.has(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
+  function replace(parent, key, replacement) {
+    if (parent && key != null) {
+      parent[key] = replacement;
+    } else {
+      root = replacement;
+    }
+  }
+
+  function visit(node, parent, key, letStack = []) {
+    if (!node || typeof node !== 'object') {
+      return;
+    }
+
+    switch (node.kind) {
+      case 'LetBinding': {
+        // Name is not in scope for value; is in scope for body.
+        visit(node.value, node, 'value', letStack);
+        const nextLetStack = Array.isArray(letStack) ? [...letStack, node] : [node];
+        visit(node.body, node, 'body', nextLetStack);
+        return;
+      }
+      case 'SetBinding': {
+        visit(node.value, node, 'value', letStack);
+        visit(node.body, node, 'body', letStack);
+        return;
+      }
+      case 'Repeat': {
+        if (node.countExpression) visit(node.countExpression, node, 'countExpression', letStack);
+        const fromExprs = Array.isArray(node.fromExpressions) ? node.fromExpressions : [];
+        for (let i = 0; i < fromExprs.length; i += 1) {
+          visit(fromExprs[i], fromExprs, i, letStack);
+        }
+        return;
+      }
+      case 'Call': {
+        visit(node.callee, node, 'callee', letStack);
+        const args = Array.isArray(node.args) ? node.args : [];
+        for (let i = 0; i < args.length; i += 1) {
+          visit(args[i], args, i, letStack);
+        }
+        return;
+      }
+      case 'Pow': {
+        visit(node.base, node, 'base', letStack);
+        return;
+      }
+      case 'PowExpr': {
+        visit(node.base, node, 'base', letStack);
+        visit(node.exponent, node, 'exponent', letStack);
+        const base = node.base;
+        const exponent = node.exponent;
+        const resolvedInt = typeof node.__resolvedIntExp === 'number' ? node.__resolvedIntExp : null;
+        const replacement = (resolvedInt !== null && Number.isInteger(resolvedInt))
+          ? Pow(base, resolvedInt)
+          : Exp(Mul(exponent, Ln(base, null)));
+        replace(parent, key, replacement);
+        // Recurse into the replacement to catch nested sugar introduced by children.
+        visit(replacement, parent, key, letStack);
+        return;
+      }
+      case 'Sum':
+      case 'Prod': {
+        const resolvedCount = typeof node.resolvedCount === 'number' ? node.resolvedCount : null;
+        if (resolvedCount === null || !Number.isInteger(resolvedCount)) {
+          throw new Error(`${node.kind} requires resolvedCount (compile-time validation should have run)`);
+        }
+
+        visit(node.body, node, 'body', letStack);
+        visit(node.min, node, 'min', letStack);
+        visit(node.max, node, 'max', letStack);
+        visit(node.step, node, 'step', letStack);
+
+        const bodyExpr = node.body;
+        const minExpr = node.min;
+        const maxExpr = node.max;
+        const stepExpr = node.step;
+
+        const nName = freshName(`r4y_${node.kind.toLowerCase()}_N`, letStack);
+        const accFnName = freshName(`r4y_${node.kind.toLowerCase()}_acc`, letStack);
+        const vFnName = freshName(`r4y_${node.kind.toLowerCase()}_v`, letStack);
+
+        const nValue = Add(Floor(Div(Sub(maxExpr, minExpr), stepExpr)), Const(1, 0));
+        const nBinding = SetBindingNode(nName, nValue, null);
+        const nRef = SetRef(nName, nBinding);
+
+        const iterParam = 'iter';
+        const accParam = 'acc';
+        const vParam = String(node.varName || 'v');
+
+        const accUpdate =
+          node.kind === 'Sum'
+            ? Add({ kind: 'ParamRef', name: accParam }, bodyExpr)
+            : Mul({ kind: 'ParamRef', name: accParam }, bodyExpr);
+        const vUpdate = Add({ kind: 'ParamRef', name: vParam }, stepExpr);
+
+        const initAcc = node.kind === 'Sum' ? Const(0, 0) : Const(1, 0);
+        const repeatNode = {
+          kind: 'Repeat',
+          countExpression: nRef,
+          fromExpressions: [initAcc, minExpr],
+          byIdentifiers: [accFnName, vFnName],
+          resolvedCount,
+        };
+
+        const vStepLet = {
+          kind: 'LetBinding',
+          name: vFnName,
+          params: [iterParam, accParam, vParam],
+          value: vUpdate,
+          body: repeatNode,
+        };
+        const accStepLet = {
+          kind: 'LetBinding',
+          name: accFnName,
+          params: [iterParam, accParam, vParam],
+          value: accUpdate,
+          body: vStepLet,
+        };
+        nBinding.body = accStepLet;
+
+        replace(parent, key, nBinding);
+        visit(nBinding, parent, key, letStack);
+        return;
+      }
+      case 'Exp':
+      case 'Sin':
+      case 'Cos':
+      case 'Tan':
+      case 'Atan':
+      case 'Asin':
+      case 'Acos':
+      case 'Abs':
+      case 'Abs2':
+      case 'Floor':
+      case 'Conjugate':
+      case 'IsNaN': {
+        visit(node.value, node, 'value', letStack);
+        return;
+      }
+      case 'Ln':
+      case 'Arg': {
+        visit(node.value, node, 'value', letStack);
+        if (node.branch) visit(node.branch, node, 'branch', letStack);
+        return;
+      }
+      case 'Add':
+      case 'Sub':
+      case 'Mul':
+      case 'Div':
+      case 'LessThan':
+      case 'GreaterThan':
+      case 'LessThanOrEqual':
+      case 'GreaterThanOrEqual':
+      case 'Equal':
+      case 'LogicalAnd':
+      case 'LogicalOr': {
+        visit(node.left, node, 'left', letStack);
+        visit(node.right, node, 'right', letStack);
+        return;
+      }
+      case 'Compose': {
+        visit(node.f, node, 'f', letStack);
+        visit(node.g, node, 'g', letStack);
+        return;
+      }
+      case 'ComposeMultiple':
+      case 'RepeatComposePlaceholder': {
+        visit(node.base, node, 'base', letStack);
+        if (node.countExpression) visit(node.countExpression, node, 'countExpression', letStack);
+        return;
+      }
+      case 'If': {
+        visit(node.condition, node, 'condition', letStack);
+        visit(node.thenBranch, node, 'thenBranch', letStack);
+        visit(node.elseBranch, node, 'elseBranch', letStack);
+        return;
+      }
+      case 'IfNaN': {
+        visit(node.value, node, 'value', letStack);
+        visit(node.fallback, node, 'fallback', letStack);
+        return;
+      }
+      default:
+        return;
+    }
+  }
+
+  visit(root, null, null, []);
+  return root;
 }
 
 export function SetBindingNode(name, value, body) {
