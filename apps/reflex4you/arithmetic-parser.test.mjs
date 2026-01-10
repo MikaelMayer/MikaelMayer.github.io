@@ -1149,14 +1149,14 @@ test('sum/prod: display preserves sum/prod surface syntax', () => {
   assert.equal(sumResult.ok, true);
   assert.equal(sumResult.value.kind, 'Sum');
   const sumLatex = formulaAstToLatex(sumResult.value);
-  assert.match(sumLatex, /\\operatorname\{sum\}/);
+  assert.match(sumLatex, /\\sum/);
   assert.doesNotMatch(sumLatex, /\\mathrm\{repeat\}/);
 
   const prodResult = parseFormulaInput('prod(k, k, 0, 10)');
   assert.equal(prodResult.ok, true);
   assert.equal(prodResult.value.kind, 'Prod');
   const prodLatex = formulaAstToLatex(prodResult.value);
-  assert.match(prodLatex, /\\operatorname\{prod\}/);
+  assert.match(prodLatex, /\\prod/);
   assert.doesNotMatch(prodLatex, /\\mathrm\{repeat\}/);
 });
 

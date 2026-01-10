@@ -305,16 +305,36 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
     case 'Sum':
     case 'Prod': {
       const name = node.kind === 'Sum' ? 'sum' : 'prod';
-      const args = [
-        nodeToLatex(node.body, 0, options),
-        latexIdentifierWithMetadata(node.varName || '?', node.varMetaHighlights || null),
-        nodeToLatex(node.min, 0, options),
-        nodeToLatex(node.max, 0, options),
-      ];
-      const explicitStep = node.stepWasImplicit ? false : true;
-      if (explicitStep) {
-        args.push(nodeToLatex(node.step, 0, options));
+      const fnMeta = identifierHighlights(node);
+      const bodyLatex = nodeToLatex(node.body, 0, options);
+      const varLatex = latexIdentifierWithMetadata(node.varName || '?', node.varMetaHighlights || null);
+      const minLatex = nodeToLatex(node.min, 0, options);
+      const maxLatex = nodeToLatex(node.max, 0, options);
+
+      // If the user used underscore-highlight syntax like `_sum(...)`, keep the
+      // function-call rendering so highlighted letters can be shown.
+      if (fnMeta.length) {
+        const args = [bodyLatex, varLatex, minLatex, maxLatex];
+        if (!node.stepWasImplicit) {
+          args.push(nodeToLatex(node.step, 0, options));
+        }
+        return `${operatorNameWithMetadata(name, fnMeta)}\\left(${args.join(', ')}\\right)`;
       }
+
+      // Prefer proper sigma/prod notation when the step is 1 (implicit or explicit).
+      const stepIsOne =
+        node.step &&
+        typeof node.step === 'object' &&
+        node.step.kind === 'Const' &&
+        node.step.im === 0 &&
+        node.step.re === 1;
+      if (node.stepWasImplicit || stepIsOne) {
+        const op = node.kind === 'Sum' ? '\\sum' : '\\prod';
+        return `${op}_{${varLatex}=${minLatex}}^{${maxLatex}}\\,${bodyLatex}`;
+      }
+
+      // Fallback: explicit step != 1 is rendered as a function call.
+      const args = [bodyLatex, varLatex, minLatex, maxLatex, nodeToLatex(node.step, 0, options)];
       return `\\operatorname{${escapeLatexIdentifier(name)}}\\left(${args.join(', ')}\\right)`;
     }
 
