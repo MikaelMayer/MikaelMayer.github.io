@@ -99,6 +99,20 @@ test('formula page renders underscore-highlight metadata letters as Huge (LEON)'
   expect(value.indexOf('{\\Huge O}')).toBeLessThan(value.indexOf('{\\Huge N}'));
 });
 
+test('formula page renders sum(...) with fractional powers and $$ repeat composition', async ({ page }) => {
+  const source = 'sum(-(-1)^n*(z-D2)^n/n, n, 1, (D1.x*10).floor,1) $$ 8';
+  await page.goto(`/formula.html?formula=${encodeURIComponent(source)}`);
+  const render = page.locator('#formula-render');
+  await expect(render).toBeVisible();
+  await expect.poll(async () => await render.getAttribute('data-latex')).toContain('\\operatorname{sum}');
+  // Preserve power surface syntax for non-integer powers; in this formula, `^n` stays as a power
+  // in display (not lowered to exp/ln).
+  await expect.poll(async () => await render.getAttribute('data-latex')).not.toContain('\\exp');
+  await expect.poll(async () => await render.getAttribute('data-latex')).not.toContain('\\ln');
+  // $$ 8 renders as a repeat composition superscript.
+  await expect.poll(async () => await render.getAttribute('data-latex')).toContain('\\circ 8');
+});
+
 test('reflex4you updates formula query param after successful apply', async ({ page }) => {
   await page.goto('/index.html');
   await waitForReflexReady(page);
