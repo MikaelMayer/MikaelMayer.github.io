@@ -506,12 +506,11 @@ const boundIdentifierParser = createParser('BoundIdentifier', (input) => {
   }
   const normalized = normalizeIdentifierWithHighlights(identifier.value);
   // Disallow reserved names and finger labels (same constraints as `let`/`set` bindings),
-  // plus a couple internal names used by repeat helpers.
+  // but do NOT reserve internal helper parameter names (those are handled by alpha-renaming
+  // in the late lowering pass).
   if (
     RESERVED_BINDING_NAMES.has(normalized.name) ||
-    isFingerLabel(normalized.name) ||
-    normalized.name === 'iter' ||
-    normalized.name === 'acc'
+    isFingerLabel(normalized.name)
   ) {
     return new ParseFailure({
       ctor: 'BoundIdentifier',

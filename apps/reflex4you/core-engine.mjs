@@ -817,6 +817,16 @@ export function lowerHighLevelSugar(ast) {
     }
   }
 
+  function freshParam(prefix, avoidNames = new Set()) {
+    const avoid = avoidNames instanceof Set ? avoidNames : new Set(avoidNames || []);
+    while (true) {
+      const candidate = `${prefix}_${nextId++}`;
+      if (!avoid.has(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
   function replace(parent, key, replacement) {
     if (parent && key != null) {
       parent[key] = replacement;
@@ -902,9 +912,12 @@ export function lowerHighLevelSugar(ast) {
         const nBinding = SetBindingNode(nName, nValue, null);
         const nRef = SetRef(nName, nBinding);
 
-        const iterParam = 'iter';
-        const accParam = 'acc';
         const vParam = String(node.varName || 'v');
+        const avoidParams = new Set([vParam]);
+        const iterParam = freshParam(`r4y_${node.kind.toLowerCase()}_iter`, avoidParams);
+        avoidParams.add(iterParam);
+        const accParam = freshParam(`r4y_${node.kind.toLowerCase()}_acc`, avoidParams);
+        avoidParams.add(accParam);
 
         const accUpdate =
           node.kind === 'Sum'

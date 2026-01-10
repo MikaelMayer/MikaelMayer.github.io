@@ -1194,6 +1194,16 @@ test('sum/prod: semantic correctness via repeat lowering', () => {
   assert.equal(sumNeg.im, 0);
 });
 
+test('sum/prod: bound variable can be named acc/iter (no conflicts with lowering helpers)', () => {
+  const sumAcc = evalLowered('sum(acc, acc, 1, 3)');
+  assert.equal(sumAcc.re, 6);
+  assert.equal(sumAcc.im, 0);
+
+  const sumIter = evalLowered('sum(iter, iter, 1, 3)');
+  assert.equal(sumIter.re, 6);
+  assert.equal(sumIter.im, 0);
+});
+
 test('sum/prod: complex-valued body works (without using i as a variable)', () => {
   const value = evalLowered('sum(k + i, k, 1, 2)');
   assert.equal(value.re, 3);
