@@ -1286,6 +1286,16 @@ async function handleMenuAction(action) {
       }
       break;
     }
+    case 'open-readme': {
+      const href =
+        'https://github.com/MikaelMayer/MikaelMayer.github.io/blob/master/apps/reflex4you/README.md';
+      try {
+        window.open(href, '_blank', 'noopener');
+      } catch (_) {
+        window.location.href = href;
+      }
+      break;
+    }
     case 'back-to-edit': {
       const href = await buildExploreUrl({
         targetPath: 'index.html',
@@ -1307,7 +1317,7 @@ async function handleMenuAction(action) {
 async function bootstrap() {
   // Service worker (same behavior as other pages).
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    const SW_URL = './service-worker.js?sw=37.1';
+    const SW_URL = './service-worker.js?sw=37.2';
     window.addEventListener('load', () => {
       navigator.serviceWorker.register(SW_URL).then((registration) => {
         if (registration?.waiting) {

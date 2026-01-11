@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { parseFormulaInput } from './arithmetic-parser.mjs';
 import { formulaAstToLatex } from './formula-renderer.mjs';
 import {
@@ -116,6 +117,68 @@ test('repeat composition inside let bindings compiles (let fn = z $$ 2 in fn)', 
   // Regression: materializeComposeMultiples must traverse into LetBinding.value.
   // If it doesn't, SSA compilation will see an unhandled ComposeMultiple and emit 0.
   assert.match(fragment, /vec2 let_fn_0\(vec2 z\)\s*\{\s*return z;\s*\}/);
+});
+
+test('identifier resolution traverses all parsed function-call nodes (regression guard)', () => {
+  // This test is designed to fail if a new AST node kind is added (and exposed via
+  // a callable function like `fact(...)`) but the identifier-resolution pass forgets
+  // to traverse into it. That exact bug yields:
+  //   "Unresolved Identifier during GPU compilation: n"
+  // because `n` remains an `Identifier` (never visited) instead of becoming `ParamRef`.
+  const parserSource = fs.readFileSync(new URL('./arithmetic-parser.mjs', import.meta.url), 'utf8');
+  const start = parserSource.indexOf('const elementaryFunctionParser = Choice([');
+  assert.ok(start >= 0, 'Expected elementaryFunctionParser in arithmetic-parser.mjs');
+  const end = parserSource.indexOf('], { ctor: \'ElementaryFunction\' });', start);
+  assert.ok(end > start, 'Expected end of elementaryFunctionParser Choice([...])');
+  const section = parserSource.slice(start, end);
+
+  const unary = new Set();
+  const binary = new Set();
+
+  // createUnaryFunctionParsers(['atan', 'arctan'], Atan)
+  const unaryListRe = /createUnaryFunctionParsers\(\s*\[([^\]]+)\]/g;
+  for (let m = unaryListRe.exec(section); m; m = unaryListRe.exec(section)) {
+    const list = m[1] || '';
+    const strRe = /'([^']+)'/g;
+    for (let s = strRe.exec(list); s; s = strRe.exec(list)) {
+      unary.add(s[1]);
+    }
+  }
+
+  // createBinaryFunctionParser('ifnan', ...)
+  const binaryRe = /createBinaryFunctionParser\(\s*'([^']+)'/g;
+  for (let m = binaryRe.exec(section); m; m = binaryRe.exec(section)) {
+    binary.add(m[1]);
+  }
+
+  // createArgParser('arg') / createArgParser('argument')
+  const argRe = /createArgParser\(\s*'([^']+)'/g;
+  for (let m = argRe.exec(section); m; m = argRe.exec(section)) {
+    unary.add(m[1]);
+  }
+
+  // lnParser / sqrtParser are explicitly listed by identifier.
+  if (section.includes('lnParser')) unary.add('ln');
+  if (section.includes('sqrtParser')) unary.add('sqrt');
+
+  // sum/prod are special syntax forms, not needed for this test.
+  unary.delete('sum');
+  unary.delete('prod');
+  binary.delete('sum');
+  binary.delete('prod');
+
+  const all = Array.from(new Set([...unary, ...binary])).sort();
+  assert.ok(all.length > 0, 'Expected at least one parsed function call to test');
+
+  for (const fn of all) {
+    const callExpr = binary.has(fn) ? `${fn}(n, 0)` : `${fn}(n)`;
+    const parsed = parseFormulaInput(`let f(n) = ${callExpr} in f(1)`);
+    assert.equal(parsed.ok, true, `Expected parse ok for "${fn}"`);
+    assert.doesNotThrow(
+      () => buildFragmentSourceFromAST(parsed.value),
+      `Expected GPU compile ok for "${fn}"`,
+    );
+  }
 });
 
 test('let alias preserves captured set bindings (set d = 1 in let f = z + d in let g = f in g)', () => {

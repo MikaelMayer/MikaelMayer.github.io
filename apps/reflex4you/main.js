@@ -3093,6 +3093,16 @@ function handleMenuAction(action) {
         console.warn('Failed to copy share link.', error);
       });
       break;
+    case 'open-readme': {
+      const href =
+        'https://github.com/MikaelMayer/MikaelMayer.github.io/blob/master/apps/reflex4you/README.md';
+      try {
+        window.open(href, '_blank', 'noopener');
+      } catch (_) {
+        window.location.href = href;
+      }
+      break;
+    }
     case 'open-explore':
       window.location.href = `./explore.html${window.location.search || ''}`;
       break;
@@ -4017,7 +4027,7 @@ function triggerImageDownload(url, filename, shouldRevoke) {
 
 if ('serviceWorker' in navigator) {
   // Version the SW script URL so updates can't get stuck behind a cached SW script.
-  const SW_URL = './service-worker.js?sw=37.1';
+  const SW_URL = './service-worker.js?sw=37.2';
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(SW_URL).then((registration) => {
       // Auto-activate updated workers so cache/version bumps take effect quickly.

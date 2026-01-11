@@ -1900,6 +1900,8 @@ function resolveSetReferences(ast, input) {
       case 'Atan':
       case 'Asin':
       case 'Acos':
+      case 'Gamma':
+      case 'Fact':
       case 'Arg':
       case 'Abs':
       case 'Abs2':
