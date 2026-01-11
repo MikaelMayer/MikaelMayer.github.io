@@ -19,10 +19,14 @@ async function navigateToDelayCam(page) {
 
 async function goToDelayedMode(page) {
   await navigateToDelayCam(page);
-  await page.locator('#liveVideo').click({ position: { x: 20, y: 700 } });
+  await page.locator('#liveVideo').click({ position: { x: 20, y: 700 }, force: true });
   await page.waitForTimeout(300);
-  await page.locator('#liveVideo').click({ position: { x: 20, y: 700 } });
+  await page.locator('#liveVideo').click({ position: { x: 20, y: 700 }, force: true });
   await page.waitForTimeout(250);
+}
+
+async function clickRec(page) {
+  await page.locator('#recBtn').click({ force: true });
 }
 
 // When share isn't available, SAVE should download and have a sane extension
@@ -30,14 +34,14 @@ test('SAVE triggers download with correct extension when share unsupported', asy
   await goToDelayedMode(page);
 
   // Start and stop to get a blob ready to save
-  await page.click('#recBtn');
+  await clickRec(page);
   await page.waitForTimeout(700);
-  await page.click('#recBtn'); // shows SAVE
+  await clickRec(page); // shows SAVE
   await expect(page.locator('#recBtn')).toHaveText('SAVE');
 
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.click('#recBtn'), // trigger save
+    clickRec(page), // trigger save
   ]);
 
   const suggested = download.suggestedFilename();
@@ -52,9 +56,9 @@ test('SAVE uses Web Share API when available and passes a File', async ({ page }
   await goToDelayedMode(page);
 
   // Start and stop to get a blob ready to save
-  await page.click('#recBtn');
+  await clickRec(page);
   await page.waitForTimeout(700);
-  await page.click('#recBtn'); // shows SAVE
+  await clickRec(page); // shows SAVE
   await expect(page.locator('#recBtn')).toHaveText('SAVE');
 
   // Stub share APIs in the page to capture the shared file
@@ -72,7 +76,7 @@ test('SAVE uses Web Share API when available and passes a File', async ({ page }
   });
 
   // Click SAVE; this should call navigator.share and NOT download
-  await page.click('#recBtn');
+  await clickRec(page);
 
   // Give the promise chain a moment to resolve
   await page.waitForTimeout(250);

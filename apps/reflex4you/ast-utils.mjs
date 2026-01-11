@@ -53,6 +53,8 @@ export function childEntries(node) {
     case 'Atan':
     case 'Asin':
     case 'Acos':
+    case 'Gamma':
+    case 'Fact':
     case 'Abs':
     case 'Abs2':
     case 'Floor':

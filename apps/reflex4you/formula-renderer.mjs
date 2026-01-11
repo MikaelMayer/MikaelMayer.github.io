@@ -4,7 +4,7 @@
 import { FINGER_DECIMAL_PLACES } from './core-engine.mjs';
 
 // Bump this when changing renderer logic so users can verify cached assets.
-export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2025-12-21.1';
+export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2026-01-11.1';
 
 const DEFAULT_MATHJAX_LOAD_TIMEOUT_MS = 9000;
 
@@ -127,6 +127,25 @@ function wrapParensLatex(latex) {
     return String(latex || '');
   }
   return `\\left(${latex}\\right)`;
+}
+
+function isAtomicForPostfixFactorial(node) {
+  if (!node || typeof node !== 'object') return false;
+  switch (node.kind) {
+    case 'Const':
+    case 'Var':
+    case 'VarX':
+    case 'VarY':
+    case 'Identifier':
+    case 'SetRef':
+    case 'ParamRef':
+    case 'FingerOffset':
+    case 'DeviceRotation':
+    case 'TrackballRotation':
+      return true;
+    default:
+      return false;
+  }
 }
 
 function maybeWrapLatex(node, latex, parentPrec, side, opKind) {
@@ -388,6 +407,15 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
         return `${op}_{${branch}}\\left(${value}\\right)`;
       }
       return `${op}\\left(${value}\\right)`;
+    }
+    case 'Gamma': {
+      const value = nodeToLatex(node.value, 0, options);
+      return `\\Gamma\\left(${value}\\right)`;
+    }
+    case 'Fact': {
+      const innerLatex = nodeToLatex(node.value, 0, options);
+      const base = isAtomicForPostfixFactorial(node.value) ? innerLatex : wrapParensLatex(innerLatex);
+      return `${base}!`;
     }
     case 'Abs':
       return `\\left|${nodeToLatex(node.value, 0, options)}\\right|`;

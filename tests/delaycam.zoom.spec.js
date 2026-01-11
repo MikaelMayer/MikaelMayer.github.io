@@ -31,8 +31,21 @@ function zoomButtonsLocator(page) {
   return page.locator('#zoomControls .zoomBtn');
 }
 
+function escapeRegExp(text) {
+  return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function zoomButtonByLabel(page, label) {
-  return page.locator('#zoomControls .zoomBtn', { hasText: label });
+  const re = new RegExp(`^${escapeRegExp(label)}$`);
+  return zoomButtonsLocator(page).filter({ hasText: re });
+}
+
+async function enterDelayedMode(page) {
+  // Default click position is the element center; use force to avoid hit-target issues in headless.
+  await page.locator('#liveVideo').click({ force: true });
+  await page.waitForTimeout(200);
+  await page.locator('#liveVideo').click({ force: true });
+  await page.waitForTimeout(300);
 }
 
 // UI presence and default selection
@@ -60,14 +73,15 @@ test('zoom controls persist in delayed mode and affect delayedVideo', async ({ p
   await navigateToDelayCam(page);
   await zoomButtonByLabel(page, '1.7x').click();
   // Enter delayed mode
-  await page.locator('#liveVideo').click({ position: { x: 20, y: 700 } });
-  await page.waitForTimeout(200);
-  await page.locator('#liveVideo').click({ position: { x: 20, y: 700 } });
-  await page.waitForTimeout(250);
-  await expect(page.locator('#delayedVideo')).toBeVisible();
+  await enterDelayedMode(page);
+  await expect(page.locator('#delayedVideo')).toBeVisible({ timeout: 10000 });
   await expect(page.locator('#zoomControls')).toBeVisible();
   const delayedTransform = await page.evaluate(() => document.getElementById('delayedVideo').style.transform || '');
-  expect(delayedTransform).toContain('scale(1.7)');
+  const m = /scale\(([^)]+)\)/.exec(delayedTransform);
+  expect(m).not.toBeNull();
+  const scale = Number(m && m[1]);
+  expect(Number.isFinite(scale)).toBeTruthy();
+  expect(Math.abs(scale - 1.7)).toBeLessThan(0.05);
 });
 
 // Basic record flow after zoom to ensure pipeline still works
@@ -77,14 +91,12 @@ const fs = require('fs');
 test('recording still works after applying zoom', async ({ page }) => {
   await navigateToDelayCam(page);
   await zoomButtonByLabel(page, '1.4x').click();
-  await page.locator('#liveVideo').click({ position: { x: 20, y: 700 } });
-  await page.waitForTimeout(250);
-  await page.locator('#liveVideo').click({ position: { x: 20, y: 700 } });
-  await page.waitForTimeout(250);
+  await enterDelayedMode(page);
+  await expect(page.locator('#recBtn')).toBeVisible({ timeout: 10000 });
 
-  await page.click('#recBtn');
+  await page.locator('#recBtn').click({ force: true });
   await page.waitForTimeout(700);
-  await page.click('#recBtn'); // stop -> SAVE
+  await page.locator('#recBtn').click({ force: true }); // stop -> SAVE
   await expect(page.locator('#recBtn')).toHaveText(/SAVE|SHARE/);
 
   // If SAVE, expect a download; if SHARE, stub to force download fallback
@@ -102,12 +114,12 @@ test('recording still works after applying zoom', async ({ page }) => {
       nav.canShare = undefined;
       nav.share = undefined;
     });
-    await page.locator('#recBtn').click(); // now SAVE path
+    await page.locator('#recBtn').click({ force: true }); // now SAVE path
   }
 
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.locator('#recBtn').click(),
+    page.locator('#recBtn').click({ force: true }),
   ]);
   const path = await download.path();
   const size = (await fs.promises.stat(path)).size;

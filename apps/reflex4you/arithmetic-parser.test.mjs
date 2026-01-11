@@ -143,6 +143,30 @@ test('parses exp/sin/cos/ln calls', () => {
   assert.equal(result.value.value.kind, 'Sin');
 });
 
+test('parses gamma(...) as a primitive and renders with Γ', () => {
+  const result = parseFormulaInput('gamma(z)');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Gamma');
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /\\Gamma/);
+  assert.doesNotThrow(() => buildFragmentSourceFromAST(result.value));
+});
+
+test('parses fact(...) as a primitive and renders with postfix ! (no parens for atoms)', () => {
+  const atom = parseFormulaInput('fact(z)');
+  assert.equal(atom.ok, true);
+  assert.equal(atom.value.kind, 'Fact');
+  const atomLatex = formulaAstToLatex(atom.value);
+  assert.match(atomLatex, /^z!$/);
+
+  const compound = parseFormulaInput('fact(z+1)');
+  assert.equal(compound.ok, true);
+  assert.equal(compound.value.kind, 'Fact');
+  const compoundLatex = formulaAstToLatex(compound.value);
+  assert.ok(compoundLatex.includes('\\left(z + 1\\right)!'));
+  assert.doesNotThrow(() => buildFragmentSourceFromAST(compound.value));
+});
+
 test('parses tan and atan calls', () => {
   const result = parseFormulaInput('tan(atan(z))');
   assert.equal(result.ok, true);

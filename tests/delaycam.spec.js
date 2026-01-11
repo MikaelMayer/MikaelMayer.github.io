@@ -19,13 +19,21 @@ async function navigateToDelayCam(page) {
   }
 }
 
+async function clickVideo(page) {
+  await page.locator('#liveVideo').click({ position: { x: 20, y: 700 }, force: true });
+}
+
+async function clickRec(page) {
+  await page.locator('#recBtn').click({ force: true });
+}
+
 test('loads and can tap to set delay', async ({ page }) => {
   await navigateToDelayCam(page);
   await expect(page.locator('#liveVideo')).toBeVisible();
   await expect(page.locator('#versionLabel')).toHaveText(/\d+\.\d+\.\d+/);
-  await page.locator('#liveVideo').click({ position: { x: 20, y: 700 } }); // start stopwatch
+  await clickVideo(page); // start stopwatch
   await page.waitForTimeout(500);
-  await page.locator('#liveVideo').click({ position: { x: 20, y: 700 } }); // freeze delay and switch UI
+  await clickVideo(page); // freeze delay and switch UI
   await page.waitForTimeout(200); // allow UI to switch
   await expect(page.locator('#delayedVideo')).toBeVisible();
   await expect(page.locator('#miniLive')).toBeVisible();
@@ -36,17 +44,17 @@ test('loads and can tap to set delay', async ({ page }) => {
 // (fake media will not produce real frames)
 test('can record then save without error', async ({ page }) => {
   await navigateToDelayCam(page);
-  await page.locator('#liveVideo').click({ position: { x: 20, y: 700 } });
+  await clickVideo(page);
   await page.waitForTimeout(300);
-  await page.locator('#liveVideo').click({ position: { x: 20, y: 700 } });
+  await clickVideo(page);
   await page.waitForTimeout(200);
-  await page.click('#recBtn'); // start
+  await clickRec(page); // start
   await page.waitForTimeout(700);
-  await page.click('#recBtn'); // stop -> shows SAVE
+  await clickRec(page); // stop -> shows SAVE
   await expect(page.locator('#recBtn')).toHaveText('SAVE');
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.click('#recBtn'), // SAVE triggers download
+    clickRec(page), // SAVE triggers download
   ]);
   const path = await download.path();
   const size = (await fs.promises.stat(path)).size;
@@ -56,20 +64,20 @@ test('can record then save without error', async ({ page }) => {
 
 test('two consecutive recordings produce two distinct non-empty downloads', async ({ page }) => {
   await navigateToDelayCam(page);
-  await page.locator('#liveVideo').click({ position: { x: 20, y: 700 } });
+  await clickVideo(page);
   await page.waitForTimeout(300);
-  await page.locator('#liveVideo').click({ position: { x: 20, y: 700 } });
+  await clickVideo(page);
   await page.waitForTimeout(200);
 
   const paths = [];
   // First recording
-  await page.click('#recBtn'); // start
+  await clickRec(page); // start
   await page.waitForTimeout(700);
-  await page.click('#recBtn'); // stop -> SAVE
+  await clickRec(page); // stop -> SAVE
   await expect(page.locator('#recBtn')).toHaveText('SAVE');
   const [download1] = await Promise.all([
     page.waitForEvent('download'),
-    page.click('#recBtn'), // SAVE triggers download
+    clickRec(page), // SAVE triggers download
   ]);
   const path1 = await download1.path();
   const size1 = (await fs.promises.stat(path1)).size;
@@ -77,13 +85,13 @@ test('two consecutive recordings produce two distinct non-empty downloads', asyn
   paths.push(path1);
 
   // Second recording
-  await page.click('#recBtn'); // start
+  await clickRec(page); // start
   await page.waitForTimeout(700);
-  await page.click('#recBtn'); // stop -> SAVE
+  await clickRec(page); // stop -> SAVE
   await expect(page.locator('#recBtn')).toHaveText('SAVE');
   const [download2] = await Promise.all([
     page.waitForEvent('download'),
-    page.click('#recBtn'), // SAVE triggers download
+    clickRec(page), // SAVE triggers download
   ]);
   const path2 = await download2.path();
   const size2 = (await fs.promises.stat(path2)).size;

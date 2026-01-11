@@ -63,6 +63,24 @@ test('formula page renders sqrt(...) as sqrt (not exp/ln desugaring)', async ({ 
   await expect.poll(async () => await render.getAttribute('data-latex')).not.toContain('\\ln');
 });
 
+test('formula page renders gamma(...) with Γ', async ({ page }) => {
+  await page.goto(`/formula.html?formula=${encodeURIComponent('gamma(z)')}`);
+  const render = page.locator('#formula-render');
+  await expect(render).toBeVisible();
+  await expect.poll(async () => await render.getAttribute('data-latex')).toContain('\\Gamma');
+});
+
+test('formula page renders fact(...) with postfix ! (no parens for atoms)', async ({ page }) => {
+  await page.goto(`/formula.html?formula=${encodeURIComponent('fact(z)')}`);
+  const render = page.locator('#formula-render');
+  await expect(render).toBeVisible();
+  await expect.poll(async () => await render.getAttribute('data-latex')).toBe('z!');
+
+  await page.goto(`/formula.html?formula=${encodeURIComponent('fact(z+1)')}`);
+  await expect(render).toBeVisible();
+  await expect.poll(async () => await render.getAttribute('data-latex')).toContain('\\left(z + 1\\right)!');
+});
+
 test('formula page renders heav(...) as a function name', async ({ page }) => {
   await page.goto(`/formula.html?formula=${encodeURIComponent('heav(z)')}`);
   const render = page.locator('#formula-render');
