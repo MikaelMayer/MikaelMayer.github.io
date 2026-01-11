@@ -118,6 +118,14 @@ test('repeat composition inside let bindings compiles (let fn = z $$ 2 in fn)', 
   assert.match(fragment, /vec2 let_fn_0\(vec2 z\)\s*\{\s*return z;\s*\}/);
 });
 
+test('sum/prod: loop variable is resolved inside fact(...)', () => {
+  const parsed = parseFormulaInput('sum(z/fact(n), n, 1, 10)');
+  assert.equal(parsed.ok, true);
+  assert.doesNotThrow(() => {
+    buildFragmentSourceFromAST(parsed.value);
+  });
+});
+
 test('let alias preserves captured set bindings (set d = 1 in let f = z + d in let g = f in g)', () => {
   const parsed = parseFormulaInput('set d = 1 in let f = z + d in let g = f in g');
   assert.equal(parsed.ok, true);
