@@ -685,7 +685,7 @@ function createUnaryFunctionParser(name, factory) {
     // highlights (e.g. `_abs(z)` / `_modulus(z)`), preserve call syntax so the
     // function name can be rendered (with Huge highlighted letters).
     if (
-      (name === 'abs' || name === 'modulus') &&
+      (name === 'abs' || name === 'modulus' || name === 'gamma' || name === 'fact') &&
       meta &&
       Array.isArray(meta.highlights) &&
       meta.highlights.length
@@ -930,6 +930,8 @@ const elementaryFunctionParser = Choice([
   ...createUnaryFunctionParsers(['atan', 'arctan'], Atan),
   ...createUnaryFunctionParsers(['asin', 'arcsin'], Asin),
   ...createUnaryFunctionParsers(['acos', 'arccos'], Acos),
+  ...createUnaryFunctionParsers(['gamma'], Gamma),
+  ...createUnaryFunctionParsers(['fact'], Fact),
   createArgParser('arg'),
   createArgParser('argument'),
   lnParser,
@@ -947,11 +949,11 @@ const builtinFunctionLiteralParser = Choice(
     keywordLiteral(name, { ctor: `${name}FunctionLiteral` }).Map((token, result) => {
       const node = createBuiltinFunctionLiteral(name, factory, result.span);
       const withMeta = attachIdentifierMeta(node, token);
-      // For abs/modulus literals, default rendering is |z| (Abs node). If the user used
-      // underscore highlighting (e.g. `_modulus`), preserve call syntax so the
-      // highlighted function name can be rendered.
+      // For some literals, default rendering is "special" (e.g. abs -> |z|, gamma -> Γ(z), fact -> z!).
+      // If the user used underscore highlighting (e.g. `_modulus`, `_gamma`, `_fact`), preserve
+      // call syntax so the highlighted function name can be rendered.
       if (
-        (name === 'abs' || name === 'modulus') &&
+        (name === 'abs' || name === 'modulus' || name === 'gamma' || name === 'fact') &&
         token &&
         Array.isArray(token.highlights) &&
         token.highlights.length

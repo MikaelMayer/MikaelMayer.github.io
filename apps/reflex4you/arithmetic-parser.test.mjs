@@ -167,6 +167,28 @@ test('parses fact(...) as a primitive and renders with postfix ! (no parens for 
   assert.doesNotThrow(() => buildFragmentSourceFromAST(compound.value));
 });
 
+test('_gamma(...) preserves call syntax so underscore-highlight letters render', () => {
+  const result = parseFormulaInput('_gamma(z)');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Gamma');
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /\\operatorname\{/);
+  assert.match(latex, /\{\\Huge/);
+  assert.match(latex, /\\left\(z\\right\)/);
+});
+
+test('_fact(...) preserves call syntax so underscore-highlight letters render', () => {
+  const result = parseFormulaInput('_fact(z)');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Fact');
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /\\operatorname\{/);
+  assert.match(latex, /\{\\Huge/);
+  assert.match(latex, /\\left\(z\\right\)/);
+  // Ensure it is not rendered as postfix factorial when underscore-highlights are present.
+  assert.doesNotMatch(latex, /z!/);
+});
+
 test('parses tan and atan calls', () => {
   const result = parseFormulaInput('tan(atan(z))');
   assert.equal(result.ok, true);
