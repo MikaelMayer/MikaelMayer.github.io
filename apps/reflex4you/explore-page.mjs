@@ -1286,6 +1286,16 @@ async function handleMenuAction(action) {
       }
       break;
     }
+    case 'open-readme': {
+      const href =
+        'https://github.com/MikaelMayer/MikaelMayer.github.io/blob/master/apps/reflex4you/README.md';
+      try {
+        window.open(href, '_blank', 'noopener');
+      } catch (_) {
+        window.location.href = href;
+      }
+      break;
+    }
     case 'back-to-edit': {
       const href = await buildExploreUrl({
         targetPath: 'index.html',

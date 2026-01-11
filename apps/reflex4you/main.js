@@ -3093,6 +3093,16 @@ function handleMenuAction(action) {
         console.warn('Failed to copy share link.', error);
       });
       break;
+    case 'open-readme': {
+      const href =
+        'https://github.com/MikaelMayer/MikaelMayer.github.io/blob/master/apps/reflex4you/README.md';
+      try {
+        window.open(href, '_blank', 'noopener');
+      } catch (_) {
+        window.location.href = href;
+      }
+      break;
+    }
     case 'open-explore':
       window.location.href = `./explore.html${window.location.search || ''}`;
       break;
