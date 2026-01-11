@@ -208,6 +208,16 @@ export function Ln(value, branch = null) {
   return { kind: "Ln", value, branch };
 }
 
+// Euler's Gamma function Γ(z) for complex z.
+export function Gamma(value) {
+  return { kind: 'Gamma', value };
+}
+
+// Factorial for complex z: fact(z) = Γ(z + 1).
+export function Fact(value) {
+  return { kind: 'Fact', value };
+}
+
 export function Abs(value) {
   return { kind: "Abs", value };
 }
@@ -721,6 +731,8 @@ function materializeRepeatLoops(ast) {
       case 'Asin':
       case 'Acos':
       case 'Arg':
+      case 'Gamma':
+      case 'Fact':
       case 'Abs':
       case 'Abs2':
       case 'Floor':
@@ -961,6 +973,8 @@ export function lowerHighLevelSugar(ast) {
       case 'Atan':
       case 'Asin':
       case 'Acos':
+      case 'Gamma':
+      case 'Fact':
       case 'Abs':
       case 'Abs2':
       case 'Floor':
@@ -1138,6 +1152,8 @@ function assignNodeIds(ast) {
     case "Atan":
     case "Asin":
     case "Acos":
+    case "Gamma":
+    case "Fact":
     case "Abs":
     case "Abs2":
     case "Floor":
@@ -1235,6 +1251,8 @@ function collectNodesPostOrder(ast, out) {
     case "Atan":
     case "Asin":
     case "Acos":
+    case "Gamma":
+    case "Fact":
     case "Abs":
     case "Abs2":
     case "Floor":
@@ -1671,6 +1689,24 @@ vec2 ${name}(vec2 z) {
 }`.trim();
   }
 
+  if (ast.kind === "Gamma") {
+    const valueName = functionName(ast.value);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 v = ${valueName}(z);
+    return c_gamma(v);
+}`.trim();
+  }
+
+  if (ast.kind === "Fact") {
+    const valueName = functionName(ast.value);
+    return `
+vec2 ${name}(vec2 z) {
+    vec2 v = ${valueName}(z);
+    return c_fact(v);
+}`.trim();
+  }
+
   if (ast.kind === "Atan") {
     const valueName = functionName(ast.value);
     return `
@@ -2029,6 +2065,73 @@ vec2 c_pow_int(vec2 base, int exp) {
   return c_pow_pos_int(base, exp);
 }
 
+// General complex exponentiation: a^b = exp(b * ln(a))
+vec2 c_pow(vec2 a, vec2 b) {
+  return c_exp(c_mul(b, c_ln(a)));
+}
+
+// Complex Gamma function Γ(z), using Lanczos approximation + reflection formula.
+// IMPORTANT: GLSL ES forbids recursion, so reflection must not call c_gamma(1-z).
+// Returns the Reflex4You overflow sentinel (1e10,1e10) on severe numeric issues.
+vec2 c_gamma_lanczos(vec2 z) {
+  // Lanczos parameters (g=7, n=9) tuned for good accuracy in float.
+  const float g = 7.0;
+  const float SQRT_2PI = 2.5066282746310007;
+
+  // Shift: z -> z - 1
+  vec2 z1 = z - vec2(1.0, 0.0);
+
+  // Coefficients (double-derived, used as float constants).
+  // See: https://en.wikipedia.org/wiki/Lanczos_approximation
+  const float p0 = 0.9999999999998099;
+  const float p1 = 676.5203681218851;
+  const float p2 = -1259.1392167224028;
+  const float p3 = 771.3234287776531;
+  const float p4 = -176.6150291621406;
+  const float p5 = 12.507343278686905;
+  const float p6 = -0.13857109526572012;
+  const float p7 = 9.984369578019572e-6;
+  const float p8 = 1.5056327351493116e-7;
+
+  vec2 x = vec2(p0, 0.0);
+  x += c_div(vec2(p1, 0.0), z1 + vec2(1.0, 0.0));
+  x += c_div(vec2(p2, 0.0), z1 + vec2(2.0, 0.0));
+  x += c_div(vec2(p3, 0.0), z1 + vec2(3.0, 0.0));
+  x += c_div(vec2(p4, 0.0), z1 + vec2(4.0, 0.0));
+  x += c_div(vec2(p5, 0.0), z1 + vec2(5.0, 0.0));
+  x += c_div(vec2(p6, 0.0), z1 + vec2(6.0, 0.0));
+  x += c_div(vec2(p7, 0.0), z1 + vec2(7.0, 0.0));
+  x += c_div(vec2(p8, 0.0), z1 + vec2(8.0, 0.0));
+
+  vec2 t = z1 + vec2(g + 0.5, 0.0);
+  vec2 zPow = z1 + vec2(0.5, 0.0);
+  vec2 term = c_pow(t, zPow);
+  vec2 eTerm = c_exp(-t);
+  vec2 y = c_mul(vec2(SQRT_2PI, 0.0), c_mul(term, c_mul(eTerm, x)));
+
+  if (c_is_error(y) > 0.5) {
+    return vec2(1.0e10, 1.0e10);
+  }
+  return y;
+}
+
+vec2 c_gamma(vec2 z) {
+  // Reflection for Re(z) < 0.5 improves accuracy/stability.
+  // Use Γ(z) = π / (sin(πz) Γ(1-z)), but compute Γ(1-z) via Lanczos directly (no recursion).
+  if (z.x < 0.5) {
+    vec2 oneMinusZ = vec2(1.0, 0.0) - z;
+    vec2 sinPiZ = c_sin(c_mul(vec2(PI, 0.0), z));
+    vec2 denom = c_mul(sinPiZ, c_gamma_lanczos(oneMinusZ));
+    return c_div(vec2(PI, 0.0), denom);
+  }
+  return c_gamma_lanczos(z);
+}
+
+// Complex factorial: fact(z) = Γ(z + 1).
+vec2 c_fact(vec2 z) {
+  return c_gamma(z + vec2(1.0, 0.0));
+}
+
 /*FORMULA_FUNCS*/
 
 vec3 reflexColor(vec2 w) {
@@ -2249,6 +2352,8 @@ function compileFormulaFunctionsSSA(rootAst) {
         case 'Atan':
         case 'Asin':
         case 'Acos':
+        case 'Gamma':
+        case 'Fact':
         case 'Abs':
         case 'Abs2':
         case 'Floor':
@@ -2624,7 +2729,9 @@ function compileFormulaFunctionsSSA(rootAst) {
         case 'Tan':
         case 'Atan':
         case 'Asin':
-        case 'Acos': {
+        case 'Acos':
+        case 'Gamma':
+        case 'Fact': {
           const value = emitExpr(node.value, zVar, env, letStack, indentLevel);
           const t = emitter.freshTemp(node.kind.toLowerCase());
           const fn =
@@ -2640,7 +2747,11 @@ function compileFormulaFunctionsSSA(rootAst) {
                       ? 'c_atan'
                       : node.kind === 'Asin'
                         ? 'c_asin'
-                        : 'c_acos';
+                        : node.kind === 'Acos'
+                          ? 'c_acos'
+                          : node.kind === 'Gamma'
+                            ? 'c_gamma'
+                            : 'c_fact';
           emitter.push(`${ind}vec2 ${t} = ${fn}(${value});`);
           return t;
         }
@@ -2952,7 +3063,9 @@ function compileFormulaFunctionsSSA(rootAst) {
         case 'Tan':
         case 'Atan':
         case 'Asin':
-        case 'Acos': {
+        case 'Acos':
+        case 'Gamma':
+        case 'Fact': {
           const value = emitExpr(node2.value, zVar, env, letStack, indentLevel);
           const t = emitter.freshTemp(node2.kind.toLowerCase());
           const fn =
@@ -2968,7 +3081,11 @@ function compileFormulaFunctionsSSA(rootAst) {
                       ? 'c_atan'
                       : node2.kind === 'Asin'
                         ? 'c_asin'
-                        : 'c_acos';
+                        : node2.kind === 'Acos'
+                          ? 'c_acos'
+                          : node2.kind === 'Gamma'
+                            ? 'c_gamma'
+                            : 'c_fact';
           emitter.push(`${ind}vec2 ${t} = ${fn}(${value});`);
           return t;
         }

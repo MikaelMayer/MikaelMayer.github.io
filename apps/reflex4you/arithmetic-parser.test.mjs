@@ -143,6 +143,52 @@ test('parses exp/sin/cos/ln calls', () => {
   assert.equal(result.value.value.kind, 'Sin');
 });
 
+test('parses gamma(...) as a primitive and renders with Γ', () => {
+  const result = parseFormulaInput('gamma(z)');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Gamma');
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /\\Gamma/);
+  assert.doesNotThrow(() => buildFragmentSourceFromAST(result.value));
+});
+
+test('parses fact(...) as a primitive and renders with postfix ! (no parens for atoms)', () => {
+  const atom = parseFormulaInput('fact(z)');
+  assert.equal(atom.ok, true);
+  assert.equal(atom.value.kind, 'Fact');
+  const atomLatex = formulaAstToLatex(atom.value);
+  assert.match(atomLatex, /^z!$/);
+
+  const compound = parseFormulaInput('fact(z+1)');
+  assert.equal(compound.ok, true);
+  assert.equal(compound.value.kind, 'Fact');
+  const compoundLatex = formulaAstToLatex(compound.value);
+  assert.ok(compoundLatex.includes('\\left(z + 1\\right)!'));
+  assert.doesNotThrow(() => buildFragmentSourceFromAST(compound.value));
+});
+
+test('_gamma(...) preserves call syntax so underscore-highlight letters render', () => {
+  const result = parseFormulaInput('_gamma(z)');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Gamma');
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /\\operatorname\{/);
+  assert.match(latex, /\{\\Huge/);
+  assert.match(latex, /\\left\(z\\right\)/);
+});
+
+test('_fact(...) preserves call syntax so underscore-highlight letters render', () => {
+  const result = parseFormulaInput('_fact(z)');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Fact');
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /\\operatorname\{/);
+  assert.match(latex, /\{\\Huge/);
+  assert.match(latex, /\\left\(z\\right\)/);
+  // Ensure it is not rendered as postfix factorial when underscore-highlights are present.
+  assert.doesNotMatch(latex, /z!/);
+});
+
 test('parses tan and atan calls', () => {
   const result = parseFormulaInput('tan(atan(z))');
   assert.equal(result.ok, true);
