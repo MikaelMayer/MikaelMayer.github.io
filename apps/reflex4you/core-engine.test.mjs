@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { parseFormulaInput } from './arithmetic-parser.mjs';
 import { formulaAstToLatex } from './formula-renderer.mjs';
+import { visitAst } from './ast-utils.mjs';
 import {
   evaluateFormulaSource,
   defaultFormulaSource,
@@ -124,6 +126,42 @@ test('sum/prod: loop variable is resolved inside fact(...)', () => {
   assert.doesNotThrow(() => {
     buildFragmentSourceFromAST(parsed.value);
   });
+});
+
+test('sum/prod: loop variable resolves inside every builtin call (regression guard)', () => {
+  const parserSource = fs.readFileSync(new URL('./arithmetic-parser.mjs', import.meta.url), 'utf8');
+  const start = parserSource.indexOf('const BUILTIN_FUNCTION_DEFINITIONS');
+  assert.ok(start >= 0, 'Expected BUILTIN_FUNCTION_DEFINITIONS in arithmetic-parser.mjs');
+  const end = parserSource.indexOf('];', start);
+  assert.ok(end > start, 'Expected end of BUILTIN_FUNCTION_DEFINITIONS array');
+  const section = parserSource.slice(start, end);
+
+  const names = [];
+  const re = /\{\s*name:\s*'([^']+)'\s*,/g;
+  for (let m = re.exec(section); m; m = re.exec(section)) {
+    names.push(m[1]);
+  }
+  const unique = Array.from(new Set(names)).sort();
+  assert.ok(unique.length > 0, 'Expected at least one builtin function name');
+
+  for (const fn of unique) {
+    const parsed = parseFormulaInput(`sum(${fn}(n), n, 1, 2)`);
+    assert.equal(parsed.ok, true, `Expected parse ok for builtin "${fn}"`);
+
+    // If identifier resolution forgets to traverse into a new node kind,
+    // `n` will remain an Identifier and later GPU compilation will fail.
+    const unresolved = [];
+    visitAst(parsed.value, (node) => {
+      if (node?.kind === 'Identifier' && node.name === 'n') {
+        unresolved.push(node);
+      }
+    });
+    assert.equal(
+      unresolved.length,
+      0,
+      `Expected loop variable "n" to be resolved under builtin "${fn}"`,
+    );
+  }
 });
 
 test('let alias preserves captured set bindings (set d = 1 in let f = z + d in let g = f in g)', () => {
