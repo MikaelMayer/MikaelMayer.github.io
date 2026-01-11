@@ -2071,20 +2071,9 @@ vec2 c_pow(vec2 a, vec2 b) {
 }
 
 // Complex Gamma function Γ(z), using Lanczos approximation + reflection formula.
+// IMPORTANT: GLSL ES forbids recursion, so reflection must not call c_gamma(1-z).
 // Returns the Reflex4You overflow sentinel (1e10,1e10) on severe numeric issues.
-vec2 c_gamma(vec2 z) {
-  // Handle poles roughly: gamma has poles at 0, -1, -2, ...
-  // We rely on the approximation + division to overflow to the sentinel near poles.
-
-  // Reflection for Re(z) < 0.5 improves accuracy/stability.
-  if (z.x < 0.5) {
-    vec2 oneMinusZ = vec2(1.0, 0.0) - z;
-    vec2 sinPiZ = c_sin(c_mul(vec2(PI, 0.0), z));
-    vec2 denom = c_mul(sinPiZ, c_gamma(oneMinusZ));
-    // π / (sin(πz) Γ(1-z))
-    return c_div(vec2(PI, 0.0), denom);
-  }
-
+vec2 c_gamma_lanczos(vec2 z) {
   // Lanczos parameters (g=7, n=9) tuned for good accuracy in float.
   const float g = 7.0;
   const float SQRT_2PI = 2.5066282746310007;
@@ -2120,11 +2109,22 @@ vec2 c_gamma(vec2 z) {
   vec2 eTerm = c_exp(-t);
   vec2 y = c_mul(vec2(SQRT_2PI, 0.0), c_mul(term, c_mul(eTerm, x)));
 
-  // If the result is clearly broken, propagate sentinel.
   if (c_is_error(y) > 0.5) {
     return vec2(1.0e10, 1.0e10);
   }
   return y;
+}
+
+vec2 c_gamma(vec2 z) {
+  // Reflection for Re(z) < 0.5 improves accuracy/stability.
+  // Use Γ(z) = π / (sin(πz) Γ(1-z)), but compute Γ(1-z) via Lanczos directly (no recursion).
+  if (z.x < 0.5) {
+    vec2 oneMinusZ = vec2(1.0, 0.0) - z;
+    vec2 sinPiZ = c_sin(c_mul(vec2(PI, 0.0), z));
+    vec2 denom = c_mul(sinPiZ, c_gamma_lanczos(oneMinusZ));
+    return c_div(vec2(PI, 0.0), denom);
+  }
+  return c_gamma_lanczos(z);
 }
 
 // Complex factorial: fact(z) = Γ(z + 1).
