@@ -4,7 +4,7 @@
 import { FINGER_DECIMAL_PLACES } from './core-engine.mjs';
 
 // Bump this when changing renderer logic so users can verify cached assets.
-export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2026-01-13.1';
+export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2026-01-13.2';
 
 const DEFAULT_MATHJAX_LOAD_TIMEOUT_MS = 9000;
 
@@ -125,24 +125,26 @@ function latexIdentifierWithMetadata(name, metaHighlights) {
   if (!highlights.length) {
     const raw = String(name || '?');
 
-    // Special-case: render gamma_1 (and gamma_<digits>) as "gamma" + big digits.
-    // This is explicitly requested even though it contains an underscore.
-    const gammaIndexMatch = raw.match(/^gamma_(\d+)$/);
-    if (gammaIndexMatch) {
-      const digits = gammaIndexMatch[1];
-      return `\\mathrm{gamma}\\,{\\Huge ${digits}}`;
-    }
-
     // Render common greek-letter identifiers as their TeX symbols.
-    // Do not apply when the identifier contains underscores (underscore-highlight or otherwise),
-    // and do not remap "gamma" (it is reserved for the Euler Gamma function).
-    if (!raw.includes('_') && raw !== 'gamma') {
+    // Do not remap "gamma" (it is reserved for the Euler Gamma function).
+    if (raw !== 'gamma') {
       const greek = GREEK_IDENTIFIER_LATEX[raw];
       if (greek) return greek;
     }
 
     return escapeLatexIdentifier(raw);
   }
+
+  // Special-case: render `gamma_1` input as a plain "gamma" word + big digit(s).
+  // With underscore-as-highlight semantics, the identifier name becomes `gamma1`
+  // (and the digit(s) are present in `highlights`).
+  const raw = String(name || '?');
+  const gammaDigitsMatch = raw.match(/^gamma(\d+)$/);
+  if (gammaDigitsMatch) {
+    const digits = gammaDigitsMatch[1];
+    return `\\mathrm{gamma}\\,{\\Huge ${digits}}`;
+  }
+
   return renderTextWithHighlights(name, highlights);
 }
 

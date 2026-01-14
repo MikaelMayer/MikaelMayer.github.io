@@ -166,11 +166,13 @@ test('renders greek-letter identifiers as symbols (unless underscores are presen
   assert.match(latex, /\\delta/);
   assert.match(latex, /\\phi/);
 
-  const underscored = parseFormulaInput('set pi_1 = 0 in pi_1');
-  assert.equal(underscored.ok, true);
-  const underscoredLatex = formulaAstToLatex(underscored.value);
-  assert.match(underscoredLatex, /pi\\_1/);
-  assert.doesNotMatch(underscoredLatex, /\\pi/);
+  // Underscore is a highlight marker, not part of the identifier:
+  // `pi_1` becomes identifier `pi1` with a highlighted "1" (so it is not a greek-letter symbol).
+  const highlighted = parseFormulaInput('set pi_1 = 0 in pi_1');
+  assert.equal(highlighted.ok, true);
+  const highlightedLatex = formulaAstToLatex(highlighted.value);
+  assert.doesNotMatch(highlightedLatex, /\\pi/);
+  assert.match(highlightedLatex, /\{\\Huge 1\}/);
 });
 
 test('renders gamma_1 as "gamma" followed by a big 1', () => {
