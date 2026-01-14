@@ -4,7 +4,7 @@
 import { FINGER_DECIMAL_PLACES } from './core-engine.mjs';
 
 // Bump this when changing renderer logic so users can verify cached assets.
-export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2026-01-11.1';
+export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2026-01-13.3';
 
 const DEFAULT_MATHJAX_LOAD_TIMEOUT_MS = 9000;
 
@@ -62,6 +62,30 @@ function escapeLatexIdentifier(name) {
   return String(name || '?').replace(/_/g, '\\_');
 }
 
+const GREEK_IDENTIFIER_LATEX = Object.freeze({
+  alpha: '\\alpha',
+  beta: '\\beta',
+  delta: '\\delta',
+  epsilon: '\\epsilon',
+  zeta: '\\zeta',
+  eta: '\\eta',
+  theta: '\\theta',
+  iota: '\\iota',
+  kappa: '\\kappa',
+  lambda: '\\lambda',
+  mu: '\\mu',
+  nu: '\\nu',
+  xi: '\\xi',
+  pi: '\\pi',
+  rho: '\\rho',
+  sigma: '\\sigma',
+  tau: '\\tau',
+  phi: '\\phi',
+  chi: '\\chi',
+  psi: '\\psi',
+  omega: '\\omega',
+});
+
 function identifierHighlights(node) {
   const highlights = node && typeof node === 'object' ? node.__identifierMeta?.highlights : null;
   return Array.isArray(highlights) ? highlights : [];
@@ -98,10 +122,56 @@ function renderTextWithHighlights(text, highlights) {
 
 function latexIdentifierWithMetadata(name, metaHighlights) {
   const highlights = Array.isArray(metaHighlights) ? metaHighlights : [];
-  if (!highlights.length) {
-    return escapeLatexIdentifier(name);
+  const raw = String(name || '?');
+
+  // Special-case: render `gamma_1` input as a plain "gamma" word + big digit(s).
+  // With underscore-as-highlight semantics, the identifier name becomes `gamma1`
+  // (and the digit(s) are present in `highlights`).
+  const gammaDigitsMatch = raw.match(/^gamma(\d+)$/);
+  if (gammaDigitsMatch && highlights.length) {
+    const digits = gammaDigitsMatch[1];
+    return `\\mathrm{gamma}\\,{\\Huge ${digits}}`;
   }
-  return renderTextWithHighlights(name, highlights);
+
+  // If the identifier ends with digits (e.g. d1), render them as a subscript: d_{1}.
+  const digitSuffixMatch = raw.match(/^([A-Za-z]+)(\d+)$/);
+  if (digitSuffixMatch) {
+    const base = digitSuffixMatch[1];
+    const digits = digitSuffixMatch[2];
+
+    const baseLen = base.length;
+    const baseHighlights = highlights
+      .filter((h) => typeof h?.index === 'number' && h.index < baseLen)
+      .map((h) => ({ index: h.index, letter: h.letter }));
+    const digitHighlights = highlights
+      .filter((h) => typeof h?.index === 'number' && h.index >= baseLen)
+      .map((h) => ({ index: h.index - baseLen, letter: h.letter }));
+
+    // Use greek-letter symbols when the base is a greek name and the base itself
+    // has no highlighted characters (highlights may still apply to the digits).
+    const baseLower = base.toLowerCase();
+    const baseLatex =
+      baseHighlights.length === 0 && baseLower !== 'gamma' && GREEK_IDENTIFIER_LATEX[baseLower]
+        ? GREEK_IDENTIFIER_LATEX[baseLower]
+        : baseHighlights.length
+          ? renderTextWithHighlights(base, baseHighlights)
+          : escapeLatexIdentifier(base);
+    const digitsLatex = digitHighlights.length ? renderTextWithHighlights(digits, digitHighlights) : digits;
+
+    return `${baseLatex}_{${digitsLatex}}`;
+  }
+
+  if (!highlights.length) {
+    // Render common greek-letter identifiers as their TeX symbols.
+    // Do not remap "gamma" (it is reserved for the Euler Gamma function).
+    if (raw !== 'gamma') {
+      const greek = GREEK_IDENTIFIER_LATEX[raw];
+      if (greek) return greek;
+    }
+    return escapeLatexIdentifier(raw);
+  }
+
+  return renderTextWithHighlights(raw, highlights);
 }
 
 function operatorNameWithMetadata(name, metaHighlights) {
@@ -216,7 +286,6 @@ function functionCallLatex(name, args, options, metaHighlights = null) {
 
   // Prefer native TeX operators for common functions.
   const operatorMap = {
-    exp: '\\exp',
     sin: '\\sin',
     cos: '\\cos',
     tan: '\\tan',
@@ -225,6 +294,17 @@ function functionCallLatex(name, args, options, metaHighlights = null) {
     acos: '\\arccos',
     ln: '\\ln',
   };
+
+  // Render exp(x) as e^{x}, except when the user used underscore-highlight syntax
+  // (e.g. `_exp(x)` / `e_xp(x)`), in which case keep the function-call form so
+  // highlighted letters can render.
+  if (fn === 'exp') {
+    const value = renderedArgs[0] ?? '?';
+    if (Array.isArray(metaHighlights) && metaHighlights.length) {
+      return `${operatorNameWithMetadata('exp', metaHighlights)}\\left(${value}\\right)`;
+    }
+    return `e^{${value}}`;
+  }
 
   if (fn === 'sqrt') {
     const value = renderedArgs[0] ?? '?';
@@ -370,7 +450,10 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
     }
 
     case 'Exp':
-      return `${identifierHighlights(node).length ? operatorNameWithMetadata('exp', identifierHighlights(node)) : '\\exp'}\\left(${nodeToLatex(node.value, 0, options)}\\right)`;
+      if (identifierHighlights(node).length) {
+        return `${operatorNameWithMetadata('exp', identifierHighlights(node))}\\left(${nodeToLatex(node.value, 0, options)}\\right)`;
+      }
+      return `e^{${nodeToLatex(node.value, 0, options)}}`;
     case 'Sin':
       return `${identifierHighlights(node).length ? operatorNameWithMetadata('sin', identifierHighlights(node)) : '\\sin'}\\left(${nodeToLatex(node.value, 0, options)}\\right)`;
     case 'Cos':
@@ -548,7 +631,7 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
     case 'LetBinding': {
       // `let` should normally be top-level (rendered in program style),
       // but keep a readable fallback if it appears nested.
-      const name = escapeLatexIdentifier(node.name || '?');
+      const name = latexIdentifierWithMetadata(node.name || '?', null);
       const value = nodeToLatex(node.value, 0, options);
       const body = nodeToLatex(node.body, 0, options);
       return `\\left(\\begin{aligned}\\mathrm{let}\\;${name} &= ${value}\\\\&${body}\\end{aligned}\\right)`;
@@ -557,7 +640,7 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
     case 'SetBinding': {
       // Top-level formatting is handled in `formulaAstToLatex` (program-style layout).
       // Keep a readable inline fallback for nested occurrences.
-      const name = escapeLatexIdentifier(node.name || '?');
+      const name = latexIdentifierWithMetadata(node.name || '?', null);
       const value = nodeToLatex(node.value, 0, options);
       const body = nodeToLatex(node.body, 0, options);
       return `\\left(\\begin{aligned}\\mathrm{set}\\;${name} &= ${value}\\\\&${body}\\end{aligned}\\right)`;
@@ -569,7 +652,7 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
       const fromExprs = Array.isArray(node.fromExpressions) ? node.fromExpressions : [];
       const fromLatex = fromExprs.length ? fromExprs.map((e) => nodeToLatex(e, 0, options)).join(', ') : '?';
       const byNames = Array.isArray(node.byIdentifiers) ? node.byIdentifiers : [];
-      const byLatex = byNames.length ? byNames.map((name) => escapeLatexIdentifier(name)).join(', ') : '?';
+      const byLatex = byNames.length ? byNames.map((name) => latexIdentifierWithMetadata(name, null)).join(', ') : '?';
       return `\\left(\\begin{aligned}\\mathrm{repeat}\\;${n}\\\\\\mathrm{from}\\;${fromLatex}\\\\\\mathrm{by}\\;${byLatex}\\end{aligned}\\right)`;
     }
 
@@ -604,7 +687,7 @@ function programStyleLatex(ast, options = {}) {
   lines.push('\\begin{aligned}');
   for (const binding of bindings) {
     const kw = binding.kind === 'LetBinding' ? '\\mathrm{let}' : '\\mathrm{set}';
-    const name = escapeLatexIdentifier(binding.name || '?');
+    const name = latexIdentifierWithMetadata(binding.name || '?', null);
     const value = nodeToLatex(binding.value, 0, options);
     lines.push(`${kw}\\;${name} &= ${value}\\\\`);
   }

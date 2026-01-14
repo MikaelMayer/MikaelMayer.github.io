@@ -75,11 +75,13 @@ function normalizeIdentifierWithHighlights(raw) {
 
   for (let i = 0; i < source.length; i += 1) {
     const ch = source[i];
-    if (ch === '_' && i + 1 < source.length && IDENTIFIER_LETTER_CHAR.test(source[i + 1])) {
+    // In Reflex syntax, underscores are not part of identifiers: they only mean
+    // "highlight the next character" (whatever it is).
+    if (ch === '_' && i + 1 < source.length) {
       highlightNext = true;
       continue;
     }
-    if (highlightNext && IDENTIFIER_LETTER_CHAR.test(ch)) {
+    if (highlightNext) {
       highlights.push({ index: normalized.length, letter: ch });
       highlightNext = false;
     } else {

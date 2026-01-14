@@ -143,6 +143,62 @@ test('parses exp/sin/cos/ln calls', () => {
   assert.equal(result.value.value.kind, 'Sin');
 });
 
+test('renders exp(x) as e^{x} (unless underscore-highlight syntax is used)', () => {
+  const plain = parseFormulaInput('exp(z)');
+  assert.equal(plain.ok, true);
+  const plainLatex = formulaAstToLatex(plain.value);
+  assert.match(plainLatex, /^e\^\{z\}$/);
+
+  const highlighted = parseFormulaInput('_exp(z)');
+  assert.equal(highlighted.ok, true);
+  const highlightedLatex = formulaAstToLatex(highlighted.value);
+  assert.match(highlightedLatex, /\\operatorname\{/);
+  assert.match(highlightedLatex, /\{\\Huge/);
+  assert.match(highlightedLatex, /\\left\(z\\right\)/);
+});
+
+test('renders greek-letter identifiers as symbols (unless underscores are present)', () => {
+  const result = parseFormulaInput('set pi = 0 in set tau = 0 in set delta = 0 in set phi = 0 in pi + tau + delta + phi');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /\\pi/);
+  assert.match(latex, /\\tau/);
+  assert.match(latex, /\\delta/);
+  assert.match(latex, /\\phi/);
+
+  // Underscore is a highlight marker, not part of the identifier:
+  // `pi_1` becomes identifier `pi1` with a highlighted "1".
+  const highlighted = parseFormulaInput('set pi_1 = 0 in pi_1');
+  assert.equal(highlighted.ok, true);
+  const highlightedLatex = formulaAstToLatex(highlighted.value);
+  // Binding name is rendered without highlight metadata, so it becomes \pi_{1}.
+  assert.match(highlightedLatex, /\\pi_\{1\}/);
+  // The reference keeps the digit highlight, so the 1 is rendered Huge (in the subscript).
+  assert.match(highlightedLatex, /\{\\Huge 1\}/);
+});
+
+test('renders gamma_1 as "gamma" followed by a big 1', () => {
+  const result = parseFormulaInput('set gamma_1 = 0 in gamma_1');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /\\mathrm\{gamma\}/);
+  assert.match(latex, /\{\\Huge 1\}/);
+});
+
+test('renders identifier trailing digits as subscripts (d1 -> d_{1})', () => {
+  const result = parseFormulaInput('set d1 = 0 in d1');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /d_\{1\}/);
+});
+
+test('renders greek identifiers with digit suffix as subscripts (pi1 -> \\pi_{1})', () => {
+  const result = parseFormulaInput('set pi1 = 0 in pi1');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /\\pi_\{1\}/);
+});
+
 test('parses gamma(...) as a primitive and renders with Γ', () => {
   const result = parseFormulaInput('gamma(z)');
   assert.equal(result.ok, true);
