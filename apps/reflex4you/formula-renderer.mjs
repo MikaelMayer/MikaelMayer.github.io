@@ -4,7 +4,7 @@
 import { FINGER_DECIMAL_PLACES } from './core-engine.mjs';
 
 // Bump this when changing renderer logic so users can verify cached assets.
-export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2026-01-13.2';
+export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2026-01-13.3';
 
 const DEFAULT_MATHJAX_LOAD_TIMEOUT_MS = 9000;
 
@@ -122,30 +122,56 @@ function renderTextWithHighlights(text, highlights) {
 
 function latexIdentifierWithMetadata(name, metaHighlights) {
   const highlights = Array.isArray(metaHighlights) ? metaHighlights : [];
-  if (!highlights.length) {
-    const raw = String(name || '?');
+  const raw = String(name || '?');
 
+  // Special-case: render `gamma_1` input as a plain "gamma" word + big digit(s).
+  // With underscore-as-highlight semantics, the identifier name becomes `gamma1`
+  // (and the digit(s) are present in `highlights`).
+  const gammaDigitsMatch = raw.match(/^gamma(\d+)$/);
+  if (gammaDigitsMatch && highlights.length) {
+    const digits = gammaDigitsMatch[1];
+    return `\\mathrm{gamma}\\,{\\Huge ${digits}}`;
+  }
+
+  // If the identifier ends with digits (e.g. d1), render them as a subscript: d_{1}.
+  const digitSuffixMatch = raw.match(/^([A-Za-z]+)(\d+)$/);
+  if (digitSuffixMatch) {
+    const base = digitSuffixMatch[1];
+    const digits = digitSuffixMatch[2];
+
+    const baseLen = base.length;
+    const baseHighlights = highlights
+      .filter((h) => typeof h?.index === 'number' && h.index < baseLen)
+      .map((h) => ({ index: h.index, letter: h.letter }));
+    const digitHighlights = highlights
+      .filter((h) => typeof h?.index === 'number' && h.index >= baseLen)
+      .map((h) => ({ index: h.index - baseLen, letter: h.letter }));
+
+    // Use greek-letter symbols when the base is a greek name and the base itself
+    // has no highlighted characters (highlights may still apply to the digits).
+    const baseLower = base.toLowerCase();
+    const baseLatex =
+      baseHighlights.length === 0 && baseLower !== 'gamma' && GREEK_IDENTIFIER_LATEX[baseLower]
+        ? GREEK_IDENTIFIER_LATEX[baseLower]
+        : baseHighlights.length
+          ? renderTextWithHighlights(base, baseHighlights)
+          : escapeLatexIdentifier(base);
+    const digitsLatex = digitHighlights.length ? renderTextWithHighlights(digits, digitHighlights) : digits;
+
+    return `${baseLatex}_{${digitsLatex}}`;
+  }
+
+  if (!highlights.length) {
     // Render common greek-letter identifiers as their TeX symbols.
     // Do not remap "gamma" (it is reserved for the Euler Gamma function).
     if (raw !== 'gamma') {
       const greek = GREEK_IDENTIFIER_LATEX[raw];
       if (greek) return greek;
     }
-
     return escapeLatexIdentifier(raw);
   }
 
-  // Special-case: render `gamma_1` input as a plain "gamma" word + big digit(s).
-  // With underscore-as-highlight semantics, the identifier name becomes `gamma1`
-  // (and the digit(s) are present in `highlights`).
-  const raw = String(name || '?');
-  const gammaDigitsMatch = raw.match(/^gamma(\d+)$/);
-  if (gammaDigitsMatch) {
-    const digits = gammaDigitsMatch[1];
-    return `\\mathrm{gamma}\\,{\\Huge ${digits}}`;
-  }
-
-  return renderTextWithHighlights(name, highlights);
+  return renderTextWithHighlights(raw, highlights);
 }
 
 function operatorNameWithMetadata(name, metaHighlights) {

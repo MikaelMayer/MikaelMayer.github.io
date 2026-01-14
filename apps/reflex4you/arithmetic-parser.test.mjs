@@ -167,11 +167,13 @@ test('renders greek-letter identifiers as symbols (unless underscores are presen
   assert.match(latex, /\\phi/);
 
   // Underscore is a highlight marker, not part of the identifier:
-  // `pi_1` becomes identifier `pi1` with a highlighted "1" (so it is not a greek-letter symbol).
+  // `pi_1` becomes identifier `pi1` with a highlighted "1".
   const highlighted = parseFormulaInput('set pi_1 = 0 in pi_1');
   assert.equal(highlighted.ok, true);
   const highlightedLatex = formulaAstToLatex(highlighted.value);
-  assert.doesNotMatch(highlightedLatex, /\\pi/);
+  // Binding name is rendered without highlight metadata, so it becomes \pi_{1}.
+  assert.match(highlightedLatex, /\\pi_\{1\}/);
+  // The reference keeps the digit highlight, so the 1 is rendered Huge (in the subscript).
   assert.match(highlightedLatex, /\{\\Huge 1\}/);
 });
 
@@ -181,6 +183,20 @@ test('renders gamma_1 as "gamma" followed by a big 1', () => {
   const latex = formulaAstToLatex(result.value);
   assert.match(latex, /\\mathrm\{gamma\}/);
   assert.match(latex, /\{\\Huge 1\}/);
+});
+
+test('renders identifier trailing digits as subscripts (d1 -> d_{1})', () => {
+  const result = parseFormulaInput('set d1 = 0 in d1');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /d_\{1\}/);
+});
+
+test('renders greek identifiers with digit suffix as subscripts (pi1 -> \\pi_{1})', () => {
+  const result = parseFormulaInput('set pi1 = 0 in pi1');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /\\pi_\{1\}/);
 });
 
 test('parses gamma(...) as a primitive and renders with Γ', () => {
