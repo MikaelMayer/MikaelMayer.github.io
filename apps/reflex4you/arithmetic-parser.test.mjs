@@ -143,6 +143,44 @@ test('parses exp/sin/cos/ln calls', () => {
   assert.equal(result.value.value.kind, 'Sin');
 });
 
+test('renders exp(x) as e^{x} (unless underscore-highlight syntax is used)', () => {
+  const plain = parseFormulaInput('exp(z)');
+  assert.equal(plain.ok, true);
+  const plainLatex = formulaAstToLatex(plain.value);
+  assert.match(plainLatex, /^e\^\{z\}$/);
+
+  const highlighted = parseFormulaInput('_exp(z)');
+  assert.equal(highlighted.ok, true);
+  const highlightedLatex = formulaAstToLatex(highlighted.value);
+  assert.match(highlightedLatex, /\\operatorname\{/);
+  assert.match(highlightedLatex, /\{\\Huge/);
+  assert.match(highlightedLatex, /\\left\(z\\right\)/);
+});
+
+test('renders greek-letter identifiers as symbols (unless underscores are present)', () => {
+  const result = parseFormulaInput('set pi = 0 in set tau = 0 in set delta = 0 in set phi = 0 in pi + tau + delta + phi');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /\\pi/);
+  assert.match(latex, /\\tau/);
+  assert.match(latex, /\\delta/);
+  assert.match(latex, /\\phi/);
+
+  const underscored = parseFormulaInput('set pi_1 = 0 in pi_1');
+  assert.equal(underscored.ok, true);
+  const underscoredLatex = formulaAstToLatex(underscored.value);
+  assert.match(underscoredLatex, /pi\\_1/);
+  assert.doesNotMatch(underscoredLatex, /\\pi/);
+});
+
+test('renders gamma_1 as "gamma" followed by a big 1', () => {
+  const result = parseFormulaInput('set gamma_1 = 0 in gamma_1');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /\\mathrm\{gamma\}/);
+  assert.match(latex, /\{\\Huge 1\}/);
+});
+
 test('parses gamma(...) as a primitive and renders with Γ', () => {
   const result = parseFormulaInput('gamma(z)');
   assert.equal(result.ok, true);
