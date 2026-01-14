@@ -57,7 +57,7 @@ function setCompileOverlayVisible(visible, message = null) {
 // Show a cold-start loading indicator by default; hide it once we have a first render.
 setCompileOverlayVisible(true, 'Loading…');
 
-const APP_VERSION = 37;
+const APP_VERSION = 38;
 const CONTEXT_LOSS_RELOAD_KEY = `reflex4you:contextLossReloaded:v${APP_VERSION}`;
 const RESUME_RELOAD_KEY = `reflex4you:resumeReloaded:v${APP_VERSION}`;
 const LAST_HIDDEN_AT_KEY = `reflex4you:lastHiddenAtMs:v${APP_VERSION}`;
@@ -2275,6 +2275,53 @@ function terminateFormulaWorker() {
   formulaCompileWorker = null;
 }
 
+function ensureFormulaCompileWorker() {
+  if (formulaCompileWorker) {
+    return formulaCompileWorker;
+  }
+  const worker = new Worker(new URL('./formula-compile-worker.mjs', import.meta.url), { type: 'module' });
+  formulaCompileWorker = worker;
+
+  worker.onmessage = (event) => {
+    const data = event?.data || {};
+    const meta = latestCompileMeta;
+    if (!meta || data.id !== meta.id) {
+      return;
+    }
+    // Worker finished; if another request started meanwhile, ignore this.
+    if (meta.id !== formulaCompileRequestId) {
+      return;
+    }
+
+    if (!data.ok) {
+      showError(String(data.caretMessage || 'Unable to parse formula.'));
+      setCompileOverlayVisible(false);
+      return;
+    }
+
+    // Apply the result, but keep typing responsive by deferring the shader swap when needed.
+    scheduleApplyCompiledFormula(data, {
+      preserveFingerState: meta.preserveFingerState,
+      updateQuery: meta.updateQuery,
+      applyMode: meta.applyMode,
+    });
+  };
+
+  worker.onerror = (error) => {
+    // Surface errors only for the active request (but always reset the worker).
+    if (latestCompileMeta?.id === formulaCompileRequestId) {
+      console.error('Formula compile worker failed.', error);
+      showError('Unable to compile formula.');
+      setCompileOverlayVisible(false);
+    }
+    // Some browsers fail to re-fetch module workers while offline (or in flaky captive portals).
+    // Reset so the next compile attempt can recreate the worker cleanly.
+    terminateFormulaWorker();
+  };
+
+  return worker;
+}
+
 function cancelScheduledApply() {
   if (scheduledApplyHandle == null) return;
   if (scheduledApplyHandleKind === 'idle' && typeof window !== 'undefined' && typeof window.cancelIdleCallback === 'function') {
@@ -2369,7 +2416,6 @@ function requestWorkerCompile(
     formulaCompileDebounceTimer = null;
   }
   cancelScheduledApply();
-  terminateFormulaWorker();
 
   latestCompileMeta = {
     id: requestId,
@@ -2385,45 +2431,21 @@ function requestWorkerCompile(
     setCompileOverlayVisible(true, overlayMessage || 'Compiling…');
   }
 
-  const worker = new Worker(new URL('./formula-compile-worker.mjs', import.meta.url), { type: 'module' });
-  formulaCompileWorker = worker;
-
-  worker.onmessage = (event) => {
-    const data = event?.data || {};
-    if (data.id !== requestId) {
-      return;
-    }
-    // Worker finished; if another request started meanwhile, ignore this.
-    if (requestId !== formulaCompileRequestId) {
-      return;
-    }
-
-    if (!data.ok) {
-      showError(String(data.caretMessage || 'Unable to parse formula.'));
-      setCompileOverlayVisible(false);
-      return;
-    }
-
-    // Apply the result, but keep typing responsive by deferring the shader swap when needed.
-    scheduleApplyCompiledFormula(
-      data,
-      { preserveFingerState, updateQuery, applyMode },
-    );
-  };
-
-  worker.onerror = (error) => {
-    // Only surface errors for the active request.
-    if (requestId !== formulaCompileRequestId) return;
-    console.error('Formula compile worker failed.', error);
+  try {
+    const worker = ensureFormulaCompileWorker();
+    worker.postMessage({
+      id: requestId,
+      source,
+      fingerValues: latestOffsets,
+    });
+  } catch (error) {
+    // If creating or posting to the worker fails (especially offline), recover by resetting
+    // and surfacing a non-fatal error; the user can retry without a full app restart.
+    console.error('Failed to start formula compile worker.', error);
+    terminateFormulaWorker();
     showError('Unable to compile formula.');
     setCompileOverlayVisible(false);
-  };
-
-  worker.postMessage({
-    id: requestId,
-    source,
-    fingerValues: latestOffsets,
-  });
+  }
 }
 
 function analyzeFingerUsage(ast) {
@@ -3067,7 +3089,6 @@ formulaTextarea.addEventListener('input', () => {
 
   // If the user keeps typing, never let a pending shader swap block the input thread.
   cancelScheduledApply();
-  terminateFormulaWorker();
   setCompileOverlayVisible(false);
 
   // Debounce compiles while typing so the UI stays responsive.
@@ -4027,7 +4048,7 @@ function triggerImageDownload(url, filename, shouldRevoke) {
 
 if ('serviceWorker' in navigator) {
   // Version the SW script URL so updates can't get stuck behind a cached SW script.
-  const SW_URL = './service-worker.js?sw=37.2';
+  const SW_URL = './service-worker.js?sw=38.0';
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(SW_URL).then((registration) => {
       // Auto-activate updated workers so cache/version bumps take effect quickly.
