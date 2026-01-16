@@ -35,6 +35,7 @@ const fingerIndicatorStack = document.getElementById('finger-indicator-stack');
 const fingerOverlay = document.getElementById('finger-overlay');
 const menuButton = document.getElementById('menu-button');
 const menuDropdown = document.getElementById('menu-dropdown');
+const focusModeMenuItem = document.getElementById('menu-focus-toggle');
 const undoButton = document.getElementById('undo-button');
 const redoButton = document.getElementById('redo-button');
 const versionPill = document.getElementById('app-version-pill');
@@ -57,7 +58,7 @@ function setCompileOverlayVisible(visible, message = null) {
 // Show a cold-start loading indicator by default; hide it once we have a first render.
 setCompileOverlayVisible(true, 'Loading…');
 
-const APP_VERSION = 38;
+const APP_VERSION = 39;
 const CONTEXT_LOSS_RELOAD_KEY = `reflex4you:contextLossReloaded:v${APP_VERSION}`;
 const RESUME_RELOAD_KEY = `reflex4you:resumeReloaded:v${APP_VERSION}`;
 const LAST_HIDDEN_AT_KEY = `reflex4you:lastHiddenAtMs:v${APP_VERSION}`;
@@ -301,6 +302,7 @@ const ANIMATION_SUFFIX = 'A';
 
 let viewerModeActive = false;
 let viewerModeRevealed = false;
+let focusModeActive = false;
 
 let animationSeconds = DEFAULT_ANIMATION_SECONDS;
 let animationController = null;
@@ -1840,6 +1842,22 @@ function revealViewerModeUIOnce() {
   }
 }
 
+function updateFocusModeMenuItem() {
+  if (!focusModeMenuItem) {
+    return;
+  }
+  focusModeMenuItem.textContent = 'Enter focus mode';
+  focusModeMenuItem.removeAttribute('aria-pressed');
+}
+
+function setFocusModeActive(active) {
+  focusModeActive = Boolean(active);
+  if (rootElement) {
+    rootElement.classList.toggle('focus-mode', focusModeActive);
+  }
+  updateFocusModeMenuItem();
+}
+
 function ensureFingerIndicator(label) {
   // Deprecated: per-finger indicators are no longer rendered.
   return null;
@@ -3106,6 +3124,14 @@ window.addEventListener('resize', () => {
 });
 
 setupMenuDropdown({ menuButton, menuDropdown, onAction: handleMenuAction });
+updateFocusModeMenuItem();
+if (menuButton) {
+  menuButton.addEventListener('click', () => {
+    if (focusModeActive) {
+      setFocusModeActive(false);
+    }
+  });
+}
 
 function handleMenuAction(action) {
   switch (action) {
@@ -3148,6 +3174,9 @@ function handleMenuAction(action) {
         console.error('Failed to save canvas image.', error);
         alert('Unable to save image. Check console for details.');
       });
+      break;
+    case 'toggle-focus-mode':
+      setFocusModeActive(true);
       break;
     case 'open-formula-view':
       window.location.href = `./formula.html${window.location.search || ''}`;
@@ -4048,7 +4077,7 @@ function triggerImageDownload(url, filename, shouldRevoke) {
 
 if ('serviceWorker' in navigator) {
   // Version the SW script URL so updates can't get stuck behind a cached SW script.
-  const SW_URL = './service-worker.js?sw=38.0';
+  const SW_URL = './service-worker.js?sw=39.0';
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(SW_URL).then((registration) => {
       // Auto-activate updated workers so cache/version bumps take effect quickly.
