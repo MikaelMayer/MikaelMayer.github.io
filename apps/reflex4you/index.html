@@ -776,6 +776,226 @@
       outline: none;
     }
 
+    /* Voice assistant panel */
+    #voice-button[data-active="true"] {
+      border-color: rgba(173, 255, 227, 0.9);
+      box-shadow: 0 0 0 2px rgba(96, 255, 210, 0.25);
+    }
+
+    #voice-button[data-listening="true"] {
+      border-color: rgba(255, 140, 140, 0.9);
+      box-shadow: 0 0 0 2px rgba(255, 120, 120, 0.3);
+    }
+
+    #voice-panel {
+      position: fixed;
+      right: 12px;
+      bottom: calc(var(--viewport-bottom-offset) + var(--safe-area-bottom) + 12px);
+      width: min(380px, 92vw);
+      max-height: min(70vh, 560px);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 12px 12px;
+      background: rgba(6, 6, 6, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 14px;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+      z-index: 55;
+      opacity: 0;
+      transform: translateY(8px);
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+
+    #voice-panel[data-open="true"] {
+      opacity: 1;
+      transform: translateY(0);
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    .voice-panel__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .voice-panel__title {
+      font-size: 15px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.95);
+      letter-spacing: 0.02em;
+    }
+
+    .voice-panel__subtitle {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.6);
+      letter-spacing: 0.01em;
+      margin-top: 2px;
+    }
+
+    .voice-panel__close {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.9);
+      border-radius: 10px;
+      width: 32px;
+      height: 32px;
+      font-size: 18px;
+      cursor: pointer;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .voice-panel__close:hover,
+    .voice-panel__close:focus-visible {
+      border-color: rgba(255, 255, 255, 0.5);
+      background: rgba(255, 255, 255, 0.12);
+      outline: none;
+    }
+
+    .voice-panel__status {
+      font-size: 12px;
+      letter-spacing: 0.01em;
+      color: rgba(181, 224, 255, 0.95);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    .voice-panel__status--warn {
+      color: rgba(255, 170, 170, 0.95);
+    }
+
+    .voice-panel__transcript {
+      min-height: 18px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.72);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      white-space: pre-wrap;
+    }
+
+    .voice-panel__controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .voice-panel__btn {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.92);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: border-color 0.15s ease, background 0.15s ease;
+      letter-spacing: 0.02em;
+    }
+
+    .voice-panel__btn:hover,
+    .voice-panel__btn:focus-visible {
+      border-color: rgba(255, 255, 255, 0.5);
+      background: rgba(255, 255, 255, 0.12);
+      outline: none;
+    }
+
+    .voice-panel__btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+      pointer-events: none;
+    }
+
+    .voice-panel__btn--primary {
+      border-color: rgba(118, 222, 255, 0.6);
+      background: rgba(118, 222, 255, 0.12);
+      color: rgba(220, 247, 255, 0.95);
+    }
+
+    .voice-panel__field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+      letter-spacing: 0.01em;
+    }
+
+    .voice-panel__field input,
+    .voice-panel__field textarea {
+      width: 100%;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(255, 255, 255, 0.05);
+      color: rgba(255, 255, 255, 0.9);
+      padding: 8px 9px;
+      font-size: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      box-sizing: border-box;
+    }
+
+    .voice-panel__field textarea {
+      min-height: 64px;
+      max-height: 160px;
+      resize: vertical;
+    }
+
+    .voice-panel__row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.65);
+    }
+
+    .voice-panel__row label {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .voice-panel__log {
+      flex: 1 1 auto;
+      overflow: auto;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.03);
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 180px;
+    }
+
+    .voice-log__item {
+      font-size: 12px;
+      line-height: 1.35;
+      padding: 6px 8px;
+      border-radius: 8px;
+      white-space: pre-wrap;
+      color: rgba(255, 255, 255, 0.92);
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .voice-log__item--user {
+      background: rgba(118, 222, 255, 0.1);
+      border: 1px solid rgba(118, 222, 255, 0.2);
+    }
+
+    .voice-log__item--assistant {
+      background: rgba(172, 255, 215, 0.12);
+      border: 1px solid rgba(172, 255, 215, 0.22);
+    }
+
+    .voice-panel__note {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.5);
+      line-height: 1.35;
+    }
+
     @media (max-width: 640px) {
       .menu-dropdown__item {
         font-size: 18px;
@@ -786,7 +1006,8 @@
     html.viewer-mode #menu-container,
     html.viewer-mode #formula-panel,
     html.viewer-mode #finger-indicator-stack,
-    html.viewer-mode #finger-overlay {
+    html.viewer-mode #finger-overlay,
+    html.viewer-mode #voice-panel {
       display: none !important;
       visibility: hidden !important;
       pointer-events: none !important;
@@ -969,6 +1190,35 @@
         />
       </svg>
     </button>
+    <button
+      id="voice-button"
+      class="icon-button"
+      type="button"
+      aria-label="Voice assistant"
+      aria-controls="voice-panel"
+      aria-expanded="false"
+      title="Voice assistant"
+    >
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+          d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3Z"
+          stroke="currentColor"
+          stroke-width="2"
+        />
+        <path
+          d="M19 11v1a7 7 0 0 1-14 0v-1"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+        />
+        <path
+          d="M12 19v2"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+        />
+      </svg>
+    </button>
     <div id="menu-anchor">
       <button
         id="menu-button"
@@ -983,6 +1233,14 @@
         <span aria-hidden="true"></span>
       </button>
       <div id="menu-dropdown" role="menu" aria-hidden="true">
+        <button
+          type="button"
+          class="menu-dropdown__item"
+          data-menu-action="open-voice-assistant"
+          role="menuitem"
+        >
+          Voice assistant
+        </button>
         <button
           type="button"
           class="menu-dropdown__item"
@@ -1052,6 +1310,63 @@
 <div id="formula-panel">
   <textarea id="formula" spellcheck="false" aria-label="Formula"></textarea>
   <div id="finger-indicator-stack" aria-live="polite"></div>
+</div>
+
+<div id="voice-panel" data-open="false" aria-hidden="true" aria-live="polite">
+  <div class="voice-panel__header">
+    <div>
+      <div class="voice-panel__title">Voice assistant</div>
+      <div class="voice-panel__subtitle">ChatGPT adjusts formulas with voice.</div>
+    </div>
+    <button id="voice-close" class="voice-panel__close" type="button" aria-label="Close voice assistant">×</button>
+  </div>
+  <div id="voice-status" class="voice-panel__status">Idle.</div>
+  <div id="voice-transcript" class="voice-panel__transcript"></div>
+  <label class="voice-panel__field">
+    <span>OpenAI API key</span>
+    <input id="voice-api-key" type="password" placeholder="sk-..." autocomplete="off" autocapitalize="off" />
+  </label>
+  <div class="voice-panel__row">
+    <label>
+      <input id="voice-remember-key" type="checkbox" />
+      Remember key
+    </label>
+    <label>
+      <input id="voice-auto-submit" type="checkbox" checked />
+      Auto-send voice
+    </label>
+  </div>
+  <label class="voice-panel__field">
+    <span>Model</span>
+    <input id="voice-model" type="text" value="gpt-4o-mini" autocomplete="off" autocapitalize="off" />
+  </label>
+  <div class="voice-panel__row">
+    <label>
+      <input id="voice-auto-speak" type="checkbox" checked />
+      Speak reply
+    </label>
+    <label>
+      <input id="voice-auto-listen" type="checkbox" />
+      Hands-free loop
+    </label>
+  </div>
+  <div class="voice-panel__controls">
+    <button id="voice-toggle" class="voice-panel__btn voice-panel__btn--primary" type="button">Start listening</button>
+    <button id="voice-send" class="voice-panel__btn" type="button">Send</button>
+    <button id="voice-clear" class="voice-panel__btn" type="button">Clear chat</button>
+  </div>
+  <label class="voice-panel__field">
+    <span>Request</span>
+    <textarea
+      id="voice-input"
+      spellcheck="false"
+      autocomplete="off"
+      autocapitalize="off"
+      placeholder="Describe what you want to see..."
+    ></textarea>
+  </label>
+  <div id="voice-log" class="voice-panel__log"></div>
+  <div class="voice-panel__note">API keys stay in this browser; prompts include the current formula and full README.</div>
 </div>
 
 <script type="module">

@@ -41,6 +41,22 @@ const versionPill = document.getElementById('app-version-pill');
 const compileOverlay = document.getElementById('compile-overlay');
 const compileOverlayText = document.getElementById('compile-overlay-text');
 const rootElement = typeof document !== 'undefined' ? document.documentElement : null;
+const voiceButton = document.getElementById('voice-button');
+const voicePanel = document.getElementById('voice-panel');
+const voiceCloseButton = document.getElementById('voice-close');
+const voiceStatus = document.getElementById('voice-status');
+const voiceTranscript = document.getElementById('voice-transcript');
+const voiceApiKeyInput = document.getElementById('voice-api-key');
+const voiceRememberKeyInput = document.getElementById('voice-remember-key');
+const voiceModelInput = document.getElementById('voice-model');
+const voiceAutoSubmitInput = document.getElementById('voice-auto-submit');
+const voiceAutoSpeakInput = document.getElementById('voice-auto-speak');
+const voiceAutoListenInput = document.getElementById('voice-auto-listen');
+const voiceToggleButton = document.getElementById('voice-toggle');
+const voiceSendButton = document.getElementById('voice-send');
+const voiceClearButton = document.getElementById('voice-clear');
+const voiceInput = document.getElementById('voice-input');
+const voiceLog = document.getElementById('voice-log');
 
 let fatalErrorActive = false;
 
@@ -81,6 +97,11 @@ const ANIMATION_TIME_PARAM = 't';
 const SOLOS_PARAM = 'solos';
 
 const DEFAULT_ANIMATION_SECONDS = 5;
+const VOICE_HISTORY_LIMIT = 12;
+const VOICE_SETTINGS_KEY = `reflex4you:voiceSettings:v${APP_VERSION}`;
+const VOICE_HISTORY_KEY = `reflex4you:voiceHistory:v${APP_VERSION}`;
+const VOICE_README_CACHE_KEY = `reflex4you:voiceReadmeCache:v${APP_VERSION}`;
+const VOICE_OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 
 const ALL_W_FINGER_LABELS = ['W0', 'W1', 'W2'];
 const W_PAIR_ZERO = ['W0', 'W1'];
@@ -202,6 +223,27 @@ let fingerSoloAnimStartButton = null;
 let fingerSoloAnimEndButton = null;
 let fingerSoloAnimDurationButton = null;
 let fingerSoloAnimGlobalToggleButton = null;
+
+// Voice assistant state.
+const defaultVoiceSettings = {
+  model: 'gpt-4o-mini',
+  rememberKey: false,
+  autoSubmit: true,
+  autoSpeak: true,
+  autoListen: false,
+};
+let voiceSettings = { ...defaultVoiceSettings };
+let voiceApiKey = '';
+let voiceHistory = [];
+let voiceReadmeCache = null;
+let voiceListening = false;
+let voiceThinking = false;
+let voiceRecognizer = null;
+let voicePendingTranscript = '';
+let voiceRequestId = 0;
+const voiceSpeechSupported = Boolean(
+  typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition),
+);
 
 // When solos are non-empty, only those labels can capture pointers.
 // Solos are stored in the URL as `solos=F1,D2,...` (comma separated).
@@ -3105,6 +3147,639 @@ window.addEventListener('resize', () => {
   activeFingerState.allSlots.forEach((label) => updateFingerDotPosition(label));
 });
 
+// --- Voice assistant ---------------------------------------------------------
+function safeLocalStorageGet(key) {
+  try {
+    return window?.localStorage?.getItem?.(key) ?? null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function safeLocalStorageSet(key, value) {
+  try {
+    window?.localStorage?.setItem?.(key, value);
+  } catch (_) {
+    // ignore
+  }
+}
+
+function setVoiceStatus(message, { tone = 'info' } = {}) {
+  if (!voiceStatus) return;
+  voiceStatus.textContent = String(message || '');
+  voiceStatus.classList.toggle('voice-panel__status--warn', tone === 'warn');
+}
+
+function setVoiceTranscript(message) {
+  if (!voiceTranscript) return;
+  voiceTranscript.textContent = message ? String(message) : '';
+}
+
+function setVoicePanelOpen(open) {
+  if (!voicePanel) return;
+  voicePanel.dataset.open = open ? 'true' : 'false';
+  voicePanel.setAttribute('aria-hidden', open ? 'false' : 'true');
+  if (voiceButton) {
+    voiceButton.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  if (open) {
+    enterEditModeForSession();
+    if (voiceApiKeyInput && !voiceApiKeyInput.value) {
+      voiceApiKeyInput.focus();
+    } else if (voiceInput) {
+      voiceInput.focus();
+    }
+  }
+}
+
+function isVoicePanelOpen() {
+  return voicePanel?.dataset?.open === 'true';
+}
+
+function updateVoiceButtonState() {
+  if (!voiceButton) return;
+  voiceButton.dataset.active = voiceListening || voiceThinking ? 'true' : 'false';
+  voiceButton.dataset.listening = voiceListening ? 'true' : 'false';
+}
+
+function updateVoiceControls() {
+  if (voiceToggleButton) {
+    voiceToggleButton.textContent = voiceListening ? 'Stop listening' : 'Start listening';
+    voiceToggleButton.disabled = voiceThinking || !voiceSpeechSupported;
+  }
+  if (voiceSendButton) {
+    voiceSendButton.disabled = voiceThinking;
+  }
+  updateVoiceButtonState();
+}
+
+function loadVoiceSettings() {
+  const raw = safeLocalStorageGet(VOICE_SETTINGS_KEY);
+  if (!raw) {
+    return;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') {
+      voiceSettings = { ...defaultVoiceSettings, ...parsed };
+      if (voiceSettings.rememberKey && typeof parsed.apiKey === 'string') {
+        voiceApiKey = parsed.apiKey;
+      }
+    }
+  } catch (_) {
+    // ignore
+  }
+}
+
+function persistVoiceSettings() {
+  const payload = {
+    model: voiceSettings.model,
+    rememberKey: Boolean(voiceSettings.rememberKey),
+    autoSubmit: Boolean(voiceSettings.autoSubmit),
+    autoSpeak: Boolean(voiceSettings.autoSpeak),
+    autoListen: Boolean(voiceSettings.autoListen),
+  };
+  if (voiceSettings.rememberKey && voiceApiKey) {
+    payload.apiKey = voiceApiKey;
+  }
+  safeLocalStorageSet(VOICE_SETTINGS_KEY, JSON.stringify(payload));
+  if (!voiceSettings.rememberKey) {
+    const raw = safeLocalStorageGet(VOICE_SETTINGS_KEY);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.apiKey) {
+          delete parsed.apiKey;
+          safeLocalStorageSet(VOICE_SETTINGS_KEY, JSON.stringify(parsed));
+        }
+      } catch (_) {
+        // ignore
+      }
+    }
+  }
+}
+
+function loadVoiceHistory() {
+  const raw = safeLocalStorageGet(VOICE_HISTORY_KEY);
+  if (!raw) return;
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      voiceHistory = parsed
+        .filter((entry) => entry && (entry.role === 'user' || entry.role === 'assistant'))
+        .slice(-VOICE_HISTORY_LIMIT);
+    }
+  } catch (_) {
+    // ignore
+  }
+}
+
+function persistVoiceHistory() {
+  safeLocalStorageSet(VOICE_HISTORY_KEY, JSON.stringify(voiceHistory.slice(-VOICE_HISTORY_LIMIT)));
+}
+
+function renderVoiceLog() {
+  if (!voiceLog) return;
+  voiceLog.innerHTML = '';
+  const entries = voiceHistory.slice(-VOICE_HISTORY_LIMIT);
+  if (!entries.length) {
+    const empty = document.createElement('div');
+    empty.className = 'voice-log__item';
+    empty.textContent = 'No voice messages yet.';
+    voiceLog.appendChild(empty);
+    return;
+  }
+  entries.forEach((entry) => {
+    const item = document.createElement('div');
+    item.className = `voice-log__item voice-log__item--${entry.role}`;
+    item.textContent = entry.content || '';
+    voiceLog.appendChild(item);
+  });
+}
+
+function appendVoiceHistory(role, content) {
+  if (!content) return;
+  voiceHistory.push({ role, content: String(content) });
+  if (voiceHistory.length > VOICE_HISTORY_LIMIT) {
+    voiceHistory = voiceHistory.slice(-VOICE_HISTORY_LIMIT);
+  }
+  persistVoiceHistory();
+  renderVoiceLog();
+}
+
+async function getVoiceReadme() {
+  if (voiceReadmeCache) return voiceReadmeCache;
+  const cached = safeLocalStorageGet(VOICE_README_CACHE_KEY);
+  if (cached) {
+    voiceReadmeCache = cached;
+  }
+  try {
+    const response = await fetch('./README.md', { cache: 'no-store' });
+    if (response.ok) {
+      const text = await response.text();
+      if (text) {
+        voiceReadmeCache = text;
+        safeLocalStorageSet(VOICE_README_CACHE_KEY, text);
+        return voiceReadmeCache;
+      }
+    }
+  } catch (_) {
+    // ignore fetch errors
+  }
+  return voiceReadmeCache || 'README unavailable.';
+}
+
+function buildVoiceContextSummary() {
+  const formula = formulaTextarea?.value || DEFAULT_FORMULA_TEXT;
+  const labels = sortSoloLabels([
+    ...(activeFingerState?.allSlots || []),
+    ...(activeFingerState?.rotationSlots || []),
+  ]);
+  const lines = labels.map((label) => {
+    if (isRotationLabel(label)) {
+      return `${label}=${formatRotationValueForEditor(label)}`;
+    }
+    return `${label}=${formatFingerValueForEditor(label)}`;
+  });
+  return {
+    formula,
+    fingers: lines.length ? lines.join('\n') : 'None',
+  };
+}
+
+function buildVoiceMessages({ prompt, readme, context }) {
+  const systemPrompt = [
+    'You are the Reflex4You voice assistant. You help edit formulas.',
+    'You receive the Reflex4You README, the current formula, and active parameter values.',
+    'Return JSON only (no markdown) with this schema:',
+    '{',
+    '  "assistant_reply": string,',
+    '  "formula": string,',
+    '  "did_update": boolean,',
+    '  "finger_values": { "D1": "a+bi", "W0": "a+bi", "RA": "a+bi", "RB": "a+bi" }',
+    '}',
+    'Rules:',
+    '- Always return a full formula string (even if unchanged).',
+    '- If you are unsure, ask a short follow-up question and set did_update=false.',
+    '- Prefer minimal edits that adjust parameters before rewriting everything.',
+    '- Use valid Reflex4You syntax; keep the formula as a single line.',
+  ].join('\n');
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'system', content: `Reflex4You README (full):\n${readme}` },
+    {
+      role: 'system',
+      content: `Current formula:\n${context.formula}\n\nActive parameters:\n${context.fingers}`,
+    },
+    ...voiceHistory.map((entry) => ({ role: entry.role, content: entry.content })),
+    { role: 'user', content: prompt },
+  ];
+  return messages;
+}
+
+function parseVoiceJson(raw) {
+  if (!raw || typeof raw !== 'string') {
+    return null;
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (_) {
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (match) {
+      try {
+        return JSON.parse(match[0]);
+      } catch (_) {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+async function fetchVoiceAssistantResponse({ messages, apiKey, model }) {
+  const response = await fetch(VOICE_OPENAI_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature: 0.2,
+      response_format: { type: 'json_object' },
+    }),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `OpenAI request failed (${response.status}).`);
+  }
+  const payload = await response.json();
+  return payload?.choices?.[0]?.message?.content || '';
+}
+
+function applyVoiceFingerValues(rawValues) {
+  if (!rawValues || typeof rawValues !== 'object') {
+    return { applied: 0, warnings: [] };
+  }
+  let applied = 0;
+  const warnings = [];
+  const trackball = { RA: null, RB: null };
+
+  Object.entries(rawValues).forEach(([label, raw]) => {
+    if (!label || typeof raw !== 'string') {
+      return;
+    }
+    const normalized = label.trim();
+    if (isRotationLabel(normalized)) {
+      const parsed = parseComplexString(raw);
+      if (!parsed) {
+        warnings.push(`Could not parse ${normalized}.`);
+        return;
+      }
+      trackball[normalized] = parsed;
+      applied += 1;
+      return;
+    }
+    if (!isFingerLabel(normalized)) {
+      warnings.push(`Ignoring unknown label ${normalized}.`);
+      return;
+    }
+    const result = applyFingerValueFromEditor(normalized, raw);
+    if (!result.ok) {
+      warnings.push(result.message || `Failed to set ${normalized}.`);
+      return;
+    }
+    applied += 1;
+  });
+
+  if (trackball.RA && trackball.RB && reflexCore) {
+    reflexCore.setTrackballFromSU2(trackball.RA, trackball.RB);
+  } else if ((trackball.RA || trackball.RB) && !(trackball.RA && trackball.RB)) {
+    warnings.push('Trackball rotation requires both RA and RB.');
+  }
+
+  return { applied, warnings };
+}
+
+function applyVoiceResponse(parsed) {
+  if (!parsed || typeof parsed !== 'object') {
+    return { ok: false, message: 'Assistant response was not JSON.' };
+  }
+  const currentFormula = formulaTextarea?.value || DEFAULT_FORMULA_TEXT;
+  const nextFormula = typeof parsed.formula === 'string' ? parsed.formula.trim() : currentFormula;
+  const didUpdate = Boolean(parsed.did_update);
+  let appliedFormula = false;
+  const warnings = [];
+
+  if (nextFormula && nextFormula !== currentFormula.trim()) {
+    const result = parseFormulaInput(nextFormula, getParserOptionsFromFingers());
+    if (!result.ok) {
+      showParseError(nextFormula, result);
+      return { ok: false, message: 'Assistant returned an invalid formula.' };
+    }
+    if (formulaTextarea) {
+      formulaTextarea.value = nextFormula;
+    }
+    pendingHistoryCommitAfterApply = true;
+    applyFormulaFromTextarea({ updateQuery: true, preserveFingerState: false });
+    appliedFormula = true;
+  } else if (didUpdate && nextFormula === currentFormula.trim()) {
+    warnings.push('Formula unchanged; applied parameter updates only.');
+  }
+
+  const fingerResult = applyVoiceFingerValues(parsed.finger_values);
+  if (!appliedFormula && fingerResult.applied > 0) {
+    commitHistorySnapshot();
+  }
+  warnings.push(...fingerResult.warnings);
+
+  return { ok: true, appliedFormula, warnings };
+}
+
+function speakVoiceReply(text, { onDone } = {}) {
+  if (!voiceSettings.autoSpeak || typeof window === 'undefined' || !window.speechSynthesis) {
+    if (typeof onDone === 'function') onDone();
+    return;
+  }
+  try {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = navigator?.language || 'en-US';
+    utterance.rate = 1;
+    utterance.onend = () => onDone?.();
+    utterance.onerror = () => onDone?.();
+    window.speechSynthesis.speak(utterance);
+  } catch (_) {
+    if (typeof onDone === 'function') onDone();
+  }
+}
+
+function maybeRestartListening() {
+  if (!voiceSettings.autoListen || !isVoicePanelOpen()) {
+    return;
+  }
+  window.setTimeout(() => {
+    if (!voiceListening && !voiceThinking) {
+      startVoiceListening();
+    }
+  }, 300);
+}
+
+function ensureVoiceRecognizer() {
+  if (voiceRecognizer || typeof window === 'undefined') return voiceRecognizer;
+  if (!voiceSpeechSupported) {
+    setVoiceStatus('Speech recognition is not supported on this device.', { tone: 'warn' });
+    return null;
+  }
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognizer = new SpeechRecognition();
+  recognizer.lang = navigator?.language || 'en-US';
+  recognizer.interimResults = true;
+  recognizer.continuous = false;
+  recognizer.maxAlternatives = 1;
+  recognizer.onresult = (event) => {
+    let interim = '';
+    let finalText = '';
+    for (let i = event.resultIndex; i < event.results.length; i += 1) {
+      const result = event.results[i];
+      const text = result[0]?.transcript || '';
+      if (result.isFinal) {
+        finalText += text;
+      } else {
+        interim += text;
+      }
+    }
+    if (interim) {
+      setVoiceTranscript(`… ${interim.trim()}`);
+    }
+    if (finalText) {
+      voicePendingTranscript = `${voicePendingTranscript} ${finalText}`.trim();
+    }
+  };
+  recognizer.onerror = (event) => {
+    voiceListening = false;
+    updateVoiceControls();
+    setVoiceStatus(`Mic error: ${event?.error || 'unknown'}.`, { tone: 'warn' });
+  };
+  recognizer.onend = () => {
+    voiceListening = false;
+    updateVoiceControls();
+    setVoiceTranscript('');
+    const transcript = voicePendingTranscript.trim();
+    voicePendingTranscript = '';
+    if (transcript) {
+      if (voiceInput) {
+        voiceInput.value = transcript;
+      }
+      if (voiceSettings.autoSubmit) {
+        sendVoicePrompt(transcript).catch(() => {});
+      }
+    }
+  };
+  voiceRecognizer = recognizer;
+  return voiceRecognizer;
+}
+
+function startVoiceListening() {
+  if (voiceListening || voiceThinking) return;
+  const recognizer = ensureVoiceRecognizer();
+  if (!recognizer) return;
+  voicePendingTranscript = '';
+  try {
+    recognizer.start();
+    voiceListening = true;
+    setVoiceStatus('Listening…');
+    updateVoiceControls();
+  } catch (error) {
+    voiceListening = false;
+    updateVoiceControls();
+    setVoiceStatus('Unable to start microphone.', { tone: 'warn' });
+    console.warn('Voice recognizer start failed.', error);
+  }
+}
+
+function stopVoiceListening() {
+  if (!voiceRecognizer || !voiceListening) return;
+  try {
+    voiceRecognizer.stop();
+  } catch (_) {
+    // ignore
+  }
+}
+
+async function sendVoicePrompt(text) {
+  const prompt = String(text || '').trim();
+  if (!prompt) {
+    setVoiceStatus('Say something to get started.', { tone: 'warn' });
+    return;
+  }
+  if (voiceListening) {
+    stopVoiceListening();
+  }
+  if (voiceApiKeyInput) {
+    voiceApiKey = voiceApiKeyInput.value.trim();
+  }
+  if (!voiceApiKey) {
+    setVoiceStatus('Add an OpenAI API key first.', { tone: 'warn' });
+    voiceApiKeyInput?.focus();
+    return;
+  }
+  voiceRequestId += 1;
+  const requestId = voiceRequestId;
+  voiceThinking = true;
+  updateVoiceControls();
+  setVoiceStatus('Thinking…');
+  if (voiceInput) {
+    voiceInput.value = '';
+  }
+
+  try {
+    const readme = await getVoiceReadme();
+    const context = buildVoiceContextSummary();
+    const messages = buildVoiceMessages({ prompt, readme, context });
+    appendVoiceHistory('user', prompt);
+    const model = String(voiceSettings.model || 'gpt-4o-mini');
+    const raw = await fetchVoiceAssistantResponse({ messages, apiKey: voiceApiKey, model });
+    if (requestId !== voiceRequestId) {
+      return;
+    }
+    const parsed = parseVoiceJson(raw);
+    const assistantReply = parsed?.assistant_reply || 'Assistant response received.';
+    appendVoiceHistory('assistant', assistantReply);
+    const applyResult = applyVoiceResponse(parsed);
+    if (!applyResult.ok) {
+      setVoiceStatus(applyResult.message, { tone: 'warn' });
+    } else if (applyResult.warnings.length) {
+      setVoiceStatus(applyResult.warnings.join(' '), { tone: 'warn' });
+    } else {
+      setVoiceStatus(applyResult.appliedFormula ? 'Formula updated.' : 'Parameters updated.');
+    }
+    speakVoiceReply(assistantReply, { onDone: maybeRestartListening });
+  } catch (error) {
+    if (requestId !== voiceRequestId) {
+      return;
+    }
+    const message = error?.message || 'Failed to contact OpenAI.';
+    setVoiceStatus(message, { tone: 'warn' });
+  } finally {
+    if (requestId === voiceRequestId) {
+      voiceThinking = false;
+      updateVoiceControls();
+    }
+  }
+}
+
+function setupVoiceAssistant() {
+  if (voiceButton) {
+    voiceButton.addEventListener('click', () => {
+      setVoicePanelOpen(!isVoicePanelOpen());
+    });
+  }
+  if (voiceCloseButton) {
+    voiceCloseButton.addEventListener('click', () => {
+      setVoicePanelOpen(false);
+    });
+  }
+  if (voiceToggleButton) {
+    voiceToggleButton.addEventListener('click', () => {
+      if (voiceListening) {
+        stopVoiceListening();
+      } else {
+        startVoiceListening();
+      }
+    });
+  }
+  if (voiceSendButton) {
+    voiceSendButton.addEventListener('click', () => {
+      sendVoicePrompt(voiceInput?.value || '').catch(() => {});
+    });
+  }
+  if (voiceClearButton) {
+    voiceClearButton.addEventListener('click', () => {
+      voiceHistory = [];
+      persistVoiceHistory();
+      renderVoiceLog();
+      setVoiceStatus('Cleared conversation.');
+    });
+  }
+  if (voiceInput) {
+    voiceInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        sendVoicePrompt(voiceInput.value).catch(() => {});
+      }
+    });
+  }
+  if (voiceApiKeyInput) {
+    voiceApiKeyInput.addEventListener('input', () => {
+      voiceApiKey = voiceApiKeyInput.value.trim();
+      persistVoiceSettings();
+    });
+  }
+  if (voiceRememberKeyInput) {
+    voiceRememberKeyInput.addEventListener('change', () => {
+      voiceSettings.rememberKey = Boolean(voiceRememberKeyInput.checked);
+      persistVoiceSettings();
+    });
+  }
+  if (voiceModelInput) {
+    voiceModelInput.addEventListener('change', () => {
+      voiceSettings.model = voiceModelInput.value.trim() || defaultVoiceSettings.model;
+      persistVoiceSettings();
+    });
+  }
+  if (voiceAutoSubmitInput) {
+    voiceAutoSubmitInput.addEventListener('change', () => {
+      voiceSettings.autoSubmit = Boolean(voiceAutoSubmitInput.checked);
+      persistVoiceSettings();
+    });
+  }
+  if (voiceAutoSpeakInput) {
+    voiceAutoSpeakInput.addEventListener('change', () => {
+      voiceSettings.autoSpeak = Boolean(voiceAutoSpeakInput.checked);
+      persistVoiceSettings();
+    });
+  }
+  if (voiceAutoListenInput) {
+    voiceAutoListenInput.addEventListener('change', () => {
+      voiceSettings.autoListen = Boolean(voiceAutoListenInput.checked);
+      persistVoiceSettings();
+    });
+  }
+
+  loadVoiceSettings();
+  loadVoiceHistory();
+
+  if (!voiceSpeechSupported && voiceToggleButton) {
+    voiceToggleButton.disabled = true;
+    setVoiceStatus('Speech recognition is not supported on this device.', { tone: 'warn' });
+  }
+
+  if (voiceApiKeyInput && voiceApiKey) {
+    voiceApiKeyInput.value = voiceApiKey;
+  }
+  if (voiceRememberKeyInput) {
+    voiceRememberKeyInput.checked = Boolean(voiceSettings.rememberKey);
+  }
+  if (voiceModelInput) {
+    voiceModelInput.value = voiceSettings.model;
+  }
+  if (voiceAutoSubmitInput) {
+    voiceAutoSubmitInput.checked = Boolean(voiceSettings.autoSubmit);
+  }
+  if (voiceAutoSpeakInput) {
+    voiceAutoSpeakInput.checked = Boolean(voiceSettings.autoSpeak);
+  }
+  if (voiceAutoListenInput) {
+    voiceAutoListenInput.checked = Boolean(voiceSettings.autoListen);
+  }
+  renderVoiceLog();
+  updateVoiceControls();
+}
+
+setupVoiceAssistant();
+
 setupMenuDropdown({ menuButton, menuDropdown, onAction: handleMenuAction });
 
 function handleMenuAction(action) {
@@ -3113,6 +3788,9 @@ function handleMenuAction(action) {
       copyShareLinkToClipboard().catch((error) => {
         console.warn('Failed to copy share link.', error);
       });
+      break;
+    case 'open-voice-assistant':
+      setVoicePanelOpen(true);
       break;
     case 'open-readme': {
       const href =
@@ -4048,7 +4726,7 @@ function triggerImageDownload(url, filename, shouldRevoke) {
 
 if ('serviceWorker' in navigator) {
   // Version the SW script URL so updates can't get stuck behind a cached SW script.
-  const SW_URL = './service-worker.js?sw=38.0';
+  const SW_URL = './service-worker.js?sw=38.1';
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(SW_URL).then((registration) => {
       // Auto-activate updated workers so cache/version bumps take effect quickly.
