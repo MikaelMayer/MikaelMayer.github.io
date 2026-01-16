@@ -1846,8 +1846,8 @@ function updateFocusModeMenuItem() {
   if (!focusModeMenuItem) {
     return;
   }
-  focusModeMenuItem.textContent = focusModeActive ? 'Exit focus mode' : 'Enter focus mode';
-  focusModeMenuItem.setAttribute('aria-pressed', focusModeActive ? 'true' : 'false');
+  focusModeMenuItem.textContent = 'Enter focus mode';
+  focusModeMenuItem.removeAttribute('aria-pressed');
 }
 
 function setFocusModeActive(active) {
@@ -3125,6 +3125,13 @@ window.addEventListener('resize', () => {
 
 setupMenuDropdown({ menuButton, menuDropdown, onAction: handleMenuAction });
 updateFocusModeMenuItem();
+if (menuButton) {
+  menuButton.addEventListener('click', () => {
+    if (focusModeActive) {
+      setFocusModeActive(false);
+    }
+  });
+}
 
 function handleMenuAction(action) {
   switch (action) {
@@ -3169,7 +3176,7 @@ function handleMenuAction(action) {
       });
       break;
     case 'toggle-focus-mode':
-      setFocusModeActive(!focusModeActive);
+      setFocusModeActive(true);
       break;
     case 'open-formula-view':
       window.location.href = `./formula.html${window.location.search || ''}`;
