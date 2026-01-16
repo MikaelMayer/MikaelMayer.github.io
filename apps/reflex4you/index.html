@@ -792,6 +792,37 @@
       pointer-events: none !important;
     }
 
+    /* Focus mode: hide UI chrome, keep a transparent menu. */
+    html.focus-mode #formula-panel,
+    html.focus-mode #finger-indicator-stack,
+    html.focus-mode #finger-overlay,
+    html.focus-mode #error,
+    html.focus-mode #compile-overlay,
+    html.focus-mode #app-version-pill,
+    html.focus-mode #undo-button,
+    html.focus-mode #redo-button {
+      display: none !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+
+    html.focus-mode #menu-button {
+      background: rgba(0, 0, 0, 0.15);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    html.focus-mode #menu-button:hover,
+    html.focus-mode #menu-button:focus-visible {
+      background: rgba(0, 0, 0, 0.28);
+      border-color: rgba(255, 255, 255, 0.6);
+    }
+
+    html.focus-mode #menu-dropdown {
+      background: rgba(0, 0, 0, 0.3);
+      border-color: rgba(255, 255, 255, 0.22);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+    }
+
     /* Boot/recovery overlay should always be visible, even in viewer mode. */
     #boot-overlay {
       position: fixed;
@@ -1016,6 +1047,15 @@
           Save image
         </button>
         <button
+          id="menu-focus-toggle"
+          type="button"
+          class="menu-dropdown__item"
+          data-menu-action="toggle-focus-mode"
+          role="menuitem"
+        >
+          Enter focus mode
+        </button>
+        <button
           type="button"
           class="menu-dropdown__item"
           data-menu-action="open-formula-view"
@@ -1034,7 +1074,7 @@
       </div>
     </div>
   </div>
-  <div id="app-version-pill" aria-live="polite" aria-label="Reflex4You version">v38</div>
+  <div id="app-version-pill" aria-live="polite" aria-label="Reflex4You version">v39</div>
 </div>
 
 <div id="error"></div>
