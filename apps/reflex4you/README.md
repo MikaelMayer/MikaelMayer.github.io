@@ -37,6 +37,18 @@ Reflex4You is an interactive complex-function explorer. Type a formula, drag the
 
    Drag `D1` to change the arm angle, `D2` to tweak the wavelength, and `D3` to offset the detectors; the visual interference pattern updates instantly and the full configuration is still shareable via the URL.
 
+## Voice assistant (ChatGPT)
+
+Reflex4You includes a voice-driven assistant for hands-free edits (ideal in VR):
+
+- Open the **Voice assistant** panel from the mic button or the menu.
+- Paste your OpenAI API key (stored only in your browser if you opt in).
+- Speak or type a request like “zoom into the Julia set and soften the colors.”
+- The assistant receives the **current formula** and the **full README** to craft a valid formula update and optional parameter tweaks.
+- Enable **Auto-send** + **Hands-free loop** for continuous voice control.
+
+If speech recognition is unavailable, you can still type requests in the panel.
+
 ## Install as a PWA
 
 - On Chrome/Edge/Android, open https://mikaelmayer.github.io/apps/reflex4you/, open the browser menu, and choose **Install app** (or **Add to Home screen** on iOS Safari).  
