@@ -225,6 +225,26 @@ Rules of thumb:
 - If a handle only appears inside an `x`/`real` projection, dragging is locked to the real axis (and similarly for `y`/`imag`). Use both axes anywhere in the formula to regain free movement.
 - URLs remember the current formula and each handle’s last position, so you can bookmark exact views.
 
+## Virtual Reality
+
+Reflex4You can be used as a virtual-reality viewer by rendering two views and offsetting them by the physical eye separation.
+
+Example formula:
+
+    set halfEyeDistance = 1.805 in
+    set FOV = 1 in
+
+    let view =
+      (z*QA + i*QB) / (i*QB.conj*z + QA.conj) $ z * FOV / 4
+    in
+    let vrview =
+      view $ z + halfEyeDistance*i*if(y < 0, 1, -1)
+    in
+    let fn =
+      z^2 + D2 $$ 50 $ z/2
+    in
+    fn $ vrview
+
 ## Formula Language
 
 The input accepts succinct expressions with complex arithmetic, composition, and built-in helpers:
