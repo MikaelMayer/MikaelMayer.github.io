@@ -220,6 +220,41 @@ function needsPowerBaseParens(node, parentPrec) {
   return isSignedLiteralConst(node);
 }
 
+function isPureRealConst(node) {
+  return node && typeof node === 'object' && node.kind === 'Const' && node.im === 0;
+}
+
+function isPureImagConst(node) {
+  return node && typeof node === 'object' && node.kind === 'Const' && node.re === 0;
+}
+
+function complexLiteralFromAddSub(node) {
+  if (!node || typeof node !== 'object') return null;
+  if (node.kind !== 'Add' && node.kind !== 'Sub') return null;
+  const left = node.left;
+  const right = node.right;
+  if (!left || !right || left.kind !== 'Const' || right.kind !== 'Const') return null;
+
+  const leftReal = isPureRealConst(left);
+  const leftImag = isPureImagConst(left);
+  const rightReal = isPureRealConst(right);
+  const rightImag = isPureImagConst(right);
+
+  if (!((leftReal && rightImag) || (leftImag && rightReal))) {
+    return null;
+  }
+
+  const re = node.kind === 'Add' ? left.re + right.re : left.re - right.re;
+  const im = node.kind === 'Add' ? left.im + right.im : left.im - right.im;
+  if (!Number.isFinite(re) || !Number.isFinite(im)) {
+    return null;
+  }
+  if (re === 0 || im === 0) {
+    return null;
+  }
+  return { re, im };
+}
+
 function isAtomicForPostfixFactorial(node) {
   if (!node || typeof node !== 'object') return false;
   switch (node.kind) {
@@ -596,6 +631,12 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
     case 'Equal':
     case 'LogicalAnd':
     case 'LogicalOr': {
+      if (node.kind === 'Add' || node.kind === 'Sub') {
+        const complexLiteral = complexLiteralFromAddSub(node);
+        if (complexLiteral) {
+          return constToLatex(complexLiteral, options);
+        }
+      }
       const prec = precedence(node);
       const leftNode = node.left;
       const rightNode = node.right;

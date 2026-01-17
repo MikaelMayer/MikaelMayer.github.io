@@ -97,6 +97,20 @@ test('renders signed bases in exponentiation with parentheses', () => {
   assert.equal(latex, '\\left(-1\\right)^{z}');
 });
 
+test('renders additive complex literals as compact constants', () => {
+  const result = parseFormulaInput('1 + 2i');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.equal(latex, '\\left(\\substack{1\\,+\\\\2\\,i}\\right)');
+});
+
+test('renders subtractive complex literals as compact constants', () => {
+  const result = parseFormulaInput('1 - 2i');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.equal(latex, '\\left(\\substack{1\\,-\\\\2\\,i}\\right)');
+});
+
 test('renders additive bases in exponentiation with parentheses', () => {
   const result = parseFormulaInput('(1 + 2)^z');
   assert.equal(result.ok, true);
