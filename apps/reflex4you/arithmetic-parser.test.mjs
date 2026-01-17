@@ -97,6 +97,20 @@ test('renders signed bases in exponentiation with parentheses', () => {
   assert.equal(latex, '\\left(-1\\right)^{z}');
 });
 
+test('renders additive bases in exponentiation with parentheses', () => {
+  const result = parseFormulaInput('(1 + 2)^z');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.equal(latex, '\\left(1 + 2\\right)^{z}');
+});
+
+test('renders multiplicative bases in exponentiation with parentheses', () => {
+  const result = parseFormulaInput('(2 * 3)^z');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.equal(latex, '\\left(2\\,3\\right)^{z}');
+});
+
 test('non-integer exponents preserve power surface syntax', () => {
   const result = parseFormulaInput('z ^ 1.5');
   assert.equal(result.ok, true);

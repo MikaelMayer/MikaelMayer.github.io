@@ -4,7 +4,7 @@
 import { FINGER_DECIMAL_PLACES } from './core-engine.mjs';
 
 // Bump this when changing renderer logic so users can verify cached assets.
-export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2026-01-17.2';
+export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2026-01-17.3';
 
 const DEFAULT_MATHJAX_LOAD_TIMEOUT_MS = 9000;
 
@@ -199,18 +199,25 @@ function wrapParensLatex(latex) {
   return `\\left(${latex}\\right)`;
 }
 
-function startsWithUnarySign(latex) {
-  const trimmed = String(latex || '').trim();
-  if (!trimmed) return false;
-  return trimmed.startsWith('-') || trimmed.startsWith('+');
+function isSignedLiteralConst(node) {
+  if (!node || typeof node !== 'object' || node.kind !== 'Const') {
+    return false;
+  }
+  if (node.im === 0) {
+    return node.re < 0;
+  }
+  if (node.re === 0) {
+    return node.im < 0;
+  }
+  return false;
 }
 
-function shouldWrapPowerBase(node, latex, parentPrec) {
+function needsPowerBaseParens(node, parentPrec) {
   if (precedence(node) < parentPrec) {
     return true;
   }
-  // Exponentiation binds tighter than unary +/- (e.g. -1^n == -(1^n)).
-  return startsWithUnarySign(latex);
+  // TeX treats unary +/- as lower precedence than exponentiation, so wrap signed literals.
+  return isSignedLiteralConst(node);
 }
 
 function isAtomicForPostfixFactorial(node) {
@@ -404,7 +411,7 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
 
     case 'Pow': {
       const baseLatex = nodeToLatex(node.base, precedence(node), options);
-      const baseWrapped = shouldWrapPowerBase(node.base, baseLatex, precedence(node))
+      const baseWrapped = needsPowerBaseParens(node.base, precedence(node))
         ? wrapParensLatex(baseLatex)
         : baseLatex;
       return `${baseWrapped}^{${formatNumber(node.exponent)}}`;
@@ -412,7 +419,7 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
 
     case 'PowExpr': {
       const baseLatex = nodeToLatex(node.base, precedence(node), options);
-      const baseWrapped = shouldWrapPowerBase(node.base, baseLatex, precedence(node))
+      const baseWrapped = needsPowerBaseParens(node.base, precedence(node))
         ? wrapParensLatex(baseLatex)
         : baseLatex;
       const expLatex = nodeToLatex(node.exponent, 0, options);
