@@ -111,6 +111,20 @@ test('renders subtractive complex literals as compact constants', () => {
   assert.equal(latex, '\\left(\\substack{1\\,-\\\\2\\,i}\\right)');
 });
 
+test('renders negative literal in multiplication with parentheses', () => {
+  const result = parseFormulaInput('-1 * 2');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.equal(latex, '\\left(-1\\right)\\,2');
+});
+
+test('renders negative literal on right multiplication with parentheses', () => {
+  const result = parseFormulaInput('2 * -1');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.equal(latex, '2\\,\\left(-1\\right)');
+});
+
 test('renders additive bases in exponentiation with parentheses', () => {
   const result = parseFormulaInput('(1 + 2)^z');
   assert.equal(result.ok, true);
