@@ -4,7 +4,7 @@
 import { FINGER_DECIMAL_PLACES } from './core-engine.mjs';
 
 // Bump this when changing renderer logic so users can verify cached assets.
-export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2026-01-13.3';
+export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2026-01-17.1';
 
 const DEFAULT_MATHJAX_LOAD_TIMEOUT_MS = 9000;
 
@@ -199,6 +199,13 @@ function wrapParensLatex(latex) {
   return `\\left(${latex}\\right)`;
 }
 
+function isNegativeConstBase(node, latex) {
+  if (!node || typeof node !== 'object') return false;
+  if (node.kind !== 'Const') return false;
+  const trimmed = String(latex || '').trim();
+  return trimmed.startsWith('-');
+}
+
 function isAtomicForPostfixFactorial(node) {
   if (!node || typeof node !== 'object') return false;
   switch (node.kind) {
@@ -390,13 +397,19 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
 
     case 'Pow': {
       const baseLatex = nodeToLatex(node.base, precedence(node), options);
-      const baseWrapped = precedence(node.base) < precedence(node) ? wrapParensLatex(baseLatex) : baseLatex;
+      const baseWrapped =
+        precedence(node.base) < precedence(node) || isNegativeConstBase(node.base, baseLatex)
+          ? wrapParensLatex(baseLatex)
+          : baseLatex;
       return `${baseWrapped}^{${formatNumber(node.exponent)}}`;
     }
 
     case 'PowExpr': {
       const baseLatex = nodeToLatex(node.base, precedence(node), options);
-      const baseWrapped = precedence(node.base) < precedence(node) ? wrapParensLatex(baseLatex) : baseLatex;
+      const baseWrapped =
+        precedence(node.base) < precedence(node) || isNegativeConstBase(node.base, baseLatex)
+          ? wrapParensLatex(baseLatex)
+          : baseLatex;
       const expLatex = nodeToLatex(node.exponent, 0, options);
       return `${baseWrapped}^{${expLatex}}`;
     }
