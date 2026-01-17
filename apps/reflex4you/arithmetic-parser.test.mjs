@@ -94,7 +94,7 @@ test('renders signed bases in exponentiation with parentheses', () => {
   const result = parseFormulaInput('(-1)^z');
   assert.equal(result.ok, true);
   const latex = formulaAstToLatex(result.value);
-  assert.match(latex, /^\\left\\(-1\\right\\)\\^\\{z\\}$/);
+  assert.equal(latex, '\\left(-1\\right)^{z}');
 });
 
 test('non-integer exponents preserve power surface syntax', () => {
