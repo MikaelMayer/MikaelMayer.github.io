@@ -91,10 +91,10 @@ test('parentheses can force (-z)^4', () => {
 });
 
 test('renders signed bases in exponentiation with parentheses', () => {
-  const result = parseFormulaInput('(-1)^n');
+  const result = parseFormulaInput('(-1)^z');
   assert.equal(result.ok, true);
   const latex = formulaAstToLatex(result.value);
-  assert.match(latex, /^\\left\\(-1\\right\\)\\^\\{n\\}$/);
+  assert.match(latex, /^\\left\\(-1\\right\\)\\^\\{z\\}$/);
 });
 
 test('non-integer exponents preserve power surface syntax', () => {
