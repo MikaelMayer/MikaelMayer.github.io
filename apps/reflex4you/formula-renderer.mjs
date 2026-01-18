@@ -4,7 +4,7 @@
 import { FINGER_DECIMAL_PLACES } from './core-engine.mjs';
 
 // Bump this when changing renderer logic so users can verify cached assets.
-export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2026-01-13.3';
+export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2026-01-17.4';
 
 const DEFAULT_MATHJAX_LOAD_TIMEOUT_MS = 9000;
 
@@ -199,6 +199,62 @@ function wrapParensLatex(latex) {
   return `\\left(${latex}\\right)`;
 }
 
+function isSignedLiteralConst(node) {
+  if (!node || typeof node !== 'object' || node.kind !== 'Const') {
+    return false;
+  }
+  if (node.im === 0) {
+    return node.re < 0;
+  }
+  if (node.re === 0) {
+    return node.im < 0;
+  }
+  return false;
+}
+
+function needsPowerBaseParens(node, parentPrec) {
+  if (precedence(node) < parentPrec) {
+    return true;
+  }
+  // TeX treats unary +/- as lower precedence than exponentiation, so wrap signed literals.
+  return isSignedLiteralConst(node);
+}
+
+function isPureRealConst(node) {
+  return node && typeof node === 'object' && node.kind === 'Const' && node.im === 0;
+}
+
+function isPureImagConst(node) {
+  return node && typeof node === 'object' && node.kind === 'Const' && node.re === 0;
+}
+
+function complexLiteralFromAddSub(node) {
+  if (!node || typeof node !== 'object') return null;
+  if (node.kind !== 'Add' && node.kind !== 'Sub') return null;
+  const left = node.left;
+  const right = node.right;
+  if (!left || !right || left.kind !== 'Const' || right.kind !== 'Const') return null;
+
+  const leftReal = isPureRealConst(left);
+  const leftImag = isPureImagConst(left);
+  const rightReal = isPureRealConst(right);
+  const rightImag = isPureImagConst(right);
+
+  if (!((leftReal && rightImag) || (leftImag && rightReal))) {
+    return null;
+  }
+
+  const re = node.kind === 'Add' ? left.re + right.re : left.re - right.re;
+  const im = node.kind === 'Add' ? left.im + right.im : left.im - right.im;
+  if (!Number.isFinite(re) || !Number.isFinite(im)) {
+    return null;
+  }
+  if (re === 0 || im === 0) {
+    return null;
+  }
+  return { re, im };
+}
+
 function isAtomicForPostfixFactorial(node) {
   if (!node || typeof node !== 'object') return false;
   switch (node.kind) {
@@ -390,13 +446,17 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
 
     case 'Pow': {
       const baseLatex = nodeToLatex(node.base, precedence(node), options);
-      const baseWrapped = precedence(node.base) < precedence(node) ? wrapParensLatex(baseLatex) : baseLatex;
+      const baseWrapped = needsPowerBaseParens(node.base, precedence(node))
+        ? wrapParensLatex(baseLatex)
+        : baseLatex;
       return `${baseWrapped}^{${formatNumber(node.exponent)}}`;
     }
 
     case 'PowExpr': {
       const baseLatex = nodeToLatex(node.base, precedence(node), options);
-      const baseWrapped = precedence(node.base) < precedence(node) ? wrapParensLatex(baseLatex) : baseLatex;
+      const baseWrapped = needsPowerBaseParens(node.base, precedence(node))
+        ? wrapParensLatex(baseLatex)
+        : baseLatex;
       const expLatex = nodeToLatex(node.exponent, 0, options);
       return `${baseWrapped}^{${expLatex}}`;
     }
@@ -571,6 +631,12 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
     case 'Equal':
     case 'LogicalAnd':
     case 'LogicalOr': {
+      if (node.kind === 'Add' || node.kind === 'Sub') {
+        const complexLiteral = complexLiteralFromAddSub(node);
+        if (complexLiteral) {
+          return constToLatex(complexLiteral, options);
+        }
+      }
       const prec = precedence(node);
       const leftNode = node.left;
       const rightNode = node.right;
@@ -579,6 +645,8 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
 
       const leftWrapped = maybeWrapLatex(leftNode, left, prec, 'left', node.kind);
       const rightWrapped = maybeWrapLatex(rightNode, right, prec, 'right', node.kind);
+      const mulLeft = node.kind === 'Mul' && isSignedLiteralConst(leftNode) ? wrapParensLatex(leftWrapped) : leftWrapped;
+      const mulRight = node.kind === 'Mul' && isSignedLiteralConst(rightNode) ? wrapParensLatex(rightWrapped) : rightWrapped;
 
       switch (node.kind) {
         case 'Add': {
@@ -589,7 +657,7 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
         }
         case 'Mul': {
           // Use a thin space instead of `\\cdot` for readability.
-          return `${leftWrapped}\\,${rightWrapped}`;
+          return `${mulLeft}\\,${mulRight}`;
         }
         case 'Div': {
           // Prefer fractions for readability; they behave as an "atomic" group in TeX.

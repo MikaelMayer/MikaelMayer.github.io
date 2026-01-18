@@ -90,6 +90,55 @@ test('parentheses can force (-z)^4', () => {
   assert.equal(result.value.base.kind, 'Sub');
 });
 
+test('renders signed bases in exponentiation with parentheses', () => {
+  const result = parseFormulaInput('(-1)^z');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.equal(latex, '\\left(-1\\right)^{z}');
+});
+
+test('renders additive complex literals as compact constants', () => {
+  const result = parseFormulaInput('1 + 2i');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.equal(latex, '\\left(\\substack{1\\,+\\\\2\\,i}\\right)');
+});
+
+test('renders subtractive complex literals as compact constants', () => {
+  const result = parseFormulaInput('1 - 2i');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.equal(latex, '\\left(\\substack{1\\,-\\\\2\\,i}\\right)');
+});
+
+test('renders negative literal in multiplication with parentheses', () => {
+  const result = parseFormulaInput('-1 * 2');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.equal(latex, '\\left(-1\\right)\\,2');
+});
+
+test('renders negative literal on right multiplication with parentheses', () => {
+  const result = parseFormulaInput('2 * -1');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.equal(latex, '2\\,\\left(-1\\right)');
+});
+
+test('renders additive bases in exponentiation with parentheses', () => {
+  const result = parseFormulaInput('(1 + 2)^z');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.equal(latex, '\\left(1 + 2\\right)^{z}');
+});
+
+test('renders multiplicative bases in exponentiation with parentheses', () => {
+  const result = parseFormulaInput('(2 * 3)^z');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.equal(latex, '\\left(2\\,3\\right)^{z}');
+});
+
 test('non-integer exponents preserve power surface syntax', () => {
   const result = parseFormulaInput('z ^ 1.5');
   assert.equal(result.ok, true);
