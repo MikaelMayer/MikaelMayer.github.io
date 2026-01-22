@@ -337,6 +337,173 @@ Tips:
 - Use `W0`/`W1` whenever you want freeform navigation without moving your handles onto the area of interest.
 - To reset a handle, click its value chip and type `0` (or any new complex literal). The formula itself is preserved across reloads because it lives in the URL.
 
+## Visualization tricks used in the videos
+
+This section records general-purpose tricks that proved useful when building
+animated math visualizations, so they can be reused reliably
+in future videos.
+
+### Split-screen layout using domain-space offsets (no view mapping)
+
+Instead of introducing a separate “view transform”, both plots are kept in
+**domain coordinates**.  
+At the very end, we:
+- select which plot to draw (e.g. by `y < 0`)
+- offset it vertically
+- apply a single global zoom
+
+```text
+# final layout (zoom and offsets only here)
+if(y < 0,
+  realGraph    $ z*S $ z+2*i,
+  complexGraph $ z*S $ z-2*i
+)
+```
+
+This keeps all geometry, grids, and hit-tests consistent.
+
+### Keep complex plots pure; apply scaling only in the real graph
+
+To preserve correct domain coloring, the complex graph must use the **true
+complex values**.  
+Any vertical exaggeration is applied only when evaluating the real graph.
+
+```text
+# real-only overrides
+set K = 6 in # for small functions
+let approx  = K*approx0  $ x in
+let dApprox = K*dApprox0 $ x in
+let ref     = K*ref0     $ x in
+```
+
+### Constant-width real curves using the derivative (tangent projection)
+
+Naively testing `|y - f(x)| < g` produces variable thickness depending on slope.
+Instead, project onto the tangent direction:
+
+```text
+set fx0 = real(approx) in
+set s   = clamp(iferror(real(dApprox), 0), -120, 120) in
+set e0  = y - fx0 in
+set h   = e0*s/(1+s^2) in
+set fx1 = real((K*approx0) $ (x+h)) in
+(h^2 + (fx1 - y)^2) < g^2
+```
+
+This gives a visually constant-width curve even near steep slopes or flat peaks.
+Often it's possible to have a closed form of the derivative which should be preferred compared to approximating the derivative.
+
+### Draw order matters: reference behind approximation
+
+When multiple hit-tests can succeed at the same pixel, the order determines
+what remains visible.
+
+```text
+if(hitApprox > 0.5, approx,
+  if(hitRef > 0.5, colRef, bg)
+)
+```
+
+Putting the approximation first avoids it being “erased” by the reference at
+overlapping regions (e.g. near extrema).
+
+### 5. Grids and axes in domain coordinates (not screen coordinates)
+
+Grids and axes are computed directly from `(x, y)` in domain space.
+
+```text
+set hitAxes = abs(x) < axisW || abs(y) < axisW in
+set hitGrid =
+  abs(x - x.floor) < gridW ||
+  abs(y - y.floor) < gridW
+in
+```
+
+Panel-specific colors can then be applied without changing the geometry.
+
+### Error contours as thin bands around a target value
+
+To visualize approximation error without clutter, highlight a narrow band
+around a target error (e.g. 5%).
+
+```text
+set e = abs(ref0 - approx0) in
+if(abs(e - err0) < errW, colErr, approx0)
+```
+
+This makes convergence for series visually readable as shrinking contours.
+
+### Avoid `0 × ∞`: interpolate terms with `if`, not multiplication
+
+When series terms grow large, multiplying them by a fading weight can produce
+numerical artifacts.  
+Instead, only interpolate **the single edge term**, and stop computing further
+terms explicitly.
+
+```text
+let fs(k, s, term) =
+  if(k < n, s + term,
+    if(k == n, s + u*term, s)
+  )
+in
+
+let ft(k, s, term) =
+  if(k < n, nextTerm, 0)
+in
+```
+
+This avoids undefined `0 × ∞` behavior and keeps the renderer stable.
+
+### Clamp and easing functions as first-class building blocks
+
+Small helper functions dramatically simplify timeline logic and improve visual
+smoothness.
+
+```text
+let clamp(v, lo, hi) = if(v < lo, lo, if(v > hi, hi, v)) in
+let ease01(u) = u^2*(3 - 2*u) in
+```
+
+Using eased interpolation for parameter changes avoids abrupt visual artifacts,
+especially when animating series terms.
+
+### Color conventions in domain coloring matter
+
+In Reflex4You domain coloring:
+- `1` is red
+- large magnitudes (e.g. `1000`) appear white
+- `j` is green, `j.conj` is blue
+
+This can be exploited to control perceived brightness:
+
+```text
+set colAxesW = 1000 in   # white axes
+set colGridW = 400  in  # light grid
+set colAxesB = 0    in  # black axes
+set colGridB = 0    in  # black grid
+set colRef   = j    in  # green reference
+```
+
+### Language constraints (not just style)
+
+Some constructs are **not supported**, not merely discouraged:
+
+- `i` is a reserved identifier (do not use as a variable name)
+- `!=` is not supported in conditionals  
+  → use `<` / `>` logic instead
+- Prefer `let` functions with implicit `z` so they compose cleanly with `$`
+
+```text
+# good
+let f = z^2 + 1 in
+
+# avoid (not supported)
+# if(a != b, ...)
+```
+
+These patterns form a reusable toolkit for building stable, readable, and
+visually accurate mathematical animations in Reflex4You.
+
 ### Solo selection (`solos=...`)
 
 When a formula has many parameters (finger constants), you can restrict which ones your fingers can move by selecting **solos**. This is stored in the URL:
