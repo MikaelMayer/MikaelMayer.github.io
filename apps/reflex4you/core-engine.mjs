@@ -1,6 +1,6 @@
 // Core engine for Reflex4You: AST helpers, GLSL generation, and renderer
 
-import { cloneAst, childEntries } from './ast-utils.mjs';
+import { cloneAst, childEntries, visitAst } from './ast-utils.mjs';
 
 // =========================
 // AST constructors
@@ -971,6 +971,83 @@ function lowerFunctionParams(ast) {
   }
 
   visit(root, null, null, []);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const usage = new Map();
+
+    function trackUsage(node, letStack = []) {
+      if (!node || typeof node !== 'object') return;
+      if (node.kind === 'Identifier') {
+        const binding = resolveLetBindingByName(node.name, letStack);
+        if (binding) {
+          usage.set(binding, (usage.get(binding) || 0) + 1);
+        }
+      }
+      if (node.kind === 'LetBinding') {
+        trackUsage(node.value, letStack);
+        const nextLetStack = Array.isArray(letStack) ? [...letStack, node] : [node];
+        trackUsage(node.body, nextLetStack);
+        return;
+      }
+      const entries = childEntries(node);
+      for (const [, child] of entries) {
+        if (Array.isArray(child)) {
+          child.forEach((entry) => trackUsage(entry, letStack));
+        } else {
+          trackUsage(child, letStack);
+        }
+      }
+    }
+
+    function stripUnused(node, parent, key, letStack = []) {
+      if (!node || typeof node !== 'object') return;
+      if (node.kind === 'LetBinding') {
+        const paramSpecs = getLetParamSpecs(node);
+        const hasFnParams = hasFunctionParams(paramSpecs);
+        const useCount = usage.get(node) || 0;
+        if (hasFnParams && useCount === 0) {
+          const replacement = node.body;
+          if (node.span && replacement && typeof replacement === 'object') {
+            replacement.span = node.span;
+            replacement.input = node.input;
+          }
+          replace(parent, key, replacement);
+          changed = true;
+          stripUnused(replacement, parent, key, letStack);
+          return;
+        }
+        stripUnused(node.value, node, 'value', letStack);
+        const nextLetStack = Array.isArray(letStack) ? [...letStack, node] : [node];
+        stripUnused(node.body, node, 'body', nextLetStack);
+        return;
+      }
+      const entries = childEntries(node);
+      for (const [childKey, child] of entries) {
+        if (Array.isArray(child)) {
+          for (let i = 0; i < child.length; i += 1) {
+            stripUnused(child[i], child, i, letStack);
+          }
+        } else {
+          stripUnused(child, node, childKey, letStack);
+        }
+      }
+    }
+
+    trackUsage(root, []);
+    stripUnused(root, null, null, []);
+    if (!changed) {
+      const remaining = [];
+      visitAst(root, (node) => {
+        if (node.kind === 'LetBinding' && hasFunctionParams(getLetParamSpecs(node))) {
+          remaining.push(node.name || '?');
+        }
+      });
+      if (remaining.length) {
+        throw new Error(`Unsupported higher-order functions in GPU lowering: ${remaining.join(', ')}`);
+      }
+    }
+  }
   return root;
 }
 
