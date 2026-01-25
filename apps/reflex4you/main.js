@@ -46,11 +46,15 @@ const rootElement = typeof document !== 'undefined' ? document.documentElement :
 let fatalErrorActive = false;
 
 const COMPILE_OVERLAY_TICK_MS = 240;
+const COMPILE_STATUS_DELAY_MS = 1000;
 let compileOverlayPhase = null;
 let compileOverlayPhaseStartedAt = 0;
 let compileOverlayStats = null;
 let compileOverlayRequestId = null;
 let compileOverlayTimerId = null;
+let compileStatusDelayTimerId = null;
+let compileStatusVisible = false;
+let compileStatusStartedAt = 0;
 
 function nowMs() {
   if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
@@ -116,10 +120,20 @@ function formatCompileOverlayMessage() {
 }
 
 function updateCompileOverlayTextFromPhase() {
-  if (!compileOverlayText || !compileOverlayPhase) {
+  if (!compileOverlayPhase) {
     return;
   }
-  compileOverlayText.textContent = formatCompileOverlayMessage();
+  const message = formatCompileOverlayMessage();
+  if (
+    compileStatusVisible &&
+    errorDiv &&
+    errorDiv.getAttribute('data-error-severity') === 'status'
+  ) {
+    errorDiv.textContent = message;
+  }
+  if (compileOverlayText && compileOverlay?.dataset?.visible === 'true') {
+    compileOverlayText.textContent = message;
+  }
 }
 
 function stopCompileOverlayTimer() {
@@ -130,12 +144,71 @@ function stopCompileOverlayTimer() {
   compileOverlayTimerId = null;
 }
 
+function cancelCompileStatusDelay() {
+  if (compileStatusDelayTimerId == null || typeof window === 'undefined') {
+    return;
+  }
+  window.clearTimeout(compileStatusDelayTimerId);
+  compileStatusDelayTimerId = null;
+}
+
+function showCompileStatusMessage(message) {
+  if (fatalErrorActive || !errorDiv) {
+    return;
+  }
+  const severity = errorDiv.getAttribute('data-error-severity');
+  if (severity && severity !== 'status') {
+    return;
+  }
+  errorDiv.setAttribute('data-error-severity', 'status');
+  errorDiv.textContent = String(message || '');
+  errorDiv.style.display = 'block';
+  compileStatusVisible = true;
+}
+
+function hideCompileStatusMessage() {
+  if (fatalErrorActive || !errorDiv) {
+    return;
+  }
+  if (errorDiv.getAttribute('data-error-severity') === 'status') {
+    clearError();
+  }
+  compileStatusVisible = false;
+}
+
+function scheduleCompileStatusDelay() {
+  if (
+    compileStatusDelayTimerId != null ||
+    compileStatusVisible ||
+    !compileOverlayPhase ||
+    typeof window === 'undefined'
+  ) {
+    return;
+  }
+  const elapsed = compileStatusStartedAt ? nowMs() - compileStatusStartedAt : 0;
+  const delay = Math.max(0, COMPILE_STATUS_DELAY_MS - elapsed);
+  compileStatusDelayTimerId = window.setTimeout(() => {
+    compileStatusDelayTimerId = null;
+    if (!compileOverlayPhase || fatalErrorActive) {
+      return;
+    }
+    showCompileStatusMessage(formatCompileOverlayMessage());
+    ensureCompileOverlayTimer();
+  }, delay);
+}
+
 function ensureCompileOverlayTimer() {
   if (compileOverlayTimerId != null || typeof window === 'undefined') {
     return;
   }
+  if (!compileStatusVisible && compileOverlay?.dataset?.visible !== 'true') {
+    return;
+  }
   compileOverlayTimerId = window.setInterval(() => {
-    if (!compileOverlayPhase || compileOverlay?.dataset?.visible !== 'true') {
+    if (
+      !compileOverlayPhase ||
+      (!compileStatusVisible && compileOverlay?.dataset?.visible !== 'true')
+    ) {
       stopCompileOverlayTimer();
       return;
     }
@@ -149,15 +222,22 @@ function setCompileOverlayPhase(phase, { requestId = null, stats = null, resetSt
     compileOverlayPhaseStartedAt = nowMs();
     compileOverlayStats = null;
   }
+  if (!compileStatusStartedAt) {
+    compileStatusStartedAt = nowMs();
+  }
+  if (compileOverlay) {
+    compileOverlay.dataset.visible = 'false';
+  }
   if (requestId != null) {
     compileOverlayRequestId = requestId;
   }
   if (stats && typeof stats === 'object') {
     compileOverlayStats = { ...(compileOverlayStats || {}), ...stats };
   }
-  setCompileOverlayVisible(true);
-  updateCompileOverlayTextFromPhase();
-  ensureCompileOverlayTimer();
+  if (compileStatusVisible) {
+    updateCompileOverlayTextFromPhase();
+  }
+  scheduleCompileStatusDelay();
 }
 
 function clearCompileOverlayPhase() {
@@ -165,24 +245,27 @@ function clearCompileOverlayPhase() {
   compileOverlayPhaseStartedAt = 0;
   compileOverlayStats = null;
   compileOverlayRequestId = null;
+  compileStatusStartedAt = 0;
+  cancelCompileStatusDelay();
+  hideCompileStatusMessage();
   stopCompileOverlayTimer();
 }
 
 function setCompileOverlayVisible(visible, message = null) {
+  if (compileOverlay) {
+    compileOverlay.dataset.visible = 'false';
+  }
   if (!visible) {
     clearCompileOverlayPhase();
-  }
-  if (!compileOverlay) {
     return;
   }
-  compileOverlay.dataset.visible = visible ? 'true' : 'false';
-  if (compileOverlayText && message != null && !compileOverlayPhase) {
-    compileOverlayText.textContent = String(message || '');
+  if (message != null) {
+    setCompileOverlayPhase(String(message || 'Compiling'), { resetStart: true });
   }
 }
 
-// Show a cold-start loading indicator by default; hide it once we have a first render.
-setCompileOverlayVisible(true, 'Loading…');
+// Show a cold-start loading indicator only if it hangs > 1s.
+setCompileOverlayPhase('Loading…', { resetStart: true });
 
 const APP_VERSION = 40;
 const CONTEXT_LOSS_RELOAD_KEY = `reflex4you:contextLossReloaded:v${APP_VERSION}`;
@@ -2225,7 +2308,8 @@ function showError(msg) {
   if (fatalErrorActive) {
     return;
   }
-  errorDiv.removeAttribute('data-error-severity');
+  clearCompileOverlayPhase();
+  errorDiv.setAttribute('data-error-severity', 'error');
   try {
     errorDiv.innerHTML = '';
   } catch (_) {
@@ -2236,6 +2320,7 @@ function showError(msg) {
 }
 
 function showFatalError(msg) {
+  clearCompileOverlayPhase();
   fatalErrorActive = true;
   errorDiv.setAttribute('data-error-severity', 'fatal');
   try {
@@ -2301,6 +2386,7 @@ function clearError() {
   if (fatalErrorActive) {
     return;
   }
+  compileStatusVisible = false;
   errorDiv.removeAttribute('data-error-severity');
   errorDiv.style.display = 'none';
   try {
