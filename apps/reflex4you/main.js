@@ -45,12 +45,138 @@ const rootElement = typeof document !== 'undefined' ? document.documentElement :
 
 let fatalErrorActive = false;
 
+const COMPILE_OVERLAY_TICK_MS = 240;
+let compileOverlayPhase = null;
+let compileOverlayPhaseStartedAt = 0;
+let compileOverlayStats = null;
+let compileOverlayRequestId = null;
+let compileOverlayTimerId = null;
+
+function nowMs() {
+  if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+    return performance.now();
+  }
+  return Date.now();
+}
+
+function formatDuration(ms) {
+  if (!Number.isFinite(ms)) {
+    return '?';
+  }
+  if (ms < 1000) {
+    return `${Math.round(ms)}ms`;
+  }
+  const seconds = ms / 1000;
+  const precision = seconds < 10 ? 1 : 0;
+  return `${seconds.toFixed(precision)}s`;
+}
+
+function formatCompileStatsLine(stats) {
+  if (!stats || typeof stats !== 'object') {
+    return '';
+  }
+  const parts = [];
+  if (Number.isFinite(stats.parseMs)) {
+    parts.push(`parse ${formatDuration(stats.parseMs)}`);
+  } else if (Number.isFinite(stats.workerParseMs)) {
+    parts.push(`parse ${formatDuration(stats.workerParseMs)}`);
+  }
+  if (Number.isFinite(stats.workerCompileMs)) {
+    parts.push(`compile ${formatDuration(stats.workerCompileMs)}`);
+  }
+  if (Number.isFinite(stats.nodeCount)) {
+    parts.push(`nodes ${stats.nodeCount}`);
+  }
+  if (Number.isFinite(stats.repeatComposeMax) && stats.repeatComposeMax > 0) {
+    parts.push(`$$ max ${stats.repeatComposeMax}`);
+  }
+  if (Number.isFinite(stats.repeatLoopMax) && stats.repeatLoopMax > 0) {
+    parts.push(`repeat max ${stats.repeatLoopMax}`);
+  }
+  if (Number.isFinite(stats.fragmentChars) && stats.fragmentChars > 0) {
+    parts.push(`shader ${stats.fragmentChars}`);
+  }
+  return parts.join(' · ');
+}
+
+function formatCompileOverlayMessage() {
+  if (!compileOverlayPhase) {
+    return '';
+  }
+  const elapsed = Math.max(0, nowMs() - compileOverlayPhaseStartedAt);
+  let headline = compileOverlayPhase;
+  if (compileOverlayRequestId != null) {
+    headline += ` #${compileOverlayRequestId}`;
+  }
+  if (elapsed >= 100) {
+    headline += ` (${formatDuration(elapsed)})`;
+  }
+  const details = formatCompileStatsLine(compileOverlayStats);
+  return details ? `${headline}\n${details}` : headline;
+}
+
+function updateCompileOverlayTextFromPhase() {
+  if (!compileOverlayText || !compileOverlayPhase) {
+    return;
+  }
+  compileOverlayText.textContent = formatCompileOverlayMessage();
+}
+
+function stopCompileOverlayTimer() {
+  if (compileOverlayTimerId == null || typeof window === 'undefined') {
+    return;
+  }
+  window.clearInterval(compileOverlayTimerId);
+  compileOverlayTimerId = null;
+}
+
+function ensureCompileOverlayTimer() {
+  if (compileOverlayTimerId != null || typeof window === 'undefined') {
+    return;
+  }
+  compileOverlayTimerId = window.setInterval(() => {
+    if (!compileOverlayPhase || compileOverlay?.dataset?.visible !== 'true') {
+      stopCompileOverlayTimer();
+      return;
+    }
+    updateCompileOverlayTextFromPhase();
+  }, COMPILE_OVERLAY_TICK_MS);
+}
+
+function setCompileOverlayPhase(phase, { requestId = null, stats = null, resetStart = true } = {}) {
+  compileOverlayPhase = phase;
+  if (resetStart || !compileOverlayPhaseStartedAt) {
+    compileOverlayPhaseStartedAt = nowMs();
+    compileOverlayStats = null;
+  }
+  if (requestId != null) {
+    compileOverlayRequestId = requestId;
+  }
+  if (stats && typeof stats === 'object') {
+    compileOverlayStats = { ...(compileOverlayStats || {}), ...stats };
+  }
+  setCompileOverlayVisible(true);
+  updateCompileOverlayTextFromPhase();
+  ensureCompileOverlayTimer();
+}
+
+function clearCompileOverlayPhase() {
+  compileOverlayPhase = null;
+  compileOverlayPhaseStartedAt = 0;
+  compileOverlayStats = null;
+  compileOverlayRequestId = null;
+  stopCompileOverlayTimer();
+}
+
 function setCompileOverlayVisible(visible, message = null) {
+  if (!visible) {
+    clearCompileOverlayPhase();
+  }
   if (!compileOverlay) {
     return;
   }
   compileOverlay.dataset.visible = visible ? 'true' : 'false';
-  if (compileOverlayText && message != null) {
+  if (compileOverlayText && message != null && !compileOverlayPhase) {
     compileOverlayText.textContent = String(message || '');
   }
 }
@@ -1609,6 +1735,43 @@ function formulaNeedsFingerDrivenReparse(source) {
   return source.includes('$$') || source.includes('^');
 }
 
+function summarizeAstStats(ast) {
+  const stats = {
+    nodeCount: 0,
+    repeatComposeCount: 0,
+    repeatComposeMax: 0,
+    repeatLoopCount: 0,
+    repeatLoopMax: 0,
+  };
+  if (!ast || typeof ast !== 'object') {
+    return stats;
+  }
+  visitAst(ast, (node) => {
+    stats.nodeCount += 1;
+    if (!node || typeof node !== 'object') {
+      return;
+    }
+    if (node.kind === 'ComposeMultiple' || node.kind === 'RepeatComposePlaceholder') {
+      stats.repeatComposeCount += 1;
+      const resolved = Number.isFinite(node.resolvedCount) ? node.resolvedCount : null;
+      const fallback =
+        node.countExpression && node.countExpression.kind === 'Const' ? node.countExpression.re : null;
+      const count = Number.isFinite(resolved) ? resolved : Number.isFinite(fallback) ? fallback : null;
+      if (Number.isFinite(count)) {
+        stats.repeatComposeMax = Math.max(stats.repeatComposeMax, Math.round(count));
+      }
+    }
+    if (node.kind === 'Repeat') {
+      stats.repeatLoopCount += 1;
+      const count = Number.isFinite(node.resolvedCount) ? node.resolvedCount : null;
+      if (Number.isFinite(count)) {
+        stats.repeatLoopMax = Math.max(stats.repeatLoopMax, Math.round(count));
+      }
+    }
+  });
+  return stats;
+}
+
 function scheduleFingerDrivenReparse() {
   if (scheduledFingerDrivenReparse) {
     return;
@@ -2317,6 +2480,37 @@ function ensureFormulaCompileWorker() {
       return;
     }
 
+    let statsUpdated = false;
+    const nextStats = meta.stats && typeof meta.stats === 'object' ? { ...meta.stats } : {};
+    if (data.timings && typeof data.timings === 'object') {
+      if (Number.isFinite(data.timings.workerParseMs)) {
+        nextStats.workerParseMs = data.timings.workerParseMs;
+        statsUpdated = true;
+      }
+      if (Number.isFinite(data.timings.workerCompileMs)) {
+        nextStats.workerCompileMs = data.timings.workerCompileMs;
+        statsUpdated = true;
+      }
+    }
+    if (data.stats && typeof data.stats === 'object') {
+      if (Number.isFinite(data.stats.fragmentChars)) {
+        nextStats.fragmentChars = data.stats.fragmentChars;
+        statsUpdated = true;
+      }
+    }
+    if (meta.stats || statsUpdated) {
+      meta.stats = nextStats;
+    }
+
+    if (meta.overlayMessage != null) {
+      const phase = meta.applyMode === 'idle' ? 'Applying (idle)' : 'Applying';
+      setCompileOverlayPhase(phase, {
+        requestId: meta.id,
+        stats: meta.stats,
+        resetStart: true,
+      });
+    }
+
     // Apply the result, but keep typing responsive by deferring the shader swap when needed.
     scheduleApplyCompiledFormula(data, {
       preserveFingerState: meta.preserveFingerState,
@@ -2423,7 +2617,15 @@ function scheduleApplyCompiledFormula(compiled, { preserveFingerState, updateQue
 
 function requestWorkerCompile(
   source,
-  { preserveFingerState, updateQuery, applyMode, overlayMessage, ast = null, nextFingerState = null } = {},
+  {
+    preserveFingerState,
+    updateQuery,
+    applyMode,
+    overlayMessage,
+    ast = null,
+    nextFingerState = null,
+    stats = null,
+  } = {},
 ) {
   formulaCompileRequestId += 1;
   const requestId = formulaCompileRequestId;
@@ -2443,10 +2645,16 @@ function requestWorkerCompile(
     applyMode,
     ast,
     nextFingerState,
+    overlayMessage,
+    stats: stats && typeof stats === 'object' ? { ...stats } : null,
   };
 
   if (overlayMessage != null) {
-    setCompileOverlayVisible(true, overlayMessage || 'Compiling…');
+    setCompileOverlayPhase('Compiling (worker)', {
+      requestId,
+      stats: latestCompileMeta.stats,
+      resetStart: true,
+    });
   }
 
   try {
@@ -3059,19 +3267,39 @@ function applyFormulaFromTextarea({ updateQuery = true, preserveFingerState = fa
   // - keep a non-serializable AST (function literals like `abs`) for export/latex
   let ast = null;
   let nextState = null;
+  let compileStats = null;
+  const shouldShowOverlay = !preserveFingerState;
+  if (shouldShowOverlay) {
+    setCompileOverlayPhase('Parsing', {
+      requestId: formulaCompileRequestId + 1,
+      resetStart: true,
+    });
+  }
   if (!preserveFingerState) {
+    const parseStart = nowMs();
     const result = parseFormulaInput(source, getParserOptionsFromFingers());
+    const parseMs = nowMs() - parseStart;
     if (!result.ok) {
       showParseError(source, result);
+      if (shouldShowOverlay) {
+        setCompileOverlayVisible(false);
+      }
       return;
     }
     const usage = analyzeFingerUsage(result.value);
     nextState = deriveFingerState(usage);
     if (nextState.mode === 'invalid') {
       showError(nextState.error);
+      if (shouldShowOverlay) {
+        setCompileOverlayVisible(false);
+      }
       return;
     }
     ast = result.value;
+    compileStats = {
+      parseMs,
+      ...summarizeAstStats(ast),
+    };
     clearError();
   }
 
@@ -3087,6 +3315,7 @@ function applyFormulaFromTextarea({ updateQuery = true, preserveFingerState = fa
     overlayMessage: preserveFingerState ? null : 'Compiling…',
     ast,
     nextFingerState: nextState,
+    stats: compileStats,
   });
 }
 

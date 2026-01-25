@@ -49,7 +49,6 @@ import {
   Conjugate,
   IsNaN,
   IfNaN,
-  MAX_REPEAT_UNROLL,
   oo,
   If,
   FingerOffset,
@@ -2365,16 +2364,6 @@ function evaluateRepeatIterationCountExpression(node, span, context) {
       input: span.input,
     });
   }
-  if (rounded > MAX_REPEAT_UNROLL) {
-    return new ParseFailure({
-      ctor: 'RepeatIterationCount',
-      message: `repeat requires an iteration count <= ${MAX_REPEAT_UNROLL}`,
-      severity: ParseSeverity.error,
-      expected: `integer <= ${MAX_REPEAT_UNROLL}`,
-      span,
-      input: span.input,
-    });
-  }
   return rounded;
 }
 
@@ -2823,16 +2812,6 @@ function evaluateRepeatCountExpression(node, span, context) {
       message: 'Repeat count must be a non-negative integer',
       severity: ParseSeverity.error,
       expected: 'non-negative integer',
-      span,
-      input: span.input,
-    });
-  }
-  if (rounded > MAX_REPEAT_UNROLL) {
-    return new ParseFailure({
-      ctor: 'RepeatCount',
-      message: `Repeat count must be <= ${MAX_REPEAT_UNROLL}`,
-      severity: ParseSeverity.error,
-      expected: `integer <= ${MAX_REPEAT_UNROLL}`,
       span,
       input: span.input,
     });
@@ -3337,16 +3316,6 @@ function validateRepeatCount(value, span) {
       message: 'Repeat count must be a positive integer',
       severity: ParseSeverity.error,
       expected: 'positive integer repeat count',
-      span,
-      input: span.input,
-    });
-  }
-  if (value > MAX_REPEAT_UNROLL) {
-    return new ParseFailure({
-      ctor: 'RepeatCount',
-      message: `Repeat count must be <= ${MAX_REPEAT_UNROLL}`,
-      severity: ParseSeverity.error,
-      expected: `integer <= ${MAX_REPEAT_UNROLL}`,
       span,
       input: span.input,
     });
