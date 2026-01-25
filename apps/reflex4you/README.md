@@ -291,6 +291,18 @@ Reflex formulas are **functions of `z`**, so a `let` binding defines a reusable 
     - `max(a, z0)` binds `w = a` and uses `z0` **instead of** the ambient `z` (the optional final argument overrides `z`).
   - If you reference a function that requires extra parameters without supplying them, it is a compile-time error.
 
+- **Passing functions to functions**:
+  - Mark a parameter as a function with `let` in the parameter list.
+  - Example (numerical derivative):
+
+```text
+let derivative(let f) = (f(z + 0.001) - f(z)) / 0.001 in
+derivative(sin)
+```
+
+  - Function parameters can declare extra arguments by repeating a signature:
+    - `let apply1(let filter(w), w0) = filter(w0 + 1) in apply1(sin, 0)`
+
 - **Repeated composition (`$$`)** works inside `let` bodies as well:
   - `f $$ n` repeats `f` exactly `n` times (same as `oo(f, n)`).
   - Example:
