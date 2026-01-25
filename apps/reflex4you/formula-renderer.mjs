@@ -198,11 +198,15 @@ function paramSpecToLatex(spec) {
     return escapeLatexIdentifier(String(spec || '?'));
   }
   const name = latexIdentifierWithMetadata(spec.name || '?', null);
+  const prefix = spec.prefix === 'set' || spec.prefix === 'let'
+    ? spec.prefix
+    : (spec.kind === 'fn' ? 'let' : null);
   if (spec.kind !== 'fn') {
-    return name;
+    return prefix ? `\\mathrm{${prefix}}\\;${name}` : name;
   }
   const nested = paramSpecListToLatex(spec.args);
-  return `\\mathrm{let}\\;${name}${nested}`;
+  const prefixText = prefix ? `\\mathrm{${prefix}}\\;` : '';
+  return `${prefixText}${name}${nested}`;
 }
 
 function paramSpecListToLatex(paramSpecs) {

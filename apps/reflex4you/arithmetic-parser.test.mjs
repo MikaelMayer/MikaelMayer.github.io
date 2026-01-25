@@ -810,7 +810,7 @@ test('missing "in" after let binding does not backtrack', () => {
 
 test('multi-argument let bindings parse and call with extra args (z remains ambient)', () => {
   const source = `
-let customif(thn, els) = if(z, thn, els) in
+let customif(set thn, set els) = if(z, thn, els) in
 customif(sin, cos)
 `.trim();
   const result = parseFormulaInput(source);
@@ -819,6 +819,8 @@ customif(sin, cos)
   assert.equal(ast.kind, 'LetBinding');
   assert.equal(ast.name, 'customif');
   assert.deepEqual(ast.params, ['thn', 'els']);
+  assert.equal(ast.paramSpecs[0].prefix, 'set');
+  assert.equal(ast.paramSpecs[1].prefix, 'set');
   assert.equal(ast.body.kind, 'Call');
   assert.equal(ast.body.callee.kind, 'Identifier');
   assert.equal(ast.body.callee.name, 'customif');
@@ -829,7 +831,7 @@ customif(sin, cos)
 
 test('multi-argument let calls can override z with a final argument (z-last)', () => {
   const source = `
-let customif(thn, els) = if(z, thn, els) in
+let customif(set thn, set els) = if(z, thn, els) in
 customif(sin, cos, z)
 `.trim();
   const result = parseFormulaInput(source);
@@ -842,14 +844,14 @@ customif(sin, cos, z)
 });
 
 test('multi-argument let functions are not first-class values (must be called)', () => {
-  const result = parseFormulaInput('let max(w) = if(z < w, w, z) in max');
+  const result = parseFormulaInput('let max(set w) = if(z < w, w, z) in max');
   assert.equal(result.ok, false);
   assert.match(result.message, /must be called or passed as a function argument/i);
 });
 
 test('function-typed let params accept expression arguments', () => {
   const source = `
-let min(w) = if(w < z, w, z) in
+let min(set w) = if(w < z, w, z) in
 let apply1(let filter) = z - 3 $ filter $ z + 3 in
 apply1(min(0))
 `.trim();
@@ -866,8 +868,8 @@ apply1(min(0))
 
 test('function-typed let params accept matching signatures', () => {
   const source = `
-let min(w) = if(w < z, w, z) in
-let apply1(let filter(w), w0) = z - 3 $ filter(w0 + 1) $ z + 3 in
+let min(set w) = if(w < z, w, z) in
+let apply1(let filter(set w), set w0) = z - 3 $ filter(w0 + 1) $ z + 3 in
 apply1(min, 0.2)
 `.trim();
   const result = parseFormulaInput(source);
@@ -883,7 +885,7 @@ apply1(min, 0.2)
 test('nested function-typed param signatures parse', () => {
   const source = `
 let apply1(let f) = f $ (z + 1) in
-let apply2(let apply1(let apply0), let apply0, c) = apply1(apply0) + c in
+let apply2(let apply1(let apply0), let apply0, set c) = apply1(apply0) + c in
 apply2(apply1, sin, 2)
 `.trim();
   const result = parseFormulaInput(source);
@@ -898,8 +900,8 @@ apply2(apply1, sin, 2)
 
 test('function-typed params reject mismatched signatures', () => {
   const source = `
-let min(w) = if(w < z, w, z) in
-let apply1(let filter(w), w0) = filter(w0 + 1) in
+let min(set w) = if(w < z, w, z) in
+let apply1(let filter(set w), set w0) = filter(w0 + 1) in
 apply1(min(0), 2)
 `.trim();
   const result = parseFormulaInput(source);

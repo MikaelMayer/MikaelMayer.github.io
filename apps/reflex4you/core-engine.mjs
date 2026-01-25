@@ -1308,11 +1308,12 @@ export function SetRef(name, binding = null) {
   return { kind: "SetRef", name, binding };
 }
 
-function createParamSpec(name, kind = 'value', args = []) {
+function createParamSpec(name, kind = 'value', args = [], prefix = null) {
   return {
     name: String(name || ''),
     kind: kind === 'fn' ? 'fn' : 'value',
     args: Array.isArray(args) ? args : [],
+    prefix: prefix === 'set' || prefix === 'let' ? prefix : null,
   };
 }
 
@@ -1327,7 +1328,7 @@ function normalizeParamSpecs(paramSpecs, legacyParams = null) {
   const params = Array.isArray(legacyParams)
     ? legacyParams
     : (Array.isArray(paramSpecs) ? paramSpecs : []);
-  return params.map((name) => createParamSpec(name, 'value', []));
+  return params.map((name) => createParamSpec(name, 'value', [], null));
 }
 
 function getLetParamSpecs(node) {

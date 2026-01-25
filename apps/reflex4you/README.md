@@ -263,7 +263,7 @@ The input accepts succinct expressions with complex arithmetic, composition, and
 - **Bindings:**
   - `set name = value in body` introduces a **value** (evaluated once at the binding site; it can “capture” the current `z`).
   - `let name = expr in body` introduces a **function** (not evaluated until used; it always receives the ambient `z`).
-    - You can also define extra parameters: `let name(p1, p2, ...) = expr in body`.
+    - You can also define extra parameters: `let name(set p1, set p2, ...) = expr in body`.
     - `z` is reserved and cannot be used as a parameter name.
 
 Examples:
@@ -285,14 +285,14 @@ Reflex formulas are **functions of `z`**, so a `let` binding defines a reusable 
   - Use at a specific input: `f(expr)` (equivalently `f $ expr`).
 
 - **Multi-argument functions (extra params)**:
-  - Define: `let max(w) = if(z < w, w, z) in ...`
+  - Define: `let max(set w) = if(z < w, w, z) in ...`
   - Call with explicit arguments:
     - `max(a)` binds `w = a` and uses the current `z`.
     - `max(a, z0)` binds `w = a` and uses `z0` **instead of** the ambient `z` (the optional final argument overrides `z`).
   - If you reference a function that requires extra parameters without supplying them, it is a compile-time error.
 
 - **Passing functions to functions**:
-  - Mark a parameter as a function with `let` in the parameter list.
+  - Mark parameters explicitly with `set` (value) or `let` (function). If you omit the keyword, it is treated like `set`.
   - Example (numerical derivative):
 
 ```text
@@ -301,7 +301,7 @@ derivative(sin)
 ```
 
   - Function parameters can declare extra arguments by repeating a signature:
-    - `let apply1(let filter(w), w0) = filter(w0 + 1) in apply1(sin, 0)`
+    - `let apply1(let filter(set w), set w0) = filter(w0 + 1) in apply1(sin, 0)`
 
 - **Repeated composition (`$$`)** works inside `let` bodies as well:
   - `f $$ n` repeats `f` exactly `n` times (same as `oo(f, n)`).

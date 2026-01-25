@@ -104,11 +104,12 @@ function attachIdentifierMeta(node, meta) {
   return node;
 }
 
-function createParamSpec(name, kind = 'value', args = []) {
+function createParamSpec(name, kind = 'value', args = [], prefix = null) {
   return {
     name: String(name || ''),
     kind: kind === 'fn' ? 'fn' : 'value',
     args: Array.isArray(args) ? args : [],
+    prefix: prefix === 'set' || prefix === 'let' ? prefix : null,
   };
 }
 
@@ -123,7 +124,7 @@ function normalizeParamSpecs(paramSpecs, legacyParams = null) {
   const params = Array.isArray(legacyParams)
     ? legacyParams
     : (Array.isArray(paramSpecs) ? paramSpecs : []);
-  return params.map((name) => createParamSpec(name, 'value', []));
+  return params.map((name) => createParamSpec(name, 'value', [], null));
 }
 
 function getLetParamSpecs(node) {
@@ -2095,12 +2096,16 @@ function paramSpecSignatureToText(specs) {
   }
   const rendered = specs.map((spec) => {
     if (!spec || typeof spec !== 'object') return '?';
+    const name = String(spec.name || '?');
+    const prefix = spec.prefix === 'set' || spec.prefix === 'let'
+      ? spec.prefix
+      : (spec.kind === 'fn' ? 'let' : null);
     if (spec.kind !== 'fn') {
-      return String(spec.name || '?');
+      return prefix ? `${prefix} ${name}` : name;
     }
     const nested = paramSpecSignatureToText(spec.args);
-    const name = String(spec.name || '?');
-    return `let ${name}${nested === '()' ? '' : nested}`;
+    const prefixText = prefix ? `${prefix} ` : '';
+    return `${prefixText}${name}${nested === '()' ? '' : nested}`;
   });
   return `(${rendered.join(', ')})`;
 }
@@ -4085,7 +4090,7 @@ letParamSpecParser = createParser('LetParamSpec', (input) => {
     const span = spanBetween(input, cursor);
     return new ParseSuccess({
       ctor: 'LetParamSpec',
-      value: createParamSpec(nameResult.value, 'fn', nestedParams),
+      value: createParamSpec(nameResult.value, 'fn', nestedParams, 'let'),
       span,
       next: cursor,
     });
@@ -4094,13 +4099,46 @@ letParamSpecParser = createParser('LetParamSpec', (input) => {
     return letMarker;
   }
 
+  const setMarker = setKeyword.runNormalized(input);
+  if (setMarker.ok) {
+    const nameResult = bindingIdentifierParser.runNormalized(setMarker.next);
+    if (!nameResult.ok) {
+      return nameResult;
+    }
+    const cursor = nameResult.next;
+    const nestedList = letParamListParser.runNormalized(cursor);
+    if (nestedList.ok) {
+      const span = spanBetween(input, nestedList.next);
+      return new ParseFailure({
+        ctor: 'LetParamSpec',
+        message: 'set parameters cannot declare a signature (use let for function parameters)',
+        severity: ParseSeverity.error,
+        expected: 'value parameter',
+        span,
+        input: span.input,
+      });
+    }
+    if (nestedList.severity === ParseSeverity.error) {
+      return nestedList;
+    }
+    return new ParseSuccess({
+      ctor: 'LetParamSpec',
+      value: createParamSpec(nameResult.value, 'value', [], 'set'),
+      span: nameResult.span,
+      next: nameResult.next,
+    });
+  }
+  if (setMarker.severity === ParseSeverity.error) {
+    return setMarker;
+  }
+
   const nameResult = bindingIdentifierParser.runNormalized(input);
   if (!nameResult.ok) {
     return nameResult;
   }
   return new ParseSuccess({
     ctor: 'LetParamSpec',
-    value: createParamSpec(nameResult.value, 'value', []),
+    value: createParamSpec(nameResult.value, 'value', [], null),
     span: nameResult.span,
     next: nameResult.next,
   });

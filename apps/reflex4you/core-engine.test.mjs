@@ -450,7 +450,7 @@ test('function-param lowering preserves evaluation and removes higher-order para
     {
       name: 'arity-0 function param with expression argument',
       source: `
-let min(w) = if(w < z, w, z) in
+let min(set w) = if(w < z, w, z) in
 let apply1(let filter) = z - 3 $ filter $ z + 3 in
 apply1(min(0))
 `.trim(),
@@ -459,8 +459,8 @@ apply1(min(0))
     {
       name: 'arity-1 function param with function identifier',
       source: `
-let min(w) = if(w < z, w, z) in
-let apply1(let filter(w), w0) = z - 3 $ filter(w0 + 1) $ z + 3 in
+let min(set w) = if(w < z, w, z) in
+let apply1(let filter(set w), set w0) = z - 3 $ filter(w0 + 1) $ z + 3 in
 apply1(min, 0.2)
 `.trim(),
       zValues: [{ re: -1, im: 0 }, { re: 1.5, im: 0 }],
@@ -493,9 +493,9 @@ derivative(sin)
     {
       name: 'derivative along parameter function',
       source: `
-let derivativeX(let f(w), w) = (f(w + 0.001) - f(w)) / 0.001 in
-let derivativeY(let f(w), w) = (f(w, z + 0.001) - f(w, z)) / 0.001 in
-let s(w) = sin(w) * z in
+let derivativeX(let f(set w), set w) = (f(w + 0.001) - f(w)) / 0.001 in
+let derivativeY(let f(set w), set w) = (f(w, z + 0.001) - f(w, z)) / 0.001 in
+let s(set w) = sin(w) * z in
 derivativeX(s, 0) + derivativeY(s, z, 0)
 `.trim(),
       zValues: [{ re: -0.4, im: 0 }, { re: 0.7, im: 0 }],
@@ -503,7 +503,7 @@ derivativeX(s, 0) + derivativeY(s, z, 0)
     {
       name: 'integral of sin (finite sum)',
       source: `
-let integral(let f, start) =
+let integral(let f, set start) =
   set N = 100 in
   set w = (z - start) / N in
   sum(set x0 = f(start + n * w) in x0 * w, n, 0, N)
