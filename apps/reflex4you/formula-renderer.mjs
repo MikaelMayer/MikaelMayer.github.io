@@ -272,6 +272,10 @@ function isPureImagConst(node) {
   return node && typeof node === 'object' && node.kind === 'Const' && node.re === 0;
 }
 
+function isZeroConst(node) {
+  return node && typeof node === 'object' && node.kind === 'Const' && node.re === 0 && node.im === 0;
+}
+
 function complexLiteralFromAddSub(node) {
   if (!node || typeof node !== 'object') return null;
   if (node.kind !== 'Add' && node.kind !== 'Sub') return null;
@@ -686,6 +690,14 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
       const rightNode = node.right;
       const left = nodeToLatex(leftNode, prec, options);
       const right = nodeToLatex(rightNode, prec, options);
+
+      if (node.kind === 'Sub' && isZeroConst(leftNode)) {
+        if (rightNode && typeof rightNode === 'object' && rightNode.kind === 'Const') {
+          return constToLatex({ re: -rightNode.re, im: -rightNode.im }, options);
+        }
+        const unaryWrapped = maybeWrapLatex(rightNode, right, prec, 'right', node.kind);
+        return `-${unaryWrapped}`;
+      }
 
       const leftWrapped = maybeWrapLatex(leftNode, left, prec, 'left', node.kind);
       const rightWrapped = maybeWrapLatex(rightNode, right, prec, 'right', node.kind);
