@@ -240,6 +240,9 @@ export function IsNaN(value) {
   return { kind: "IsNaN", value };
 }
 
+// Cap repeat/compose unrolling to keep compile times bounded.
+export const MAX_REPEAT_UNROLL = 512;
+
 export function oo(f, n) {
   const count = Number(n);
   if (!Number.isInteger(count) || count < 1) {
@@ -432,6 +435,9 @@ function materializeComposeMultiples(ast) {
         visit(node.countExpression, node, "countExpression");
       }
       const count = tryResolveStaticRepeatCount(node.countExpression);
+      if (count !== null && count > MAX_REPEAT_UNROLL) {
+        throw new Error(`Repeat composition count must be <= ${MAX_REPEAT_UNROLL} (got ${count})`);
+      }
       let replacement;
       if (count === null) {
         replacement = node.base || VarZ();
@@ -460,6 +466,9 @@ function materializeComposeMultiples(ast) {
         visit(node.base, node, "base");
       }
       const count = typeof node.resolvedCount === "number" ? node.resolvedCount : null;
+      if (count !== null && count > MAX_REPEAT_UNROLL) {
+        throw new Error(`Repeat composition count must be <= ${MAX_REPEAT_UNROLL} (got ${count})`);
+      }
       let replacement;
       if (count === null) {
         replacement = node.base || VarZ();
@@ -586,6 +595,9 @@ function materializeRepeatLoops(ast) {
       const n = typeof node.resolvedCount === 'number' ? node.resolvedCount : null;
       if (n === null || !Number.isInteger(n)) {
         throw new Error('Repeat iteration count must be resolved to an integer at compile time');
+      }
+      if (n > MAX_REPEAT_UNROLL) {
+        throw new Error(`Repeat iteration count must be <= ${MAX_REPEAT_UNROLL} (got ${n})`);
       }
 
       const fromExprs = Array.isArray(node.fromExpressions) ? node.fromExpressions : [];
