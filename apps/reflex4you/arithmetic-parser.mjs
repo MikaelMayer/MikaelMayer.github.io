@@ -104,8 +104,53 @@ function attachIdentifierMeta(node, meta) {
   return node;
 }
 
-function createParamRef(name) {
-  return { kind: 'ParamRef', name };
+function createParamSpec(name, kind = 'value', args = [], prefix = null) {
+  return {
+    name: String(name || ''),
+    kind: kind === 'fn' ? 'fn' : 'value',
+    args: Array.isArray(args) ? args : [],
+    prefix: prefix === 'set' || prefix === 'let' ? prefix : null,
+  };
+}
+
+function normalizeParamSpecs(paramSpecs, legacyParams = null) {
+  if (Array.isArray(paramSpecs)) {
+    if (paramSpecs.length === 0) return [];
+    const first = paramSpecs[0];
+    if (first && typeof first === 'object' && typeof first.kind === 'string') {
+      return paramSpecs;
+    }
+  }
+  const params = Array.isArray(legacyParams)
+    ? legacyParams
+    : (Array.isArray(paramSpecs) ? paramSpecs : []);
+  return params.map((name) => createParamSpec(name, 'value', [], null));
+}
+
+function getLetParamSpecs(node) {
+  if (!node || typeof node !== 'object') return [];
+  return normalizeParamSpecs(node.paramSpecs, node.params);
+}
+
+function getValueParamNames(paramSpecs) {
+  return Array.isArray(paramSpecs)
+    ? paramSpecs.filter((spec) => spec && spec.kind !== 'fn').map((spec) => spec.name)
+    : [];
+}
+
+function createParamRef(paramOrName, paramSpec = null) {
+  let name = paramOrName;
+  let spec = paramSpec;
+  if (paramOrName && typeof paramOrName === 'object' && typeof paramOrName.name === 'string') {
+    name = paramOrName.name;
+    spec = paramOrName;
+  }
+  const node = { kind: 'ParamRef', name: String(name || '') };
+  if (spec && typeof spec === 'object' && typeof spec.kind === 'string') {
+    node.paramKind = spec.kind === 'fn' ? 'fn' : 'value';
+    node.paramSpec = spec;
+  }
+  return node;
 }
 
 function createIdentifier(name, meta = null) {
@@ -1741,6 +1786,24 @@ function resolveSetReferences(ast, input) {
   const letEnv = [];
   const paramEnv = [];
 
+  function buildParamEnvFrame(paramSpecs) {
+    const frame = new Map();
+    (Array.isArray(paramSpecs) ? paramSpecs : []).forEach((spec) => {
+      if (spec && typeof spec.name === 'string' && spec.name) {
+        frame.set(spec.name, spec);
+      }
+    });
+    return frame;
+  }
+
+  function findParamSpecForName(name) {
+    for (let i = paramEnv.length - 1; i >= 0; i -= 1) {
+      const spec = paramEnv[i].get(name);
+      if (spec) return spec;
+    }
+    return null;
+  }
+
   function findLetBindingForName(name) {
     for (let i = letEnv.length - 1; i >= 0; i -= 1) {
       if (letEnv[i].name === name) {
@@ -1759,7 +1822,8 @@ function resolveSetReferences(ast, input) {
         // `let name(params...) = value in body`
         // - `name` is in scope only for `body`
         // - nested `let` is handled by a separate top-level validation step; still traverse.
-        paramEnv.push(new Set(Array.isArray(node.params) ? node.params : []));
+        const paramSpecs = getLetParamSpecs(node);
+        paramEnv.push(buildParamEnvFrame(paramSpecs));
         const valueErr = visit(node.value, node, 'value');
         paramEnv.pop();
         if (valueErr) {
@@ -1782,15 +1846,14 @@ function resolveSetReferences(ast, input) {
       }
       case 'Identifier': {
         // Let-parameter references (first-order placeholders).
-        for (let i = paramEnv.length - 1; i >= 0; i -= 1) {
-          if (paramEnv[i].has(node.name)) {
-            const resolved = createParamRef(node.name);
-            resolved.span = node.span;
-            resolved.input = node.input;
-            resolved.__identifierMeta = node.__identifierMeta;
-            Object.assign(node, resolved);
-            return null;
-          }
+        const paramSpec = findParamSpecForName(node.name);
+        if (paramSpec) {
+          const resolved = createParamRef(paramSpec);
+          resolved.span = node.span;
+          resolved.input = node.input;
+          resolved.__identifierMeta = node.__identifierMeta;
+          Object.assign(node, resolved);
+          return null;
         }
 
         const binding = findBindingForName(setEnv, node.name);
@@ -1803,21 +1866,6 @@ function resolveSetReferences(ast, input) {
         }
         const letBinding = findLetBindingForName(node.name);
         if (letBinding) {
-          const paramCount = Array.isArray(letBinding.params) ? letBinding.params.length : 0;
-          if (paramCount > 0) {
-            const isCallCallee = parent && typeof parent === 'object' && parent.kind === 'Call' && key === 'callee';
-            if (!isCallCallee) {
-              const span = node.span ?? input.createSpan(0, 0);
-              return new ParseFailure({
-                ctor: 'Identifier',
-                message: `Function "${node.name}" requires ${paramCount} extra argument${paramCount === 1 ? '' : 's'}`,
-                severity: ParseSeverity.error,
-                expected: 'function call',
-                span,
-                input: span.input || input,
-              });
-            }
-          }
           // Keep the identifier node (so the renderer can still show the name),
           // but tag it so GPU lowering can resolve it later.
           node.__letBinding = letBinding;
@@ -1873,7 +1921,8 @@ function resolveSetReferences(ast, input) {
         const stepErr = visit(node.step, node, 'step');
         if (stepErr) return stepErr;
         const loopName = String(node.varName || '');
-        paramEnv.push(new Set(loopName ? [loopName] : []));
+        const loopSpec = loopName ? createParamSpec(loopName, 'value', []) : null;
+        paramEnv.push(buildParamEnvFrame(loopSpec ? [loopSpec] : []));
         const bodyErr = visit(node.body, node, 'body');
         paramEnv.pop();
         return bodyErr;
@@ -2039,6 +2088,292 @@ function validateLetBindingsTopLevelOnly(ast, input) {
     });
   }
   return null;
+}
+
+function paramSpecSignatureToText(specs) {
+  if (!Array.isArray(specs) || specs.length === 0) {
+    return '()';
+  }
+  const rendered = specs.map((spec) => {
+    if (!spec || typeof spec !== 'object') return '?';
+    const name = String(spec.name || '?');
+    const prefix = spec.prefix === 'set' || spec.prefix === 'let'
+      ? spec.prefix
+      : (spec.kind === 'fn' ? 'let' : null);
+    if (spec.kind !== 'fn') {
+      return prefix ? `${prefix} ${name}` : name;
+    }
+    const nested = paramSpecSignatureToText(spec.args);
+    const prefixText = prefix ? `${prefix} ` : '';
+    return `${prefixText}${name}${nested === '()' ? '' : nested}`;
+  });
+  return `(${rendered.join(', ')})`;
+}
+
+function paramSpecsCompatible(expected, actual) {
+  const expList = Array.isArray(expected) ? expected : [];
+  const actList = Array.isArray(actual) ? actual : [];
+  if (expList.length !== actList.length) return false;
+  for (let i = 0; i < expList.length; i += 1) {
+    const exp = expList[i];
+    const act = actList[i];
+    if (!exp || !act) return false;
+    const expKind = exp.kind === 'fn' ? 'fn' : 'value';
+    const actKind = act.kind === 'fn' ? 'fn' : 'value';
+    if (expKind !== actKind) return false;
+    if (expKind === 'fn' && !paramSpecsCompatible(exp.args, act.args)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function validateFunctionParamUsage(ast, input) {
+  const paramEnv = [];
+  const letStack = [];
+
+  function buildParamEnvFrame(paramSpecs) {
+    const frame = new Map();
+    (Array.isArray(paramSpecs) ? paramSpecs : []).forEach((spec) => {
+      if (spec && typeof spec.name === 'string' && spec.name) {
+        frame.set(spec.name, spec);
+      }
+    });
+    return frame;
+  }
+
+  function findParamSpecForName(name) {
+    for (let i = paramEnv.length - 1; i >= 0; i -= 1) {
+      const spec = paramEnv[i].get(name);
+      if (spec) return spec;
+    }
+    return null;
+  }
+
+  function signatureForNode(node) {
+    if (!node || typeof node !== 'object') return null;
+    if (node.kind === 'ParamRef') {
+      const spec = node.paramSpec || findParamSpecForName(node.name);
+      if (!spec || spec.kind !== 'fn') return null;
+      return spec.args || [];
+    }
+    if (node.kind === 'Identifier') {
+      const binding = node.__letBinding || resolveLetBindingByName(node.name, letStack);
+      if (!binding) return null;
+      return getLetParamSpecs(binding);
+    }
+    if (node.__functionLiteral) {
+      return [];
+    }
+    return null;
+  }
+
+  function failureForSignatureMismatch(node, paramName, expectedSpecs) {
+    const span = node.span ?? input.createSpan(0, 0);
+    const expectedText = paramSpecSignatureToText(expectedSpecs);
+    return new ParseFailure({
+      ctor: 'Call',
+      message: `Argument for parameter "${paramName}" must match signature ${expectedText}`,
+      severity: ParseSeverity.error,
+      expected: `signature ${expectedText}`,
+      span,
+      input: span.input || input,
+    });
+  }
+
+  function validateExpr(node, expectedParamSpec = null) {
+    if (!node || typeof node !== 'object') return null;
+
+    if (expectedParamSpec) {
+      if (expectedParamSpec.kind !== 'fn') {
+        return validateExpr(node, null);
+      }
+      const expectedSpecs = Array.isArray(expectedParamSpec.args) ? expectedParamSpec.args : [];
+      const actualSpecs = signatureForNode(node);
+      if (expectedSpecs.length > 0) {
+        if (!actualSpecs || !paramSpecsCompatible(expectedSpecs, actualSpecs)) {
+          return failureForSignatureMismatch(node, expectedParamSpec.name, expectedSpecs);
+        }
+        return null;
+      }
+      if (actualSpecs && !paramSpecsCompatible(expectedSpecs, actualSpecs)) {
+        return failureForSignatureMismatch(node, expectedParamSpec.name, expectedSpecs);
+      }
+      return validateExpr(node, null);
+    }
+
+    const actualSpecs = signatureForNode(node);
+    if (actualSpecs && actualSpecs.length > 0) {
+      const span = node.span ?? input.createSpan(0, 0);
+      return new ParseFailure({
+        ctor: 'Identifier',
+        message: `Function value with ${actualSpecs.length} parameter${actualSpecs.length === 1 ? '' : 's'} must be called or passed as a function argument`,
+        severity: ParseSeverity.error,
+        expected: 'function call',
+        span,
+        input: span.input || input,
+      });
+    }
+
+    switch (node.kind) {
+      case 'LetBinding': {
+        const paramSpecs = getLetParamSpecs(node);
+        paramEnv.push(buildParamEnvFrame(paramSpecs));
+        const valueErr = validateExpr(node.value, null);
+        paramEnv.pop();
+        if (valueErr) return valueErr;
+        letStack.push(node);
+        const bodyErr = validateExpr(node.body, null);
+        letStack.pop();
+        return bodyErr;
+      }
+      case 'SetBinding': {
+        const valueErr = validateExpr(node.value, null);
+        if (valueErr) return valueErr;
+        return validateExpr(node.body, null);
+      }
+      case 'Call': {
+        const calleeSpecs = signatureForNode(node.callee);
+        const args = Array.isArray(node.args) ? node.args : [];
+        if (calleeSpecs) {
+          const k = calleeSpecs.length;
+          if (!(args.length === k || args.length === k + 1)) {
+            const span = node.span ?? input.createSpan(0, 0);
+            return new ParseFailure({
+              ctor: 'Call',
+              message: `Function call expects ${k} or ${k + 1} arguments, got ${args.length}`,
+              severity: ParseSeverity.error,
+              expected: `${k} or ${k + 1} arguments`,
+              span,
+              input: span.input || input,
+            });
+          }
+          for (let i = 0; i < k; i += 1) {
+            const argErr = validateExpr(args[i], calleeSpecs[i]);
+            if (argErr) return argErr;
+          }
+          if (args.length === k + 1) {
+            const zErr = validateExpr(args[args.length - 1], null);
+            if (zErr) return zErr;
+          }
+          return null;
+        }
+        if (args.length !== 1) {
+          const span = node.span ?? input.createSpan(0, 0);
+          return new ParseFailure({
+            ctor: 'Call',
+            message: `Only unary calls are supported here (got ${args.length} args)`,
+            severity: ParseSeverity.error,
+            expected: 'one argument',
+            span,
+            input: span.input || input,
+          });
+        }
+        const calleeErr = validateExpr(node.callee, null);
+        if (calleeErr) return calleeErr;
+        return validateExpr(args[0], null);
+      }
+      case 'Pow':
+        return validateExpr(node.base, null);
+      case 'PowExpr': {
+        const baseErr = validateExpr(node.base, null);
+        if (baseErr) return baseErr;
+        return validateExpr(node.exponent, null);
+      }
+      case 'Exp':
+      case 'Sin':
+      case 'Cos':
+      case 'Tan':
+      case 'Atan':
+      case 'Asin':
+      case 'Acos':
+      case 'Gamma':
+      case 'Fact':
+      case 'Abs':
+      case 'Abs2':
+      case 'Floor':
+      case 'Conjugate':
+      case 'IsNaN':
+        return validateExpr(node.value, null);
+      case 'Ln':
+      case 'Arg': {
+        const valueErr = validateExpr(node.value, null);
+        if (valueErr) return valueErr;
+        if (node.branch) return validateExpr(node.branch, null);
+        return null;
+      }
+      case 'Sub':
+      case 'Mul':
+      case 'Op':
+      case 'Add':
+      case 'Div':
+      case 'LessThan':
+      case 'GreaterThan':
+      case 'LessThanOrEqual':
+      case 'GreaterThanOrEqual':
+      case 'Equal':
+      case 'LogicalAnd':
+      case 'LogicalOr': {
+        const leftErr = validateExpr(node.left, null);
+        if (leftErr) return leftErr;
+        return validateExpr(node.right, null);
+      }
+      case 'Compose': {
+        const gErr = validateExpr(node.g, null);
+        if (gErr) return gErr;
+        return validateExpr(node.f, null);
+      }
+      case 'ComposeMultiple': {
+        const baseErr = validateExpr(node.base, null);
+        if (baseErr) return baseErr;
+        if (node.countExpression) return validateExpr(node.countExpression, null);
+        return null;
+      }
+      case 'If': {
+        const condErr = validateExpr(node.condition, null);
+        if (condErr) return condErr;
+        const thenErr = validateExpr(node.thenBranch, null);
+        if (thenErr) return thenErr;
+        return validateExpr(node.elseBranch, null);
+      }
+      case 'IfNaN': {
+        const valueErr = validateExpr(node.value, null);
+        if (valueErr) return valueErr;
+        return validateExpr(node.fallback, null);
+      }
+      case 'Repeat': {
+        if (node.countExpression) {
+          const countErr = validateExpr(node.countExpression, null);
+          if (countErr) return countErr;
+        }
+        const initExprs = Array.isArray(node.fromExpressions) ? node.fromExpressions : [];
+        for (let i = 0; i < initExprs.length; i += 1) {
+          const initErr = validateExpr(initExprs[i], null);
+          if (initErr) return initErr;
+        }
+        return null;
+      }
+      case 'Sum':
+      case 'Prod': {
+        const minErr = validateExpr(node.min, null);
+        if (minErr) return minErr;
+        const maxErr = validateExpr(node.max, null);
+        if (maxErr) return maxErr;
+        const stepErr = validateExpr(node.step, null);
+        if (stepErr) return stepErr;
+        const loopName = String(node.varName || '');
+        const loopSpec = loopName ? createParamSpec(loopName, 'value', []) : null;
+        paramEnv.push(buildParamEnvFrame(loopSpec ? [loopSpec] : []));
+        const bodyErr = validateExpr(node.body, null);
+        paramEnv.pop();
+        return bodyErr;
+      }
+      default:
+        return null;
+    }
+  }
+
+  return validateExpr(ast, null);
 }
 
 function findBindingForName(env, name) {
@@ -2475,7 +2810,18 @@ function validateRepeatExpressions(ast, parseOptions, input) {
               input: span.input || input,
             });
           }
-          const arity = Array.isArray(binding.params) ? binding.params.length : 0;
+          const paramSpecs = getLetParamSpecs(binding);
+          const arity = paramSpecs.length;
+          if (paramSpecs.some((spec) => spec && spec.kind === 'fn')) {
+            return new ParseFailure({
+              ctor: 'RepeatBinding',
+              message: `repeat step function "${name}" cannot take function-typed parameters`,
+              severity: ParseSeverity.error,
+              expected: 'value-typed parameters',
+              span: binding.span ?? span,
+              input: (binding.span?.input ?? span.input) || input,
+            });
+          }
           if (arity !== k + 1) {
             return new ParseFailure({
               ctor: 'RepeatBinding',
@@ -3668,6 +4014,9 @@ const setBindingParser = createParser('SetBinding', (input) => {
 const letKeyword = keywordLiteral('let', { ctor: 'LetKeyword' });
 const letEqualsLiteral = wsLiteral('=', { ctor: 'LetEquals' });
 
+let letParamSpecParser;
+const letParamSpecRef = lazy(() => letParamSpecParser, { ctor: 'LetParamSpecRef' });
+
 const letParamListParser = createParser('LetParamList', (input) => {
   const open = wsLiteral('(', { ctor: 'LetParamOpen' }).runNormalized(input);
   if (!open.ok) {
@@ -3688,7 +4037,7 @@ const letParamListParser = createParser('LetParamList', (input) => {
     return closeImmediate;
   }
 
-  const first = bindingIdentifierParser.runNormalized(open.next);
+  const first = letParamSpecRef.runNormalized(open.next);
   if (!first.ok) {
     return first;
   }
@@ -3702,7 +4051,7 @@ const letParamListParser = createParser('LetParamList', (input) => {
       }
       break;
     }
-    const nextParam = bindingIdentifierParser.runNormalized(comma.next);
+    const nextParam = letParamSpecRef.runNormalized(comma.next);
     if (!nextParam.ok) {
       return nextParam;
     }
@@ -3722,6 +4071,79 @@ const letParamListParser = createParser('LetParamList', (input) => {
   });
 });
 
+letParamSpecParser = createParser('LetParamSpec', (input) => {
+  const letMarker = letKeyword.runNormalized(input);
+  if (letMarker.ok) {
+    const nameResult = bindingIdentifierParser.runNormalized(letMarker.next);
+    if (!nameResult.ok) {
+      return nameResult;
+    }
+    let cursor = nameResult.next;
+    let nestedParams = [];
+    const nestedList = letParamListParser.runNormalized(cursor);
+    if (nestedList.ok) {
+      nestedParams = nestedList.value;
+      cursor = nestedList.next;
+    } else if (nestedList.severity === ParseSeverity.error) {
+      return nestedList;
+    }
+    const span = spanBetween(input, cursor);
+    return new ParseSuccess({
+      ctor: 'LetParamSpec',
+      value: createParamSpec(nameResult.value, 'fn', nestedParams, 'let'),
+      span,
+      next: cursor,
+    });
+  }
+  if (letMarker.severity === ParseSeverity.error) {
+    return letMarker;
+  }
+
+  const setMarker = setKeyword.runNormalized(input);
+  if (setMarker.ok) {
+    const nameResult = bindingIdentifierParser.runNormalized(setMarker.next);
+    if (!nameResult.ok) {
+      return nameResult;
+    }
+    const cursor = nameResult.next;
+    const nestedList = letParamListParser.runNormalized(cursor);
+    if (nestedList.ok) {
+      const span = spanBetween(input, nestedList.next);
+      return new ParseFailure({
+        ctor: 'LetParamSpec',
+        message: 'set parameters cannot declare a signature (use let for function parameters)',
+        severity: ParseSeverity.error,
+        expected: 'value parameter',
+        span,
+        input: span.input,
+      });
+    }
+    if (nestedList.severity === ParseSeverity.error) {
+      return nestedList;
+    }
+    return new ParseSuccess({
+      ctor: 'LetParamSpec',
+      value: createParamSpec(nameResult.value, 'value', [], 'set'),
+      span: nameResult.span,
+      next: nameResult.next,
+    });
+  }
+  if (setMarker.severity === ParseSeverity.error) {
+    return setMarker;
+  }
+
+  const nameResult = bindingIdentifierParser.runNormalized(input);
+  if (!nameResult.ok) {
+    return nameResult;
+  }
+  return new ParseSuccess({
+    ctor: 'LetParamSpec',
+    value: createParamSpec(nameResult.value, 'value', [], null),
+    span: nameResult.span,
+    next: nameResult.next,
+  });
+});
+
 const letBindingParser = createParser('LetBinding', (input) => {
   const keyword = letKeyword.runNormalized(input);
   if (!keyword.ok) {
@@ -3731,11 +4153,11 @@ const letBindingParser = createParser('LetBinding', (input) => {
   if (!nameResult.ok) {
     return nameResult;
   }
-  let params = [];
+  let paramSpecs = [];
   let cursor = nameResult.next;
   const paramList = letParamListParser.runNormalized(cursor);
   if (paramList.ok) {
-    params = paramList.value;
+    paramSpecs = paramList.value;
     cursor = paramList.next;
   } else if (paramList.severity === ParseSeverity.error) {
     return paramList;
@@ -3758,10 +4180,12 @@ const letBindingParser = createParser('LetBinding', (input) => {
     return bodyResult;
   }
   const span = spanBetween(input, bodyResult.next);
+  const valueParams = getValueParamNames(paramSpecs);
   const value = {
     kind: 'LetBinding',
     name: nameResult.value,
-    params,
+    params: valueParams,
+    paramSpecs,
     value: valueResult.value,
     body: bodyResult.value,
     span,
@@ -3834,6 +4258,10 @@ export function parseFormulaInput(input, options = {}) {
   const resolveError = resolveSetReferences(parsed.value, normalized);
   if (resolveError instanceof ParseFailure) {
     return resolveError;
+  }
+  const signatureValidated = validateFunctionParamUsage(parsed.value, normalized);
+  if (signatureValidated instanceof ParseFailure) {
+    return signatureValidated;
   }
   const repeatResolved = resolveRepeatPlaceholders(parsed.value, parseOptions, normalized);
   if (repeatResolved instanceof ParseFailure) {
