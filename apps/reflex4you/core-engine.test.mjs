@@ -128,6 +128,9 @@ function evaluateAstComplex(root, { z = { re: 0, im: 0 } } = {}) {
 
   function applyFunctionValue(fnValue, argValues, zOverride) {
     const specs = Array.isArray(fnValue.paramSpecs) ? fnValue.paramSpecs : [];
+    if (argValues.length !== specs.length) {
+      throw new Error(`Function arity mismatch: expected ${specs.length}, got ${argValues.length}`);
+    }
     const nextParamEnv = new Map(fnValue.capturedParamEnv || []);
     for (let i = 0; i < specs.length; i += 1) {
       const spec = specs[i];
@@ -152,6 +155,10 @@ function evaluateAstComplex(root, { z = { re: 0, im: 0 } } = {}) {
         const v = localParamEnv.get(node.name);
         if (!v) throw new Error(`Unbound ParamRef: ${node.name}`);
         if (node.paramKind === 'fn' || (v && v.kind === 'closure')) {
+          const specLen = Array.isArray(v.paramSpecs) ? v.paramSpecs.length : 0;
+          if (specLen > 0) {
+            throw new Error(`ParamRef "${node.name}" with ${specLen} args must be called`);
+          }
           return applyFunctionValue(v, [], zLocal);
         }
         return v;
@@ -188,6 +195,29 @@ function evaluateAstComplex(root, { z = { re: 0, im: 0 } } = {}) {
       case 'Cos': {
         const v = evalNode(node.value, zLocal, localParamEnv, localSetEnv, localLetEnv);
         return { re: Math.cos(v.re), im: 0 };
+      }
+      case 'Sum':
+      case 'Prod': {
+        const n = typeof node.resolvedCount === 'number' ? node.resolvedCount : null;
+        if (n === null) throw new Error('Sum/Prod requires resolvedCount');
+        const minNode = node.min;
+        const stepNode = node.step;
+        const minValue = evalNode(minNode, zLocal, localParamEnv, localSetEnv, localLetEnv);
+        const stepValue = stepNode
+          ? evalNode(stepNode, zLocal, localParamEnv, localSetEnv, localLetEnv)
+          : { re: 1, im: 0 };
+        const min = minValue.re;
+        const step = stepValue.re;
+        let acc = node.kind === 'Sum' ? { re: 0, im: 0 } : { re: 1, im: 0 };
+        if (n <= 0) return acc;
+        const varName = String(node.varName || 'n');
+        for (let i = 0; i < n; i += 1) {
+          const nextParamEnv = new Map(localParamEnv);
+          nextParamEnv.set(varName, { re: min + i * step, im: 0 });
+          const term = evalNode(node.body, zLocal, nextParamEnv, localSetEnv, localLetEnv);
+          acc = node.kind === 'Sum' ? complexAdd(acc, term) : complexMul(acc, term);
+        }
+        return acc;
       }
       case 'Compose': {
         const inner = evalNode(node.g, zLocal, localParamEnv, localSetEnv, localLetEnv);
@@ -434,6 +464,50 @@ apply2(apply1, apply0, 2)
 `.trim(),
       zValues: [{ re: -1, im: 0 }, { re: 2, im: 0 }],
     },
+    {
+      name: 'derivative higher-order function',
+      source: `
+let derivative(let f) = (f(z + 0.001) - f(z)) / 0.001 in
+derivative(sin)
+`.trim(),
+      zValues: [{ re: -1, im: 0 }, { re: 0.5, im: 0 }],
+      expect: (zVal, result) => {
+        const expected = Math.cos(zVal.re);
+        assert.ok(
+          Math.abs(result.re - expected) < 5e-3,
+          `Expected derivative approx cos(${zVal.re}), got ${result.re}`,
+        );
+      },
+    },
+    {
+      name: 'derivative along parameter function',
+      source: `
+let derivativeX(let f(w), w) = (f(w + 0.001) - f(w)) / 0.001 in
+let derivativeY(let f(w), w) = (f(w, z + 0.001) - f(w, z)) / 0.001 in
+let s(w) = sin(w) * z in
+derivativeX(s, 0) + derivativeY(s, z, 0)
+`.trim(),
+      zValues: [{ re: -0.4, im: 0 }, { re: 0.7, im: 0 }],
+    },
+    {
+      name: 'integral of sin (finite sum)',
+      source: `
+let integral(let f, start) =
+  set N = 100 in
+  set w = (z - start) / N in
+  sum(set x0 = f(start + n * w) in x0 * w, n, 0, N)
+in
+integral(sin, 0) - 1
+`.trim(),
+      zValues: [{ re: 0.5, im: 0 }, { re: 1.0, im: 0 }],
+      expect: (zVal, result) => {
+        const expected = -Math.cos(zVal.re);
+        assert.ok(
+          Math.abs(result.re - expected) < 0.02,
+          `Expected integral approx -cos(${zVal.re}), got ${result.re}`,
+        );
+      },
+    },
   ];
 
   for (const testCase of cases) {
@@ -448,6 +522,9 @@ apply2(apply1, apply0, 2)
         approxComplex(expected, actual),
         `Mismatch for ${testCase.name} at z=${JSON.stringify(zValue)}: ${JSON.stringify(expected)} vs ${JSON.stringify(actual)}`,
       );
+      if (typeof testCase.expect === 'function') {
+        testCase.expect(zValue, expected);
+      }
     }
     const prepared = prepareAstForGpu(original);
     assertNoHigherOrderParams(prepared);
