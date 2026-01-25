@@ -179,6 +179,46 @@ function operatorNameWithMetadata(name, metaHighlights) {
   return `\\operatorname{${inner}}`;
 }
 
+function normalizeParamSpecsForRender(paramSpecs, legacyParams = null) {
+  if (Array.isArray(paramSpecs)) {
+    if (paramSpecs.length === 0) return [];
+    const first = paramSpecs[0];
+    if (first && typeof first === 'object' && typeof first.kind === 'string') {
+      return paramSpecs;
+    }
+  }
+  const params = Array.isArray(legacyParams)
+    ? legacyParams
+    : (Array.isArray(paramSpecs) ? paramSpecs : []);
+  return params.map((name) => ({ name, kind: 'value', args: [] }));
+}
+
+function paramSpecToLatex(spec) {
+  if (!spec || typeof spec !== 'object') {
+    return escapeLatexIdentifier(String(spec || '?'));
+  }
+  const name = latexIdentifierWithMetadata(spec.name || '?', null);
+  if (spec.kind !== 'fn') {
+    return name;
+  }
+  const nested = paramSpecListToLatex(spec.args);
+  return `\\mathrm{let}\\;${name}${nested}`;
+}
+
+function paramSpecListToLatex(paramSpecs) {
+  const specs = normalizeParamSpecsForRender(paramSpecs);
+  if (!specs.length) return '';
+  const rendered = specs.map((spec) => paramSpecToLatex(spec)).join(', ');
+  return `\\left(${rendered}\\right)`;
+}
+
+function bindingParamListLatex(binding) {
+  if (!binding || typeof binding !== 'object') return '';
+  const specs = normalizeParamSpecsForRender(binding.paramSpecs, binding.params);
+  if (!specs.length) return '';
+  return paramSpecListToLatex(specs);
+}
+
 function isLatexAlreadyWrappedInParens(latex) {
   const t = String(latex || '').trim();
   // Common case produced by this renderer.
@@ -700,9 +740,10 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
       // `let` should normally be top-level (rendered in program style),
       // but keep a readable fallback if it appears nested.
       const name = latexIdentifierWithMetadata(node.name || '?', null);
+      const params = bindingParamListLatex(node);
       const value = nodeToLatex(node.value, 0, options);
       const body = nodeToLatex(node.body, 0, options);
-      return `\\left(\\begin{aligned}\\mathrm{let}\\;${name} &= ${value}\\\\&${body}\\end{aligned}\\right)`;
+      return `\\left(\\begin{aligned}\\mathrm{let}\\;${name}${params} &= ${value}\\\\&${body}\\end{aligned}\\right)`;
     }
 
     case 'SetBinding': {
@@ -756,8 +797,9 @@ function programStyleLatex(ast, options = {}) {
   for (const binding of bindings) {
     const kw = binding.kind === 'LetBinding' ? '\\mathrm{let}' : '\\mathrm{set}';
     const name = latexIdentifierWithMetadata(binding.name || '?', null);
+    const params = binding.kind === 'LetBinding' ? bindingParamListLatex(binding) : '';
     const value = nodeToLatex(binding.value, 0, options);
-    lines.push(`${kw}\\;${name} &= ${value}\\\\`);
+    lines.push(`${kw}\\;${name}${params} &= ${value}\\\\`);
   }
   lines.push(`&${nodeToLatex(cursor, 0, options)}`);
   lines.push('\\end{aligned}');

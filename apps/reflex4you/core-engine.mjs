@@ -1,6 +1,6 @@
 // Core engine for Reflex4You: AST helpers, GLSL generation, and renderer
 
-import { cloneAst } from './ast-utils.mjs';
+import { cloneAst, childEntries } from './ast-utils.mjs';
 
 // =========================
 // AST constructors
@@ -604,7 +604,11 @@ function materializeRepeatLoops(ast) {
         if (!binding) {
           throw new Error(`Repeat step function "${byNames[j]}" is not in scope`);
         }
-        const arity = Array.isArray(binding.params) ? binding.params.length : 0;
+        const paramSpecs = getLetParamSpecs(binding);
+        if (hasFunctionParams(paramSpecs)) {
+          throw new Error(`Repeat step function "${byNames[j]}" cannot take function-typed parameters`);
+        }
+        const arity = paramSpecs.length;
         if (arity !== k + 1) {
           throw new Error(`Repeat step function "${byNames[j]}" must have arity ${k + 1} (got ${arity})`);
         }
@@ -789,12 +793,190 @@ function materializeRepeatLoops(ast) {
   return root;
 }
 
-function prepareAstForGpu(ast) {
+export function prepareAstForGpu(ast) {
   // GPU compilation now does explicit environment passing (no global slots),
   // but we also need a stable, non-mutating clone that preserves SetRef graphs
   // AND a late lowering phase for high-level surface sugar (sum/prod, PowExpr).
   const cloned = cloneAst(ast, { preserveBindings: true });
-  return lowerHighLevelSugar(cloned);
+  const lowered = lowerFunctionParams(cloned);
+  return lowerHighLevelSugar(lowered);
+}
+
+function lowerFunctionParams(ast) {
+  let root = ast;
+  let nextId = 0;
+
+  function collectLetNames(letStack) {
+    const out = new Set();
+    (Array.isArray(letStack) ? letStack : []).forEach((n) => {
+      if (n && typeof n.name === 'string' && n.name) {
+        out.add(n.name);
+      }
+    });
+    return out;
+  }
+
+  function freshLetName(prefix, letStack) {
+    const taken = collectLetNames(letStack);
+    while (true) {
+      const candidate = `${prefix}_${nextId++}`;
+      if (!taken.has(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
+  function resolveLetBindingByName(name, letStack) {
+    const target = String(name || '');
+    for (let i = (letStack?.length || 0) - 1; i >= 0; i -= 1) {
+      const entry = letStack[i];
+      if (entry && typeof entry === 'object' && entry.kind === 'LetBinding' && entry.name === target) {
+        return entry;
+      }
+    }
+    return null;
+  }
+
+  function replace(parent, key, replacement) {
+    if (parent && key != null) {
+      parent[key] = replacement;
+    } else {
+      root = replacement;
+    }
+  }
+
+  function replaceParamRefs(node, replacements) {
+    if (!node || typeof node !== 'object') return node;
+    if (node.kind === 'ParamRef' && node.paramSpec && replacements.has(node.paramSpec)) {
+      const replacement = cloneAst(replacements.get(node.paramSpec), { preserveBindings: true });
+      if (node.span && replacement && typeof replacement === 'object') {
+        replacement.span = node.span;
+        replacement.input = node.input;
+      }
+      return replacement;
+    }
+    const entries = childEntries(node);
+    for (const [key, child] of entries) {
+      if (Array.isArray(child)) {
+        node[key] = child.map((entry) => replaceParamRefs(entry, replacements));
+      } else {
+        node[key] = replaceParamRefs(child, replacements);
+      }
+    }
+    return node;
+  }
+
+  function specializeCall(node, letStack) {
+    if (!node || node.kind !== 'Call') return null;
+    if (!node.callee || node.callee.kind !== 'Identifier') return null;
+    const binding = resolveLetBindingByName(node.callee.name, letStack);
+    if (!binding) return null;
+    const paramSpecs = getLetParamSpecs(binding);
+    if (!hasFunctionParams(paramSpecs)) return null;
+
+    const args = Array.isArray(node.args) ? node.args : [];
+    const totalParams = paramSpecs.length;
+    if (!(args.length === totalParams || args.length === totalParams + 1)) {
+      throw new Error(`Function "${binding.name}" expects ${totalParams} or ${totalParams + 1} arguments, got ${args.length}`);
+    }
+
+    const functionArgs = new Map();
+    const valueArgs = [];
+    const valueSpecs = [];
+    for (let i = 0; i < totalParams; i += 1) {
+      const spec = paramSpecs[i];
+      const arg = args[i];
+      if (spec && spec.kind === 'fn') {
+        functionArgs.set(spec, arg);
+      } else {
+        valueSpecs.push(spec);
+        valueArgs.push(arg);
+      }
+    }
+    const zOverride = args.length === totalParams + 1 ? args[args.length - 1] : null;
+
+    const clonedValue = cloneAst(binding.value, { preserveBindings: true });
+    const specializedValue = replaceParamRefs(clonedValue, functionArgs);
+    const freshName = freshLetName(`r4y_fnparam_${binding.name || 'fn'}`, letStack);
+
+    const callArgs = zOverride ? [...valueArgs, zOverride] : valueArgs;
+    const callNode = {
+      kind: 'Call',
+      callee: { kind: 'Identifier', name: freshName },
+      args: callArgs,
+    };
+
+    const paramNames = getValueParamNames(valueSpecs);
+    const letNode = {
+      kind: 'LetBinding',
+      name: freshName,
+      params: paramNames,
+      paramSpecs: valueSpecs,
+      value: specializedValue,
+      body: callNode,
+    };
+
+    const span = node.span ?? binding.span;
+    if (span) {
+      letNode.span = span;
+      letNode.input = span.input;
+      callNode.span = span;
+      callNode.input = span.input;
+      callNode.callee.span = span;
+      callNode.callee.input = span.input;
+    }
+    return letNode;
+  }
+
+  function visit(node, parent, key, letStack = []) {
+    if (!node || typeof node !== 'object') return;
+    switch (node.kind) {
+      case 'LetBinding': {
+        visit(node.value, node, 'value', letStack);
+        const nextLetStack = Array.isArray(letStack) ? [...letStack, node] : [node];
+        visit(node.body, node, 'body', nextLetStack);
+        return;
+      }
+      case 'SetBinding': {
+        visit(node.value, node, 'value', letStack);
+        visit(node.body, node, 'body', letStack);
+        return;
+      }
+      case 'Call': {
+        visit(node.callee, node, 'callee', letStack);
+        const args = Array.isArray(node.args) ? node.args : [];
+        for (let i = 0; i < args.length; i += 1) {
+          visit(args[i], args, i, letStack);
+        }
+        const replacement = specializeCall(node, letStack);
+        if (replacement) {
+          replace(parent, key, replacement);
+          visit(replacement, parent, key, letStack);
+        }
+        return;
+      }
+      default: {
+        const entries = childEntries(node);
+        for (const [childKey, child] of entries) {
+          if (Array.isArray(child)) {
+            for (let i = 0; i < child.length; i += 1) {
+              visit(child[i], child, i, letStack);
+            }
+          } else {
+            visit(child, node, childKey, letStack);
+          }
+        }
+      }
+    }
+  }
+
+  visit(root, null, null, []);
+  return root;
+}
+
+export function lowerFunctionParamsForGpu(ast) {
+  const cloned = cloneAst(ast, { preserveBindings: true });
+  return lowerFunctionParams(cloned);
 }
 
 // =========================
@@ -946,17 +1128,23 @@ export function lowerHighLevelSugar(ast) {
           resolvedCount,
         };
 
+        const vParams = [iterParam, accParam, vParam];
+        const vParamSpecs = vParams.map((p) => createParamSpec(p, 'value', []));
         const vStepLet = {
           kind: 'LetBinding',
           name: vFnName,
-          params: [iterParam, accParam, vParam],
+          params: vParams,
+          paramSpecs: vParamSpecs,
           value: vUpdate,
           body: repeatNode,
         };
+        const accParams = [iterParam, accParam, vParam];
+        const accParamSpecs = accParams.map((p) => createParamSpec(p, 'value', []));
         const accStepLet = {
           kind: 'LetBinding',
           name: accFnName,
-          params: [iterParam, accParam, vParam],
+          params: accParams,
+          paramSpecs: accParamSpecs,
           value: accUpdate,
           body: vStepLet,
         };
@@ -1041,6 +1229,43 @@ export function SetBindingNode(name, value, body) {
 
 export function SetRef(name, binding = null) {
   return { kind: "SetRef", name, binding };
+}
+
+function createParamSpec(name, kind = 'value', args = []) {
+  return {
+    name: String(name || ''),
+    kind: kind === 'fn' ? 'fn' : 'value',
+    args: Array.isArray(args) ? args : [],
+  };
+}
+
+function normalizeParamSpecs(paramSpecs, legacyParams = null) {
+  if (Array.isArray(paramSpecs)) {
+    if (paramSpecs.length === 0) return [];
+    const first = paramSpecs[0];
+    if (first && typeof first === 'object' && typeof first.kind === 'string') {
+      return paramSpecs;
+    }
+  }
+  const params = Array.isArray(legacyParams)
+    ? legacyParams
+    : (Array.isArray(paramSpecs) ? paramSpecs : []);
+  return params.map((name) => createParamSpec(name, 'value', []));
+}
+
+function getLetParamSpecs(node) {
+  if (!node || typeof node !== 'object') return [];
+  return normalizeParamSpecs(node.paramSpecs, node.params);
+}
+
+function getValueParamNames(paramSpecs) {
+  return Array.isArray(paramSpecs)
+    ? paramSpecs.filter((spec) => spec && spec.kind !== 'fn').map((spec) => spec.name)
+    : [];
+}
+
+function hasFunctionParams(paramSpecs) {
+  return Array.isArray(paramSpecs) && paramSpecs.some((spec) => spec && spec.kind === 'fn');
 }
 
 function fingerIndexFromLabel(label) {
@@ -2328,9 +2553,13 @@ function compileFormulaFunctionsSSA(rootAst) {
         case 'LetBinding': {
           // Only traverse the value and body; nested lets will be compiled separately,
           // but their free variables must still be discovered.
-          const ownParams = Array.isArray(node.params) ? node.params : [];
+          const ownSpecs = getLetParamSpecs(node);
           const nextParamNames = new Set(localParamNames);
-          ownParams.forEach((p) => nextParamNames.add(p));
+          ownSpecs.forEach((spec) => {
+            if (spec && typeof spec.name === 'string') {
+              nextParamNames.add(spec.name);
+            }
+          });
           walk(node.value, nextParamNames, localSetBindings, localLetStack);
           const nextLetStack = Array.isArray(localLetStack) ? [...localLetStack, node] : [node];
           walk(node.body, localParamNames, localSetBindings, nextLetStack);
@@ -2450,9 +2679,10 @@ function compileFormulaFunctionsSSA(rootAst) {
     }
     let info = letInfoByBinding.get(letNode);
     if (!info) {
+      const paramSpecs = getLetParamSpecs(letNode);
       info = {
         glslName: nextLetGlslName(),
-        params: Array.isArray(letNode.params) ? letNode.params : [],
+        params: getValueParamNames(paramSpecs),
         captures: [],
         compiled: false,
         source: '',
@@ -2463,7 +2693,8 @@ function compileFormulaFunctionsSSA(rootAst) {
       return info;
     }
 
-    const boundParams = new Set(info.params);
+    const boundSpecs = getLetParamSpecs(letNode);
+    const boundParams = new Set(boundSpecs.map((spec) => spec.name));
     const { freeParams, freeSets } = collectFreeValueVars(
       letNode.value,
       boundParams,

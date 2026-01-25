@@ -42,13 +42,224 @@ import {
   Floor,
   Conjugate,
   IsNaN,
+  lowerFunctionParamsForGpu,
   buildFragmentSourceFromAST,
+  prepareAstForGpu,
 } from './core-engine.mjs';
+import { visitAst } from './ast-utils.mjs';
 
 const EPSILON = 1e-9;
 
 function approxEqual(a, b) {
   return Math.abs(a - b) < EPSILON;
+}
+
+function approxComplex(a, b) {
+  return approxEqual(a.re, b.re) && approxEqual(a.im, b.im);
+}
+
+function complexAdd(a, b) {
+  return { re: a.re + b.re, im: a.im + b.im };
+}
+
+function complexSub(a, b) {
+  return { re: a.re - b.re, im: a.im - b.im };
+}
+
+function complexMul(a, b) {
+  return { re: a.re * b.re - a.im * b.im, im: a.re * b.im + a.im * b.re };
+}
+
+function complexDiv(a, b) {
+  const denom = b.re * b.re + b.im * b.im;
+  if (denom < 1e-12) {
+    return { re: NaN, im: NaN };
+  }
+  return { re: (a.re * b.re + a.im * b.im) / denom, im: (a.im * b.re - a.re * b.im) / denom };
+}
+
+function normalizeParamSpecsForTest(paramSpecs, legacyParams = null) {
+  if (Array.isArray(paramSpecs)) {
+    if (paramSpecs.length === 0) return [];
+    const first = paramSpecs[0];
+    if (first && typeof first === 'object' && typeof first.kind === 'string') {
+      return paramSpecs;
+    }
+  }
+  const params = Array.isArray(legacyParams)
+    ? legacyParams
+    : (Array.isArray(paramSpecs) ? paramSpecs : []);
+  return params.map((name) => ({ name, kind: 'value', args: [] }));
+}
+
+function evaluateAstComplex(root, { z = { re: 0, im: 0 } } = {}) {
+  const setEnv = new Map(); // SetBinding node -> complex value
+  const letEnv = []; // stack of closures
+  const paramEnv = new Map(); // param name -> complex value or function value
+
+  function lookupLet(name, envStack) {
+    for (let i = envStack.length - 1; i >= 0; i -= 1) {
+      if (envStack[i].name === name) return envStack[i];
+    }
+    return null;
+  }
+
+  function asFunctionValue(node, zLocal, localParamEnv, localSetEnv, localLetEnv) {
+    if (node && typeof node === 'object') {
+      if (node.kind === 'Identifier') {
+        const closure = lookupLet(node.name, localLetEnv);
+        if (closure) return closure;
+      }
+      if (node.kind === 'ParamRef') {
+        const v = localParamEnv.get(node.name);
+        if (v && v.kind === 'closure') return v;
+      }
+    }
+    return {
+      kind: 'closure',
+      name: '<expr>',
+      paramSpecs: [],
+      expr: node,
+      capturedSetEnv: new Map(localSetEnv),
+      capturedLetEnv: localLetEnv.slice(),
+      capturedParamEnv: new Map(localParamEnv),
+    };
+  }
+
+  function applyFunctionValue(fnValue, argValues, zOverride) {
+    const specs = Array.isArray(fnValue.paramSpecs) ? fnValue.paramSpecs : [];
+    const nextParamEnv = new Map(fnValue.capturedParamEnv || []);
+    for (let i = 0; i < specs.length; i += 1) {
+      const spec = specs[i];
+      nextParamEnv.set(spec.name, argValues[i]);
+    }
+    const zLocal = zOverride ?? { re: 0, im: 0 };
+    return evalNode(fnValue.expr, zLocal, nextParamEnv, fnValue.capturedSetEnv, fnValue.capturedLetEnv);
+  }
+
+  function evalNode(node, zLocal, localParamEnv, localSetEnv, localLetEnv) {
+    if (!node || typeof node !== 'object') return { re: 0, im: 0 };
+    switch (node.kind) {
+      case 'Const':
+        return { re: node.re, im: node.im };
+      case 'Var':
+        return { re: zLocal.re, im: zLocal.im };
+      case 'VarX':
+        return { re: zLocal.re, im: 0 };
+      case 'VarY':
+        return { re: zLocal.im, im: 0 };
+      case 'ParamRef': {
+        const v = localParamEnv.get(node.name);
+        if (!v) throw new Error(`Unbound ParamRef: ${node.name}`);
+        if (node.paramKind === 'fn' || (v && v.kind === 'closure')) {
+          return applyFunctionValue(v, [], zLocal);
+        }
+        return v;
+      }
+      case 'SetRef': {
+        const v = localSetEnv.get(node.binding);
+        if (!v) throw new Error(`Unbound SetRef: ${node.name}`);
+        return v;
+      }
+      case 'Add':
+        return complexAdd(evalNode(node.left, zLocal, localParamEnv, localSetEnv, localLetEnv), evalNode(node.right, zLocal, localParamEnv, localSetEnv, localLetEnv));
+      case 'Sub':
+        return complexSub(evalNode(node.left, zLocal, localParamEnv, localSetEnv, localLetEnv), evalNode(node.right, zLocal, localParamEnv, localSetEnv, localLetEnv));
+      case 'Mul':
+        return complexMul(evalNode(node.left, zLocal, localParamEnv, localSetEnv, localLetEnv), evalNode(node.right, zLocal, localParamEnv, localSetEnv, localLetEnv));
+      case 'Div':
+        return complexDiv(evalNode(node.left, zLocal, localParamEnv, localSetEnv, localLetEnv), evalNode(node.right, zLocal, localParamEnv, localSetEnv, localLetEnv));
+      case 'LessThan': {
+        const left = evalNode(node.left, zLocal, localParamEnv, localSetEnv, localLetEnv);
+        const right = evalNode(node.right, zLocal, localParamEnv, localSetEnv, localLetEnv);
+        return { re: left.re < right.re ? 1 : 0, im: 0 };
+      }
+      case 'If': {
+        const cond = evalNode(node.condition, zLocal, localParamEnv, localSetEnv, localLetEnv);
+        const flag = cond.re !== 0 || cond.im !== 0;
+        return flag
+          ? evalNode(node.thenBranch, zLocal, localParamEnv, localSetEnv, localLetEnv)
+          : evalNode(node.elseBranch, zLocal, localParamEnv, localSetEnv, localLetEnv);
+      }
+      case 'Sin': {
+        const v = evalNode(node.value, zLocal, localParamEnv, localSetEnv, localLetEnv);
+        return { re: Math.sin(v.re), im: 0 };
+      }
+      case 'Cos': {
+        const v = evalNode(node.value, zLocal, localParamEnv, localSetEnv, localLetEnv);
+        return { re: Math.cos(v.re), im: 0 };
+      }
+      case 'Compose': {
+        const inner = evalNode(node.g, zLocal, localParamEnv, localSetEnv, localLetEnv);
+        return evalNode(node.f, inner, localParamEnv, localSetEnv, localLetEnv);
+      }
+      case 'SetBinding': {
+        const value = evalNode(node.value, zLocal, localParamEnv, localSetEnv, localLetEnv);
+        const nextSetEnv = new Map(localSetEnv);
+        nextSetEnv.set(node, value);
+        return evalNode(node.body, zLocal, localParamEnv, nextSetEnv, localLetEnv);
+      }
+      case 'LetBinding': {
+        const paramSpecs = normalizeParamSpecsForTest(node.paramSpecs, node.params);
+        const closure = {
+          kind: 'closure',
+          name: node.name,
+          paramSpecs,
+          expr: node.value,
+          capturedSetEnv: new Map(localSetEnv),
+          capturedLetEnv: localLetEnv.slice(),
+          capturedParamEnv: new Map(localParamEnv),
+        };
+        const nextLetEnv = localLetEnv.slice();
+        nextLetEnv.push(closure);
+        return evalNode(node.body, zLocal, localParamEnv, localSetEnv, nextLetEnv);
+      }
+      case 'Call': {
+        const args = Array.isArray(node.args) ? node.args : [];
+        const fnValue = asFunctionValue(node.callee, zLocal, localParamEnv, localSetEnv, localLetEnv);
+        const paramSpecs = Array.isArray(fnValue.paramSpecs) ? fnValue.paramSpecs : [];
+        if (!(args.length === paramSpecs.length || args.length === paramSpecs.length + 1)) {
+          throw new Error(`Arity mismatch for call: got ${args.length}`);
+        }
+        const argValues = [];
+        for (let i = 0; i < paramSpecs.length; i += 1) {
+          const spec = paramSpecs[i];
+          if (spec.kind === 'fn') {
+            argValues.push(asFunctionValue(args[i], zLocal, localParamEnv, localSetEnv, localLetEnv));
+          } else {
+            argValues.push(evalNode(args[i], zLocal, localParamEnv, localSetEnv, localLetEnv));
+          }
+        }
+        const zForBody =
+          args.length === paramSpecs.length + 1
+            ? evalNode(args[args.length - 1], zLocal, localParamEnv, localSetEnv, localLetEnv)
+            : zLocal;
+        return applyFunctionValue(fnValue, argValues, zForBody);
+      }
+      default:
+        throw new Error(`Unsupported node kind in test interpreter: ${node.kind}`);
+    }
+  }
+
+  return evalNode(root, z, paramEnv, setEnv, letEnv);
+}
+
+function assertNoHigherOrderParams(ast) {
+  const violations = [];
+  visitAst(ast, (node) => {
+    if (node.kind === 'LetBinding') {
+      const specs = normalizeParamSpecsForTest(node.paramSpecs, node.params);
+      if (specs.some((spec) => spec && spec.kind === 'fn')) {
+        violations.push(`let ${node.name || '?'} has function params`);
+      }
+    }
+    if (node.kind === 'ParamRef') {
+      if (node.paramKind === 'fn' || node.paramSpec?.kind === 'fn') {
+        violations.push(`param ${node.name || '?'} remains function-typed`);
+      }
+    }
+  });
+  assert.equal(violations.length, 0, `Expected no higher-order params, found: ${violations.join('; ')}`);
 }
 
 test('default formula is the identity function z -> z', () => {
@@ -191,6 +402,60 @@ test('let alias preserves captured set bindings (set d = 1 in let f = z + d in l
   // At least one let-bound function should capture a set binding.
   assert.match(fragment, /cap_s_/);
   assert.doesNotMatch(fragment, /undefined/);
+});
+
+test('function-param lowering preserves evaluation and removes higher-order params', () => {
+  const cases = [
+    {
+      name: 'arity-0 function param with expression argument',
+      source: `
+let min(w) = if(w < z, w, z) in
+let apply1(let filter) = z - 3 $ filter $ z + 3 in
+apply1(min(0))
+`.trim(),
+      zValues: [{ re: -2, im: 0 }, { re: 0.5, im: 0 }, { re: 3, im: 0 }],
+    },
+    {
+      name: 'arity-1 function param with function identifier',
+      source: `
+let min(w) = if(w < z, w, z) in
+let apply1(let filter(w), w0) = z - 3 $ filter(w0 + 1) $ z + 3 in
+apply1(min, 0.2)
+`.trim(),
+      zValues: [{ re: -1, im: 0 }, { re: 1.5, im: 0 }],
+    },
+    {
+      name: 'nested function-param signatures',
+      source: `
+let apply0 = z + 2 in
+let apply1(let f) = f $ (z + 1) in
+let apply2(let apply1(let apply0), let apply0, c) = apply1(apply0) + c in
+apply2(apply1, apply0, 2)
+`.trim(),
+      zValues: [{ re: -1, im: 0 }, { re: 2, im: 0 }],
+    },
+  ];
+
+  for (const testCase of cases) {
+    const parsed = parseFormulaInput(testCase.source);
+    assert.equal(parsed.ok, true, `Expected parse ok for ${testCase.name}`);
+    const original = parsed.value;
+    const lowered = lowerFunctionParamsForGpu(original);
+    for (const zValue of testCase.zValues) {
+      const expected = evaluateAstComplex(original, { z: zValue });
+      const actual = evaluateAstComplex(lowered, { z: zValue });
+      assert.ok(
+        approxComplex(expected, actual),
+        `Mismatch for ${testCase.name} at z=${JSON.stringify(zValue)}: ${JSON.stringify(expected)} vs ${JSON.stringify(actual)}`,
+      );
+    }
+    const prepared = prepareAstForGpu(original);
+    assertNoHigherOrderParams(prepared);
+    assert.doesNotThrow(
+      () => buildFragmentSourceFromAST(original),
+      `Expected GPU compilation to succeed for ${testCase.name}`,
+    );
+  }
 });
 
 test('buildFragmentSourceFromAST does not silently drop legacy RepeatComposePlaceholder nodes', () => {
