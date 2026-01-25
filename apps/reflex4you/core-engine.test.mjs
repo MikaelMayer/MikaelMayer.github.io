@@ -163,6 +163,17 @@ function evaluateAstComplex(root, { z = { re: 0, im: 0 } } = {}) {
         }
         return v;
       }
+      case 'Identifier': {
+        const closure = lookupLet(node.name, localLetEnv);
+        if (!closure) {
+          throw new Error(`Unknown function: ${node.name}`);
+        }
+        const specLen = Array.isArray(closure.paramSpecs) ? closure.paramSpecs.length : 0;
+        if (specLen > 0) {
+          throw new Error(`Identifier "${node.name}" with ${specLen} args must be called`);
+        }
+        return applyFunctionValue(closure, [], zLocal);
+      }
       case 'SetRef': {
         const v = localSetEnv.get(node.binding);
         if (!v) throw new Error(`Unbound SetRef: ${node.name}`);
