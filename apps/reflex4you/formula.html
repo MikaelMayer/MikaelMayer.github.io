@@ -332,10 +332,11 @@
           <div class="controls__field">
             <span class="controls__label">Canvas background (RRGGBBAA)</span>
             <input id="bghex" class="controls__input" type="text" value="ffffff80" spellcheck="false" inputmode="text" aria-label="Canvas background in RRGGBBAA hex" />
-            <button class="preset" type="button" data-bghex="ffffff80">white50</button>
-            <button class="preset" type="button" data-bghex="1e3a8aff">blue</button>
-            <button class="preset" type="button" data-bghex="000000ff">black</button>
-            <button class="preset" type="button" data-bghex="00000000">transparent</button>
+            <button class="preset" type="button" data-bghex="ffffff80" data-fghex="000000ff">white50</button>
+            <button class="preset" type="button" data-bghex="00000080" data-fghex="ffffffff">black50</button>
+            <button class="preset" type="button" data-bghex="1e3a8aff" data-fghex="000000ff">blue</button>
+            <button class="preset" type="button" data-bghex="000000ff" data-fghex="000000ff">black</button>
+            <button class="preset" type="button" data-bghex="00000000" data-fghex="000000ff">transparent</button>
           </div>
           <button id="download-png" class="btn" type="button" disabled>Download PNG</button>
         </div>
