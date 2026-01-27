@@ -37,6 +37,8 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 
 const DEFAULT_FORMULA_TEXT = 'z';
 const DEFAULT_CANVAS_BG_HEX = 'ffffff80';
+const DEFAULT_CANVAS_FG_HEX = '000000ff';
+let currentCanvasFgHex = DEFAULT_CANVAS_FG_HEX;
 
 function $(id) {
   return document.getElementById(id);
@@ -57,6 +59,25 @@ function readCanvasBackgroundHex() {
   const el = $('bghex');
   const parsed = normalizeHex8(el?.value);
   return parsed || DEFAULT_CANVAS_BG_HEX;
+}
+
+function readCanvasForegroundHex() {
+  return currentCanvasFgHex || DEFAULT_CANVAS_FG_HEX;
+}
+
+function setCanvasForegroundHex(value) {
+  const normalized = normalizeHex8(value);
+  currentCanvasFgHex = normalized || DEFAULT_CANVAS_FG_HEX;
+}
+
+function updateForegroundForBackgroundHex(bgHex, presetMap) {
+  if (!presetMap) return;
+  const normalized = normalizeHex8(bgHex);
+  if (!normalized) return;
+  const presetFg = presetMap.get(normalized);
+  if (presetFg) {
+    currentCanvasFgHex = presetFg;
+  }
 }
 
 function setDownloadEnabled(enabled) {
@@ -151,6 +172,7 @@ async function renderFromSource(source, { updateUrl = false } = {}) {
   const renderEl = $('formula-render');
   await renderFormulaToCanvas(parsed.value, renderEl, {
     backgroundHex: readCanvasBackgroundHex(),
+    foregroundHex: readCanvasForegroundHex(),
   });
   const latex = renderEl?.dataset?.latex || '';
   showStaleWarning(buildStaleDiagnostic({ latex, renderEl }));
@@ -176,20 +198,37 @@ async function bootstrap() {
 
   // Background controls.
   const bgEl = $('bghex');
+  const presetButtons = Array.from(document.querySelectorAll?.('button[data-bghex]') || []);
+  const presetForegroundByBgHex = new Map();
+  presetButtons.forEach((btn) => {
+    const bgHex = normalizeHex8(btn.getAttribute('data-bghex'));
+    const fgHex = normalizeHex8(btn.getAttribute('data-fghex'));
+    if (bgHex && fgHex) {
+      presetForegroundByBgHex.set(bgHex, fgHex);
+    }
+  });
   if (bgEl && !normalizeHex8(bgEl.value)) {
     bgEl.value = DEFAULT_CANVAS_BG_HEX;
   }
   if (bgEl) {
+    updateForegroundForBackgroundHex(bgEl.value, presetForegroundByBgHex);
     bgEl.addEventListener('input', () => {
+      updateForegroundForBackgroundHex(bgEl.value, presetForegroundByBgHex);
       // Re-render without touching the URL; just affects the raster background.
       const current = inputEl ? inputEl.value : source;
       renderFromSource(current, { updateUrl: false }).catch(() => {});
     });
   }
-  document.querySelectorAll?.('button[data-bghex]')?.forEach((btn) => {
+  presetButtons.forEach((btn) => {
+    const bgHex = normalizeHex8(btn.getAttribute('data-bghex')) || DEFAULT_CANVAS_BG_HEX;
+    const fgHex = normalizeHex8(btn.getAttribute('data-fghex'));
     btn.addEventListener('click', () => {
-      const next = normalizeHex8(btn.getAttribute('data-bghex')) || DEFAULT_CANVAS_BG_HEX;
-      if (bgEl) bgEl.value = next;
+      if (bgEl) bgEl.value = bgHex;
+      if (fgHex) {
+        setCanvasForegroundHex(fgHex);
+      } else {
+        updateForegroundForBackgroundHex(bgHex, presetForegroundByBgHex);
+      }
       const current = inputEl ? inputEl.value : source;
       renderFromSource(current, { updateUrl: false }).catch(() => {});
     });

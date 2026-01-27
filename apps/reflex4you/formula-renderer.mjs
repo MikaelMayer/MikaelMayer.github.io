@@ -4,9 +4,11 @@
 import { FINGER_DECIMAL_PLACES } from './core-engine.mjs';
 
 // Bump this when changing renderer logic so users can verify cached assets.
-export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2026-01-17.4';
+export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2026-01-27.1';
 
 const DEFAULT_MATHJAX_LOAD_TIMEOUT_MS = 9000;
+const DEFAULT_CANVAS_BG_HEX = 'ffffff80';
+const DEFAULT_CANVAS_FG_HEX = '000000ff';
 
 function precedence(node) {
   if (!node || typeof node !== 'object') return 100;
@@ -844,7 +846,12 @@ function parseHex8Color(value) {
 
 function resolveCanvasBackground(options = {}) {
   const candidate = options.backgroundHex ?? options.background ?? options.canvasBackground ?? null;
-  return parseHex8Color(candidate) ?? parseHex8Color('ffffff80');
+  return parseHex8Color(candidate) ?? parseHex8Color(DEFAULT_CANVAS_BG_HEX);
+}
+
+function resolveCanvasForeground(options = {}) {
+  const candidate = options.foregroundHex ?? null;
+  return parseHex8Color(candidate) ?? parseHex8Color(DEFAULT_CANVAS_FG_HEX);
 }
 
 function resizeCanvasToDisplaySize(canvas, options = {}) {
@@ -881,6 +888,8 @@ export async function renderLatexToCanvas(latex, canvas, options = {}) {
   if (!ctx) return;
 
   const bg = resolveCanvasBackground(options);
+  const fg = resolveCanvasForeground(options);
+  const fgStyle = `rgba(${fg.r},${fg.g},${fg.b},${fg.a})`;
   const drawInsetBackground = options?.drawInsetBackground !== false;
   const win = typeof window !== 'undefined' ? window : null;
   const ready = await waitForMathJaxStartup(win);
@@ -889,7 +898,7 @@ export async function renderLatexToCanvas(latex, canvas, options = {}) {
     ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = `rgba(${bg.r},${bg.g},${bg.b},${bg.a})`;
     ctx.fillRect(0, 0, width, height);
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillStyle = fgStyle;
     ctx.font = '16px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
     ctx.fillText(String(latex || ''), 16, 28);
     return;
@@ -902,7 +911,9 @@ export async function renderLatexToCanvas(latex, canvas, options = {}) {
   }
   svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
   // Ensure a deterministic color when rasterizing the SVG.
-  svg.setAttribute('style', `${svg.getAttribute('style') || ''};color:#000;`);
+  const svgStyle = svg.getAttribute('style') || '';
+  const colorStyle = `color:${fgStyle}`;
+  svg.setAttribute('style', svgStyle ? `${svgStyle};${colorStyle}` : colorStyle);
 
   const serializer = new XMLSerializer();
   const svgText = serializer.serializeToString(svg);
