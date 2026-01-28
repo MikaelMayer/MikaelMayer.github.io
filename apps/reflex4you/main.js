@@ -877,7 +877,17 @@ function refreshFingerSoloValueDisplays() {
     if (fingerSoloAnimGlobalToggleButton) {
       // Show only when multiple parameters are animatable.
       fingerSoloAnimGlobalToggleButton.style.display = animatedCount >= 2 ? '' : 'none';
-      const playing = Boolean(animationController?.isPlaying?.());
+      let playing = Boolean(animationController?.isPlaying?.());
+      if (
+        !playing &&
+        !animationController &&
+        animatedCount === 1 &&
+        isEditModeActive() &&
+        previewController?.isPlaying?.()
+      ) {
+        const [label] = all.keys();
+        playing = Boolean(label && previewLabelSet?.has?.(label));
+      }
       fingerSoloAnimGlobalToggleButton.textContent = playing ? '⏸ Anim' : '▶ Anim';
       fingerSoloAnimGlobalToggleButton.setAttribute('aria-pressed', playing ? 'true' : 'false');
     }
@@ -1103,7 +1113,8 @@ function buildInlineFingerValueEditor(label) {
     toggleAnimBtn.dataset.mode = animated ? 'remove' : 'add';
   }
 
-  function setEditing(nextEditing) {
+  function setEditing(nextEditing, options = {}) {
+    const shouldFocus = options.focusInput !== false;
     wrap.dataset.editing = nextEditing ? 'true' : 'false';
     display.style.display = nextEditing ? 'none' : '';
     // Important: CSS default is `display: none`, so `''` would keep it hidden.
@@ -1112,12 +1123,20 @@ function buildInlineFingerValueEditor(label) {
     if (nextEditing) {
       currentInput.value = formatFingerValueForEditor(label);
       currentInput.setCustomValidity('');
-      // Focus synchronously (mobile browsers may block async focus/keyboard).
-      try {
-        currentInput.focus({ preventScroll: true });
-        currentInput.select();
-      } catch (_) {
-        // ignore
+      if (shouldFocus) {
+        // Focus synchronously (mobile browsers may block async focus/keyboard).
+        try {
+          currentInput.focus({ preventScroll: true });
+          currentInput.select();
+        } catch (_) {
+          // ignore
+        }
+      } else {
+        try {
+          display.blur();
+        } catch (_) {
+          // ignore
+        }
       }
     }
   }
@@ -1197,7 +1216,10 @@ function buildInlineFingerValueEditor(label) {
   display.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
-    setEditing(true);
+    const interval = readAnimationIntervalFromQuery(label);
+    const animated = Boolean(interval && interval.start && interval.end);
+    const shouldFocus = !(animated && wrap.dataset.editing !== 'true');
+    setEditing(true, { focusInput: shouldFocus });
     refresh();
     updateAnimatedButtonsEnabledState();
   });
@@ -1320,6 +1342,21 @@ function buildInlineFingerValueEditor(label) {
     event.stopPropagation();
     const interval = readAnimationIntervalFromQuery(label);
     if (!interval) return;
+    const allTracks = buildAnimationTracksFromQuery();
+    const isSoloTrack = allTracks.size === 1 && allTracks.has(label);
+    if (isSoloTrack && !isEditModeActive()) {
+      if (previewLabelSet && previewLabelSet.has(label)) {
+        stopPreviewAnimations();
+      }
+      if (globalMutedLabelSet && globalMutedLabelSet.has(label)) {
+        const nextMuted = new Set(globalMutedLabelSet);
+        nextMuted.delete(label);
+        globalMutedLabelSet = nextMuted;
+      }
+      toggleGlobalAnimationPlayback();
+      refresh();
+      return;
+    }
     // If a global URL animation controller exists, this toggles participation
     // for this label (mute/unmute). Otherwise, it plays this label as a preview loop.
     //
@@ -3868,6 +3905,15 @@ function toggleGlobalAnimationPlayback() {
   recomputeGlobalTrackLabelSets(anyIntervals);
 
   if (!reflexCore) {
+    return;
+  }
+
+  if (!animationController && isEditModeActive() && anyIntervals.size === 1) {
+    const [label] = anyIntervals.keys();
+    if (label) {
+      const isPreviewPlaying = Boolean(previewController?.isPlaying?.() && previewLabelSet?.has(label));
+      setPreviewLabelPlaying(label, !isPreviewPlaying);
+    }
     return;
   }
 
