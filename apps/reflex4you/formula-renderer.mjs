@@ -4,7 +4,7 @@
 import { FINGER_DECIMAL_PLACES } from './core-engine.mjs';
 
 // Bump this when changing renderer logic so users can verify cached assets.
-export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2026-01-27.1';
+export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2026-01-28.1';
 
 const DEFAULT_MATHJAX_LOAD_TIMEOUT_MS = 9000;
 const DEFAULT_CANVAS_BG_HEX = 'ffffff80';
@@ -62,6 +62,27 @@ function formatNumber(value, { decimalPlaces = FINGER_DECIMAL_PLACES, decimalSep
 
 function escapeLatexIdentifier(name) {
   return String(name || '?').replace(/_/g, '\\_');
+}
+
+const PRIME_SUFFIX = 'prime';
+
+function splitPrimeSuffix(raw) {
+  const source = String(raw || '');
+  let base = source;
+  let count = 0;
+  while (base.endsWith(PRIME_SUFFIX)) {
+    base = base.slice(0, -PRIME_SUFFIX.length);
+    count += 1;
+  }
+  return { base, count };
+}
+
+function escapeLatexIdentifierWithPrimeSuffix(name) {
+  const raw = String(name || '?');
+  const { base, count } = splitPrimeSuffix(raw);
+  const baseName = count ? base : raw;
+  const primeLatex = count ? "'".repeat(count) : '';
+  return `${escapeLatexIdentifier(baseName)}${primeLatex}`;
 }
 
 const GREEK_IDENTIFIER_LATEX = Object.freeze({
@@ -125,27 +146,33 @@ function renderTextWithHighlights(text, highlights) {
 function latexIdentifierWithMetadata(name, metaHighlights) {
   const highlights = Array.isArray(metaHighlights) ? metaHighlights : [];
   const raw = String(name || '?');
+  const { base: primeBase, count: primeCount } = splitPrimeSuffix(raw);
+  const baseRaw = primeCount ? primeBase : raw;
+  const primeLatex = primeCount ? "'".repeat(primeCount) : '';
+  const baseHighlights = primeCount
+    ? highlights.filter((h) => typeof h?.index === 'number' && h.index < baseRaw.length)
+    : highlights;
 
   // Special-case: render `gamma_1` input as a plain "gamma" word + big digit(s).
   // With underscore-as-highlight semantics, the identifier name becomes `gamma1`
   // (and the digit(s) are present in `highlights`).
-  const gammaDigitsMatch = raw.match(/^gamma(\d+)$/);
-  if (gammaDigitsMatch && highlights.length) {
+  const gammaDigitsMatch = baseRaw.match(/^gamma(\d+)$/);
+  if (gammaDigitsMatch && baseHighlights.length) {
     const digits = gammaDigitsMatch[1];
-    return `\\mathrm{gamma}\\,{\\Huge ${digits}}`;
+    return `\\mathrm{gamma}\\,{\\Huge ${digits}}${primeLatex}`;
   }
 
   // If the identifier ends with digits (e.g. d1), render them as a subscript: d_{1}.
-  const digitSuffixMatch = raw.match(/^([A-Za-z]+)(\d+)$/);
+  const digitSuffixMatch = baseRaw.match(/^([A-Za-z]+)(\d+)$/);
   if (digitSuffixMatch) {
     const base = digitSuffixMatch[1];
     const digits = digitSuffixMatch[2];
 
     const baseLen = base.length;
-    const baseHighlights = highlights
+    const baseHighlightsForDigits = baseHighlights
       .filter((h) => typeof h?.index === 'number' && h.index < baseLen)
       .map((h) => ({ index: h.index, letter: h.letter }));
-    const digitHighlights = highlights
+    const digitHighlights = baseHighlights
       .filter((h) => typeof h?.index === 'number' && h.index >= baseLen)
       .map((h) => ({ index: h.index - baseLen, letter: h.letter }));
 
@@ -153,27 +180,27 @@ function latexIdentifierWithMetadata(name, metaHighlights) {
     // has no highlighted characters (highlights may still apply to the digits).
     const baseLower = base.toLowerCase();
     const baseLatex =
-      baseHighlights.length === 0 && baseLower !== 'gamma' && GREEK_IDENTIFIER_LATEX[baseLower]
+      baseHighlightsForDigits.length === 0 && baseLower !== 'gamma' && GREEK_IDENTIFIER_LATEX[baseLower]
         ? GREEK_IDENTIFIER_LATEX[baseLower]
-        : baseHighlights.length
-          ? renderTextWithHighlights(base, baseHighlights)
+        : baseHighlightsForDigits.length
+          ? renderTextWithHighlights(base, baseHighlightsForDigits)
           : escapeLatexIdentifier(base);
     const digitsLatex = digitHighlights.length ? renderTextWithHighlights(digits, digitHighlights) : digits;
 
-    return `${baseLatex}_{${digitsLatex}}`;
+    return `${baseLatex}_{${digitsLatex}}${primeLatex}`;
   }
 
-  if (!highlights.length) {
+  if (!baseHighlights.length) {
     // Render common greek-letter identifiers as their TeX symbols.
     // Do not remap "gamma" (it is reserved for the Euler Gamma function).
-    if (raw !== 'gamma') {
-      const greek = GREEK_IDENTIFIER_LATEX[raw];
-      if (greek) return greek;
+    if (baseRaw !== 'gamma') {
+      const greek = GREEK_IDENTIFIER_LATEX[baseRaw];
+      if (greek) return `${greek}${primeLatex}`;
     }
-    return escapeLatexIdentifier(raw);
+    return `${escapeLatexIdentifier(baseRaw)}${primeLatex}`;
   }
 
-  return renderTextWithHighlights(raw, highlights);
+  return `${renderTextWithHighlights(baseRaw, baseHighlights)}${primeLatex}`;
 }
 
 function operatorNameWithMetadata(name, metaHighlights) {
@@ -434,7 +461,7 @@ function functionCallLatex(name, args, options, metaHighlights = null) {
   const opName =
     Array.isArray(metaHighlights) && metaHighlights.length
       ? operatorNameWithMetadata(fn, metaHighlights)
-      : `\\operatorname{${escapeLatexIdentifier(fn)}}`;
+      : `\\operatorname{${escapeLatexIdentifierWithPrimeSuffix(fn)}}`;
   return `${opName}\\left(${renderedArgs.join(', ')}\\right)`;
 }
 
