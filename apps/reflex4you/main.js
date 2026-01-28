@@ -1348,12 +1348,8 @@ function buildInlineFingerValueEditor(label) {
       if (previewLabelSet && previewLabelSet.has(label)) {
         stopPreviewAnimations();
       }
-      if (globalMutedLabelSet && globalMutedLabelSet.has(label)) {
-        const nextMuted = new Set(globalMutedLabelSet);
-        nextMuted.delete(label);
-        globalMutedLabelSet = nextMuted;
-      }
-      toggleGlobalAnimationPlayback();
+      const currentlyActive = Boolean(animationController && !globalMutedLabelSet.has(label));
+      setGlobalLabelMuted(label, currentlyActive);
       refresh();
       return;
     }
