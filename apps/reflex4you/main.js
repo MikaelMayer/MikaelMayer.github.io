@@ -877,7 +877,17 @@ function refreshFingerSoloValueDisplays() {
     if (fingerSoloAnimGlobalToggleButton) {
       // Show only when multiple parameters are animatable.
       fingerSoloAnimGlobalToggleButton.style.display = animatedCount >= 2 ? '' : 'none';
-      const playing = Boolean(animationController?.isPlaying?.());
+      let playing = Boolean(animationController?.isPlaying?.());
+      if (
+        !playing &&
+        !animationController &&
+        animatedCount === 1 &&
+        isEditModeActive() &&
+        previewController?.isPlaying?.()
+      ) {
+        const [label] = all.keys();
+        playing = Boolean(label && previewLabelSet?.has?.(label));
+      }
       fingerSoloAnimGlobalToggleButton.textContent = playing ? '⏸ Anim' : '▶ Anim';
       fingerSoloAnimGlobalToggleButton.setAttribute('aria-pressed', playing ? 'true' : 'false');
     }
@@ -1334,7 +1344,7 @@ function buildInlineFingerValueEditor(label) {
     if (!interval) return;
     const allTracks = buildAnimationTracksFromQuery();
     const isSoloTrack = allTracks.size === 1 && allTracks.has(label);
-    if (isSoloTrack) {
+    if (isSoloTrack && !isEditModeActive()) {
       if (previewLabelSet && previewLabelSet.has(label)) {
         stopPreviewAnimations();
       }
@@ -3895,6 +3905,15 @@ function toggleGlobalAnimationPlayback() {
   recomputeGlobalTrackLabelSets(anyIntervals);
 
   if (!reflexCore) {
+    return;
+  }
+
+  if (!animationController && isEditModeActive() && anyIntervals.size === 1) {
+    const [label] = anyIntervals.keys();
+    if (label) {
+      const isPreviewPlaying = Boolean(previewController?.isPlaying?.() && previewLabelSet?.has(label));
+      setPreviewLabelPlaying(label, !isPreviewPlaying);
+    }
     return;
   }
 
