@@ -1088,7 +1088,6 @@ const primaryParserNonRepeat = Choice([
   explicitComposeParser,
   elementaryFunctionParser,
   builtinFunctionLiteralParser,
-  ifParser,
   setBindingRef,
   groupedParser,
   literalParser,
@@ -1104,6 +1103,15 @@ const primaryParser = createParser('Primary', (input) => {
   }
   if (repeatResult.severity === ParseSeverity.error || failureAdvancedPastInput(repeatResult, input)) {
     return repeatResult;
+  }
+  // Commit specifically for `if ...`: once we see `if`, do not backtrack and
+  // treat it as an Identifier.
+  const ifResult = ifParser.runNormalized(input);
+  if (ifResult.ok) {
+    return ifResult;
+  }
+  if (ifResult.severity === ParseSeverity.error || failureAdvancedPastInput(ifResult, input)) {
+    return ifResult;
   }
   return primaryParserNonRepeat.runNormalized(input);
 });

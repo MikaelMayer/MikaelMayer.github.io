@@ -825,6 +825,13 @@ test('renders if syntax based on input form', () => {
   assert.match(callLatex, /\\operatorname\{if\}\\left/);
 });
 
+test('missing "then" after if is reported inside let bindings', () => {
+  const result = parseFormulaInput('let c = if 1 else 0 in z');
+  assert.equal(result.ok, false);
+  assert.equal(result.ctor, 'IfThenKeyword');
+  assert.equal(result.expected, 'then');
+});
+
 test('set bindings produce scoped nodes with shared slots', () => {
   const result = parseFormulaInput('set foo = x + 1 in foo * foo');
   assert.equal(result.ok, true);
