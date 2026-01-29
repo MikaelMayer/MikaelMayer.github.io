@@ -248,6 +248,13 @@ test('renders greek identifiers with digit suffix as subscripts (pi1 -> \\pi_{1}
   assert.match(latex, /\\pi_\{1\}/);
 });
 
+test('renders prime suffix as apostrophe (xprime -> x\')', () => {
+  const result = parseFormulaInput('set xprime = 0 in xprime');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /x'/);
+});
+
 test('parses gamma(...) as a primitive and renders with Γ', () => {
   const result = parseFormulaInput('gamma(z)');
   assert.equal(result.ok, true);
