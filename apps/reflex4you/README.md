@@ -163,7 +163,7 @@ This is a compact “Riemann sphere” template that:
 ```text
 set R = 1.5 in
 set r2 = abs^2 in
-if(r2 > R*R, 0,
+if r2 > R*R then 0 else
   set z_s = -sqrt(R*R - r2) in
     set u = z/(R - z_s) in
   set u1 = i*u in
@@ -174,7 +174,6 @@ if(r2 > R*R, 0,
   set u2 = (Ainv*u1 + Binv)/(-(Binv.conj)*u1 + Ainv.conj) in
   set u_rot = (-i)*u2 in
   sin(u_rot)
-)
 ```
 
 The `i*u` / `(-i)` sandwich is a fixed basis alignment so “screen up/right” matches the on-screen trackball axes.
@@ -191,7 +190,7 @@ Notes:
 
 - Reflex supports `arg(z)` (and synonym `argument(z)`): it returns the **phase** of `z` (i.e. `atan2(im(z), re(z))`) as a **real** angle in radians.
 - `arg(z, k)` forwards `k` to `ln(z, k)` so you can control the branch cut (it is computed as `imag(ln(z, k))`).
-- Clamping to `[-1, 1]` is written explicitly with nested `if(...)`.
+- Clamping to `[-1, 1]` is written explicitly with nested `if ... then ... else ...`.
 
 ```text
 set qw = A.x in
@@ -200,7 +199,7 @@ set qy = B.y in
 set qz = A.y in
 
 set tPitch = 2*(qw*qx - qy*qz) in
-set tPitchClamped = if(tPitch < -1, -1, if(tPitch > 1, 1, tPitch)) in
+set tPitchClamped = if tPitch < -1 then -1 else if tPitch > 1 then 1 else tPitch in
 set pitchX = asin(tPitchClamped) in
 
 set yawNum = 2*(qw*qy + qx*qz) in
@@ -238,7 +237,7 @@ Example formula:
       (z*QA + i*QB) / (i*QB.conj*z + QA.conj) $ z * FOV / 4
     in
     let vrview =
-      view $ z + halfEyeDistance*i*if(y < 0, 1, -1)
+      view $ z + halfEyeDistance*i*if y < 0 then 1 else -1
     in
     let fn =
       z^2 + D2 $$ 50 $ z/2
@@ -259,7 +258,7 @@ The input accepts succinct expressions with complex arithmetic, composition, and
   - Each `fj` must be a **user-defined** `let` function with exactly `k+1` parameters: `fj(k, r1, ..., rk)`.
   - Dot composition is equivalent: `f $ expr` is the same as `expr.f` (so `a.b` means `b(a(z))`).
 - **Functions:** `exp`, `sin`, `cos`, `tan`, `atan`/`arctan`, `arg`/`argument`, `asin`/`arcsin`, `acos`/`arccos`, `ln`, `sqrt`, `abs`/`modulus`, `abs2`, `floor`, `conj`, `heav`, `isnan`, `ifnan`/`iferror`. `sqrt(z, k)` desugars to `exp(0.5 * ln(z, k))`, so the optional second argument shifts the log branch; `heav(x)` evaluates to `1` when `x > 0` and `0` otherwise.
-- **Conditionals:** comparisons (`<`, `<=`, `>`, `>=`, `==`), logical ops (`&&`, `||`), and `if(cond, then, else)`.
+- **Conditionals:** comparisons (`<`, `<=`, `>`, `>=`, `==`), logical ops (`&&`, `||`), and `if cond then then else else`.
 - **Bindings:**
   - `set name = value in body` introduces a **value** (evaluated once at the binding site; it can “capture” the current `z`).
   - `let name = expr in body` introduces a **function** (not evaluated until used; it always receives the ambient `z`).
@@ -272,7 +271,7 @@ Examples:
 f $ ((z - W0) / (W1 - W0))    # pan/zoom/rotate via W gestures (W0 is the "zero" end)
 sin $ z - D1                  # manual handle for offsetting input
 set c = abs(z) in c / (1 + c) # temporary value
-if(real < 0, conj(z), z)      # axis-aware interaction
+if real < 0 then conj(z) else z      # axis-aware interaction
 ```
 
 ### Functions (`let`) and calls
@@ -285,7 +284,7 @@ Reflex formulas are **functions of `z`**, so a `let` binding defines a reusable 
   - Use at a specific input: `f(expr)` (equivalently `f $ expr`).
 
 - **Multi-argument functions (extra params)**:
-  - Define: `let max(set w) = if(z < w, w, z) in ...`
+  - Define: `let max(set w) = if z < w then w else z in ...`
   - Call with explicit arguments:
     - `max(a)` binds `w = a` and uses the current `z`.
     - `max(a, z0)` binds `w = a` and uses `z0` **instead of** the ambient `z` (the optional final argument overrides `z`).
@@ -366,10 +365,10 @@ At the very end, we:
 
 ```text
 # final layout (zoom and offsets only here)
-if(y < 0,
-  realGraph    $ z*S $ z+2*i,
+if y < 0 then
+  realGraph    $ z*S $ z+2*i
+else
   complexGraph $ z*S $ z-2*i
-)
 ```
 
 This keeps all geometry, grids, and hit-tests consistent.
@@ -411,9 +410,8 @@ When multiple hit-tests can succeed at the same pixel, the order determines
 what remains visible.
 
 ```text
-if(hitApprox > 0.5, approx,
-  if(hitRef > 0.5, colRef, bg)
-)
+if hitApprox > 0.5 then approx else
+  if hitRef > 0.5 then colRef else bg
 ```
 
 Putting the approximation first avoids it being “erased” by the reference at
@@ -440,7 +438,7 @@ around a target error (e.g. 5%).
 
 ```text
 set e = abs(ref0 - approx0) in
-if(abs(e - err0) < errW, colErr, approx0)
+if abs(e - err0) < errW then colErr else approx0
 ```
 
 This makes convergence for series visually readable as shrinking contours.
@@ -454,13 +452,12 @@ terms explicitly.
 
 ```text
 let fs(k, s, term) =
-  if(k < n, s + term,
-    if(k == n, s + u*term, s)
-  )
+  if k < n then s + term else
+    if k == n then s + u*term else s
 in
 
 let ft(k, s, term) =
-  if(k < n, nextTerm, 0)
+  if k < n then nextTerm else 0
 in
 ```
 
@@ -472,7 +469,7 @@ Small helper functions dramatically simplify timeline logic and improve visual
 smoothness.
 
 ```text
-let clamp(v, lo, hi) = if(v < lo, lo, if(v > hi, hi, v)) in
+let clamp(v, lo, hi) = if v < lo then lo else if v > hi then hi else v in
 let ease01(u) = u^2*(3 - 2*u) in
 ```
 
@@ -510,7 +507,7 @@ Some constructs are **not supported**, not merely discouraged:
 let f = z^2 + 1 in
 
 # avoid (not supported)
-# if(a != b, ...)
+# if a != b then ...
 ```
 
 These patterns form a reusable toolkit for building stable, readable, and

@@ -778,6 +778,53 @@ test('parses if expressions with embedded comparisons', () => {
   assert.equal(node.elseBranch.kind, 'Add');
 });
 
+test('parses if/then/else expressions', () => {
+  const result = parseFormulaInput('if x < y then x + 1 else y + 2');
+  assert.equal(result.ok, true);
+  const node = result.value;
+  assert.equal(node.kind, 'If');
+  assert.equal(node.condition.kind, 'LessThan');
+  assert.equal(node.thenBranch.kind, 'Add');
+  assert.equal(node.elseBranch.kind, 'Add');
+  assert.equal(node.ifSyntax, 'then');
+});
+
+test('parses parenthesized if/then/else conditions', () => {
+  const result = parseFormulaInput('if (x < y) then x else y');
+  assert.equal(result.ok, true);
+  const node = result.value;
+  assert.equal(node.kind, 'If');
+  assert.equal(node.condition.kind, 'LessThan');
+  assert.equal(node.thenBranch.kind, 'VarX');
+  assert.equal(node.elseBranch.kind, 'VarY');
+  assert.equal(node.ifSyntax, 'then');
+});
+
+test('parses nested if/then/else without trailing parentheses', () => {
+  const result = parseFormulaInput('if x < y then if y < 0 then x else y else 0');
+  assert.equal(result.ok, true);
+  const node = result.value;
+  assert.equal(node.kind, 'If');
+  assert.equal(node.thenBranch.kind, 'If');
+  assert.equal(node.thenBranch.ifSyntax, 'then');
+  assert.equal(node.elseBranch.kind, 'Const');
+});
+
+test('renders if syntax based on input form', () => {
+  const keywordResult = parseFormulaInput('if x < y then x else y');
+  assert.equal(keywordResult.ok, true);
+  const keywordLatex = formulaAstToLatex(keywordResult.value);
+  assert.match(keywordLatex, /\\mathrm\{if\}/);
+  assert.match(keywordLatex, /\\mathrm\{then\}/);
+  assert.match(keywordLatex, /\\mathrm\{else\}/);
+  assert.doesNotMatch(keywordLatex, /\\operatorname\{if\}\\left/);
+
+  const callResult = parseFormulaInput('if(x < y, x, y)');
+  assert.equal(callResult.ok, true);
+  const callLatex = formulaAstToLatex(callResult.value);
+  assert.match(callLatex, /\\operatorname\{if\}\\left/);
+});
+
 test('set bindings produce scoped nodes with shared slots', () => {
   const result = parseFormulaInput('set foo = x + 1 in foo * foo');
   assert.equal(result.ok, true);

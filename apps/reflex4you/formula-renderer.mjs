@@ -778,6 +778,9 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
       const cond = nodeToLatex(node.condition, 0, options);
       const thenBranch = nodeToLatex(node.thenBranch, 0, options);
       const elseBranch = nodeToLatex(node.elseBranch, 0, options);
+      if (node.ifSyntax === 'then') {
+        return `\\mathrm{if}\\;${cond}\\;\\mathrm{then}\\;${thenBranch}\\;\\mathrm{else}\\;${elseBranch}`;
+      }
       return `\\operatorname{if}\\left(${cond}, ${thenBranch}, ${elseBranch}\\right)`;
     }
 

@@ -678,23 +678,93 @@ const explicitRepeatComposeParser = createParser('ExplicitRepeatCompose', (input
   });
 });
 
-const ifParser = Sequence([
-  keywordLiteral('if', { ctor: 'IfKeyword' }),
-  wsLiteral('(', { ctor: 'IfOpen' }),
-  expressionRef,
-  wsLiteral(',', { ctor: 'IfComma1' }),
-  expressionRef,
-  wsLiteral(',', { ctor: 'IfComma2' }),
-  expressionRef,
-  wsLiteral(')', { ctor: 'IfClose' }),
-], {
-  ctor: 'IfCall',
-  projector: (values) => ({
-    condition: values[2],
-    thenBranch: values[4],
-    elseBranch: values[6],
-  }),
-}).Map(({ condition, thenBranch, elseBranch }, result) => withSpan(If(condition, thenBranch, elseBranch), result.span));
+const ifKeyword = keywordLiteral('if', { ctor: 'IfKeyword' });
+const ifThenKeyword = keywordLiteral('then', { ctor: 'IfThenKeyword' });
+const ifElseKeyword = keywordLiteral('else', { ctor: 'IfElseKeyword' });
+
+function parseIfThenElse(conditionInput, startInput) {
+  const conditionResult = expressionRef.runNormalized(conditionInput);
+  if (!conditionResult.ok) {
+    return conditionResult;
+  }
+  const thenKeyword = ifThenKeyword.runNormalized(conditionResult.next);
+  if (!thenKeyword.ok) {
+    return thenKeyword;
+  }
+  const thenResult = expressionRef.runNormalized(thenKeyword.next);
+  if (!thenResult.ok) {
+    return thenResult;
+  }
+  const elseKeyword = ifElseKeyword.runNormalized(thenResult.next);
+  if (!elseKeyword.ok) {
+    return elseKeyword;
+  }
+  const elseResult = expressionRef.runNormalized(elseKeyword.next);
+  if (!elseResult.ok) {
+    return elseResult;
+  }
+  const span = spanBetween(startInput, elseResult.next);
+  const node = withSpan(If(conditionResult.value, thenResult.value, elseResult.value), span);
+  node.ifSyntax = 'then';
+  return new ParseSuccess({
+    ctor: 'IfThenElse',
+    value: node,
+    span,
+    next: elseResult.next,
+  });
+}
+
+const ifParser = createParser('If', (input) => {
+  const keyword = ifKeyword.runNormalized(input);
+  if (!keyword.ok) {
+    return keyword;
+  }
+  const afterIf = keyword.next;
+  const open = wsLiteral('(', { ctor: 'IfOpen' }).runNormalized(afterIf);
+  if (!open.ok) {
+    if (open.severity === ParseSeverity.error) {
+      return open;
+    }
+    return parseIfThenElse(afterIf, input);
+  }
+
+  const conditionInside = expressionRef.runNormalized(open.next);
+  if (!conditionInside.ok) {
+    return conditionInside;
+  }
+  const comma1 = wsLiteral(',', { ctor: 'IfComma1' }).runNormalized(conditionInside.next);
+  if (!comma1.ok) {
+    if (comma1.severity === ParseSeverity.error) {
+      return comma1;
+    }
+    // No comma: backtrack and parse `if <expr> then <expr> else <expr>`.
+    return parseIfThenElse(afterIf, input);
+  }
+  const thenResult = expressionRef.runNormalized(comma1.next);
+  if (!thenResult.ok) {
+    return thenResult;
+  }
+  const comma2 = wsLiteral(',', { ctor: 'IfComma2' }).runNormalized(thenResult.next);
+  if (!comma2.ok) {
+    return comma2;
+  }
+  const elseResult = expressionRef.runNormalized(comma2.next);
+  if (!elseResult.ok) {
+    return elseResult;
+  }
+  const close = wsLiteral(')', { ctor: 'IfClose' }).runNormalized(elseResult.next);
+  if (!close.ok) {
+    return close;
+  }
+  const span = spanBetween(input, close.next);
+  const node = withSpan(If(conditionInside.value, thenResult.value, elseResult.value), span);
+  return new ParseSuccess({
+    ctor: 'IfCall',
+    value: node,
+    span,
+    next: close.next,
+  });
+});
 
 function createBinaryFunctionParser(name, factory) {
   return Sequence([
