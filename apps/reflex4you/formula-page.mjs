@@ -1,5 +1,5 @@
 import { parseFormulaInput } from './arithmetic-parser.mjs';
-import { formatCaretIndicator } from './parse-error-format.mjs';
+import { formatCaretIndicator, getCaretSelection } from './parse-error-format.mjs';
 import { renderFormulaToCanvas, FORMULA_RENDERER_BUILD_ID } from './formula-renderer.mjs';
 import {
   verifyCompressionSupport,
@@ -44,6 +44,10 @@ function $(id) {
   return document.getElementById(id);
 }
 
+const formulaInput = $('formula-input');
+const formulaError = $('formula-error');
+let parseErrorSelection = null;
+
 function normalizeHex8(value) {
   const raw = String(value || '').trim().replace(/^#/, '');
   if (raw.length === 6 && /^[0-9a-fA-F]{6}$/.test(raw)) {
@@ -86,16 +90,97 @@ function setDownloadEnabled(enabled) {
   btn.disabled = !enabled;
 }
 
-function showError(message) {
-  const errorEl = $('formula-error');
-  if (!errorEl) return;
-  if (message) {
-    errorEl.textContent = message;
-    errorEl.style.display = 'block';
-  } else {
-    errorEl.textContent = '';
-    errorEl.style.display = 'none';
+function setParseErrorSelection(selection) {
+  if (!selection || !Number.isFinite(selection.start) || !formulaInput || !formulaError) {
+    parseErrorSelection = null;
+    if (formulaError) {
+      formulaError.removeAttribute('data-error-kind');
+      formulaError.removeAttribute('title');
+    }
+    return;
   }
+  const start = Math.max(0, selection.start);
+  const end = Number.isFinite(selection.end) ? Math.max(start, selection.end) : start;
+  parseErrorSelection = { start, end };
+  formulaError.setAttribute('data-error-kind', 'parse');
+  formulaError.title = 'Click to jump to error';
+}
+
+function scrollTextareaToSelection(textarea, selectionStart) {
+  if (!textarea || typeof window === 'undefined') {
+    return;
+  }
+  const value = textarea.value || '';
+  const lineIndex = value.slice(0, selectionStart).split('\n').length - 1;
+  let lineHeight = null;
+  try {
+    const style = window.getComputedStyle(textarea);
+    lineHeight = parseFloat(style.lineHeight);
+    if (!Number.isFinite(lineHeight)) {
+      const fontSize = parseFloat(style.fontSize);
+      lineHeight = Number.isFinite(fontSize) ? fontSize * 1.35 : null;
+    }
+  } catch (_) {
+    lineHeight = null;
+  }
+  const targetTop = Number.isFinite(lineHeight)
+    ? Math.max(0, lineIndex * lineHeight - textarea.clientHeight * 0.3)
+    : null;
+  if (Number.isFinite(targetTop)) {
+    textarea.scrollTop = targetTop;
+  }
+}
+
+function focusFormulaSelection(selection) {
+  if (!formulaInput || !selection) {
+    return;
+  }
+  const valueLength = formulaInput.value.length;
+  const start = Math.max(0, Math.min(selection.start, valueLength));
+  const end = Math.max(start, Math.min(selection.end, valueLength));
+  formulaInput.focus();
+  try {
+    formulaInput.setSelectionRange(start, end);
+  } catch (_) {
+    // ignore
+  }
+  scrollTextareaToSelection(formulaInput, start);
+}
+
+function handleParseErrorClick(event) {
+  if (!parseErrorSelection || !formulaInput) {
+    return;
+  }
+  if (event?.target?.closest) {
+    const ignore = event.target.closest('button, a, input, textarea, select');
+    if (ignore) {
+      return;
+    }
+  }
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
+  focusFormulaSelection(parseErrorSelection);
+}
+
+function showError(message, { parseSelection } = {}) {
+  if (!formulaError) return;
+  setParseErrorSelection(parseSelection);
+  if (message) {
+    formulaError.textContent = message;
+    formulaError.style.display = 'block';
+  } else {
+    formulaError.textContent = '';
+    formulaError.style.display = 'none';
+  }
+}
+
+function showParseError(source, failure) {
+  const parseSelection = getCaretSelection(source, failure);
+  showError(formatCaretIndicator(source, failure), { parseSelection });
+}
+
+if (formulaError) {
+  formulaError.addEventListener('click', handleParseErrorClick);
 }
 
 function showStaleWarning(message) {
@@ -163,7 +248,7 @@ async function renderFromSource(source, { updateUrl = false } = {}) {
 
   const parsed = parseFormulaInput(normalized);
   if (!parsed.ok) {
-    showError(formatCaretIndicator(normalized, parsed));
+    showParseError(normalized, parsed);
     clearRender();
     return { ok: false };
   }
@@ -191,7 +276,7 @@ async function bootstrap() {
 
   const source = (decoded && decoded.trim()) ? decoded : DEFAULT_FORMULA_TEXT;
 
-  const inputEl = $('formula-input');
+  const inputEl = formulaInput;
   if (inputEl) {
     inputEl.value = source;
   }

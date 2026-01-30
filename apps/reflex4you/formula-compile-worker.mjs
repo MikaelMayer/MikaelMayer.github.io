@@ -1,5 +1,5 @@
 import { parseFormulaInput } from './arithmetic-parser.mjs';
-import { formatCaretIndicator } from './parse-error-format.mjs';
+import { formatCaretIndicator, getCaretSelection } from './parse-error-format.mjs';
 import { compileFormulaForGpu } from './core-engine.mjs';
 
 function nowMs() {
@@ -22,10 +22,12 @@ self.onmessage = (event) => {
     const result = parseFormulaInput(source, { fingerValues });
     parseMs = nowMs() - parseStart;
     if (!result.ok) {
+      const caretSelection = getCaretSelection(source, result);
       self.postMessage({
         id,
         ok: false,
         caretMessage: formatCaretIndicator(source, result),
+        caretSelection,
         timings: { workerParseMs: parseMs },
       });
       return;

@@ -19,3 +19,22 @@ export function formatCaretIndicator(source, failure) {
 
   return `${line}\n${caretLine}\n${message}`;
 }
+
+export function getCaretSelection(source, failure) {
+  if (!failure?.span) return null;
+  const displaySource = String(source ?? '');
+  const origin = failure?.span?.input?.start ?? 0;
+  const rawStart = failure?.span?.start - origin;
+  const rawEnd = failure?.span?.end - origin;
+  if (!Number.isFinite(rawStart) || !Number.isFinite(rawEnd)) {
+    return null;
+  }
+  const maxLen = displaySource.length;
+  const start = Math.max(0, Math.min(rawStart, maxLen));
+  const endRaw = Math.max(0, Math.min(rawEnd, maxLen));
+  let end = endRaw;
+  if (end <= start && maxLen > 0) {
+    end = Math.min(start + 1, maxLen);
+  }
+  return { start, end };
+}
