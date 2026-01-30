@@ -12,7 +12,7 @@ import {
 import { formulaAstToLatex, renderLatexToCanvas } from './formula-renderer.mjs';
 import { visitAst } from './ast-utils.mjs';
 import { parseFormulaInput } from './arithmetic-parser.mjs';
-import { formatCaretIndicator } from './parse-error-format.mjs';
+import { formatCaretIndicator, getCaretSelection } from './parse-error-format.mjs';
 import {
   FORMULA_PARAM,
   FORMULA_B64_PARAM,
@@ -44,6 +44,7 @@ const compileOverlayText = document.getElementById('compile-overlay-text');
 const rootElement = typeof document !== 'undefined' ? document.documentElement : null;
 
 let fatalErrorActive = false;
+let parseErrorSelection = null;
 
 const COMPILE_OVERLAY_TICK_MS = 240;
 const COMPILE_STATUS_DELAY_MS = 1000;
@@ -156,6 +157,7 @@ function showCompileStatusMessage(message) {
   if (fatalErrorActive || !errorDiv) {
     return;
   }
+  setParseErrorSelection(null);
   const severity = errorDiv.getAttribute('data-error-severity');
   if (severity && severity !== 'status') {
     return;
@@ -267,7 +269,7 @@ function setCompileOverlayVisible(visible, message = null) {
 // Show a cold-start loading indicator only if it hangs > 1s.
 setCompileOverlayPhase('Loading…', { resetStart: true });
 
-const APP_VERSION = 41;
+const APP_VERSION = 42;
 const CONTEXT_LOSS_RELOAD_KEY = `reflex4you:contextLossReloaded:v${APP_VERSION}`;
 const RESUME_RELOAD_KEY = `reflex4you:resumeReloaded:v${APP_VERSION}`;
 const LAST_HIDDEN_AT_KEY = `reflex4you:lastHiddenAtMs:v${APP_VERSION}`;
@@ -2341,11 +2343,86 @@ function handleTrackballChange(su2) {
   }
 }
 
-function showError(msg) {
+function setParseErrorSelection(selection) {
+  if (!selection || !Number.isFinite(selection.start) || !formulaTextarea) {
+    parseErrorSelection = null;
+    if (errorDiv) {
+      errorDiv.removeAttribute('data-error-kind');
+      errorDiv.removeAttribute('title');
+    }
+    return;
+  }
+  const start = Math.max(0, selection.start);
+  const end = Number.isFinite(selection.end) ? Math.max(start, selection.end) : start;
+  parseErrorSelection = { start, end };
+  if (errorDiv) {
+    errorDiv.setAttribute('data-error-kind', 'parse');
+    errorDiv.title = 'Click to jump to error';
+  }
+}
+
+function scrollTextareaToSelection(textarea, selectionStart) {
+  if (!textarea || typeof window === 'undefined') {
+    return;
+  }
+  const value = textarea.value || '';
+  const lineIndex = value.slice(0, selectionStart).split('\n').length - 1;
+  let lineHeight = null;
+  try {
+    const style = window.getComputedStyle(textarea);
+    lineHeight = parseFloat(style.lineHeight);
+    if (!Number.isFinite(lineHeight)) {
+      const fontSize = parseFloat(style.fontSize);
+      lineHeight = Number.isFinite(fontSize) ? fontSize * 1.35 : null;
+    }
+  } catch (_) {
+    lineHeight = null;
+  }
+  const targetTop = Number.isFinite(lineHeight)
+    ? Math.max(0, lineIndex * lineHeight - textarea.clientHeight * 0.3)
+    : null;
+  if (Number.isFinite(targetTop)) {
+    textarea.scrollTop = targetTop;
+  }
+}
+
+function focusFormulaSelection(selection) {
+  if (!formulaTextarea || !selection) {
+    return;
+  }
+  const valueLength = formulaTextarea.value.length;
+  const start = Math.max(0, Math.min(selection.start, valueLength));
+  const end = Math.max(start, Math.min(selection.end, valueLength));
+  formulaTextarea.focus();
+  try {
+    formulaTextarea.setSelectionRange(start, end);
+  } catch (_) {
+    // ignore
+  }
+  scrollTextareaToSelection(formulaTextarea, start);
+}
+
+function handleParseErrorClick(event) {
+  if (fatalErrorActive || !parseErrorSelection || !formulaTextarea) {
+    return;
+  }
+  if (event?.target?.closest) {
+    const ignore = event.target.closest('button, a, input, textarea, select, .error-actions');
+    if (ignore) {
+      return;
+    }
+  }
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
+  focusFormulaSelection(parseErrorSelection);
+}
+
+function showError(msg, { parseSelection } = {}) {
   if (fatalErrorActive) {
     return;
   }
   clearCompileOverlayPhase();
+  setParseErrorSelection(parseSelection);
   errorDiv.setAttribute('data-error-severity', 'error');
   try {
     errorDiv.innerHTML = '';
@@ -2359,6 +2436,7 @@ function showError(msg) {
 function showFatalError(msg) {
   clearCompileOverlayPhase();
   fatalErrorActive = true;
+  setParseErrorSelection(null);
   errorDiv.setAttribute('data-error-severity', 'fatal');
   try {
     errorDiv.innerHTML = '';
@@ -2424,6 +2502,7 @@ function clearError() {
     return;
   }
   compileStatusVisible = false;
+  setParseErrorSelection(null);
   errorDiv.removeAttribute('data-error-severity');
   errorDiv.style.display = 'none';
   try {
@@ -2431,6 +2510,10 @@ function clearError() {
   } catch (_) {
     errorDiv.textContent = '';
   }
+}
+
+if (errorDiv) {
+  errorDiv.addEventListener('click', handleParseErrorClick);
 }
 
 function handleRendererInitializationFailure(error) {
@@ -2554,7 +2637,8 @@ function maybeRecoverFromWebglContextLoss() {
 }
 
 function showParseError(source, failure) {
-  showError(formatCaretIndicator(source, failure));
+  const parseSelection = getCaretSelection(source, failure);
+  showError(formatCaretIndicator(source, failure), { parseSelection });
 }
 
 // =========================
@@ -2598,7 +2682,9 @@ function ensureFormulaCompileWorker() {
     }
 
     if (!data.ok) {
-      showError(String(data.caretMessage || 'Unable to parse formula.'));
+      showError(String(data.caretMessage || 'Unable to parse formula.'), {
+        parseSelection: data.caretSelection,
+      });
       setCompileOverlayVisible(false);
       return;
     }
@@ -4438,7 +4524,7 @@ function triggerImageDownload(url, filename, shouldRevoke) {
 
 if ('serviceWorker' in navigator) {
   // Version the SW script URL so updates can't get stuck behind a cached SW script.
-  const SW_URL = './service-worker.js?sw=41.0';
+  const SW_URL = './service-worker.js?sw=42.0';
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(SW_URL).then((registration) => {
       // Auto-activate updated workers so cache/version bumps take effect quickly.
