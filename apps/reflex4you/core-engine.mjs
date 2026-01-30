@@ -1,6 +1,7 @@
 // Core engine for Reflex4You: AST helpers, GLSL generation, and renderer
 
 import { cloneAst, childEntries, visitAst } from './ast-utils.mjs';
+import { evaluateConstantNode } from './constant-eval.mjs';
 
 // =========================
 // AST constructors
@@ -799,7 +800,8 @@ export function prepareAstForGpu(ast) {
   // AND a late lowering phase for high-level surface sugar (sum/prod, PowExpr).
   const cloned = cloneAst(ast, { preserveBindings: true });
   const lowered = lowerFunctionParams(cloned);
-  return lowerHighLevelSugar(lowered);
+  const loweredHighLevel = lowerHighLevelSugar(lowered);
+  return inlineConstantSets(loweredHighLevel);
 }
 
 function lowerFunctionParams(ast) {
@@ -1048,6 +1050,90 @@ function lowerFunctionParams(ast) {
       }
     }
   }
+  return root;
+}
+
+function inlineConstantSets(ast) {
+  let root = ast;
+  const evalContext = {
+    fingerValues: null,
+    bindingStack: [],
+    allowFingerConstants: false,
+  };
+
+  function replace(parent, key, replacement) {
+    if (parent && key != null) {
+      parent[key] = replacement;
+    } else {
+      root = replacement;
+    }
+  }
+
+  function makeConstNode(value, sourceNode) {
+    const node = Const(value.re, value.im);
+    if (sourceNode && sourceNode.span) {
+      node.span = sourceNode.span;
+      node.input = sourceNode.input;
+    }
+    return node;
+  }
+
+  function isFiniteComplex(value) {
+    return Number.isFinite(value.re) && Number.isFinite(value.im);
+  }
+
+  function getBindingValue(binding, localBindings) {
+    for (let i = localBindings.length - 1; i >= 0; i -= 1) {
+      if (localBindings[i].binding === binding) {
+        return localBindings[i].value;
+      }
+    }
+    return null;
+  }
+
+  function visit(node, parent, key, localBindings) {
+    if (!node || typeof node !== 'object') {
+      return;
+    }
+    if (node.kind === 'SetRef') {
+      if (node.binding) {
+        const constantValue = getBindingValue(node.binding, localBindings);
+        if (constantValue) {
+          replace(parent, key, makeConstNode(constantValue, node));
+        }
+      }
+      return;
+    }
+    if (node.kind === 'SetBinding') {
+      visit(node.value, node, 'value', localBindings);
+      const value = evaluateConstantNode(node.value, evalContext, {}, localBindings);
+      if (value && isFiniteComplex(value)) {
+        const nextBindings = [...localBindings, { binding: node, value }];
+        visit(node.body, node, 'body', nextBindings);
+        const replacement = node.body;
+        if (node.span && replacement && typeof replacement === 'object') {
+          replacement.span = node.span;
+          replacement.input = node.input;
+        }
+        replace(parent, key, replacement);
+        return;
+      }
+      visit(node.body, node, 'body', localBindings);
+      return;
+    }
+    const entries = childEntries(node);
+    for (const [childKey, child] of entries) {
+      if (Array.isArray(child)) {
+        for (let i = 0; i < child.length; i += 1) {
+          visit(child[i], child, i, localBindings);
+        }
+      } else {
+        visit(child, node, childKey, localBindings);
+      }
+    }
+  }
+
+  visit(root, null, null, []);
   return root;
 }
 
