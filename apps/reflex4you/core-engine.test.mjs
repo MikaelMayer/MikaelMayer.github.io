@@ -433,8 +433,8 @@ test('identifier resolution traverses all parsed function-call nodes (regression
   }
 });
 
-test('let alias preserves captured set bindings (set d = 1 in let f = z + d in let g = f in g)', () => {
-  const parsed = parseFormulaInput('set d = 1 in let f = z + d in let g = f in g');
+test('let alias preserves captured set bindings (set d = D1.x in let f = z + d in let g = f in g)', () => {
+  const parsed = parseFormulaInput('set d = D1.x in let f = z + d in let g = f in g');
   assert.equal(parsed.ok, true);
   let fragment = '';
   assert.doesNotThrow(() => {
