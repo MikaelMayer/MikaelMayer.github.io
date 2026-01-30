@@ -546,6 +546,31 @@ integral(sin, 0) - 1
   }
 });
 
+test('prepareAstForGpu inlines constant set bindings', () => {
+  const parsed = parseFormulaInput('set a = 1 in set b = a + 2 in b + z');
+  assert.equal(parsed.ok, true);
+  const prepared = prepareAstForGpu(parsed.value);
+  let setBindings = 0;
+  let setRefs = 0;
+  visitAst(prepared, (node) => {
+    if (node.kind === 'SetBinding') setBindings += 1;
+    if (node.kind === 'SetRef') setRefs += 1;
+  });
+  assert.equal(setBindings, 0);
+  assert.equal(setRefs, 0);
+});
+
+test('prepareAstForGpu preserves finger-based set bindings', () => {
+  const parsed = parseFormulaInput('set a = D1.x in a + 1');
+  assert.equal(parsed.ok, true);
+  const prepared = prepareAstForGpu(parsed.value);
+  let setBindings = 0;
+  visitAst(prepared, (node) => {
+    if (node.kind === 'SetBinding') setBindings += 1;
+  });
+  assert.ok(setBindings > 0);
+});
+
 test('buildFragmentSourceFromAST does not silently drop legacy RepeatComposePlaceholder nodes', () => {
   // This node kind should normally be resolved during parsing, but shader generation
   // must not compile it as just the base when the count is a literal.

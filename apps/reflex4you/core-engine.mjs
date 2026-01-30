@@ -799,7 +799,8 @@ export function prepareAstForGpu(ast) {
   // AND a late lowering phase for high-level surface sugar (sum/prod, PowExpr).
   const cloned = cloneAst(ast, { preserveBindings: true });
   const lowered = lowerFunctionParams(cloned);
-  return lowerHighLevelSugar(lowered);
+  const loweredHighLevel = lowerHighLevelSugar(lowered);
+  return inlineConstantSets(loweredHighLevel);
 }
 
 function lowerFunctionParams(ast) {
@@ -1048,6 +1049,347 @@ function lowerFunctionParams(ast) {
       }
     }
   }
+  return root;
+}
+
+function inlineConstantSets(ast) {
+  let root = ast;
+  const truthyEps = 1e-12;
+
+  function replace(parent, key, replacement) {
+    if (parent && key != null) {
+      parent[key] = replacement;
+    } else {
+      root = replacement;
+    }
+  }
+
+  function makeConstNode(value, sourceNode) {
+    const node = Const(value.re, value.im);
+    if (sourceNode && sourceNode.span) {
+      node.span = sourceNode.span;
+      node.input = sourceNode.input;
+    }
+    return node;
+  }
+
+  function isFiniteComplex(value) {
+    return Number.isFinite(value.re) && Number.isFinite(value.im);
+  }
+
+  function complexAddConst(a, b) {
+    return { re: a.re + b.re, im: a.im + b.im };
+  }
+
+  function complexSubConst(a, b) {
+    return { re: a.re - b.re, im: a.im - b.im };
+  }
+
+  function complexMulConst(a, b) {
+    return {
+      re: a.re * b.re - a.im * b.im,
+      im: a.re * b.im + a.im * b.re,
+    };
+  }
+
+  function complexDivConst(a, b) {
+    const denom = b.re * b.re + b.im * b.im;
+    if (denom < 1e-12) {
+      return null;
+    }
+    return {
+      re: (a.re * b.re + a.im * b.im) / denom,
+      im: (a.im * b.re - a.re * b.im) / denom,
+    };
+  }
+
+  function complexPowIntConst(value, exp) {
+    if (!Number.isInteger(exp)) {
+      return null;
+    }
+    if (exp === 0) {
+      return { re: 1, im: 0 };
+    }
+    let power = Math.abs(exp);
+    let base = { re: value.re, im: value.im };
+    let result = { re: 1, im: 0 };
+    while (power > 0) {
+      if (power % 2 === 1) {
+        result = complexMulConst(result, base);
+      }
+      base = complexMulConst(base, base);
+      power = Math.floor(power / 2);
+    }
+    if (exp < 0) {
+      return complexDivConst({ re: 1, im: 0 }, result);
+    }
+    return result;
+  }
+
+  function isTruthyComplex(value) {
+    return Math.abs(value.re) > truthyEps || Math.abs(value.im) > truthyEps;
+  }
+
+  function evaluateConstantValue(node, env) {
+    if (!node || typeof node !== 'object') {
+      return null;
+    }
+    switch (node.kind) {
+      case 'Const':
+        return { re: node.re, im: node.im };
+      case 'SetRef': {
+        if (node.binding && env.has(node.binding)) {
+          return env.get(node.binding);
+        }
+        return null;
+      }
+      case 'SetBinding': {
+        const value = evaluateConstantValue(node.value, env);
+        if (!value) {
+          return null;
+        }
+        const nextEnv = new Map(env);
+        nextEnv.set(node, value);
+        return evaluateConstantValue(node.body, nextEnv);
+      }
+      case 'Add': {
+        const left = evaluateConstantValue(node.left, env);
+        const right = evaluateConstantValue(node.right, env);
+        return left && right ? complexAddConst(left, right) : null;
+      }
+      case 'Sub': {
+        const left = evaluateConstantValue(node.left, env);
+        const right = evaluateConstantValue(node.right, env);
+        return left && right ? complexSubConst(left, right) : null;
+      }
+      case 'Mul': {
+        const left = evaluateConstantValue(node.left, env);
+        const right = evaluateConstantValue(node.right, env);
+        return left && right ? complexMulConst(left, right) : null;
+      }
+      case 'Div': {
+        const left = evaluateConstantValue(node.left, env);
+        const right = evaluateConstantValue(node.right, env);
+        if (!left || !right) {
+          return null;
+        }
+        return complexDivConst(left, right);
+      }
+      case 'Pow': {
+        const base = evaluateConstantValue(node.base, env);
+        if (!base) {
+          return null;
+        }
+        return complexPowIntConst(base, node.exponent);
+      }
+      case 'Exp': {
+        const value = evaluateConstantValue(node.value, env);
+        if (!value || value.im !== 0) {
+          return null;
+        }
+        return { re: Math.exp(value.re), im: 0 };
+      }
+      case 'Sin': {
+        const value = evaluateConstantValue(node.value, env);
+        if (!value || value.im !== 0) {
+          return null;
+        }
+        return { re: Math.sin(value.re), im: 0 };
+      }
+      case 'Cos': {
+        const value = evaluateConstantValue(node.value, env);
+        if (!value || value.im !== 0) {
+          return null;
+        }
+        return { re: Math.cos(value.re), im: 0 };
+      }
+      case 'Tan': {
+        const value = evaluateConstantValue(node.value, env);
+        if (!value || value.im !== 0) {
+          return null;
+        }
+        return { re: Math.tan(value.re), im: 0 };
+      }
+      case 'Atan': {
+        const value = evaluateConstantValue(node.value, env);
+        if (!value || value.im !== 0) {
+          return null;
+        }
+        return { re: Math.atan(value.re), im: 0 };
+      }
+      case 'Asin': {
+        const value = evaluateConstantValue(node.value, env);
+        if (!value || value.im !== 0 || value.re < -1 || value.re > 1) {
+          return null;
+        }
+        return { re: Math.asin(value.re), im: 0 };
+      }
+      case 'Acos': {
+        const value = evaluateConstantValue(node.value, env);
+        if (!value || value.im !== 0 || value.re < -1 || value.re > 1) {
+          return null;
+        }
+        return { re: Math.acos(value.re), im: 0 };
+      }
+      case 'Ln': {
+        const value = evaluateConstantValue(node.value, env);
+        if (!value || value.im !== 0 || value.re <= 0) {
+          return null;
+        }
+        return { re: Math.log(value.re), im: 0 };
+      }
+      case 'Arg': {
+        const value = evaluateConstantValue(node.value, env);
+        if (!value || value.im !== 0 || value.re === 0) {
+          return null;
+        }
+        return { re: value.re < 0 ? Math.PI : 0, im: 0 };
+      }
+      case 'Abs': {
+        const value = evaluateConstantValue(node.value, env);
+        if (!value) {
+          return null;
+        }
+        return { re: Math.hypot(value.re, value.im), im: 0 };
+      }
+      case 'Abs2': {
+        const value = evaluateConstantValue(node.value, env);
+        if (!value) {
+          return null;
+        }
+        return { re: value.re * value.re + value.im * value.im, im: 0 };
+      }
+      case 'Floor': {
+        const value = evaluateConstantValue(node.value, env);
+        return value ? { re: Math.floor(value.re), im: Math.floor(value.im) } : null;
+      }
+      case 'Conjugate': {
+        const value = evaluateConstantValue(node.value, env);
+        return value ? { re: value.re, im: -value.im } : null;
+      }
+      case 'IsNaN': {
+        const value = evaluateConstantValue(node.value, env);
+        if (!value) {
+          return null;
+        }
+        const magnitude = Math.hypot(value.re, value.im);
+        const isError = !Number.isFinite(magnitude) || magnitude > 1e10;
+        return { re: isError ? 1 : 0, im: 0 };
+      }
+      case 'LessThan':
+      case 'GreaterThan':
+      case 'LessThanOrEqual':
+      case 'GreaterThanOrEqual':
+      case 'Equal': {
+        const left = evaluateConstantValue(node.left, env);
+        const right = evaluateConstantValue(node.right, env);
+        if (!left || !right) {
+          return null;
+        }
+        let result = 0;
+        switch (node.kind) {
+          case 'LessThan':
+            result = left.re < right.re ? 1 : 0;
+            break;
+          case 'GreaterThan':
+            result = left.re > right.re ? 1 : 0;
+            break;
+          case 'LessThanOrEqual':
+            result = left.re <= right.re ? 1 : 0;
+            break;
+          case 'GreaterThanOrEqual':
+            result = left.re >= right.re ? 1 : 0;
+            break;
+          case 'Equal':
+            result = left.re === right.re ? 1 : 0;
+            break;
+          default:
+            result = 0;
+        }
+        return { re: result, im: 0 };
+      }
+      case 'LogicalAnd':
+      case 'LogicalOr': {
+        const left = evaluateConstantValue(node.left, env);
+        const right = evaluateConstantValue(node.right, env);
+        if (!left || !right) {
+          return null;
+        }
+        const leftTruthy = isTruthyComplex(left);
+        const rightTruthy = isTruthyComplex(right);
+        const result =
+          node.kind === 'LogicalAnd'
+            ? leftTruthy && rightTruthy
+            : leftTruthy || rightTruthy;
+        return { re: result ? 1 : 0, im: 0 };
+      }
+      case 'If': {
+        const condition = evaluateConstantValue(node.condition, env);
+        if (!condition) {
+          return null;
+        }
+        const branch = isTruthyComplex(condition) ? node.thenBranch : node.elseBranch;
+        return evaluateConstantValue(branch, env);
+      }
+      case 'IfNaN': {
+        const value = evaluateConstantValue(node.value, env);
+        if (!value) {
+          return null;
+        }
+        const magnitude = Math.hypot(value.re, value.im);
+        const isError = !Number.isFinite(magnitude) || magnitude > 1e10;
+        if (isError) {
+          return evaluateConstantValue(node.fallback, env);
+        }
+        return value;
+      }
+      default:
+        return null;
+    }
+  }
+
+  function visit(node, parent, key, env) {
+    if (!node || typeof node !== 'object') {
+      return;
+    }
+    if (node.kind === 'SetRef') {
+      if (node.binding && env.has(node.binding)) {
+        const constantValue = env.get(node.binding);
+        replace(parent, key, makeConstNode(constantValue, node));
+      }
+      return;
+    }
+    if (node.kind === 'SetBinding') {
+      visit(node.value, node, 'value', env);
+      const value = evaluateConstantValue(node.value, env);
+      if (value && isFiniteComplex(value)) {
+        const nextEnv = new Map(env);
+        nextEnv.set(node, value);
+        visit(node.body, node, 'body', nextEnv);
+        const replacement = node.body;
+        if (node.span && replacement && typeof replacement === 'object') {
+          replacement.span = node.span;
+          replacement.input = node.input;
+        }
+        replace(parent, key, replacement);
+        return;
+      }
+      visit(node.body, node, 'body', env);
+      return;
+    }
+    const entries = childEntries(node);
+    for (const [childKey, child] of entries) {
+      if (Array.isArray(child)) {
+        for (let i = 0; i < child.length; i += 1) {
+          visit(child[i], child, i, env);
+        }
+      } else {
+        visit(child, node, childKey, env);
+      }
+    }
+  }
+
+  visit(root, null, null, new Map());
   return root;
 }
 
