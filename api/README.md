@@ -9,6 +9,10 @@ and generate shareable URLs (including finger values, animations, and timing).
   - Endpoint: `/api/reflex4you`
   - Method: `POST`
   - Returns: `{ ok, url, caretMessage, caretSelection }`
+- `reflex4you-preview.mjs` – Vercel Serverless Function
+  - Endpoint: `/api/reflex4you-preview`
+  - Method: `GET` or `POST`
+  - Returns: `image/svg+xml` (or JSON when `format=json`)
 
 ## Quick deploy on Vercel (from GitHub)
 
@@ -44,7 +48,7 @@ You can test this on https://hoppscotch.io/, just select POST, select body, cont
   "duration": "6s",
   "solos": ["D1", "D2"],
   "edit": true,
-  "compress": false,
+  "compress": true,
   "includeFormulaParam": false,
   "validate": true,
   "compile": false
@@ -57,16 +61,49 @@ You can test this on https://hoppscotch.io/, just select POST, select body, cont
   strings (`a+bi`, `a-bi`, `a,b`, or `a`).
 - `animations` encodes `labelA=start..end` for finger labels only.
 - `duration` sets `t=...` in seconds (e.g. `"5s"` or `5`).
-- `compress=true` uses `formulab64` (gzip + base64url). Use
-  `includeFormulaParam=true` to also include `formula=` for compatibility.
+- `compress` defaults to `true` and uses `formulab64` (gzip + base64url). Set
+  `compress=false` to emit a raw `formula=` instead.
+- `includeFormulaParam=true` also includes `formula=` alongside `formulab64`.
+
+## Preview endpoint
+
+Render a formula preview image (MathJax SVG):
+
+```json
+POST /api/reflex4you-preview
+{
+  "source": "sin(z^2 + D1)",
+  "values": { "D1": "0.2+0.3i" },
+  "inlineFingerConstants": true,
+  "format": "json"
+}
+```
+
+When `format=json`, the response includes the SVG as a string:
+
+```json
+{
+  "ok": true,
+  "svg": "<svg ...>...</svg>",
+  "latex": "\\operatorname{sin}(z^2 + D_1)",
+  "caretMessage": null,
+  "caretSelection": null
+}
+```
+
+You can also call it via GET for `<img src>` embedding:
+
+```
+/api/reflex4you-preview?formulab64=...&format=svg
+```
 
 ## Example response
 
 ```json
 {
   "ok": true,
-  "url": "https://mikaelmayer.github.io/apps/reflex4you/index.html?formula=sin(z%5E2%20%2B%20D1)%20%24%20z%20-%20D2&D1=0.2-0.3i",
-  "query": "formula=sin(z%5E2%20%2B%20D1)%20%24%20z%20-%20D2&D1=0.2-0.3i",
+  "url": "https://mikaelmayer.github.io/apps/reflex4you/index.html?formulab64=H4sIA...&D1=0.2-0.3i",
+  "query": "formulab64=H4sIA...&D1=0.2-0.3i",
   "warnings": null
 }
 ```

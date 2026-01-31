@@ -24,5 +24,8 @@
   "devDependencies": {
     "@playwright/test": "^1.48.2",
     "http-server": "^14.1.1"
+  },
+  "dependencies": {
+    "mathjax-full": "^3.2.1"
   }
 }
