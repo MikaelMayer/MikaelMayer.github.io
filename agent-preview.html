@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤖 Agent Preview</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+
+        .btn-secondary {
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid #e2e8f0;
+        }
+
+        .btn-secondary:hover {
+            background: #f1f5f9;
+        }
+
+        .editor-section {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .editor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .editor-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .editor {
+            width: 100%;
+            min-height: 300px;
+            padding: 15px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            resize: vertical;
+            background: #fafafa;
+        }
+
+        .editor:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .preview-section {
+            background: var(--surface);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .preview-header {
+            background: #f8fafc;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .preview-frame {
+            width: 100%;
+            min-height: 400px;
+            border: none;
+            background: white;
+        }
+
+        .status {
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        .status.success {
+            background: #ecfdf5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+
+        .status.error {
+            background: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 15px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            font-weight: 500;
+        }
+
+        .tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .file-info {
+            background: #f8fafc;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .controls {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Agent Preview</h1>
+            <div class="controls">
+                <button class="btn btn-primary" onclick="loadPreview()">
+                    ▶️ Load Preview
+                </button>
+                <button class="btn btn-secondary" onclick="clearEditor()">
+                    🗑️ Clear
+                </button>
+                <button class="btn btn-secondary" onclick="shareCode()">
+                    🔗 Share
+                </button>
+                <a href="html.html" class="btn btn-secondary">
+                    🔧 Advanced Editor
+                </a>
+            </div>
+        </div>
+
+        <div class="editor-section">
+            <div class="editor-header">
+                <h2>Code Editor</h2>
+                <div class="controls">
+                    <select id="templateSelect" onchange="loadTemplate()">
+                        <option value="">Choose a template...</option>
+                        <option value="basic">Basic HTML Page</option>
+                        <option value="react">React App</option>
+                        <option value="vue">Vue App</option>
+                        <option value="game">Simple Game</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('html')">HTML</div>
+                <div class="tab" onclick="switchTab('css')">CSS</div>
+                <div class="tab" onclick="switchTab('js')">JavaScript</div>
+            </div>
+
+            <div id="html-tab" class="tab-content active">
+                <div class="file-info">📄 HTML Content</div>
+                <textarea id="htmlEditor" class="editor" placeholder="Paste your HTML code here or ask an agent to generate it..."></textarea>
+            </div>
+
+            <div id="css-tab" class="tab-content">
+                <div class="file-info">🎨 CSS Styles</div>
+                <textarea id="cssEditor" class="editor" placeholder="Additional CSS styles..."></textarea>
+            </div>
+
+            <div id="js-tab" class="tab-content">
+                <div class="file-info">⚡ JavaScript Code</div>
+                <textarea id="jsEditor" class="editor" placeholder="Additional JavaScript code..."></textarea>
+            </div>
+        </div>
+
+        <div class="preview-section">
+            <div class="preview-header">
+                <h2>Preview</h2>
+                <div class="controls">
+                    <button class="btn btn-secondary" onclick="openInNewTab()">
+                        🚀 Open in New Tab
+                    </button>
+                </div>
+            </div>
+            <iframe id="previewFrame" class="preview-frame"></iframe>
+        </div>
+    </div>
+
+    <script>
+        // Auto-save functionality
+        function saveToLocalStorage() {
+            localStorage.setItem('agentPreview_html', document.getElementById('htmlEditor').value);
+            localStorage.setItem('agentPreview_css', document.getElementById('cssEditor').value);
+            localStorage.setItem('agentPreview_js', document.getElementById('jsEditor').value);
+        }
+
+        function loadFromLocalStorage() {
+            const html = localStorage.getItem('agentPreview_html') || '';
+            const css = localStorage.getItem('agentPreview_css') || '';
+            const js = localStorage.getItem('agentPreview_js') || '';
+            
+            document.getElementById('htmlEditor').value = html;
+            document.getElementById('cssEditor').value = css;
+            document.getElementById('jsEditor').value = js;
+            
+            if (html) {
+                loadPreview();
+            }
+        }
+
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function loadPreview() {
+            const htmlContent = document.getElementById('htmlEditor').value;
+            const cssContent = document.getElementById('cssEditor').value;
+            const jsContent = document.getElementById('jsEditor').value;
+            
+            let fullHtml = htmlContent;
+            
+            // Add CSS if provided
+            if (cssContent) {
+                const cssBlock = `<style>\n${cssContent}\n</style>`;
+                if (fullHtml.includes('</head>')) {
+                    fullHtml = fullHtml.replace('</head>', cssBlock + '\n</head>');
+                } else {
+                    fullHtml = cssBlock + '\n' + fullHtml;
+                }
+            }
+            
+            // Add JavaScript if provided
+            if (jsContent) {
+                const jsBlock = `<script>\n${jsContent}\n</script>`;
+                if (fullHtml.includes('</body>')) {
+                    fullHtml = fullHtml.replace('</body>', jsBlock + '\n</body>');
+                } else {
+                    fullHtml = fullHtml + '\n' + jsBlock;
+                }
+            }
+            
+            const iframe = document.getElementById('previewFrame');
+            const doc = iframe.contentDocument || iframe.contentWindow.document;
+            doc.open();
+            doc.write(fullHtml);
+            doc.close();
+            
+            saveToLocalStorage();
+        }
+
+        function clearEditor() {
+            if (confirm('Clear all content?')) {
+                document.getElementById('htmlEditor').value = '';
+                document.getElementById('cssEditor').value = '';
+                document.getElementById('jsEditor').value = '';
+                document.getElementById('previewFrame').src = 'about:blank';
+                localStorage.removeItem('agentPreview_html');
+                localStorage.removeItem('agentPreview_css');
+                localStorage.removeItem('agentPreview_js');
+            }
+        }
+
+        function openInNewTab() {
+            const htmlContent = document.getElementById('htmlEditor').value;
+            const cssContent = document.getElementById('cssEditor').value;
+            const jsContent = document.getElementById('jsEditor').value;
+            
+            let fullHtml = htmlContent;
+            
+            if (cssContent) {
+                const cssBlock = `<style>\n${cssContent}\n</style>`;
+                if (fullHtml.includes('</head>')) {
+                    fullHtml = fullHtml.replace('</head>', cssBlock + '\n</head>');
+                } else {
+                    fullHtml = cssBlock + '\n' + fullHtml;
+                }
+            }
+            
+            if (jsContent) {
+                const jsBlock = `<script>\n${jsContent}\n</script>`;
+                if (fullHtml.includes('</body>')) {
+                    fullHtml = fullHtml.replace('</body>', jsBlock + '\n</body>');
+                } else {
+                    fullHtml = fullHtml + '\n' + jsBlock;
+                }
+            }
+            
+            const newWindow = window.open();
+            newWindow.document.write(fullHtml);
+            newWindow.document.close();
+        }
+
+        function shareCode() {
+            const htmlContent = document.getElementById('htmlEditor').value;
+            const url = `${window.location.origin}/agent-preview.html#code=${btoa(encodeURIComponent(htmlContent))}`;
+            navigator.clipboard.writeText(url).then(() => {
+                alert('Share URL copied to clipboard!');
+            });
+        }
+
+        function loadTemplate() {
+            const template = document.getElementById('templateSelect').value;
+            const templates = {
+                basic: `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My App</title>
+</head>
+<body>
+    <div id="app">
+        <h1>Hello World!</h1>
+        <p>Start building your app here.</p>
+    </div>
+</body>
+</html>`,
+                react: `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>React App</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        function App() {
+            const [count, setCount] = React.useState(0);
+            
+            return (
+                <div style={{padding: '20px', fontFamily: 'Arial, sans-serif'}}>
+                    <h1>React App</h1>
+                    <p>Count: {count}</p>
+                    <button onClick={() => setCount(count + 1)}>
+                        Increment
+                    </button>
+                </div>
+            );
+        }
+        
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>`
+            };
+            
+            if (templates[template]) {
+                document.getElementById('htmlEditor').value = templates[template];
+                loadPreview();
+            }
+        }
+
+        // Auto-save on input
+        document.addEventListener('input', (e) => {
+            if (e.target.classList.contains('editor')) {
+                saveToLocalStorage();
+            }
+        });
+
+        // Load URL hash if present
+        window.addEventListener('load', () => {
+            const hash = window.location.hash;
+            if (hash.startsWith('#code=')) {
+                try {
+                    const code = decodeURIComponent(atob(hash.substring(6)));
+                    document.getElementById('htmlEditor').value = code;
+                    loadPreview();
+                } catch (e) {
+                    console.error('Failed to decode URL code:', e);
+                }
+            } else {
+                loadFromLocalStorage();
+            }
+        });
+    </script>
+</body>
+</html>
