@@ -25,6 +25,9 @@ https://YOUR_PROJECT.vercel.app/api/reflex4you
 
 ## Request format
 
+You can test this on https://hoppscotch.io/, just select POST, select body, content type application/json and paste the following
+
+
 ```json
 {
   "source": "sin(z^2 + D1) $ z - D2",
