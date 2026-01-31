@@ -2,17 +2,20 @@ import { parseFormulaInput } from './arithmetic-parser.mjs';
 import { formatCaretIndicator, getCaretSelection } from './parse-error-format.mjs';
 import { renderFormulaToCanvas, FORMULA_RENDERER_BUILD_ID } from './formula-renderer.mjs';
 import {
+  FORMULA_PARAM,
+  FORMULA_B64_PARAM,
+  LAST_STATE_SEARCH_KEY,
   verifyCompressionSupport,
   readFormulaFromQuery,
-  updateFormulaQueryParam,
-  updateFormulaQueryParamImmediately,
+  writeFormulaToSearchParams,
 } from './formula-url.mjs';
+import { setupMenuDropdown } from './menu-ui.mjs';
 
 // Ensure the PWA service worker is installed even when users land directly
 // on the formula page (e.g. from a shared link).
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
   // Version the SW script URL so updates can't get stuck behind a cached SW script.
-  const SW_URL = './service-worker.js?sw=43.0';
+  const SW_URL = './service-worker.js?sw=44.0';
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(SW_URL).then((registration) => {
       // Match the viewer page behavior: activate updated workers ASAP so
@@ -46,7 +49,60 @@ function $(id) {
 
 const formulaInput = $('formula-input');
 const formulaError = $('formula-error');
+const menuButton = $('menu-button');
+const menuDropdown = $('menu-dropdown');
 let parseErrorSelection = null;
+let initialFormulaFromUrl = null;
+
+function clearPersistedFormulaSearch() {
+  try {
+    window.localStorage?.removeItem(LAST_STATE_SEARCH_KEY);
+  } catch (_) {
+    // ignore storage failures
+  }
+}
+
+async function buildViewerUrl({ includeFormula, source }) {
+  if (typeof window === 'undefined') {
+    return './index.html';
+  }
+  const url = new URL(window.location.href);
+  url.pathname = url.pathname.replace(/[^/]*$/, 'index.html');
+  url.hash = '';
+  const params = new URLSearchParams(url.search);
+  if (includeFormula) {
+    await writeFormulaToSearchParams(params, source);
+  } else {
+    params.delete(FORMULA_PARAM);
+    params.delete(FORMULA_B64_PARAM);
+  }
+  url.search = params.toString();
+  return url.toString();
+}
+
+async function handleMenuAction(action) {
+  switch (action) {
+    case 'visualize-formula': {
+      const source = String(formulaInput?.value ?? '');
+      const href = await buildViewerUrl({ includeFormula: true, source });
+      window.location.href = href;
+      break;
+    }
+    case 'back-to-viewer': {
+      if (initialFormulaFromUrl != null) {
+        const href = await buildViewerUrl({ includeFormula: true, source: initialFormulaFromUrl });
+        window.location.href = href;
+        break;
+      }
+      clearPersistedFormulaSearch();
+      const href = await buildViewerUrl({ includeFormula: false });
+      window.location.href = href;
+      break;
+    }
+    default:
+      break;
+  }
+}
 
 function normalizeHex8(value) {
   const raw = String(value || '').trim().replace(/^#/, '');
@@ -238,14 +294,8 @@ function buildStaleDiagnostic({ latex, renderEl }) {
   ].join('\n');
 }
 
-async function renderFromSource(source, { updateUrl = false } = {}) {
+async function renderFromSource(source) {
   const normalized = String(source || '');
-  if (updateUrl) {
-    // Keep URL shareable while editing; do an immediate legacy update, then
-    // attempt compressed upgrade asynchronously (debounced by caller).
-    updateFormulaQueryParamImmediately(normalized);
-  }
-
   const parsed = parseFormulaInput(normalized);
   if (!parsed.ok) {
     showParseError(normalized, parsed);
@@ -268,11 +318,22 @@ async function renderFromSource(source, { updateUrl = false } = {}) {
 async function bootstrap() {
   await verifyCompressionSupport();
 
+  setupMenuDropdown({
+    menuButton,
+    menuDropdown,
+    onAction: (action) => {
+      handleMenuAction(action).catch((error) => {
+        console.warn('Failed to handle menu action.', error);
+      });
+    },
+  });
+
   const decoded = await readFormulaFromQuery({
     onDecodeError: () => {
       showError('We could not decode the formula embedded in this link.');
     },
   });
+  initialFormulaFromUrl = decoded;
 
   const source = (decoded && decoded.trim()) ? decoded : DEFAULT_FORMULA_TEXT;
 
@@ -301,7 +362,7 @@ async function bootstrap() {
       updateForegroundForBackgroundHex(bgEl.value, presetForegroundByBgHex);
       // Re-render without touching the URL; just affects the raster background.
       const current = inputEl ? inputEl.value : source;
-      renderFromSource(current, { updateUrl: false }).catch(() => {});
+      renderFromSource(current).catch(() => {});
     });
   }
   presetButtons.forEach((btn) => {
@@ -315,7 +376,7 @@ async function bootstrap() {
         updateForegroundForBackgroundHex(bgHex, presetForegroundByBgHex);
       }
       const current = inputEl ? inputEl.value : source;
-      renderFromSource(current, { updateUrl: false }).catch(() => {});
+      renderFromSource(current).catch(() => {});
     });
   });
 
@@ -339,26 +400,16 @@ async function bootstrap() {
     });
   }
 
-  await renderFromSource(source, { updateUrl: false });
+  await renderFromSource(source);
 
   // Live edit + render loop.
-  let upgradeTimer = null;
   if (inputEl) {
     inputEl.addEventListener('input', () => {
       const current = inputEl.value;
-      renderFromSource(current, { updateUrl: true }).catch((err) => {
+      renderFromSource(current).catch((err) => {
         console.error('Failed to render formula.', err);
         showError('Unable to render formula.');
       });
-
-      if (upgradeTimer != null) {
-        window.clearTimeout(upgradeTimer);
-      }
-      upgradeTimer = window.setTimeout(() => {
-        updateFormulaQueryParam(current).catch((error) => {
-          console.warn('Failed to upgrade formula parameter.', error);
-        });
-      }, 450);
     });
   }
 }
