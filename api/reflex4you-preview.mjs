@@ -421,13 +421,9 @@ async function startStaticServer(rootDir) {
 async function getBrowser() {
   if (!browserPromise) {
     browserPromise = (async () => {
+      chromium.setGraphicsMode = true;
       const executablePath = await chromium.executablePath();
-      const launchArgs = [
-        ...chromium.args,
-        '--ignore-gpu-blocklist',
-        '--use-gl=swiftshader',
-        '--enable-webgl',
-      ];
+      const launchArgs = [...chromium.args];
       return await playwrightChromium.launch({
         args: launchArgs,
         executablePath: executablePath || undefined,
