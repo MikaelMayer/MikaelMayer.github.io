@@ -26,6 +26,7 @@
     "http-server": "^14.1.1"
   },
   "dependencies": {
-    "mathjax-full": "^3.2.1"
+    "@sparticuz/chromium": "^143.0.4",
+    "playwright-core": "^1.58.1"
   }
 }

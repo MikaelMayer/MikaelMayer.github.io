@@ -12,7 +12,7 @@ and generate shareable URLs (including finger values, animations, and timing).
 - `reflex4you-preview.mjs` – Vercel Serverless Function
   - Endpoint: `/api/reflex4you-preview`
   - Method: `GET` or `POST`
-  - Returns: `image/svg+xml` (or JSON when `format=json`)
+  - Returns: `image/png` (or JSON when `format=json`)
 
 ## Quick deploy on Vercel (from GitHub)
 
@@ -67,35 +67,48 @@ You can test this on https://hoppscotch.io/, just select POST, select body, cont
 
 ## Preview endpoint
 
-Render a formula preview image (MathJax SVG):
+Render a WebGL preview image via Playwright (PNG):
 
 ```json
 POST /api/reflex4you-preview
 {
   "source": "sin(z^2 + D1)",
   "values": { "D1": "0.2+0.3i" },
-  "inlineFingerConstants": true,
+  "ratio": "1:2",
+  "pixels": 1080,
+  "window": { "xMin": -2, "xMax": 2, "yMin": -4, "yMax": 4 },
   "format": "json"
 }
 ```
 
-When `format=json`, the response includes the SVG as a string:
+When `format=json`, the response includes metadata and a base64 PNG:
 
 ```json
 {
   "ok": true,
-  "svg": "<svg ...>...</svg>",
-  "latex": "\\operatorname{sin}(z^2 + D_1)",
-  "caretMessage": null,
-  "caretSelection": null
+  "width": 540,
+  "height": 1080,
+  "ratio": 0.5,
+  "window": { "xMin": -2, "xMax": 2, "yMin": -4, "yMax": 4 },
+  "view": { "viewXMin": -2, "viewXMax": 2, "viewYMin": -4, "viewYMax": 4 },
+  "image": "iVBORw0KGgoAAA...",
+  "imageType": "image/png"
 }
 ```
 
 You can also call it via GET for `<img src>` embedding:
 
 ```
-/api/reflex4you-preview?formulab64=...&format=svg
+/api/reflex4you-preview?formulab64=...&ratio=1:2&pixels=1080
 ```
+
+### Preview parameters
+
+- `ratio`: aspect ratio (number or `"W:H"`). Default: `0.5` (1:2).
+- `pixels`: long-side pixel count used with `ratio`. Default: `1080`.
+- `width`/`height`: explicit dimensions (override `ratio`/`pixels`).
+- `window`: view window bounds `{ xMin, xMax, yMin, yMax }`. Default: `{-2..2, -4..4}`.
+- `compile`: when true, validates the formula via GPU compilation before rendering.
 
 ## Example response
 

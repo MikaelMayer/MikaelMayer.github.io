@@ -1,22 +1,29 @@
-import { gunzipSync } from 'node:zlib';
+import { gunzipSync, gzipSync } from 'node:zlib';
+import { createServer } from 'node:http';
+import { createReadStream, statSync } from 'node:fs';
+import { dirname, extname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { chromium as playwrightChromium } from 'playwright-core';
+import chromium from '@sparticuz/chromium';
 import { parseFormulaInput } from '../apps/reflex4you/arithmetic-parser.mjs';
 import { formatCaretIndicator, getCaretSelection } from '../apps/reflex4you/parse-error-format.mjs';
-import { formulaAstToLatex } from '../apps/reflex4you/formula-renderer.mjs';
-import { mathjax } from 'mathjax-full/js/mathjax.js';
-import { TeX } from 'mathjax-full/js/input/tex.js';
-import { SVG } from 'mathjax-full/js/output/svg.js';
-import { liteAdaptor } from 'mathjax-full/js/adaptors/liteAdaptor.js';
-import { RegisterHTMLHandler } from 'mathjax-full/js/handlers/html.js';
+import { compileFormulaForGpu, FINGER_DECIMAL_PLACES } from '../apps/reflex4you/core-engine.mjs';
 
+const DEFAULT_CANVAS_RATIO = 0.5;
+const DEFAULT_CANVAS_PIXELS = 1080;
+const DEFAULT_WINDOW = Object.freeze({
+  xMin: -2,
+  xMax: 2,
+  yMin: -4,
+  yMax: 4,
+});
+const MAX_CANVAS_PIXELS = 20000;
+const DECIMAL_PLACES = Number.isFinite(FINGER_DECIMAL_PLACES) ? FINGER_DECIMAL_PLACES : 4;
 const FINGER_LABEL_REGEX = /^(?:[FD]\d+|W[012])$/;
 const ROTATION_LABEL_REGEX = /^(?:RA|RB)$/;
 const ALLOWED_LABEL_REGEX = /^(?:[FD]\d+|W[012]|RA|RB)$/;
 
-const adaptor = liteAdaptor();
-RegisterHTMLHandler(adaptor);
-const tex = new TeX({ packages: ['base', 'ams'] });
-const svg = new SVG({ fontCache: 'none' });
-const mathJaxDoc = mathjax.document('', { InputJax: tex, OutputJax: svg });
+let browserPromise = null;
 
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -71,22 +78,157 @@ function readQueryBody(req) {
       body.__valuesFromQuery = true;
     }
   }
-  if (params.has('inlineFingerConstants')) {
-    body.inlineFingerConstants = parseBooleanInput(params.get('inlineFingerConstants'), null);
-  }
-  if (params.has('compactComplexNumbers')) {
-    body.compactComplexNumbers = parseBooleanInput(params.get('compactComplexNumbers'), null);
-  }
-  if (params.has('decimalPlaces')) {
-    body.decimalPlaces = Number(params.get('decimalPlaces'));
-  }
-  if (params.has('decimalSeparator')) {
-    body.decimalSeparator = params.get('decimalSeparator');
-  }
-  if (params.has('format')) {
-    body.format = params.get('format');
-  }
+  if (params.has('ratio')) body.ratio = params.get('ratio');
+  if (params.has('pixels')) body.pixels = params.get('pixels');
+  if (params.has('width')) body.width = params.get('width');
+  if (params.has('height')) body.height = params.get('height');
+  if (params.has('window')) body.window = params.get('window');
+  if (params.has('xMin')) body.xMin = params.get('xMin');
+  if (params.has('xMax')) body.xMax = params.get('xMax');
+  if (params.has('yMin')) body.yMin = params.get('yMin');
+  if (params.has('yMax')) body.yMax = params.get('yMax');
+  if (params.has('waitMs')) body.waitMs = params.get('waitMs');
+  if (params.has('format')) body.format = params.get('format');
+  if (params.has('compile')) body.compile = parseBooleanInput(params.get('compile'), null);
+  if (params.has('compress')) body.compress = parseBooleanInput(params.get('compress'), null);
   return body;
+}
+
+function parseRatioInput(value) {
+  if (value == null) return null;
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }
+  const raw = String(value).trim();
+  if (!raw) return null;
+  if (raw.includes(':') || raw.includes('x') || raw.includes('×')) {
+    const parts = raw.split(/[:x×]/i).map((part) => Number(part.trim()));
+    if (parts.length === 2 && parts.every((n) => Number.isFinite(n) && n > 0)) {
+      return parts[0] / parts[1];
+    }
+  }
+  if (raw.includes('/')) {
+    const parts = raw.split('/').map((part) => Number(part.trim()));
+    if (parts.length === 2 && parts.every((n) => Number.isFinite(n) && n > 0)) {
+      return parts[0] / parts[1];
+    }
+  }
+  const numeric = Number(raw);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+}
+
+function parseWindowInput(input) {
+  if (input == null) return null;
+  if (typeof input === 'object') {
+    const xMin = Number(input.xMin ?? input.xmin);
+    const xMax = Number(input.xMax ?? input.xmax);
+    const yMin = Number(input.yMin ?? input.ymin);
+    const yMax = Number(input.yMax ?? input.ymax);
+    if ([xMin, xMax, yMin, yMax].every((n) => Number.isFinite(n))) {
+      return { xMin, xMax, yMin, yMax };
+    }
+  }
+  const raw = String(input).trim();
+  if (!raw) return null;
+  const parts = raw.split(/[,\s]+/).map((part) => Number(part.trim())).filter((n) => Number.isFinite(n));
+  if (parts.length === 4) {
+    return { xMin: parts[0], xMax: parts[1], yMin: parts[2], yMax: parts[3] };
+  }
+  return null;
+}
+
+function clampInt(value, { min = 1, max = MAX_CANVAS_PIXELS } = {}) {
+  const n = Math.floor(Number(value));
+  if (!Number.isFinite(n)) return null;
+  if (n < min || n > max) return null;
+  return n;
+}
+
+function resolveDimensions(body, errors) {
+  const width = clampInt(body?.width);
+  const height = clampInt(body?.height);
+  if (width && height) {
+    return { width, height, ratio: width / height };
+  }
+  const ratio = parseRatioInput(body?.ratio) ?? DEFAULT_CANVAS_RATIO;
+  const pixels = clampInt(body?.pixels ?? body?.pixelSize ?? body?.size ?? DEFAULT_CANVAS_PIXELS);
+  if (!ratio || !pixels) {
+    errors.push('Invalid ratio/pixels parameters.');
+    return null;
+  }
+  const effectiveRatio = ratio;
+  let w;
+  let h;
+  if (effectiveRatio >= 1) {
+    w = pixels;
+    h = clampInt(pixels / effectiveRatio);
+  } else {
+    h = pixels;
+    w = clampInt(pixels * effectiveRatio);
+  }
+  if (!w || !h) {
+    errors.push('Invalid computed canvas dimensions.');
+    return null;
+  }
+  return { width: w, height: h, ratio: effectiveRatio };
+}
+
+function resolveWindow(body, warnings, errors) {
+  const fromWindow = parseWindowInput(body?.window);
+  const fromFields =
+    body?.xMin != null || body?.xMax != null || body?.yMin != null || body?.yMax != null
+      ? {
+        xMin: Number(body?.xMin),
+        xMax: Number(body?.xMax),
+        yMin: Number(body?.yMin),
+        yMax: Number(body?.yMax),
+      }
+      : null;
+  const candidate = fromWindow || fromFields || DEFAULT_WINDOW;
+  const xMin = Number(candidate.xMin);
+  const xMax = Number(candidate.xMax);
+  const yMin = Number(candidate.yMin);
+  const yMax = Number(candidate.yMax);
+  if (![xMin, xMax, yMin, yMax].every((n) => Number.isFinite(n))) {
+    errors.push('Invalid window bounds.');
+    return null;
+  }
+  if (xMin >= xMax || yMin >= yMax) {
+    errors.push('window bounds must satisfy xMin < xMax and yMin < yMax.');
+    return null;
+  }
+  const xCenter = (xMin + xMax) / 2;
+  const yCenter = (yMin + yMax) / 2;
+  let adjXMin = xMin;
+  let adjXMax = xMax;
+  let adjYMin = yMin;
+  let adjYMax = yMax;
+  if (Math.abs(xCenter) > 1e-9 || Math.abs(yCenter) > 1e-9) {
+    warnings.push('window is recentred around 0; Reflex4You view is origin-centered.');
+    adjXMin = xMin - xCenter;
+    adjXMax = xMax - xCenter;
+    adjYMin = yMin - yCenter;
+    adjYMax = yMax - yCenter;
+  }
+  return { xMin: adjXMin, xMax: adjXMax, yMin: adjYMin, yMax: adjYMax };
+}
+
+function computeViewSettings(windowBounds, ratio) {
+  const halfSpanX = (windowBounds.xMax - windowBounds.xMin) / 2;
+  const halfSpanY = (windowBounds.yMax - windowBounds.yMin) / 2;
+  const baseHalfSpan =
+    ratio >= 1
+      ? Math.max(halfSpanX, halfSpanY * ratio)
+      : Math.max(halfSpanY, halfSpanX / ratio);
+  const viewXSpan = ratio >= 1 ? 2 * baseHalfSpan : 2 * baseHalfSpan * ratio;
+  const viewYSpan = ratio >= 1 ? 2 * baseHalfSpan / ratio : 2 * baseHalfSpan;
+  return {
+    baseHalfSpan,
+    viewXMin: -viewXSpan / 2,
+    viewXMax: viewXSpan / 2,
+    viewYMin: -viewYSpan / 2,
+    viewYMax: viewYSpan / 2,
+  };
 }
 
 function isFingerLabel(label) {
@@ -166,10 +308,32 @@ function parseComplexInput(value) {
   return null;
 }
 
-function normalizeFingerValues(input, errors) {
-  const fingerValues = {};
+function roundToPlaces(value) {
+  if (!Number.isFinite(value)) return NaN;
+  const factor = 10 ** DECIMAL_PLACES;
+  const rounded = Math.round(value * factor) / factor;
+  return Object.is(rounded, -0) ? 0 : rounded;
+}
+
+function formatNumberForQuery(value) {
+  const rounded = roundToPlaces(value);
+  if (!Number.isFinite(rounded)) return null;
+  return rounded.toFixed(DECIMAL_PLACES).replace(/\.?0+$/, '');
+}
+
+function formatComplexForQuery(re, im) {
+  const real = formatNumberForQuery(re);
+  const imag = formatNumberForQuery(Math.abs(im));
+  if (real == null || imag == null) return null;
+  const sign = im >= 0 ? '+' : '-';
+  return `${real}${sign}${imag}i`;
+}
+
+function normalizeValueMap(input, errors) {
+  const parseFingerValues = {};
+  const queryValues = new Map();
   if (!input || typeof input !== 'object') {
-    return fingerValues;
+    return { parseFingerValues, queryValues };
   }
   for (const rawLabel of Object.keys(input)) {
     const label = String(rawLabel || '').trim();
@@ -182,11 +346,17 @@ function normalizeFingerValues(input, errors) {
       errors.push(`Invalid complex value for "${label}".`);
       continue;
     }
+    const formatted = formatComplexForQuery(parsed.re, parsed.im);
+    if (!formatted) {
+      errors.push(`Unable to format complex value for "${label}".`);
+      continue;
+    }
+    queryValues.set(label, formatted);
     if (isFingerLabel(label) || isRotationLabel(label)) {
-      fingerValues[label] = { re: parsed.re, im: parsed.im };
+      parseFingerValues[label] = { re: parsed.re, im: parsed.im };
     }
   }
-  return fingerValues;
+  return { parseFingerValues, queryValues };
 }
 
 function decodeBase64Url(encoded) {
@@ -198,6 +368,15 @@ function decodeBase64Url(encoded) {
 function decodeFormulaFromBase64Url(encoded) {
   const buffer = decodeBase64Url(encoded);
   return gunzipSync(buffer).toString('utf8');
+}
+
+function encodeFormulaToBase64Url(formula) {
+  const gz = gzipSync(Buffer.from(String(formula), 'utf8'));
+  return Buffer.from(gz)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 }
 
 function resolveFormulaSource(body, errors) {
@@ -217,9 +396,172 @@ function resolveFormulaSource(body, errors) {
   return null;
 }
 
-function renderLatexToSvg(latex) {
-  const node = mathJaxDoc.convert(String(latex || ''), { display: true });
-  return adaptor.outerHTML(node);
+function buildQueryParams({ source, queryValues, compress }) {
+  const params = new URLSearchParams();
+  if (compress) {
+    const encoded = encodeFormulaToBase64Url(source);
+    params.set('formulab64', encoded);
+  } else {
+    params.set('formula', source);
+  }
+  for (const [label, value] of queryValues.entries()) {
+    params.set(label, value);
+  }
+  return params;
+}
+
+function resolveRepoRoot() {
+  const here = dirname(fileURLToPath(import.meta.url));
+  return resolve(here, '..');
+}
+
+function contentTypeForPath(filePath) {
+  switch (extname(filePath)) {
+    case '.html':
+      return 'text/html; charset=utf-8';
+    case '.css':
+      return 'text/css; charset=utf-8';
+    case '.mjs':
+    case '.js':
+      return 'text/javascript; charset=utf-8';
+    case '.json':
+      return 'application/json; charset=utf-8';
+    case '.svg':
+      return 'image/svg+xml';
+    case '.png':
+      return 'image/png';
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg';
+    case '.gif':
+      return 'image/gif';
+    case '.webp':
+      return 'image/webp';
+    case '.ico':
+      return 'image/x-icon';
+    default:
+      return 'application/octet-stream';
+  }
+}
+
+async function startStaticServer(rootDir) {
+  return await new Promise((resolvePromise, rejectPromise) => {
+    const server = createServer((req, res) => {
+      try {
+        const url = new URL(req.url || '/', 'http://localhost');
+        let pathname = decodeURIComponent(url.pathname);
+        if (pathname === '/') {
+          pathname = '/apps/reflex4you/index.html';
+        }
+        const safePath = resolve(rootDir, `.${pathname}`);
+        if (!safePath.startsWith(rootDir)) {
+          res.statusCode = 403;
+          res.end('Forbidden');
+          return;
+        }
+        let stat;
+        try {
+          stat = statSync(safePath);
+        } catch (_) {
+          res.statusCode = 404;
+          res.end('Not found');
+          return;
+        }
+        if (stat.isDirectory()) {
+          const indexPath = join(safePath, 'index.html');
+          try {
+            stat = statSync(indexPath);
+          } catch (_) {
+            res.statusCode = 404;
+            res.end('Not found');
+            return;
+          }
+          res.statusCode = 200;
+          res.setHeader('Content-Type', contentTypeForPath(indexPath));
+          createReadStream(indexPath).pipe(res);
+          return;
+        }
+        res.statusCode = 200;
+        res.setHeader('Content-Type', contentTypeForPath(safePath));
+        createReadStream(safePath).pipe(res);
+      } catch (error) {
+        res.statusCode = 500;
+        res.end('Server error');
+      }
+    });
+    server.on('error', rejectPromise);
+    server.listen(0, '127.0.0.1', () => resolvePromise(server));
+  });
+}
+
+async function getBrowser() {
+  if (!browserPromise) {
+    browserPromise = (async () => {
+      const executablePath = await chromium.executablePath();
+      const launchArgs = [
+        ...chromium.args,
+        '--ignore-gpu-blocklist',
+        '--use-gl=swiftshader',
+        '--enable-webgl',
+      ];
+      return await playwrightChromium.launch({
+        args: launchArgs,
+        executablePath: executablePath || undefined,
+        headless: chromium.headless,
+      });
+    })();
+  }
+  try {
+    return await browserPromise;
+  } catch (error) {
+    browserPromise = null;
+    throw error;
+  }
+}
+
+async function renderPreview({ url, width, height, baseHalfSpan, waitMs }) {
+  const browser = await getBrowser();
+  const context = await browser.newContext({
+    viewport: { width, height },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => Boolean(window.__reflexReady));
+    const actualView = await page.evaluate(async (settings) => {
+      await window.__reflexReady;
+      const core = window.__reflexCore;
+      if (!core) {
+        throw new Error('Reflex core not available');
+      }
+      if (Number.isFinite(settings.baseHalfSpan)) {
+        core.baseHalfSpan = settings.baseHalfSpan;
+      }
+      core.renderToPixelSize(settings.width, settings.height);
+      if (core.gl && typeof core.gl.finish === 'function') {
+        core.gl.finish();
+      }
+      return {
+        viewXMin: core.viewXMin,
+        viewXMax: core.viewXMax,
+        viewYMin: core.viewYMin,
+        viewYMax: core.viewYMax,
+      };
+    }, { width, height, baseHalfSpan });
+    if (waitMs > 0) {
+      await page.waitForTimeout(waitMs);
+    }
+    const canvas = await page.$('#glcanvas');
+    if (!canvas) {
+      throw new Error('Canvas not found');
+    }
+    const buffer = await canvas.screenshot({ type: 'png' });
+    return { buffer, actualView };
+  } finally {
+    await page.close();
+    await context.close();
+  }
 }
 
 export default async function handler(req, res) {
@@ -258,6 +600,7 @@ export default async function handler(req, res) {
   }
 
   const errors = [];
+  const warnings = [];
   const source = resolveFormulaSource(body, errors);
   if (!source || !source.trim()) {
     jsonResponse(res, 400, { ok: false, error: 'source is required', details: errors.length ? errors : null });
@@ -265,66 +608,88 @@ export default async function handler(req, res) {
   }
 
   const valuesInput = body?.values ?? body?.fingerValues ?? null;
-  const fingerValues = normalizeFingerValues(valuesInput, errors);
+  const { parseFingerValues, queryValues } = normalizeValueMap(valuesInput, errors);
+
+  const dimensions = resolveDimensions(body, errors);
+  const windowBounds = resolveWindow(body, warnings, errors);
+
   if (errors.length) {
     jsonResponse(res, 400, { ok: false, error: 'Invalid request', details: errors });
     return;
   }
 
-  const result = parseFormulaInput(source, { fingerValues });
-  if (!result.ok) {
+  const viewSettings = computeViewSettings(windowBounds, dimensions.ratio);
+  const compile = Boolean(body?.compile);
+  const compress = Boolean(body?.compress);
+  const waitMs = clampInt(body?.waitMs, { min: 0, max: 10000 }) ?? 100;
+
+  const parseResult = parseFormulaInput(source, { fingerValues: parseFingerValues });
+  if (!parseResult.ok) {
     jsonResponse(res, 200, {
       ok: false,
-      svg: null,
-      latex: null,
-      caretMessage: formatCaretIndicator(source, result),
-      caretSelection: getCaretSelection(source, result),
+      caretMessage: formatCaretIndicator(source, parseResult),
+      caretSelection: getCaretSelection(source, parseResult),
     });
     return;
   }
 
-  const inlineFingerConstants = body?.inlineFingerConstants === true;
-  const latexOptions = {
-    inlineFingerConstants,
-    fingerValues,
-  };
-  if (body?.compactComplexNumbers === false) {
-    latexOptions.compactComplexNumbers = false;
-  }
-  if (Number.isFinite(body?.decimalPlaces)) {
-    latexOptions.decimalPlaces = Number(body.decimalPlaces);
-  }
-  if (typeof body?.decimalSeparator === 'string' && body.decimalSeparator) {
-    latexOptions.decimalSeparator = body.decimalSeparator;
+  if (compile) {
+    try {
+      compileFormulaForGpu(parseResult.value);
+    } catch (error) {
+      const message = error?.message ? String(error.message) : String(error || 'Compilation error');
+      jsonResponse(res, 200, {
+        ok: false,
+        caretMessage: `Compilation error:\n${message}`,
+        caretSelection: null,
+      });
+      return;
+    }
   }
 
-  let latex;
-  let svgText;
+  const queryParams = buildQueryParams({ source, queryValues, compress });
+  const rootDir = resolveRepoRoot();
+  const server = await startStaticServer(rootDir);
+  const address = server.address();
+  const port = typeof address === 'object' && address ? address.port : null;
+  if (!port) {
+    server.close();
+    jsonResponse(res, 500, { ok: false, error: 'Failed to allocate preview server port' });
+    return;
+  }
+  const previewUrl = `http://127.0.0.1:${port}/apps/reflex4you/index.html?${queryParams.toString()}`;
+
   try {
-    latex = formulaAstToLatex(result.value, latexOptions);
-    svgText = renderLatexToSvg(latex);
+    const { buffer, actualView } = await renderPreview({
+      url: previewUrl,
+      width: dimensions.width,
+      height: dimensions.height,
+      baseHalfSpan: viewSettings.baseHalfSpan,
+      waitMs,
+    });
+    const wantsJson = String(body?.format || '').toLowerCase() === 'json';
+    if (wantsJson) {
+      jsonResponse(res, 200, {
+        ok: true,
+        width: dimensions.width,
+        height: dimensions.height,
+        ratio: dimensions.ratio,
+        window: windowBounds,
+        view: actualView,
+        warnings: warnings.length ? warnings : null,
+        image: buffer.toString('base64'),
+        imageType: 'image/png',
+      });
+      return;
+    }
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Length', buffer.length);
+    res.end(buffer);
   } catch (error) {
     const message = error?.message ? String(error.message) : String(error || 'Preview render error');
     jsonResponse(res, 500, { ok: false, error: message });
-    return;
+  } finally {
+    server.close();
   }
-
-  const wantsJson =
-    String(body?.format || '').toLowerCase() === 'json' ||
-    String(req.headers?.accept || '').includes('application/json');
-
-  if (wantsJson) {
-    jsonResponse(res, 200, {
-      ok: true,
-      svg: svgText,
-      latex,
-      caretMessage: null,
-      caretSelection: null,
-    });
-    return;
-  }
-
-  res.statusCode = 200;
-  res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
-  res.end(svgText);
 }
