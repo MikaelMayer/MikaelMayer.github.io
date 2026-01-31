@@ -11,12 +11,7 @@ import { compileFormulaForGpu, FINGER_DECIMAL_PLACES } from '../apps/reflex4you/
 
 const DEFAULT_CANVAS_RATIO = 0.5;
 const DEFAULT_CANVAS_PIXELS = 1080;
-const DEFAULT_WINDOW = Object.freeze({
-  xMin: -2,
-  xMax: 2,
-  yMin: -4,
-  yMax: 4,
-});
+const DEFAULT_VIEW_HEIGHT = 8;
 const MAX_CANVAS_PIXELS = 20000;
 const DECIMAL_PLACES = Number.isFinite(FINGER_DECIMAL_PLACES) ? FINGER_DECIMAL_PLACES : 4;
 const FINGER_LABEL_REGEX = /^(?:[FD]\d+|W[012])$/;
@@ -78,63 +73,18 @@ function readQueryBody(req) {
       body.__valuesFromQuery = true;
     }
   }
-  if (params.has('ratio')) body.ratio = params.get('ratio');
   if (params.has('pixels')) body.pixels = params.get('pixels');
+  if (params.has('pixelWidth')) body.pixelWidth = params.get('pixelWidth');
+  if (params.has('pixelHeight')) body.pixelHeight = params.get('pixelHeight');
+  if (params.has('pxWidth')) body.pixelWidth = params.get('pxWidth');
+  if (params.has('pxHeight')) body.pixelHeight = params.get('pxHeight');
   if (params.has('width')) body.width = params.get('width');
   if (params.has('height')) body.height = params.get('height');
-  if (params.has('window')) body.window = params.get('window');
-  if (params.has('xMin')) body.xMin = params.get('xMin');
-  if (params.has('xMax')) body.xMax = params.get('xMax');
-  if (params.has('yMin')) body.yMin = params.get('yMin');
-  if (params.has('yMax')) body.yMax = params.get('yMax');
   if (params.has('waitMs')) body.waitMs = params.get('waitMs');
   if (params.has('format')) body.format = params.get('format');
   if (params.has('compile')) body.compile = parseBooleanInput(params.get('compile'), null);
   if (params.has('compress')) body.compress = parseBooleanInput(params.get('compress'), null);
   return body;
-}
-
-function parseRatioInput(value) {
-  if (value == null) return null;
-  if (typeof value === 'number') {
-    return Number.isFinite(value) && value > 0 ? value : null;
-  }
-  const raw = String(value).trim();
-  if (!raw) return null;
-  if (raw.includes(':') || raw.includes('x') || raw.includes('×')) {
-    const parts = raw.split(/[:x×]/i).map((part) => Number(part.trim()));
-    if (parts.length === 2 && parts.every((n) => Number.isFinite(n) && n > 0)) {
-      return parts[0] / parts[1];
-    }
-  }
-  if (raw.includes('/')) {
-    const parts = raw.split('/').map((part) => Number(part.trim()));
-    if (parts.length === 2 && parts.every((n) => Number.isFinite(n) && n > 0)) {
-      return parts[0] / parts[1];
-    }
-  }
-  const numeric = Number(raw);
-  return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
-}
-
-function parseWindowInput(input) {
-  if (input == null) return null;
-  if (typeof input === 'object') {
-    const xMin = Number(input.xMin ?? input.xmin);
-    const xMax = Number(input.xMax ?? input.xmax);
-    const yMin = Number(input.yMin ?? input.ymin);
-    const yMax = Number(input.yMax ?? input.ymax);
-    if ([xMin, xMax, yMin, yMax].every((n) => Number.isFinite(n))) {
-      return { xMin, xMax, yMin, yMax };
-    }
-  }
-  const raw = String(input).trim();
-  if (!raw) return null;
-  const parts = raw.split(/[,\s]+/).map((part) => Number(part.trim())).filter((n) => Number.isFinite(n));
-  if (parts.length === 4) {
-    return { xMin: parts[0], xMax: parts[1], yMin: parts[2], yMax: parts[3] };
-  }
-  return null;
 }
 
 function clampInt(value, { min = 1, max = MAX_CANVAS_PIXELS } = {}) {
@@ -144,91 +94,65 @@ function clampInt(value, { min = 1, max = MAX_CANVAS_PIXELS } = {}) {
   return n;
 }
 
-function resolveDimensions(body, errors) {
-  const width = clampInt(body?.width);
-  const height = clampInt(body?.height);
+function resolvePixelDimensions(body, errors) {
+  const width = clampInt(body?.pixelWidth ?? body?.pxWidth);
+  const height = clampInt(body?.pixelHeight ?? body?.pxHeight);
   if (width && height) {
     return { width, height, ratio: width / height };
   }
-  const ratio = parseRatioInput(body?.ratio) ?? DEFAULT_CANVAS_RATIO;
   const pixels = clampInt(body?.pixels ?? body?.pixelSize ?? body?.size ?? DEFAULT_CANVAS_PIXELS);
-  if (!ratio || !pixels) {
-    errors.push('Invalid ratio/pixels parameters.');
+  if (!pixels) {
+    errors.push('Invalid pixels parameter.');
     return null;
   }
-  const effectiveRatio = ratio;
+  const ratio = DEFAULT_CANVAS_RATIO;
   let w;
   let h;
-  if (effectiveRatio >= 1) {
+  if (ratio >= 1) {
     w = pixels;
-    h = clampInt(pixels / effectiveRatio);
+    h = clampInt(pixels / ratio);
   } else {
     h = pixels;
-    w = clampInt(pixels * effectiveRatio);
+    w = clampInt(pixels * ratio);
   }
   if (!w || !h) {
     errors.push('Invalid computed canvas dimensions.');
     return null;
   }
-  return { width: w, height: h, ratio: effectiveRatio };
+  return { width: w, height: h, ratio };
 }
 
-function resolveWindow(body, warnings, errors) {
-  const fromWindow = parseWindowInput(body?.window);
-  const fromFields =
-    body?.xMin != null || body?.xMax != null || body?.yMin != null || body?.yMax != null
-      ? {
-        xMin: Number(body?.xMin),
-        xMax: Number(body?.xMax),
-        yMin: Number(body?.yMin),
-        yMax: Number(body?.yMax),
-      }
-      : null;
-  const candidate = fromWindow || fromFields || DEFAULT_WINDOW;
-  const xMin = Number(candidate.xMin);
-  const xMax = Number(candidate.xMax);
-  const yMin = Number(candidate.yMin);
-  const yMax = Number(candidate.yMax);
-  if (![xMin, xMax, yMin, yMax].every((n) => Number.isFinite(n))) {
-    errors.push('Invalid window bounds.');
+function resolveViewSpan(body, errors) {
+  const hasWidth = body?.width != null && body.width !== '';
+  const hasHeight = body?.height != null && body.height !== '';
+  if (hasWidth && hasHeight) {
+    errors.push('Provide only one of width or height for the view span.');
     return null;
   }
-  if (xMin >= xMax || yMin >= yMax) {
-    errors.push('window bounds must satisfy xMin < xMax and yMin < yMax.');
+  if (!hasWidth && !hasHeight) {
+    return { mode: 'height', span: DEFAULT_VIEW_HEIGHT };
+  }
+  const width = hasWidth ? Number(body.width) : null;
+  const height = hasHeight ? Number(body.height) : null;
+  if (hasWidth && (!Number.isFinite(width) || width <= 0)) {
+    errors.push('Invalid width span.');
     return null;
   }
-  const xCenter = (xMin + xMax) / 2;
-  const yCenter = (yMin + yMax) / 2;
-  let adjXMin = xMin;
-  let adjXMax = xMax;
-  let adjYMin = yMin;
-  let adjYMax = yMax;
-  if (Math.abs(xCenter) > 1e-9 || Math.abs(yCenter) > 1e-9) {
-    warnings.push('window is recentred around 0; Reflex4You view is origin-centered.');
-    adjXMin = xMin - xCenter;
-    adjXMax = xMax - xCenter;
-    adjYMin = yMin - yCenter;
-    adjYMax = yMax - yCenter;
+  if (hasHeight && (!Number.isFinite(height) || height <= 0)) {
+    errors.push('Invalid height span.');
+    return null;
   }
-  return { xMin: adjXMin, xMax: adjXMax, yMin: adjYMin, yMax: adjYMax };
+  return hasWidth ? { mode: 'width', span: width } : { mode: 'height', span: height };
 }
 
-function computeViewSettings(windowBounds, ratio) {
-  const halfSpanX = (windowBounds.xMax - windowBounds.xMin) / 2;
-  const halfSpanY = (windowBounds.yMax - windowBounds.yMin) / 2;
-  const baseHalfSpan =
-    ratio >= 1
-      ? Math.max(halfSpanX, halfSpanY * ratio)
-      : Math.max(halfSpanY, halfSpanX / ratio);
-  const viewXSpan = ratio >= 1 ? 2 * baseHalfSpan : 2 * baseHalfSpan * ratio;
-  const viewYSpan = ratio >= 1 ? 2 * baseHalfSpan / ratio : 2 * baseHalfSpan;
-  return {
-    baseHalfSpan,
-    viewXMin: -viewXSpan / 2,
-    viewXMax: viewXSpan / 2,
-    viewYMin: -viewYSpan / 2,
-    viewYMax: viewYSpan / 2,
-  };
+function computeBaseHalfSpan(viewSpan, ratio) {
+  if (!viewSpan || !Number.isFinite(viewSpan.span) || viewSpan.span <= 0) {
+    return null;
+  }
+  if (viewSpan.mode === 'height') {
+    return ratio >= 1 ? (viewSpan.span / 2) * ratio : viewSpan.span / 2;
+  }
+  return ratio >= 1 ? viewSpan.span / 2 : viewSpan.span / (2 * ratio);
 }
 
 function isFingerLabel(label) {
@@ -610,15 +534,19 @@ export default async function handler(req, res) {
   const valuesInput = body?.values ?? body?.fingerValues ?? null;
   const { parseFingerValues, queryValues } = normalizeValueMap(valuesInput, errors);
 
-  const dimensions = resolveDimensions(body, errors);
-  const windowBounds = resolveWindow(body, warnings, errors);
+  const dimensions = resolvePixelDimensions(body, errors);
+  const viewSpan = resolveViewSpan(body, errors);
 
   if (errors.length) {
     jsonResponse(res, 400, { ok: false, error: 'Invalid request', details: errors });
     return;
   }
 
-  const viewSettings = computeViewSettings(windowBounds, dimensions.ratio);
+  const baseHalfSpan = computeBaseHalfSpan(viewSpan, dimensions.ratio);
+  if (!Number.isFinite(baseHalfSpan) || baseHalfSpan <= 0) {
+    jsonResponse(res, 400, { ok: false, error: 'Invalid view span.' });
+    return;
+  }
   const compile = Boolean(body?.compile);
   const compress = Boolean(body?.compress);
   const waitMs = clampInt(body?.waitMs, { min: 0, max: 10000 }) ?? 100;
@@ -664,17 +592,16 @@ export default async function handler(req, res) {
       url: previewUrl,
       width: dimensions.width,
       height: dimensions.height,
-      baseHalfSpan: viewSettings.baseHalfSpan,
+      baseHalfSpan,
       waitMs,
     });
     const wantsJson = String(body?.format || '').toLowerCase() === 'json';
     if (wantsJson) {
       jsonResponse(res, 200, {
         ok: true,
-        width: dimensions.width,
-        height: dimensions.height,
+        pixelWidth: dimensions.width,
+        pixelHeight: dimensions.height,
         ratio: dimensions.ratio,
-        window: windowBounds,
         view: actualView,
         warnings: warnings.length ? warnings : null,
         image: buffer.toString('base64'),

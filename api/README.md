@@ -74,9 +74,9 @@ POST /api/reflex4you-preview
 {
   "source": "sin(z^2 + D1)",
   "values": { "D1": "0.2+0.3i" },
-  "ratio": "1:2",
-  "pixels": 1080,
-  "window": { "xMin": -2, "xMax": 2, "yMin": -4, "yMax": 4 },
+  "height": 8,
+  "pixelWidth": 540,
+  "pixelHeight": 1080,
   "format": "json"
 }
 ```
@@ -86,10 +86,9 @@ When `format=json`, the response includes metadata and a base64 PNG:
 ```json
 {
   "ok": true,
-  "width": 540,
-  "height": 1080,
+  "pixelWidth": 540,
+  "pixelHeight": 1080,
   "ratio": 0.5,
-  "window": { "xMin": -2, "xMax": 2, "yMin": -4, "yMax": 4 },
   "view": { "viewXMin": -2, "viewXMax": 2, "viewYMin": -4, "viewYMax": 4 },
   "image": "iVBORw0KGgoAAA...",
   "imageType": "image/png"
@@ -99,15 +98,14 @@ When `format=json`, the response includes metadata and a base64 PNG:
 You can also call it via GET for `<img src>` embedding:
 
 ```
-/api/reflex4you-preview?formulab64=...&ratio=1:2&pixels=1080
+/api/reflex4you-preview?formulab64=...&height=8&pixels=1080
 ```
 
 ### Preview parameters
 
-- `ratio`: aspect ratio (number or `"W:H"`). Default: `0.5` (1:2).
-- `pixels`: long-side pixel count used with `ratio`. Default: `1080`.
-- `width`/`height`: explicit dimensions (override `ratio`/`pixels`).
-- `window`: view window bounds `{ xMin, xMax, yMin, yMax }`. Default: `{-2..2, -4..4}`.
+- `width` or `height`: view span in the complex plane (centered at 0). Default: `height=8`.
+- `pixels`: long-side pixel count when `pixelWidth`/`pixelHeight` are omitted. Default: `1080` (1:2 aspect).
+- `pixelWidth`/`pixelHeight`: explicit output pixel size (overrides `pixels`).
 - `compile`: when true, validates the formula via GPU compilation before rendering.
 
 ## Example response
