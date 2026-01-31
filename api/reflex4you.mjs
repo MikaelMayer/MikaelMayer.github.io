@@ -286,8 +286,7 @@ export default async function handler(req, res) {
     typeof body?.baseUrl === 'string' && body.baseUrl.trim()
       ? body.baseUrl.trim()
       : DEFAULT_BASE_URL;
-  const compress = Boolean(body?.compress);
-  const includeFormulaParam = Boolean(body?.includeFormulaParam);
+  const compress = body?.compress == null ? true : Boolean(body.compress);
   const validate = body?.validate !== false;
   const compile = Boolean(body?.compile);
   const edit = Boolean(body?.edit);
@@ -357,11 +356,7 @@ export default async function handler(req, res) {
     try {
       const encoded = encodeFormulaToBase64Url(source);
       params.set('formulab64', encoded);
-      if (includeFormulaParam) {
-        params.set('formula', source);
-      } else {
-        params.delete('formula');
-      }
+      params.delete('formula');
     } catch (error) {
       warnings.push('Compression failed; falling back to raw formula parameter.');
       params.set('formula', source);

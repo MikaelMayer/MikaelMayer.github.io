@@ -207,8 +207,6 @@ paths:
                   type: boolean
                 compress:
                   type: boolean
-                includeFormulaParam:
-                  type: boolean
                 validate:
                   type: boolean
                 compile:
