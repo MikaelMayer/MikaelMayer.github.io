@@ -64,7 +64,6 @@ function readQueryBody(req) {
   if (params.has('source')) body.source = params.get('source');
   if (params.has('formula')) body.formula = params.get('formula');
   if (params.has('formulab64')) body.formulab64 = params.get('formulab64');
-  if (params.has('formula64')) body.formula64 = params.get('formula64');
   if (params.has('values')) {
     const raw = params.get('values');
     if (raw) {
@@ -206,12 +205,12 @@ function resolveFormulaSource(body, errors) {
   if (raw != null && String(raw).trim()) {
     return String(raw);
   }
-  const encoded = body?.formulab64 ?? body?.formula64 ?? null;
+  const encoded = body?.formulab64 ?? null;
   if (encoded != null && String(encoded).trim()) {
     try {
       return decodeFormulaFromBase64Url(encoded);
     } catch (error) {
-      errors.push('Invalid formulab64/formula64 value.');
+      errors.push('Invalid formulab64 value.');
       return null;
     }
   }

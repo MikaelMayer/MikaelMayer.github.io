@@ -48,7 +48,7 @@ You can test this on https://hoppscotch.io/, just select POST, select body, cont
   "duration": "6s",
   "solos": ["D1", "D2"],
   "edit": true,
-  "compress": true,
+  "compress": false,
   "includeFormulaParam": false,
   "validate": true,
   "compile": false
@@ -61,7 +61,7 @@ You can test this on https://hoppscotch.io/, just select POST, select body, cont
   strings (`a+bi`, `a-bi`, `a,b`, or `a`).
 - `animations` encodes `labelA=start..end` for finger labels only.
 - `duration` sets `t=...` in seconds (e.g. `"5s"` or `5`).
-- `compress` defaults to `true` and uses `formulab64` (gzip + base64url). Set
+- `compress=true` uses `formulab64` (gzip + base64url). Set
   `compress=false` to emit a raw `formula=` instead.
 - `includeFormulaParam=true` also includes `formula=` alongside `formulab64`.
 

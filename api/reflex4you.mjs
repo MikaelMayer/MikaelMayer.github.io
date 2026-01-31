@@ -286,7 +286,7 @@ export default async function handler(req, res) {
     typeof body?.baseUrl === 'string' && body.baseUrl.trim()
       ? body.baseUrl.trim()
       : DEFAULT_BASE_URL;
-  const compress = body?.compress == null ? true : Boolean(body.compress);
+  const compress = Boolean(body?.compress);
   const includeFormulaParam = Boolean(body?.includeFormulaParam);
   const validate = body?.validate !== false;
   const compile = Boolean(body?.compile);
