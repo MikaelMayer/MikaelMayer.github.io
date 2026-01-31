@@ -4,6 +4,7 @@ Reflex4You is an interactive complex-function explorer built around a compact
 formula language.
 
 For app usage, sharing links, and development workflows, see `guide.md`.
+For ChatGPT agent integration guidance, see `CHATGPT_AGENT_INTEGRATION.md`.
 
 ## Interaction Constants
 
