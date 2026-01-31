@@ -1,14 +1,11 @@
 import { gunzipSync, gzipSync } from 'node:zlib';
-import { createServer } from 'node:http';
-import { createReadStream, statSync } from 'node:fs';
-import { dirname, extname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { chromium as playwrightChromium } from 'playwright-core';
 import chromium from '@sparticuz/chromium';
 import { parseFormulaInput } from '../apps/reflex4you/arithmetic-parser.mjs';
 import { formatCaretIndicator, getCaretSelection } from '../apps/reflex4you/parse-error-format.mjs';
 import { compileFormulaForGpu, FINGER_DECIMAL_PLACES } from '../apps/reflex4you/core-engine.mjs';
 
+const DEFAULT_BASE_URL = 'https://mikaelmayer.github.io/apps/reflex4you/index.html';
 const DEFAULT_CANVAS_RATIO = 0.5;
 const DEFAULT_CANVAS_PIXELS = 1080;
 const DEFAULT_VIEW_HEIGHT = 8;
@@ -66,6 +63,7 @@ function readQueryBody(req) {
   if (params.has('source')) body.source = params.get('source');
   if (params.has('formula')) body.formula = params.get('formula');
   if (params.has('formulab64')) body.formulab64 = params.get('formulab64');
+  if (params.has('baseUrl')) body.baseUrl = params.get('baseUrl');
   if (params.has('values')) {
     const raw = params.get('values');
     if (raw) {
@@ -334,88 +332,19 @@ function buildQueryParams({ source, queryValues, compress }) {
   return params;
 }
 
-function resolveRepoRoot() {
-  const here = dirname(fileURLToPath(import.meta.url));
-  return resolve(here, '..');
-}
-
-function contentTypeForPath(filePath) {
-  switch (extname(filePath)) {
-    case '.html':
-      return 'text/html; charset=utf-8';
-    case '.css':
-      return 'text/css; charset=utf-8';
-    case '.mjs':
-    case '.js':
-      return 'text/javascript; charset=utf-8';
-    case '.json':
-      return 'application/json; charset=utf-8';
-    case '.svg':
-      return 'image/svg+xml';
-    case '.png':
-      return 'image/png';
-    case '.jpg':
-    case '.jpeg':
-      return 'image/jpeg';
-    case '.gif':
-      return 'image/gif';
-    case '.webp':
-      return 'image/webp';
-    case '.ico':
-      return 'image/x-icon';
-    default:
-      return 'application/octet-stream';
+function resolveBaseUrl(body, errors) {
+  const candidate =
+    typeof body?.baseUrl === 'string' && body.baseUrl.trim()
+      ? body.baseUrl.trim()
+      : DEFAULT_BASE_URL;
+  try {
+    const url = new URL(candidate);
+    url.hash = '';
+    return url;
+  } catch (error) {
+    errors.push('Invalid baseUrl.');
+    return null;
   }
-}
-
-async function startStaticServer(rootDir) {
-  return await new Promise((resolvePromise, rejectPromise) => {
-    const server = createServer((req, res) => {
-      try {
-        const url = new URL(req.url || '/', 'http://localhost');
-        let pathname = decodeURIComponent(url.pathname);
-        if (pathname === '/') {
-          pathname = '/apps/reflex4you/index.html';
-        }
-        const safePath = resolve(rootDir, `.${pathname}`);
-        if (!safePath.startsWith(rootDir)) {
-          res.statusCode = 403;
-          res.end('Forbidden');
-          return;
-        }
-        let stat;
-        try {
-          stat = statSync(safePath);
-        } catch (_) {
-          res.statusCode = 404;
-          res.end('Not found');
-          return;
-        }
-        if (stat.isDirectory()) {
-          const indexPath = join(safePath, 'index.html');
-          try {
-            stat = statSync(indexPath);
-          } catch (_) {
-            res.statusCode = 404;
-            res.end('Not found');
-            return;
-          }
-          res.statusCode = 200;
-          res.setHeader('Content-Type', contentTypeForPath(indexPath));
-          createReadStream(indexPath).pipe(res);
-          return;
-        }
-        res.statusCode = 200;
-        res.setHeader('Content-Type', contentTypeForPath(safePath));
-        createReadStream(safePath).pipe(res);
-      } catch (error) {
-        res.statusCode = 500;
-        res.end('Server error');
-      }
-    });
-    server.on('error', rejectPromise);
-    server.listen(0, '127.0.0.1', () => resolvePromise(server));
-  });
 }
 
 async function getBrowser() {
@@ -444,11 +373,12 @@ async function renderPreview({ url, width, height, baseHalfSpan, waitMs }) {
   const context = await browser.newContext({
     viewport: { width, height },
     deviceScaleFactor: 1,
+    serviceWorkers: 'block',
   });
   const page = await context.newPage();
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => Boolean(window.__reflexReady));
+    await page.waitForFunction(() => typeof window.__reflexReady !== 'undefined');
     const actualView = await page.evaluate(async (settings) => {
       await window.__reflexReady;
       const core = window.__reflexCore;
@@ -532,6 +462,7 @@ export default async function handler(req, res) {
 
   const dimensions = resolvePixelDimensions(body, errors);
   const viewSpan = resolveViewSpan(body, errors);
+  const baseUrl = resolveBaseUrl(body, errors);
 
   if (errors.length) {
     jsonResponse(res, 400, { ok: false, error: 'Invalid request', details: errors });
@@ -572,18 +503,9 @@ export default async function handler(req, res) {
   }
 
   const queryParams = buildQueryParams({ source, queryValues, compress });
-  const rootDir = resolveRepoRoot();
-  const server = await startStaticServer(rootDir);
-  const address = server.address();
-  const port = typeof address === 'object' && address ? address.port : null;
-  if (!port) {
-    server.close();
-    jsonResponse(res, 500, { ok: false, error: 'Failed to allocate preview server port' });
-    return;
-  }
-  const previewUrl = `http://127.0.0.1:${port}/apps/reflex4you/index.html?${queryParams.toString()}`;
-
   try {
+    baseUrl.search = queryParams.toString();
+    const previewUrl = baseUrl.toString();
     const { buffer, actualView } = await renderPreview({
       url: previewUrl,
       width: dimensions.width,
@@ -612,7 +534,5 @@ export default async function handler(req, res) {
   } catch (error) {
     const message = error?.message ? String(error.message) : String(error || 'Preview render error');
     jsonResponse(res, 500, { ok: false, error: message });
-  } finally {
-    server.close();
   }
 }
