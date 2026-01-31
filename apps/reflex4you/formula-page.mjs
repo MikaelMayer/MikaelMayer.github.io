@@ -52,6 +52,7 @@ const formulaError = $('formula-error');
 const menuButton = $('menu-button');
 const menuDropdown = $('menu-dropdown');
 let parseErrorSelection = null;
+let initialFormulaFromUrl = null;
 
 function clearPersistedFormulaSearch() {
   try {
@@ -88,6 +89,11 @@ async function handleMenuAction(action) {
       break;
     }
     case 'back-to-viewer': {
+      if (initialFormulaFromUrl != null) {
+        const href = await buildViewerUrl({ includeFormula: true, source: initialFormulaFromUrl });
+        window.location.href = href;
+        break;
+      }
       clearPersistedFormulaSearch();
       const href = await buildViewerUrl({ includeFormula: false });
       window.location.href = href;
@@ -327,6 +333,7 @@ async function bootstrap() {
       showError('We could not decode the formula embedded in this link.');
     },
   });
+  initialFormulaFromUrl = decoded;
 
   const source = (decoded && decoded.trim()) ? decoded : DEFAULT_FORMULA_TEXT;
 
