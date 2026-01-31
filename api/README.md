@@ -1,0 +1,97 @@
+# Reflex4You API (Vercel)
+
+This folder contains a minimal serverless API to validate Reflex4You formulas
+and generate shareable URLs (including finger values, animations, and timing).
+
+## Files
+
+- `reflex4you.mjs` – Vercel Serverless Function
+  - Endpoint: `/api/reflex4you`
+  - Method: `POST`
+  - Returns: `{ ok, url, caretMessage, caretSelection }`
+
+## Quick deploy on Vercel (from GitHub)
+
+1. Push this repo to GitHub (public is fine).
+2. In Vercel, click **New Project** and import the repo.
+3. Vercel will detect the API under `/api`.
+4. Deploy. Your endpoint becomes:
+
+```
+https://YOUR_PROJECT.vercel.app/api/reflex4you
+```
+
+> Note: GitHub Pages cannot run APIs. Vercel (or Netlify/Cloudflare) is required.
+
+## Request format
+
+```json
+{
+  "source": "sin(z^2 + D1) $ z - D2",
+  "baseUrl": "https://mikaelmayer.github.io/apps/reflex4you/index.html",
+  "values": {
+    "D1": { "x": 0.2, "y": -0.3 },
+    "D2": "0.4+0.1i",
+    "RA": [1, 0],
+    "RB": [0, 0]
+  },
+  "animations": {
+    "D1": { "start": "0+0i", "end": "1+0i" }
+  },
+  "duration": "6s",
+  "solos": ["D1", "D2"],
+  "edit": true,
+  "compress": false,
+  "includeFormulaParam": false,
+  "validate": true,
+  "compile": false
+}
+```
+
+### Notes
+
+- `values` accepts objects (`{ x, y }` or `{ re, im }`), arrays (`[re, im]`), or
+  strings (`a+bi`, `a-bi`, `a,b`, or `a`).
+- `animations` encodes `labelA=start..end` for finger labels only.
+- `duration` sets `t=...` in seconds (e.g. `"5s"` or `5`).
+- `compress=true` uses `formulab64` (gzip + base64url). Use
+  `includeFormulaParam=true` to also include `formula=` for compatibility.
+
+## Example response
+
+```json
+{
+  "ok": true,
+  "url": "https://mikaelmayer.github.io/apps/reflex4you/index.html?formula=sin(z%5E2%20%2B%20D1)%20%24%20z%20-%20D2&D1=0.2-0.3i",
+  "query": "formula=sin(z%5E2%20%2B%20D1)%20%24%20z%20-%20D2&D1=0.2-0.3i",
+  "warnings": null
+}
+```
+
+If the formula fails to parse:
+
+```json
+{
+  "ok": false,
+  "url": null,
+  "caretMessage": "z^2 +\n     ^\nExpected expression",
+  "caretSelection": { "start": 5, "end": 6 }
+}
+```
+
+## Local test
+
+If you run this on a local Vercel dev server:
+
+```bash
+npm i -g vercel
+vercel dev
+```
+
+Then test:
+
+```bash
+curl -X POST http://localhost:3000/api/reflex4you \
+  -H "Content-Type: application/json" \
+  -d '{"source":"z","values":{"D1":"0.2+0.3i"}}'
+```
