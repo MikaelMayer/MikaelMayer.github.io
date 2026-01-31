@@ -5,10 +5,18 @@ validate them with the JavaScript parser, and return a shareable link.
 
 ## Minimal requirements
 
-- A small HTTP service (or OpenAI Action) that can run the Reflex4You parser
-  modules in Node 18+ (ESM) or a bundler.
 - A base viewer URL (default):
   https://mikaelmayer.github.io/apps/reflex4you/index.html
+- A way to run the parser outside the static site (see below).
+
+## Important: the site is static (no API)
+
+`apps/reflex4you` is a static web app. It cannot host an API endpoint for
+ChatGPT to call. If you want **parse feedback**, you must run the parser in a
+separate place:
+
+- **Recommended:** a small HTTP service and a ChatGPT Custom GPT Action.
+- **Fallback:** a local CLI script + manual copy/paste (no automated tool calls).
 
 ## Share URL format
 
@@ -72,6 +80,123 @@ Notes:
   `core-engine.mjs` and report any compilation errors (this matches the in-app
   worker in `formula-compile-worker.mjs`).
 
+## ChatGPT-specific integration (recommended)
+
+### 1) Build a tiny validation API
+
+Here is a minimal Node (ESM) service you can deploy to Vercel/Render/Cloudflare:
+
+```js
+// server.mjs
+import express from 'express';
+import { parseFormulaInput } from './apps/reflex4you/arithmetic-parser.mjs';
+import { formatCaretIndicator, getCaretSelection } from './apps/reflex4you/parse-error-format.mjs';
+
+const app = express();
+app.use(express.json({ limit: '64kb' }));
+
+app.post('/validate', (req, res) => {
+  const source = String(req.body?.source || '');
+  const baseUrl = String(req.body?.baseUrl || 'https://mikaelmayer.github.io/apps/reflex4you/index.html');
+  const fingerValues = req.body?.fingerValues && typeof req.body.fingerValues === 'object'
+    ? req.body.fingerValues
+    : {};
+
+  const result = parseFormulaInput(source, { fingerValues });
+  if (!result.ok) {
+    res.json({
+      ok: false,
+      url: null,
+      caretMessage: formatCaretIndicator(source, result),
+      caretSelection: getCaretSelection(source, result),
+    });
+    return;
+  }
+
+  const params = new URLSearchParams();
+  params.set('formula', source);
+  res.json({
+    ok: true,
+    url: `${baseUrl}?${params.toString()}`,
+    caretMessage: null,
+    caretSelection: null,
+  });
+});
+
+app.listen(3000, () => console.log('Listening on http://localhost:3000'));
+```
+
+Notes:
+
+- This uses the **raw** `formula` param to avoid browser-only compression APIs.
+- If you want `formulab64`, use `zlib.gzipSync` + base64url encoding on the server.
+
+### 2) Create a Custom GPT Action
+
+In ChatGPT:
+
+1. Create a **Custom GPT**.
+2. In the **Actions** tab, add an OpenAPI schema like this (update the URL):
+
+```yaml
+openapi: 3.1.0
+info:
+  title: Reflex4You Formula Validator
+  version: 1.0.0
+servers:
+  - url: https://your-domain.example.com
+paths:
+  /validate:
+    post:
+      operationId: validateReflexFormula
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                source:
+                  type: string
+                baseUrl:
+                  type: string
+                fingerValues:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    properties:
+                      x: { type: number }
+                      y: { type: number }
+              required: [source]
+      responses:
+        "200":
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  url: { type: string, nullable: true }
+                  caretMessage: { type: string, nullable: true }
+                  caretSelection:
+                    type: object
+                    nullable: true
+                    properties:
+                      start: { type: number }
+                      end: { type: number }
+```
+
+### 3) Give the GPT a precise system instruction
+
+Example instruction text:
+
+```
+You are a Reflex4You formula agent. Draft a formula, then call
+validateReflexFormula. If ok=false, use caretMessage to fix the formula and
+retry. Once ok=true, return the url to the user.
+```
+
 ## Suggested tool API (example)
 
 Single endpoint that both validates and builds the link:
@@ -114,3 +239,36 @@ When invalid:
 2. Call the validation tool (parse).
 3. If invalid, use caret feedback to revise and retry.
 4. When valid, return the share URL to the user.
+
+## No-API fallback (manual loop)
+
+If you cannot host any API at all, you still have two options:
+
+1. **No validation:** have ChatGPT produce a formula + share link directly.
+2. **Manual validation:** run a local CLI script and paste the caret feedback
+   back into ChatGPT for the next iteration.
+
+Example local CLI (Node):
+
+```js
+// validate.mjs
+import { parseFormulaInput } from './apps/reflex4you/arithmetic-parser.mjs';
+import { formatCaretIndicator } from './apps/reflex4you/parse-error-format.mjs';
+
+const source = process.argv.slice(2).join(' ');
+const result = parseFormulaInput(source);
+if (!result.ok) {
+  console.error(formatCaretIndicator(source, result));
+  process.exit(1);
+}
+
+const params = new URLSearchParams();
+params.set('formula', source);
+console.log(`https://mikaelmayer.github.io/apps/reflex4you/index.html?${params}`);
+```
+
+Run:
+
+```
+node validate.mjs "sin(z^2 + D1) $ z - D2"
+```
