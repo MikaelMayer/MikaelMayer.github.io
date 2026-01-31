@@ -239,9 +239,9 @@ paths:
                     properties:
                       start: { type: number }
                       end: { type: number }
-  /api/reflex4you-preview:
+  /api/reflex4you-render:
     get:
-      operationId: renderReflexPreviewGet
+      operationId: renderReflexImageGet
       parameters:
         - name: formula
           in: query
@@ -313,7 +313,7 @@ paths:
                   image: { type: string }
                   imageType: { type: string }
     post:
-      operationId: renderReflexPreview
+      operationId: renderReflexImage
       requestBody:
         required: true
         content:
