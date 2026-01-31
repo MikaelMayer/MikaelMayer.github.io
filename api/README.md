@@ -106,6 +106,7 @@ You can also call it via GET for `<img src>` embedding:
 - `width` or `height`: view span in the complex plane (centered at 0). Default: `height=8`.
 - `pixels`: long-side pixel count when `pixelWidth`/`pixelHeight` are omitted. Default: `1080` (1:2 aspect).
 - `pixelWidth`/`pixelHeight`: explicit output pixel size (overrides `pixels`).
+- `baseUrl`: optional viewer URL (defaults to the GitHub Pages Reflex4You index).
 - `compile`: when true, validates the formula via GPU compilation before rendering.
 
 ## Example response
