@@ -183,6 +183,8 @@
     // so we can attempt to preserve selection across parses.
     let previouslySelectedId = null;
 
+    let searchTimeoutId = null;
+
     window.onload = () => {
       // Attempt to restore previous error log
       const errLog = localStorage.getItem('errLog');
@@ -385,62 +387,6 @@
         endLine: blockStart + blockLines.length - 1
       });
     }
-    // We parse a single block from the set of lines. Then store it in parsedBlocks.
-    function parseBlockFromLines(startLine, blockLines, indent) {
-      const code = blockLines.join('\n');
-      const firstLine = blockLines[0] || '';
-      // Attempt to figure out if it's a CSS or JS block by naive heuristics:
-      // - If the first line has a pattern like: "selector {" we call it CSS, name= "selector"
-      // - If the first line has "function name(" => type=function, name=...
-      // - If the first line has "var/let/const name =" => type=declaration, name=...
-      // - Otherwise type=unknown, name=some fallback.
-
-      let type = 'unknown';
-      let name = '';
-
-      // if we see something that ends with '{', might be CSS or function
-      // let's see if it looks like a CSS rule: "something {"
-      const curlyMatch = firstLine.match(/^(\s*)([^{}]+)\{\s*$/);
-      if (curlyMatch) {
-        // This line might be a CSS block, e.g. ".myClass {"
-        type = 'css';
-        // "anything before the curly brace" as the name. We do not trim the leading spaces though,
-        // but let's remove them from the 'identifier' specifically to avoid leading spaces in name:
-        name = curlyMatch[2].trimEnd();
-      } else {
-        // check if function
-        const funcMatch = firstLine.match(/\bfunction\s+([a-zA-Z0-9_]+)/);
-        if (funcMatch) {
-          type = 'function';
-          name = funcMatch[1];
-        } else {
-          // check if var/let/const
-          const declMatch = firstLine.match(/\b(var|let|const)\s+([a-zA-Z0-9_]+)/);
-          if (declMatch) {
-            type = 'declaration';
-            name = declMatch[2];
-          }
-        }
-      }
-
-      // If we still haven't found a name, let's use the first line as the name for display
-      if (!name) {
-        name = firstLine.trim() || '(empty line)';
-      }
-
-      // Construct a unique ID. We can do: type + ":" + name + ":" + startLine
-      const uniqueId = `${type}:${name}:${startLine}`;
-      
-      parsedBlocks.push({
-        name,
-        type,
-        code,
-        startLine,
-        endLine: startLine + blockLines.length - 1,
-        indent,
-        uniqueId
-      });
-    }
     function parseCssRegion(lines, startIndex) {
       let i = 0;
       while (i < lines.length) {
@@ -540,6 +486,10 @@
         else break;
       }
       return count;
+    }
+
+    function removeLeadingIndentationStringcode) {
+      return removeLeadingIndentation(code.split('\n')).join('\n');
     }
 
     function removeLeadingIndentation(lines) {
@@ -646,30 +596,125 @@
     function fillSecondTextAreaFromSelection() {
       const selVal = $('functionSelect').value;
       if (!selVal) {
-        // If user picked "Select a declaration...", blank out the second area
         $('functionInput').value = '';
         $('updateMessage').textContent = '';
         return;
       }
       const block = parsedBlocks.find(b => b.uniqueId === selVal);
       if (!block) {
-        // Should not happen if the dropdown is in sync
         $('functionInput').value = '';
         return;
       }
+    
       let snippetLines = block.code.split('\n');
-      // Remove leading indentation for display:
+      // Remove leading indentation before displaying
       snippetLines = removeLeadingIndentation(snippetLines);
       $('functionInput').value = snippetLines.join('\n');
+    
+      setTimeout(() => $('functionInput').scrollTop = 0, 1);
     }
+    
 
     // -------------------------------
     // 3) SECOND TEXTAREA LOGIC
     // -------------------------------
     function onSecondTextChanged() {
+      // Immediately handle partial search
+      immediatePartialSearch();
+
+      // Clear any pending timeout
+      if (searchTimeoutId) {
+        clearTimeout(searchTimeoutId);
+      }
+      // Schedule a new search after 1 second
+      searchTimeoutId = setTimeout(() => {
+        autoSelectIfUniqueMatch();
+      }, 1000);
+
       updateFunctionUIState();
       // Also see if the typed block name matches any existing block, in which case we auto-select
       autoSelectMatchingBlock();
+    }
+
+    function immediatePartialSearch() {
+      const sel = $('functionSelect');
+      // The raw typed text (with trailing spaces)
+      const rawTyped = $('functionInput').value;
+      // The trimmed, lowercased text
+      const typed = rawTyped.trimEnd().toLowerCase();
+    
+      // If nothing typed, revert dropdown
+      if (!typed) {
+        sel.value = '';
+        return;
+      }
+    
+      // 1) Get partial matches. First prefer names that START with `typed`
+      let candidates = parsedBlocks.filter(b =>
+        b.name.toLowerCase().startsWith(typed)
+      );
+      if (candidates.length === 0) {
+        // 2) Otherwise, pick names that simply CONTAIN `typed`
+        candidates = parsedBlocks.filter(b =>
+          b.name.toLowerCase().includes(typed)
+        );
+      }
+    
+      // -- If user typed a space at the end, and typed is not "function..."
+      // then immediately auto-select & fill second textbox:
+      if (rawTyped.endsWith(' ') && !typed.startsWith('function')) {
+        if (candidates.length > 0) {
+          const chosen = candidates[0];
+          sel.value = chosen.uniqueId;
+          previouslySelectedId = chosen.uniqueId;
+          highlightDropdownIfNeeded();
+    
+          // Now fill the second textarea with the chosen block’s code
+          // using your existing logic:
+          fillSecondTextAreaFromSelection();
+          updateFunctionUIState();
+        } else {
+          // No matches => revert dropdown
+          sel.value = '';
+        }
+        // End here so we don’t fall through to the normal partial selection
+        return;
+      }
+    
+      // -- Otherwise, do the usual partial-match selection (no immediate fill):
+      if (candidates.length > 0) {
+        sel.value = candidates[0].uniqueId;
+        previouslySelectedId = candidates[0].uniqueId;
+        highlightDropdownIfNeeded();
+      } else {
+        sel.value = '';
+      }
+    }
+    
+    
+
+    // If there's only one match, auto-select it
+    function autoSelectIfUniqueMatch() {
+      const typed = $('functionInput').value.trim();
+      if (!typed) return; // Nothing typed => do nothing
+
+      const typedLower = typed.toLowerCase();
+      // Filter blocks that match exactly in a case-insensitive way
+      const exactMatches = parsedBlocks.filter(block =>
+        block.name.toLowerCase() === typedLower
+      );
+      console.log(parsedBlocks, typedLower);
+
+      if (exactMatches.length === 1) {
+        // Exactly one match => auto-select it
+        const match = exactMatches[0];
+        $('functionSelect').value = match.uniqueId;
+        previouslySelectedId = match.uniqueId;
+        fillSecondTextAreaFromSelection();
+        updateFunctionUIState();
+        highlightDropdownIfNeeded();
+        updateButtonDisabledState();
+      }
     }
 
     // Determine color highlights and messages for the second text area
@@ -714,7 +759,7 @@
       }
 
       // If the snippet is exactly the same as the selected block => green
-      if (selBlock.code === snippet) {
+      if (removeLeadingIndentationString(selBlock.code) === snippet) {
         funcInput.classList.add('highlight-green');
       } else {
         // If name matches but code differs => yellow
@@ -773,40 +818,6 @@
       updateButtonDisabledState();
     }
 
-    // Return { name, type } guessed from the snippet's first line
-    function extractNameFromBlock(snippet) {
-      const lines = snippet.split('\n');
-      const firstLine = lines[0];
-      let type = 'unknown';
-      let name = '';
-
-      // CSS?
-      // e.g. ".foo {"
-      const curlyMatch = firstLine.match(/^(\s*)([^{}]+)\{\s*$/);
-      if (curlyMatch) {
-        type = 'css';
-        name = curlyMatch[2].trimEnd();
-      } else {
-        // function?
-        const funcMatch = firstLine.match(/\bfunction\s+([a-zA-Z0-9_]+)/);
-        if (funcMatch) {
-          type = 'function';
-          name = funcMatch[1];
-        } else {
-          // var/let/const?
-          const declMatch = firstLine.match(/\b(var|let|const)\s+([a-zA-Z0-9_]+)/);
-          if (declMatch) {
-            type = 'declaration';
-            name = declMatch[2];
-          } else {
-            // fallback
-            name = firstLine.trim() || ('(empty line of '+snippet+')');
-          }
-        }
-      }
-      return { name, type };
-    }
-
     // If we find a block with the same name, we return { block, exact:true|false }
     // If no block found, return null
     function findBlockMatchingSnippet(snippet) {
@@ -814,7 +825,7 @@
       let found = null;
       for (const b of parsedBlocks) {
         if (b.name === name) {
-          found = { block: b, exact: (b.code === snippet) };
+          found = { block: b, exact: (removeLeadingIndentationString(b.code) === snippet) };
           break;
         }
       }
@@ -853,13 +864,11 @@
       const oldIndent = selBlock.indent;
       const newIndent = countLeadingSpaces(snippetLines[0]);
       const indentDiff = oldIndent - newIndent;
+      // Normally, newIndent is always less than oldIndent
 
       // shift all snippet lines by indentDiff (if positive, add spaces; if negative, remove spaces if possible).
       const adjustedSnippetLines = snippetLines.map(line => {
-        const current = countLeadingSpaces(line);
-        let newCount = current + indentDiff;
-        if (newCount < 0) newCount = 0; // no negative indentation
-        return ' '.repeat(newCount) + line;
+        return ' '.repeat(indentDiff) + line;
       });
 
       // Now we splice them in
@@ -898,12 +907,12 @@
       if (!block) {
         // the selected block is missing => highlight red
         sel.classList.add('dropdown-red');
-        logError("Did not find selection?!");
+        //logError("Did not find selection?!");
       } else {
         const snippetName = extractNameFromBlock($('functionInput').value).name;
         if (snippetName && snippetName !== block.name) {
           sel.classList.add('dropdown-orange');
-          logError("Could not find "+snippetName+", expected "+block.name);
+          //logError("Could not find "+snippetName+", expected "+block.name);
         }
       }
     }
