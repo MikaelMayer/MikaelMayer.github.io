@@ -9,10 +9,12 @@ and generate shareable URLs (including finger values, animations, and timing).
   - Endpoint: `/api/reflex4you`
   - Method: `POST`
   - Returns: `{ ok, url, caretMessage, caretSelection }`
-- `reflex4you-preview.mjs` – Vercel Serverless Function
-  - Endpoint: `/api/reflex4you-preview`
+- `reflex4you-render.mjs` – Vercel Serverless Function
+  - Endpoint: `/api/reflex4you-render`
   - Method: `GET` or `POST`
   - Returns: `image/png` (or JSON when `format=json`)
+- `reflex4you-preview.mjs` – Legacy alias (kept for compatibility)
+  - Endpoint: `/api/reflex4you-preview`
 
 ## Quick deploy on Vercel (from GitHub)
 
@@ -70,7 +72,7 @@ You can test this on https://hoppscotch.io/, just select POST, select body, cont
 Render a WebGL preview image via Playwright (PNG):
 
 ```json
-POST /api/reflex4you-preview
+POST /api/reflex4you-render
 {
   "source": "sin(z^2 + D1)",
   "values": { "D1": "0.2+0.3i" },
@@ -98,7 +100,7 @@ When `format=json`, the response includes metadata and a base64 PNG:
 You can also call it via GET for `<img src>` embedding:
 
 ```
-/api/reflex4you-preview?formulab64=...&height=8&pixels=1080
+/api/reflex4you-render?formulab64=...&height=8&pixels=1080
 ```
 
 ### Preview parameters

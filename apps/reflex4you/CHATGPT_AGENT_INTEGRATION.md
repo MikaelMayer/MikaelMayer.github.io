@@ -141,12 +141,15 @@ In ChatGPT:
 ```yaml
 openapi: 3.1.0
 info:
-  title: Reflex4You Formula Validator
+  title: Reflex4You Formula API
   version: 1.0.0
+externalDocs:
+  description: Reflex4You Formula Language – Latest README
+  url: https://mikaelmayer.github.io/apps/reflex4you/README.md
 servers:
-  - url: https://your-domain.example.com
+  - url: https://your-vercel-app.vercel.app
 paths:
-  /validate:
+  /api/reflex4you:
     post:
       operationId: validateReflexFormula
       requestBody:
@@ -158,19 +161,64 @@ paths:
               properties:
                 source:
                   type: string
-                baseUrl:
-                  type: string
+                values:
+                  type: object
+                  additionalProperties:
+                    oneOf:
+                      - type: string
+                      - type: array
+                        items: { type: number }
+                      - type: object
+                        properties:
+                          x: { type: number }
+                          y: { type: number }
+                          re: { type: number }
+                          im: { type: number }
                 fingerValues:
+                  type: object
+                  additionalProperties:
+                    oneOf:
+                      - type: string
+                      - type: array
+                        items: { type: number }
+                      - type: object
+                        properties:
+                          x: { type: number }
+                          y: { type: number }
+                          re: { type: number }
+                          im: { type: number }
+                animations:
                   type: object
                   additionalProperties:
                     type: object
                     properties:
-                      x: { type: number }
-                      y: { type: number }
+                      start: { type: string }
+                      end: { type: string }
+                duration:
+                  oneOf:
+                    - type: string
+                    - type: number
+                solos:
+                  oneOf:
+                    - type: string
+                    - type: array
+                      items: { type: string }
+                edit:
+                  type: boolean
+                compress:
+                  type: boolean
+                includeFormulaParam:
+                  type: boolean
+                validate:
+                  type: boolean
+                compile:
+                  type: boolean
+                baseUrl:
+                  type: string
               required: [source]
       responses:
         "200":
-          description: Validation result
+          description: Reflex4You validation result
           content:
             application/json:
               schema:
@@ -178,6 +226,12 @@ paths:
                 properties:
                   ok: { type: boolean }
                   url: { type: string, nullable: true }
+                  query: { type: string, nullable: true }
+                  warnings:
+                    oneOf:
+                      - type: array
+                        items: { type: string }
+                      - type: "null"
                   caretMessage: { type: string, nullable: true }
                   caretSelection:
                     type: object
@@ -185,6 +239,170 @@ paths:
                     properties:
                       start: { type: number }
                       end: { type: number }
+  /api/reflex4you-render:
+    get:
+      operationId: renderReflexImageGet
+      parameters:
+        - name: formula
+          in: query
+          schema: { type: string }
+        - name: formulab64
+          in: query
+          schema: { type: string }
+        - name: values
+          in: query
+          schema: { type: string }
+        - name: width
+          in: query
+          schema: { type: number }
+        - name: height
+          in: query
+          schema: { type: number }
+        - name: pixels
+          in: query
+          schema: { type: number }
+        - name: pixelWidth
+          in: query
+          schema: { type: number }
+        - name: pixelHeight
+          in: query
+          schema: { type: number }
+        - name: waitMs
+          in: query
+          schema: { type: number }
+        - name: compile
+          in: query
+          schema: { type: boolean }
+        - name: compress
+          in: query
+          schema: { type: boolean }
+        - name: format
+          in: query
+          schema: { type: string }
+        - name: baseUrl
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Reflex4You preview image (PNG) or JSON metadata
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  pixelWidth: { type: number }
+                  pixelHeight: { type: number }
+                  ratio: { type: number }
+                  view:
+                    type: object
+                    properties:
+                      viewXMin: { type: number }
+                      viewXMax: { type: number }
+                      viewYMin: { type: number }
+                      viewYMax: { type: number }
+                  warnings:
+                    oneOf:
+                      - type: array
+                        items: { type: string }
+                      - type: "null"
+                  image: { type: string }
+                  imageType: { type: string }
+    post:
+      operationId: renderReflexImage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                source:
+                  type: string
+                formula:
+                  type: string
+                formulab64:
+                  type: string
+                values:
+                  type: object
+                  additionalProperties:
+                    oneOf:
+                      - type: string
+                      - type: array
+                        items: { type: number }
+                      - type: object
+                        properties:
+                          x: { type: number }
+                          y: { type: number }
+                          re: { type: number }
+                          im: { type: number }
+                fingerValues:
+                  type: object
+                  additionalProperties:
+                    oneOf:
+                      - type: string
+                      - type: array
+                        items: { type: number }
+                      - type: object
+                        properties:
+                          x: { type: number }
+                          y: { type: number }
+                          re: { type: number }
+                          im: { type: number }
+                width:
+                  type: number
+                height:
+                  type: number
+                pixels:
+                  type: number
+                pixelWidth:
+                  type: number
+                pixelHeight:
+                  type: number
+                waitMs:
+                  type: number
+                compile:
+                  type: boolean
+                compress:
+                  type: boolean
+                format:
+                  type: string
+                baseUrl:
+                  type: string
+      responses:
+        "200":
+          description: Reflex4You preview image (PNG) or JSON metadata
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  pixelWidth: { type: number }
+                  pixelHeight: { type: number }
+                  ratio: { type: number }
+                  view:
+                    type: object
+                    properties:
+                      viewXMin: { type: number }
+                      viewXMax: { type: number }
+                      viewYMin: { type: number }
+                      viewYMax: { type: number }
+                  warnings:
+                    oneOf:
+                      - type: array
+                        items: { type: string }
+                      - type: "null"
+                  image: { type: string }
+                  imageType: { type: string }
 ```
 
 ### 3) Give the GPT a precise system instruction
