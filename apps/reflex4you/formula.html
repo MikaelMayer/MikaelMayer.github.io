@@ -91,6 +91,89 @@
       font-weight: 600;
     }
 
+    #menu-anchor {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    #menu-button {
+      width: 40px;
+      height: 40px;
+      border-radius: 999px;
+      border: 1px solid var(--panel-border);
+      background: rgba(0, 0, 0, 0.28);
+      color: var(--text);
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    #menu-button:hover,
+    #menu-button:focus-visible {
+      border-color: rgba(255, 255, 255, 0.35);
+      background: rgba(0, 0, 0, 0.45);
+      outline: none;
+    }
+
+    #menu-button span {
+      width: 18px;
+      height: 2px;
+      border-radius: 2px;
+      background: currentColor;
+      display: block;
+    }
+
+    #menu-dropdown {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      background: rgba(0, 0, 0, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      border-radius: 12px;
+      min-width: 200px;
+      padding: 6px 0;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      opacity: 0;
+      transform: translateY(-6px);
+      pointer-events: none;
+      visibility: hidden;
+      transition: opacity 0.12s ease, transform 0.12s ease;
+      z-index: 5;
+    }
+
+    #menu-dropdown.menu-dropdown--open {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+      visibility: visible;
+    }
+
+    .menu-dropdown__item {
+      background: transparent;
+      border: 0;
+      color: rgba(255, 255, 255, 0.92);
+      font-size: 13px;
+      padding: 10px 16px;
+      text-align: left;
+      cursor: pointer;
+      width: 100%;
+      font-family: inherit;
+    }
+
+    .menu-dropdown__item:hover,
+    .menu-dropdown__item:focus-visible {
+      background: rgba(255, 255, 255, 0.08);
+      outline: none;
+    }
+
     .card {
       border: 1px solid var(--panel-border);
       background: var(--panel);
@@ -311,10 +394,38 @@
   <div class="page">
     <div class="topbar">
       <div class="brand">Reflex4You</div>
-      <a class="chip" href="./index.html">
-        <strong>Back</strong>
-        <span>to viewer</span>
-      </a>
+      <div id="menu-anchor">
+        <button
+          id="menu-button"
+          type="button"
+          aria-label="Open menu"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          aria-controls="menu-dropdown"
+        >
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+        </button>
+        <div id="menu-dropdown" role="menu" aria-hidden="true">
+          <button
+            type="button"
+            class="menu-dropdown__item"
+            data-menu-action="visualize-formula"
+            role="menuitem"
+          >
+            Visualize formula
+          </button>
+          <button
+            type="button"
+            class="menu-dropdown__item"
+            data-menu-action="back-to-viewer"
+            role="menuitem"
+          >
+            Back to viewer
+          </button>
+        </div>
+      </div>
     </div>
 
     <div class="card">
