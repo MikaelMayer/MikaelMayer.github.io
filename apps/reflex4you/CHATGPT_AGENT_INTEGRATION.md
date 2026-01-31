@@ -145,9 +145,9 @@ info:
   version: 1.0.0
 externalDocs:
   description: Reflex4You Formula Language – Latest README
-  url: https://mikaelmayer.vercel.app/apps/reflex4you/README.md
+  url: https://mikaelmayer.github.io/apps/reflex4you/README.md
 servers:
-  - url: https://mikaelmayer.vercel.app
+  - url: https://your-vercel-app.vercel.app
 paths:
   /api/reflex4you:
     post:
