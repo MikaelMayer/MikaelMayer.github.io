@@ -16,7 +16,7 @@ exact complex number:
 | --- | --- | --- |
 | `F0`, `F1`, `F2`, `F3` | Fixed handles | Fingers are assigned in order (first touch -> `F1`, etc.). (`F0` is supported as an alias of `F1`.) |
 | `D0`, `D1`, `D2`, `D3` | Dynamic handles | Touch the handle closest to the complex point you want to move. (`D0` is supported as an alias of `D1`.) |
-| `W0`, `W1`, `W2` | Workspace frame | Gestures update both values together. One finger pans; two fingers capture the full similarity transform (pan, zoom, rotate) so you can navigate like Google Maps. (`W0` is an alias of `W2`; use `W0/W1` or legacy `W1/W2` pairs, not both.) |
+| `W0`, `W1` | Workspace frame | Gestures update both values together. One finger pans; two fingers capture the full similarity transform (pan, zoom, rotate) so you can navigate like Google Maps. |
 
 Rules of thumb:
 
@@ -31,8 +31,7 @@ Rules of thumb:
   formula to regain free movement.
 - URLs remember the current formula and each handle's last position, so you can
   bookmark exact views.
-- `W` handles come as a pair: prefer `W0/W1`, or use the legacy `W1/W2`. (`W0`
-  and `W2` are aliases and cannot appear together in the same formula.)
+- `W` handles come as a pair (`W0`/`W1`).
 
 ### Animate parameters on load (URL `A` suffix)
 
@@ -272,7 +271,7 @@ The input accepts succinct expressions with complex arithmetic, composition,
 and built-in helpers:
 
 - **Variables:** `z`, `x`/`re`/`real`, `y`/`im`/`imag`.
-- **Finger tokens:** `F0`-`F3`, `D0`-`D3`, `W0`, `W1`, `W2`.
+- **Finger tokens:** `F0`-`F3`, `D0`-`D3`, `W0`, `W1`.
 - **3D rotations (SU(2))**: `QA`, `QB` (device), `RA`, `RB` (trackball).
 - **Literals:** `1.25`, `-3.5`, `2+3i`, `0,1`, `i`, `-i`, `j`
   (for `-1/2 + sqrt(3)/2 i`).
