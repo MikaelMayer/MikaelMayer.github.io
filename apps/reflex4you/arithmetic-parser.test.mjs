@@ -322,6 +322,21 @@ test('parses arg(z) and argument(z) calls', () => {
   assert.equal(argumentResult.value.branch, null);
 });
 
+test('renders argument literals with full label and highlights', () => {
+  const literal = parseFormulaInput('argument');
+  assert.equal(literal.ok, true);
+  const literalLatex = formulaAstToLatex(literal.value);
+  assert.match(literalLatex, /\\operatorname\{argument\}\\left\(z\\right\)/);
+
+  const highlighted = parseFormulaInput('arg_ument');
+  assert.equal(highlighted.ok, true);
+  const highlightedLatex = formulaAstToLatex(highlighted.value);
+  assert.match(highlightedLatex, /\\operatorname\{/);
+  assert.match(highlightedLatex, /\{\\Huge U\}/);
+  assert.match(highlightedLatex, /arg\{\\Huge U\}ment/);
+  assert.match(highlightedLatex, /\\left\(z\\right\)/);
+});
+
 test('arg(z, k) forwards the branch argument (like ln)', () => {
   const result = parseFormulaInput('arg(z, x + 1)');
   assert.equal(result.ok, true);

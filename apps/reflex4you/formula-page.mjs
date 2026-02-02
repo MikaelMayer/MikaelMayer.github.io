@@ -1,6 +1,7 @@
 import { parseFormulaInput } from './arithmetic-parser.mjs';
+import { visitAst } from './ast-utils.mjs';
 import { formatCaretIndicator, getCaretSelection } from './parse-error-format.mjs';
-import { renderFormulaToCanvas, FORMULA_RENDERER_BUILD_ID } from './formula-renderer.mjs';
+import { renderFormulaToCanvas } from './formula-renderer.mjs';
 import {
   FORMULA_PARAM,
   FORMULA_B64_PARAM,
@@ -15,7 +16,7 @@ import { setupMenuDropdown } from './menu-ui.mjs';
 // on the formula page (e.g. from a shared link).
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
   // Version the SW script URL so updates can't get stuck behind a cached SW script.
-  const SW_URL = './service-worker.js?sw=44.0';
+  const SW_URL = './service-worker.js?sw=45.0';
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(SW_URL).then((registration) => {
       // Match the viewer page behavior: activate updated workers ASAP so
@@ -51,8 +52,11 @@ const formulaInput = $('formula-input');
 const formulaError = $('formula-error');
 const menuButton = $('menu-button');
 const menuDropdown = $('menu-dropdown');
+const inlineFingersToggle = $('inline-fingers');
 let parseErrorSelection = null;
 let initialFormulaFromUrl = null;
+
+const FINGER_LABEL_REGEX = /^(?:[FD]\d+|W[012])$/;
 
 function clearPersistedFormulaSearch() {
   try {
@@ -113,6 +117,110 @@ function normalizeHex8(value) {
     return raw.toLowerCase();
   }
   return null;
+}
+
+function parseComplexString(raw) {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const normalized = trimmed.replace(/\s+/g, '').toLowerCase();
+
+  if (normalized.endsWith('i')) {
+    const core = normalized.slice(0, -1);
+    if (!core.length || core === '+') {
+      return { x: 0, y: 1 };
+    }
+    if (core === '-') {
+      return { x: 0, y: -1 };
+    }
+    let splitIdx = -1;
+    for (let i = core.length - 1; i > 0; i -= 1) {
+      const ch = core[i];
+      if (ch === '+' || ch === '-') {
+        splitIdx = i;
+        break;
+      }
+    }
+    if (splitIdx !== -1) {
+      const realPart = core.slice(0, splitIdx) || '0';
+      const imagPart = core.slice(splitIdx) || '0';
+      const re = Number(realPart);
+      const im = Number(imagPart);
+      if (Number.isFinite(re) && Number.isFinite(im)) {
+        return { x: re, y: im };
+      }
+    } else {
+      const im = Number(core);
+      if (Number.isFinite(im)) {
+        return { x: 0, y: im };
+      }
+    }
+  }
+
+  const tupleParts = normalized.split(',');
+  if (tupleParts.length === 2) {
+    const re = Number(tupleParts[0]);
+    const im = Number(tupleParts[1]);
+    if (Number.isFinite(re) && Number.isFinite(im)) {
+      return { x: re, y: im };
+    }
+  }
+
+  const realValue = Number(normalized);
+  if (Number.isFinite(realValue)) {
+    return { x: realValue, y: 0 };
+  }
+
+  return null;
+}
+
+function readFingerValuesFromQuery() {
+  if (typeof window === 'undefined') {
+    return new Map();
+  }
+  const params = new URLSearchParams(window.location.search);
+  const values = new Map();
+  params.forEach((value, key) => {
+    if (!FINGER_LABEL_REGEX.test(key)) {
+      return;
+    }
+    const parsed = parseComplexString(value);
+    if (parsed) {
+      values.set(key, parsed);
+    }
+  });
+  return values;
+}
+
+function defaultFingerValue(label) {
+  return label === 'W1' ? { x: 1, y: 0 } : { x: 0, y: 0 };
+}
+
+function collectFingerSlots(ast) {
+  const slots = new Set();
+  if (!ast || typeof ast !== 'object') {
+    return slots;
+  }
+  visitAst(ast, (node) => {
+    if (node && typeof node === 'object' && node.kind === 'FingerOffset' && node.slot) {
+      slots.add(node.slot);
+    }
+  });
+  return slots;
+}
+
+function buildInlineFingerValues(ast) {
+  const queryValues = readFingerValuesFromQuery();
+  const slots = collectFingerSlots(ast);
+  const inlineValues = new Map();
+  slots.forEach((slot) => {
+    if (queryValues.has(slot)) {
+      inlineValues.set(slot, queryValues.get(slot));
+    } else {
+      inlineValues.set(slot, defaultFingerValue(slot));
+    }
+  });
+  return inlineValues;
 }
 
 function readCanvasBackgroundHex() {
@@ -239,18 +347,6 @@ if (formulaError) {
   formulaError.addEventListener('click', handleParseErrorClick);
 }
 
-function showStaleWarning(message) {
-  const el = $('stale-warning');
-  if (!el) return;
-  if (message) {
-    el.textContent = message;
-    el.style.display = 'block';
-  } else {
-    el.textContent = '';
-    el.style.display = 'none';
-  }
-}
-
 function clearRender() {
   const renderEl = $('formula-render');
   if (renderEl) {
@@ -262,36 +358,6 @@ function clearRender() {
     renderEl.removeAttribute('data-renderer');
   }
   setDownloadEnabled(false);
-  showStaleWarning(null);
-}
-
-function buildStaleDiagnostic({ latex, renderEl }) {
-  const reasons = [];
-  if (typeof latex === 'string') {
-    if (latex.includes('\\cdot')) reasons.push('latex contains \\\\cdot (old renderer)');
-    if (latex.includes('\\left(\\left(') || latex.includes('\\right)\\right)')) reasons.push('latex contains double parentheses');
-  }
-  const datasetBuild = renderEl?.dataset?.rendererBuildId || '';
-  if (datasetBuild && datasetBuild !== FORMULA_RENDERER_BUILD_ID) {
-    reasons.push(`renderer build id mismatch: "${datasetBuild}" != "${FORMULA_RENDERER_BUILD_ID}"`);
-  }
-  if (!datasetBuild) {
-    reasons.push('renderer build id missing (likely stale cached module)');
-  }
-
-  if (!reasons.length) {
-    return null;
-  }
-
-  const controllerUrl = navigator?.serviceWorker?.controller?.scriptURL || 'none';
-  const scope = navigator?.serviceWorker?.controller ? '(controlled)' : '(not controlled)';
-  return [
-    'WARNING: stale/mismatched cached assets detected.',
-    `Reasons: ${reasons.join('; ')}`,
-    `Expected renderer: ${FORMULA_RENDERER_BUILD_ID}`,
-    `Controller: ${controllerUrl} ${scope}`,
-    'Fix: hard reload, or Application → Service Workers → Unregister; then reload.',
-  ].join('\n');
 }
 
 async function renderFromSource(source) {
@@ -305,12 +371,14 @@ async function renderFromSource(source) {
 
   showError(null);
   const renderEl = $('formula-render');
+  const inlineFingerConstants = Boolean(inlineFingersToggle?.checked);
+  const fingerValues = inlineFingerConstants ? buildInlineFingerValues(parsed.value) : null;
   await renderFormulaToCanvas(parsed.value, renderEl, {
     backgroundHex: readCanvasBackgroundHex(),
     foregroundHex: readCanvasForegroundHex(),
+    inlineFingerConstants,
+    fingerValues,
   });
-  const latex = renderEl?.dataset?.latex || '';
-  showStaleWarning(buildStaleDiagnostic({ latex, renderEl }));
   setDownloadEnabled(true);
   return { ok: true };
 }
@@ -379,6 +447,13 @@ async function bootstrap() {
       renderFromSource(current).catch(() => {});
     });
   });
+
+  if (inlineFingersToggle) {
+    inlineFingersToggle.addEventListener('change', () => {
+      const current = inputEl ? inputEl.value : source;
+      renderFromSource(current).catch(() => {});
+    });
+  }
 
   // Download.
   const downloadBtn = $('download-png');
