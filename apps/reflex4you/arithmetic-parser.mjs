@@ -243,6 +243,9 @@ const BUILTIN_FUNCTION_DEFINITIONS = [
 function createBuiltinFunctionLiteral(name, factory, span) {
   const identityVar = withSpan(VarZ(), span);
   const node = withSpan(factory(identityVar), span);
+  if (node && typeof node === 'object' && node.kind === 'Arg') {
+    node.syntaxLabel = name;
+  }
   node.__functionLiteral = {
     kind: 'builtin',
     name,
@@ -260,6 +263,19 @@ function applyFunctionLiteral(node, argument) {
     return null;
   }
   const applied = node.__functionLiteral.apply(argument);
+  if (applied && typeof applied === 'object') {
+    if (node.syntaxLabel && !applied.syntaxLabel) {
+      applied.syntaxLabel = node.syntaxLabel;
+    } else if (!applied.syntaxLabel && applied.kind === 'Arg' && node.__functionLiteral?.name) {
+      applied.syntaxLabel = node.__functionLiteral.name;
+    }
+    const highlights = node.__identifierMeta?.highlights;
+    if (Array.isArray(highlights) && highlights.length) {
+      applied.__identifierMeta = {
+        highlights: highlights.map((h) => ({ index: h.index, letter: h.letter })),
+      };
+    }
+  }
   return applied;
 }
 
