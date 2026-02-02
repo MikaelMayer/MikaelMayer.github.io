@@ -454,5 +454,6 @@ and more likely to compile on strict WebGL drivers.
   df
   ```
 
-- **Keep captures small.** Hoist constants to outer `set` bindings and pass only
-  what a helper function needs, so the generated GLSL has fewer parameters.
+- **Keep captures small.** Hoist constants to outer `set` bindings and pass only what a helper function needs, so the generated GLSL has fewer parameters. Don't call a high-order helper in two branches of a if then else if it's just the argument that changes. Instead, conditionally compute the argument and call the high order helper once. High order helpers are inlined.
+
+- **let/set distinction.$$ Use let for anything you intend to apply to an ambient `z` later, or with `$` or `$$`. `set` generates a constant that, if composed, will result in itself.
