@@ -16,7 +16,7 @@ exact complex number:
 | --- | --- | --- |
 | `F0`, `F1`, `F2`, `F3` | Fixed handles | Fingers are assigned in order (first touch -> `F1`, etc.). (`F0` is supported as an alias of `F1`.) |
 | `D0`, `D1`, `D2`, `D3` | Dynamic handles | Touch the handle closest to the complex point you want to move. (`D0` is supported as an alias of `D1`.) |
-| `W0`, `W1` | Workspace frame | Gestures update both values together. One finger pans; two fingers capture the full similarity transform (pan, zoom, rotate) so you can navigate like Google Maps. |
+| `W0`, `W1`, `W2` | Workspace frame | Gestures update both values together. One finger pans; two fingers capture the full similarity transform (pan, zoom, rotate) so you can navigate like Google Maps. (`W0` is an alias of `W2`; use `W0/W1` or legacy `W1/W2` pairs, not both.) |
 
 Rules of thumb:
 
@@ -31,6 +31,8 @@ Rules of thumb:
   formula to regain free movement.
 - URLs remember the current formula and each handle's last position, so you can
   bookmark exact views.
+- `W` handles come as a pair: prefer `W0/W1`, or use the legacy `W1/W2`. (`W0`
+  and `W2` are aliases and cannot appear together in the same formula.)
 
 ### Animate parameters on load (URL `A` suffix)
 
@@ -269,14 +271,19 @@ Example formula:
 The input accepts succinct expressions with complex arithmetic, composition,
 and built-in helpers:
 
-- **Variables:** `z`, `x`, `y`, `real`, `imag`.
-- **Finger tokens:** `F0`-`F3`, `D0`-`D3`, `W0`, `W1`.
+- **Variables:** `z`, `x`/`re`/`real`, `y`/`im`/`imag`.
+- **Finger tokens:** `F0`-`F3`, `D0`-`D3`, `W0`, `W1`, `W2`.
 - **3D rotations (SU(2))**: `QA`, `QB` (device), `RA`, `RB` (trackball).
 - **Literals:** `1.25`, `-3.5`, `2+3i`, `0,1`, `i`, `-i`, `j`
   (for `-1/2 + sqrt(3)/2 i`).
 - **Operators:** `+`, `-`, `*`, `/`, power (`^` with integer exponents),
   composition (`o(f, g)` or `f $ g`), repeated composition (`oo(f, n)` or
   `f $$ n`).
+- **Range aggregates:** `sum(expr, k, min, max[, step])`, `prod(expr, k, min, max[, step])`.
+  - Binds `k` for the body expression and iterates `k = min, min+step, ...`.
+  - `min`, `max`, and `step` must be **compile-time real constants**.
+  - `step` defaults to `1`. If the iteration count is `<= 0`, sum returns `0`
+    and prod returns `1`.
 - **Loops:** `repeat n from a1, a2, ..., ak by f1, f2, ..., fk` iterates a
   **k-register state** for `n` steps and returns the final `r1`.
   - `n` must be a **compile-time integer** (for example, `10`, `floor(3.9)`).
@@ -286,10 +293,12 @@ and built-in helpers:
   - Dot composition is equivalent: `f $ expr` is the same as `expr.f`
     (so `a.b` means `b(a(z))`).
 - **Functions:** `exp`, `sin`, `cos`, `tan`, `atan`/`arctan`, `arg`/`argument`,
-  `asin`/`arcsin`, `acos`/`arccos`, `ln`, `sqrt`, `abs`/`modulus`, `abs2`,
-  `floor`, `conj`, `heav`, `isnan`, `ifnan`/`iferror`. `sqrt(z, k)` desugars to
-  `exp(0.5 * ln(z, k))`, so the optional second argument shifts the log branch.
-  `heav(x)` evaluates to `1` when `x > 0` and `0` otherwise.
+  `asin`/`arcsin`, `acos`/`arccos`, `ln`, `sqrt`, `gamma`, `fact`,
+  `abs`/`modulus`, `abs2`, `floor`, `conj`, `heav`, `isnan`, `ifnan`/`iferror`.
+  `sqrt(z, k)` desugars to `exp(0.5 * ln(z, k))`, so the optional second
+  argument shifts the log branch (same optional `k` for `ln` and `arg`).
+  `gamma` is Euler's Γ(z); `fact(z)` is Γ(z + 1). `heav(x)` evaluates to `1`
+  when `x > 0` and `0` otherwise.
 - **Conditionals:** comparisons (`<`, `<=`, `>`, `>=`, `==`), logical ops
   (`&&`, `||`), and `if cond then then else else`.
 - **Bindings:**
