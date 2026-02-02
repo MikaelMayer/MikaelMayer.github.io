@@ -32,6 +32,28 @@ Rules of thumb:
 - URLs remember the current formula and each handle's last position, so you can
   bookmark exact views.
 
+### Animate parameters on load (URL `A` suffix)
+
+Reflex4You can auto-animate finger parameters when a link is opened by adding an
+**`A` (capital A)** suffix to the parameter name in the query string. Each
+animated parameter stores a single **start..end** interval:
+
+- Example: `D1A=1+2i..-1-3i`
+  - The `..` separates the start and end complex values.
+  - The complex syntax matches normal handle values (`D1=...`).
+- You can animate multiple handles at once: `D1A=...&D2A=...&F1A=...`
+- All animated handles play **in sync** and loop forward (start → end → start).
+- Duration is controlled by the shared `t` parameter (seconds):
+  - Default: `t=5s`
+  - Example: `t=10s` (the trailing `s` is optional)
+
+On load, Reflex4You applies the **start values** immediately so the UI matches
+the animation's first frame. Animations begin automatically unless `edit=true`
+is present. While an animation is playing, any click/tap stops it and switches
+into edit mode for the rest of the session (so it won't restart until refresh).
+Only handles that appear in the current formula are eligible; unused animation
+params are pruned from the URL.
+
 ### 3D rotations via SU(2): device (`QA`/`QB`) + trackball (`RA`/`RB`)
 
 Reflex4You works in the complex plane, but many demos want **true 3D
