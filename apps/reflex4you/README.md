@@ -289,6 +289,8 @@ and built-in helpers:
     If `n <= 0` it performs zero iterations and returns `a1`.
   - Each `fj` must be a **user-defined** `let` function with exactly `k+1`
     parameters: `fj(k, r1, ..., rk)`.
+  - Only include registers for values that change. Constants or captured values
+    can be referenced directly (or `set` once outside) without adding registers.
   - Dot composition is equivalent: `f $ expr` is the same as `expr.f`
     (so `a.b` means `b(a(z))`).
 - **Functions:** `exp`, `sin`, `cos`, `tan`, `atan`/`arctan`, `arg`/`argument`,
@@ -385,11 +387,10 @@ let step(k, s) = s + k^4 in
 repeat 10 from 0 by step
 
 # Truncated exp series (n terms): sum z^i / i! for i=0..n-1
-# Registers: (sum, term, zConst). Keep zConst unchanged across iterations.
-let fsum(k, sum, term, zc) = sum + term in
-let fterm(k, sum, term, zc) = term * zc / (k + 1) in
-let fz(k, sum, term, zc) = zc in
-repeat 12 from 0, 1, z by fsum, fterm, fz
+# Registers: (sum, term). z is captured from the outer scope (no register needed).
+let fsum(k, sum, term) = sum + term in
+let fterm(k, sum, term) = term * z / (k + 1) in
+repeat 12 from 0, 1 by fsum, fterm
 ```
 
 ## Formula optimization principles (GPU-friendly)
