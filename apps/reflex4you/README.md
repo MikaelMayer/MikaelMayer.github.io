@@ -14,8 +14,8 @@ exact complex number:
 
 | Label family | Meaning | How to move |
 | --- | --- | --- |
-| `F0`, `F1`, `F2`, `F3` | Fixed handles | Fingers are assigned in order (first touch -> `F1`, etc.). (`F0` is supported as an alias of `F1`.) |
-| `D0`, `D1`, `D2`, `D3` | Dynamic handles | Touch the handle closest to the complex point you want to move. (`D0` is supported as an alias of `D1`.) |
+| `F0`, `F1`, `F2`, ... | Fixed handles | Fingers are assigned in order (first touch -> `F1`, etc.). (`F0` is supported as an alias of `F1`.) |
+| `D0`, `D1`, `D2`, ... | Dynamic handles | Touch the handle closest to the complex point you want to move. (`D0` is supported as an alias of `D1`.) |
 | `W0`, `W1` | Workspace frame | Gestures update both values together. One finger pans; two fingers capture the full similarity transform (pan, zoom, rotate) so you can navigate like Google Maps. |
 
 Rules of thumb:
@@ -271,7 +271,7 @@ The input accepts succinct expressions with complex arithmetic, composition,
 and built-in helpers:
 
 - **Variables:** `z`, `x`/`re`/`real`, `y`/`im`/`imag`.
-- **Finger tokens:** `F0`-`F3`, `D0`-`D3`, `W0`, `W1`.
+- **Finger tokens:** `F0`, `F1`, ... and `D0`, `D1`, ... (no hard limit), plus `W0`, `W1`.
 - **3D rotations (SU(2))**: `QA`, `QB` (device), `RA`, `RB` (trackball).
 - **Literals:** `1.25`, `-3.5`, `2+3i`, `0,1`, `i`, `-i`, `j`
   (for `-1/2 + sqrt(3)/2 i`).
