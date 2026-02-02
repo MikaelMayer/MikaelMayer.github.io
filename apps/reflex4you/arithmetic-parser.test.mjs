@@ -333,7 +333,8 @@ test('renders argument literals with full label and highlights', () => {
   const highlightedLatex = formulaAstToLatex(highlighted.value);
   assert.match(highlightedLatex, /\\operatorname\{/);
   assert.match(highlightedLatex, /\{\\Huge U\}/);
-  assert.match(highlightedLatex, /ment\\right\)/);
+  assert.match(highlightedLatex, /arg\{\\Huge U\}ment/);
+  assert.match(highlightedLatex, /\\left\(z\\right\)/);
 });
 
 test('arg(z, k) forwards the branch argument (like ln)', () => {
