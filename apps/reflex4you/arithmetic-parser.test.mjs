@@ -236,14 +236,6 @@ test('renders greek-letter identifiers as symbols (unless underscores are presen
   assert.match(highlightedLatex, /\{\\Huge 1\}/);
 });
 
-test('renders trailing-underscore identifiers in plain text', () => {
-  const result = parseFormulaInput('pi_');
-  assert.equal(result.ok, true);
-  const latex = formulaAstToLatex(result.value);
-  assert.match(latex, /pi/);
-  assert.doesNotMatch(latex, /\\pi/);
-});
-
 test('renders gamma_1 as "gamma" followed by a big 1', () => {
   const result = parseFormulaInput('set gamma_1 = 0 in gamma_1');
   assert.equal(result.ok, true);
