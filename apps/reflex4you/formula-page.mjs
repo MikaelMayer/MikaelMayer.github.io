@@ -1,7 +1,7 @@
 import { parseFormulaInput } from './arithmetic-parser.mjs';
 import { visitAst } from './ast-utils.mjs';
 import { formatCaretIndicator, getCaretSelection } from './parse-error-format.mjs';
-import { renderFormulaToCanvas } from './formula-renderer.mjs';
+import { measureFormulaCanvasSize, renderFormulaToCanvas } from './formula-renderer.mjs';
 import { canvasToPngBlob, downloadBlob } from './image-export.mjs';
 import {
   FORMULA_PARAM,
@@ -47,6 +47,7 @@ const EXPORT_CROP_PADDING_PX = 8;
 const EXPORT_CROP_COLOR_TOLERANCE = 10;
 const EXPORT_CROP_ALPHA_TOLERANCE = 10;
 const PREVIEW_CROP_PADDING_PX = EXPORT_CROP_PADDING_PX;
+const MAX_EXPORT_CANVAS_DIM = 20000;
 let currentCanvasFgHex = DEFAULT_CANVAS_FG_HEX;
 let lastRenderState = null;
 let previewBaseHeight = null;
@@ -219,6 +220,19 @@ function cropCanvasToBounds(canvas, bounds, padding = 0) {
   if (!outCtx) return null;
   outCtx.drawImage(canvas, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
   return output;
+}
+
+function clampExportCanvasSize(width, height) {
+  const w = Math.max(1, Math.floor(Number(width) || 0));
+  const h = Math.max(1, Math.floor(Number(height) || 0));
+  if (!w || !h) return null;
+  const scale = Math.min(1, MAX_EXPORT_CANVAS_DIM / w, MAX_EXPORT_CANVAS_DIM / h);
+  if (!Number.isFinite(scale) || scale <= 0) return null;
+  return {
+    width: Math.max(1, Math.floor(w * scale)),
+    height: Math.max(1, Math.floor(h * scale)),
+    scale,
+  };
 }
 
 function getPreviewRenderSize(canvas) {
@@ -643,19 +657,32 @@ async function bootstrap() {
         if (renderState?.ast) {
           backgroundHex = renderState.backgroundHex || backgroundHex;
           const offscreen = document.createElement('canvas');
-          offscreen.width = canvas.width || 1;
-          offscreen.height = canvas.height || 1;
-          await renderFormulaToCanvas(renderState.ast, offscreen, {
+          const renderOptions = {
             backgroundHex,
             foregroundHex: renderState.foregroundHex || readCanvasForegroundHex(),
             inlineFingerConstants: renderState.inlineFingerConstants,
             fingerValues: renderState.fingerValues,
             drawInsetBackground: false,
             dpr: 1,
-          });
+          };
+          let exportSize = null;
+          try {
+            exportSize = await measureFormulaCanvasSize(renderState.ast, renderOptions);
+          } catch (err) {
+            console.warn('Failed to measure formula size for export.', err);
+          }
+          const clamped = exportSize ? clampExportCanvasSize(exportSize.width, exportSize.height) : null;
+          if (clamped) {
+            offscreen.width = clamped.width;
+            offscreen.height = clamped.height;
+          } else {
+            offscreen.width = canvas.width || 1;
+            offscreen.height = canvas.height || 1;
+          }
+          await renderFormulaToCanvas(renderState.ast, offscreen, renderOptions);
           sourceCanvas = offscreen;
         }
-        const padding = Math.round(EXPORT_CROP_PADDING_PX * getCanvasPixelRatio(canvas));
+        const padding = Math.round(EXPORT_CROP_PADDING_PX * getCanvasPixelRatio(sourceCanvas));
         const bounds = findCanvasContentBounds(sourceCanvas, { backgroundHex });
         const cropped = bounds ? cropCanvasToBounds(sourceCanvas, bounds, padding) : null;
         const outputCanvas = cropped || sourceCanvas;
