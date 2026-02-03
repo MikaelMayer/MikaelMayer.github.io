@@ -14,8 +14,8 @@ exact complex number:
 
 | Label family | Meaning | How to move |
 | --- | --- | --- |
-| `F0`, `F1`, `F2`, `F3` | Fixed handles | Fingers are assigned in order (first touch -> `F1`, etc.). (`F0` is supported as an alias of `F1`.) |
-| `D0`, `D1`, `D2`, `D3` | Dynamic handles | Touch the handle closest to the complex point you want to move. (`D0` is supported as an alias of `D1`.) |
+| `F0`, `F1`, `F2`, ... | Fixed handles | Fingers are assigned in order (first touch -> `F1`, etc.). (`F0` is supported as an alias of `F1`.) |
+| `D0`, `D1`, `D2`, ... | Dynamic handles | Touch the handle closest to the complex point you want to move. (`D0` is supported as an alias of `D1`.) |
 | `W0`, `W1` | Workspace frame | Gestures update both values together. One finger pans; two fingers capture the full similarity transform (pan, zoom, rotate) so you can navigate like Google Maps. |
 
 Rules of thumb:
@@ -31,6 +31,29 @@ Rules of thumb:
   formula to regain free movement.
 - URLs remember the current formula and each handle's last position, so you can
   bookmark exact views.
+- `W` handles come as a pair (`W0`/`W1`).
+
+### Animate parameters on load (URL `A` suffix)
+
+Reflex4You can auto-animate finger parameters when a link is opened by adding an
+**`A` (capital A)** suffix to the parameter name in the query string. Each
+animated parameter stores a single **start..end** interval:
+
+- Example: `D1A=1+2i..-1-3i`
+  - The `..` separates the start and end complex values.
+  - The complex syntax matches normal handle values (`D1=...`).
+- You can animate multiple handles at once: `D1A=...&D2A=...&F1A=...`
+- All animated handles play **in sync** and loop forward (start → end → start).
+- Duration is controlled by the shared `t` parameter (seconds):
+  - Default: `t=5s`
+  - Example: `t=10s` (the trailing `s` is optional)
+
+On load, Reflex4You applies the **start values** immediately so the UI matches
+the animation's first frame. Animations begin automatically unless `edit=true`
+is present. While an animation is playing, any click/tap stops it and switches
+into edit mode for the rest of the session (so it won't restart until refresh).
+Only handles that appear in the current formula are eligible; unused animation
+params are pruned from the URL.
 
 ### 3D rotations via SU(2): device (`QA`/`QB`) + trackball (`RA`/`RB`)
 
@@ -247,27 +270,36 @@ Example formula:
 The input accepts succinct expressions with complex arithmetic, composition,
 and built-in helpers:
 
-- **Variables:** `z`, `x`, `y`, `real`, `imag`.
-- **Finger tokens:** `F0`-`F3`, `D0`-`D3`, `W0`, `W1`.
+- **Variables:** `z`, `x`/`re`/`real`, `y`/`im`/`imag`.
+- **Finger tokens:** `F0`, `F1`, ... and `D0`, `D1`, ... (no hard limit), plus `W0`, `W1`.
 - **3D rotations (SU(2))**: `QA`, `QB` (device), `RA`, `RB` (trackball).
 - **Literals:** `1.25`, `-3.5`, `2+3i`, `0,1`, `i`, `-i`, `j`
   (for `-1/2 + sqrt(3)/2 i`).
 - **Operators:** `+`, `-`, `*`, `/`, power (`^` with integer exponents),
   composition (`o(f, g)` or `f $ g`), repeated composition (`oo(f, n)` or
   `f $$ n`).
+- **Range aggregates:** `sum(expr, k, min, max[, step])`, `prod(expr, k, min, max[, step])`.
+  - Binds `k` for the body expression and iterates `k = min, min+step, ...`.
+  - `min`, `max`, and `step` must be **compile-time real constants**.
+  - `step` defaults to `1`. If the iteration count is `<= 0`, sum returns `0`
+    and prod returns `1`.
 - **Loops:** `repeat n from a1, a2, ..., ak by f1, f2, ..., fk` iterates a
   **k-register state** for `n` steps and returns the final `r1`.
   - `n` must be a **compile-time integer** (for example, `10`, `floor(3.9)`).
     If `n <= 0` it performs zero iterations and returns `a1`.
   - Each `fj` must be a **user-defined** `let` function with exactly `k+1`
     parameters: `fj(k, r1, ..., rk)`.
+  - Only include registers for values that change. Constants or captured values
+    can be referenced directly (or `set` once outside) without adding registers.
   - Dot composition is equivalent: `f $ expr` is the same as `expr.f`
     (so `a.b` means `b(a(z))`).
 - **Functions:** `exp`, `sin`, `cos`, `tan`, `atan`/`arctan`, `arg`/`argument`,
-  `asin`/`arcsin`, `acos`/`arccos`, `ln`, `sqrt`, `abs`/`modulus`, `abs2`,
-  `floor`, `conj`, `heav`, `isnan`, `ifnan`/`iferror`. `sqrt(z, k)` desugars to
-  `exp(0.5 * ln(z, k))`, so the optional second argument shifts the log branch.
-  `heav(x)` evaluates to `1` when `x > 0` and `0` otherwise.
+  `asin`/`arcsin`, `acos`/`arccos`, `ln`, `sqrt`, `gamma`, `fact`,
+  `abs`/`modulus`, `abs2`, `floor`, `conj`, `heav`, `isnan`, `ifnan`/`iferror`.
+  `sqrt(z, k)` desugars to `exp(0.5 * ln(z, k))`, so the optional second
+  argument shifts the log branch (same optional `k` for `ln` and `arg`).
+  `gamma` is Euler's Γ(z); `fact(z)` is Γ(z + 1). `heav(x)` evaluates to `1`
+  when `x > 0` and `0` otherwise.
 - **Conditionals:** comparisons (`<`, `<=`, `>`, `>=`, `==`), logical ops
   (`&&`, `||`), and `if cond then then else else`.
 - **Bindings:**
@@ -355,11 +387,10 @@ let step(k, s) = s + k^4 in
 repeat 10 from 0 by step
 
 # Truncated exp series (n terms): sum z^i / i! for i=0..n-1
-# Registers: (sum, term, zConst). Keep zConst unchanged across iterations.
-let fsum(k, sum, term, zc) = sum + term in
-let fterm(k, sum, term, zc) = term * zc / (k + 1) in
-let fz(k, sum, term, zc) = zc in
-repeat 12 from 0, 1, z by fsum, fterm, fz
+# Registers: (sum, term). z is captured from the outer scope (no register needed).
+let fsum(k, sum, term) = sum + term in
+let fterm(k, sum, term) = term * z / (k + 1) in
+repeat 12 from 0, 1 by fsum, fterm
 ```
 
 ## Formula optimization principles (GPU-friendly)
