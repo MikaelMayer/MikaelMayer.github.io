@@ -46,8 +46,10 @@ const DEFAULT_CANVAS_FG_HEX = '000000ff';
 const EXPORT_CROP_PADDING_PX = 8;
 const EXPORT_CROP_COLOR_TOLERANCE = 10;
 const EXPORT_CROP_ALPHA_TOLERANCE = 10;
+const PREVIEW_CROP_PADDING_PX = EXPORT_CROP_PADDING_PX;
 let currentCanvasFgHex = DEFAULT_CANVAS_FG_HEX;
 let lastRenderState = null;
+let previewBaseHeight = null;
 
 function $(id) {
   return document.getElementById(id);
@@ -217,6 +219,63 @@ function cropCanvasToBounds(canvas, bounds, padding = 0) {
   if (!outCtx) return null;
   outCtx.drawImage(canvas, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
   return output;
+}
+
+function getPreviewRenderSize(canvas) {
+  const containerWidth = canvas?.parentElement?.clientWidth || canvas?.clientWidth || 0;
+  const width = Math.max(1, Math.floor(containerWidth));
+  if (!previewBaseHeight) {
+    const initialHeight = canvas?.clientHeight || 0;
+    previewBaseHeight = Math.max(1, Math.floor(initialHeight || 220));
+  }
+  return { width, height: previewBaseHeight || 220 };
+}
+
+function copyCanvasMetadata(source, target) {
+  if (!source || !target) return;
+  if (source.dataset?.latex) target.dataset.latex = source.dataset.latex;
+  if (source.dataset?.renderer) target.dataset.renderer = source.dataset.renderer;
+  if (source.dataset?.rendererBuildId) target.dataset.rendererBuildId = source.dataset.rendererBuildId;
+}
+
+async function renderFormulaPreviewToCanvas(ast, canvas, options = {}) {
+  if (!canvas) return;
+  const { width, height } = getPreviewRenderSize(canvas);
+  const dpr = (typeof window !== 'undefined' && Number.isFinite(window.devicePixelRatio) && window.devicePixelRatio > 0)
+    ? window.devicePixelRatio
+    : 1;
+
+  const scratch = document.createElement('canvas');
+  scratch.width = width;
+  scratch.height = height;
+
+  await renderFormulaToCanvas(ast, scratch, {
+    ...options,
+    drawInsetBackground: false,
+    dpr,
+  });
+
+  const padding = Math.round(PREVIEW_CROP_PADDING_PX * dpr);
+  const bounds = findCanvasContentBounds(scratch, { backgroundHex: options.backgroundHex });
+  const cropped = bounds ? cropCanvasToBounds(scratch, bounds, padding) : scratch;
+
+  const cssWidth = Math.max(1, Math.round(cropped.width / dpr));
+  const cssHeight = Math.max(1, Math.round(cropped.height / dpr));
+
+  canvas.style.width = `${cssWidth}px`;
+  canvas.style.height = `${cssHeight}px`;
+  canvas.style.margin = '0 auto';
+  canvas.style.maxWidth = '100%';
+
+  canvas.width = Math.max(1, Math.round(cssWidth * dpr));
+  canvas.height = Math.max(1, Math.round(cssHeight * dpr));
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(cropped, 0, 0, cropped.width, cropped.height, 0, 0, canvas.width, canvas.height);
+
+  copyCanvasMetadata(scratch, canvas);
 }
 
 function parseComplexString(raw) {
@@ -477,7 +536,7 @@ async function renderFromSource(source) {
   const fingerValues = inlineFingerConstants ? buildInlineFingerValues(parsed.value) : null;
   const backgroundHex = readCanvasBackgroundHex();
   const foregroundHex = readCanvasForegroundHex();
-  await renderFormulaToCanvas(parsed.value, renderEl, {
+  await renderFormulaPreviewToCanvas(parsed.value, renderEl, {
     backgroundHex,
     foregroundHex,
     inlineFingerConstants,
