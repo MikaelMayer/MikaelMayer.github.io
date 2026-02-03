@@ -9,6 +9,7 @@ export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2026
 const DEFAULT_MATHJAX_LOAD_TIMEOUT_MS = 9000;
 const DEFAULT_CANVAS_BG_HEX = 'ffffff80';
 const DEFAULT_CANVAS_FG_HEX = '000000ff';
+const DEFAULT_CANVAS_PAD_PX = 24;
 
 function precedence(node) {
   if (!node || typeof node !== 'object') return 100;
@@ -914,6 +915,11 @@ function resolveCanvasForeground(options = {}) {
   return parseHex8Color(candidate) ?? parseHex8Color(DEFAULT_CANVAS_FG_HEX);
 }
 
+function resolveCanvasPaddingPx(options = {}) {
+  const candidate = options && typeof options === 'object' ? options.padPx : null;
+  return Number.isFinite(candidate) && candidate >= 0 ? candidate : DEFAULT_CANVAS_PAD_PX;
+}
+
 function resizeCanvasToDisplaySize(canvas, options = {}) {
   const forced = options && typeof options === 'object' ? options.dpr : null;
   const dpr = (Number.isFinite(forced) && forced > 0 ? forced : ((typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1));
@@ -940,6 +946,66 @@ function getSvgViewBoxSize(svgEl) {
     return { width: w, height: h };
   }
   return null;
+}
+
+async function measureLatexCanvasSize(latex, options = {}) {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return null;
+  }
+  if (typeof XMLSerializer === 'undefined' || typeof Blob === 'undefined' || typeof Image === 'undefined') {
+    return null;
+  }
+  const win = window;
+  const ready = await waitForMathJaxStartup(win);
+  if (!ready || typeof win.MathJax?.tex2svg !== 'function') {
+    return null;
+  }
+  const mjxNode = win.MathJax.tex2svg(String(latex || ''), { display: true });
+  const svg = mjxNode?.querySelector?.('svg');
+  if (!svg) {
+    return null;
+  }
+  svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  const serializer = new XMLSerializer();
+  const svgText = serializer.serializeToString(svg);
+  const blob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+
+  try {
+    const img = new Image();
+    img.decoding = 'async';
+    const loaded = new Promise((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = (e) => reject(e);
+    });
+    img.src = url;
+    await loaded;
+
+    const width = Number(img.naturalWidth || img.width || 0);
+    const height = Number(img.naturalHeight || img.height || 0);
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+      return null;
+    }
+
+    const pad = resolveCanvasPaddingPx(options);
+    return {
+      width: Math.ceil(width + pad * 2),
+      height: Math.ceil(height + pad * 2),
+      pad,
+    };
+  } finally {
+    try {
+      URL.revokeObjectURL(url);
+    } catch (_) {
+      // ignore
+    }
+  }
+}
+
+export async function measureFormulaCanvasSize(ast, options = {}) {
+  if (!ast) return null;
+  const latex = formulaAstToLatex(ast, options);
+  return await measureLatexCanvasSize(latex, options);
 }
 
 export async function renderLatexToCanvas(latex, canvas, options = {}) {
@@ -996,7 +1062,7 @@ export async function renderLatexToCanvas(latex, canvas, options = {}) {
     ctx.fillRect(0, 0, width, height);
 
     const size = getSvgViewBoxSize(svg) || { width: img.width || 1, height: img.height || 1 };
-    const pad = 24;
+    const pad = resolveCanvasPaddingPx(options);
     const maxW = Math.max(1, width - pad * 2);
     const maxH = Math.max(1, height - pad * 2);
     const scale = Math.min(maxW / size.width, maxH / size.height);
