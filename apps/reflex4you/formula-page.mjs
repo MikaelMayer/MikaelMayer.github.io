@@ -43,7 +43,13 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 const DEFAULT_FORMULA_TEXT = 'z';
 const DEFAULT_CANVAS_BG_HEX = 'ffffff80';
 const DEFAULT_CANVAS_FG_HEX = '000000ff';
+const EXPORT_CROP_PADDING_PX = 8;
+const EXPORT_CROP_COLOR_TOLERANCE = 10;
+const EXPORT_CROP_ALPHA_TOLERANCE = 10;
+const PREVIEW_CROP_PADDING_PX = EXPORT_CROP_PADDING_PX;
 let currentCanvasFgHex = DEFAULT_CANVAS_FG_HEX;
+let lastRenderState = null;
+let previewBaseHeight = null;
 
 function $(id) {
   return document.getElementById(id);
@@ -120,6 +126,156 @@ function normalizeHex8(value) {
     return raw.toLowerCase();
   }
   return null;
+}
+
+function parseHex8Color(value) {
+  const normalized = normalizeHex8(value);
+  if (!normalized) return null;
+  const r = Number.parseInt(normalized.slice(0, 2), 16);
+  const g = Number.parseInt(normalized.slice(2, 4), 16);
+  const b = Number.parseInt(normalized.slice(4, 6), 16);
+  const a = Number.parseInt(normalized.slice(6, 8), 16);
+  if (![r, g, b, a].every((n) => Number.isFinite(n))) return null;
+  return { r, g, b, a };
+}
+
+function getCanvasPixelRatio(canvas) {
+  const cssWidth = canvas?.clientWidth || 0;
+  const backingWidth = canvas?.width || 0;
+  if (cssWidth > 0 && backingWidth > 0) {
+    const ratio = backingWidth / cssWidth;
+    return Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+  }
+  return 1;
+}
+
+function findCanvasContentBounds(
+  canvas,
+  {
+    backgroundHex,
+    colorTolerance = EXPORT_CROP_COLOR_TOLERANCE,
+    alphaTolerance = EXPORT_CROP_ALPHA_TOLERANCE,
+  } = {},
+) {
+  const ctx = canvas?.getContext?.('2d');
+  if (!ctx) return null;
+  const width = canvas.width || 0;
+  const height = canvas.height || 0;
+  if (!width || !height) return null;
+
+  let bg = parseHex8Color(backgroundHex) || { r: 0, g: 0, b: 0, a: 0 };
+  if (bg.a === 0) {
+    bg = { r: 0, g: 0, b: 0, a: 0 };
+  }
+
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+
+  const data = ctx.getImageData(0, 0, width, height).data;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const idx = (y * width + x) * 4;
+      const r = data[idx];
+      const g = data[idx + 1];
+      const b = data[idx + 2];
+      const a = data[idx + 3];
+      const alphaDiff = Math.abs(a - bg.a);
+      const colorDiff = Math.abs(r - bg.r) + Math.abs(g - bg.g) + Math.abs(b - bg.b);
+      if (alphaDiff > alphaTolerance || colorDiff > colorTolerance) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
+  if (maxX < minX || maxY < minY) {
+    return null;
+  }
+
+  return { minX, minY, maxX, maxY };
+}
+
+function cropCanvasToBounds(canvas, bounds, padding = 0) {
+  if (!canvas || !bounds) return null;
+  const width = canvas.width || 0;
+  const height = canvas.height || 0;
+  if (!width || !height) return null;
+  const pad = Math.max(0, Math.floor(padding));
+  const minX = Math.max(0, bounds.minX - pad);
+  const minY = Math.max(0, bounds.minY - pad);
+  const maxX = Math.min(width - 1, bounds.maxX + pad);
+  const maxY = Math.min(height - 1, bounds.maxY + pad);
+  const cropW = Math.max(1, maxX - minX + 1);
+  const cropH = Math.max(1, maxY - minY + 1);
+
+  const output = document.createElement('canvas');
+  output.width = cropW;
+  output.height = cropH;
+  const outCtx = output.getContext('2d');
+  if (!outCtx) return null;
+  outCtx.drawImage(canvas, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
+  return output;
+}
+
+function getPreviewRenderSize(canvas) {
+  const containerWidth = canvas?.parentElement?.clientWidth || canvas?.clientWidth || 0;
+  const width = Math.max(1, Math.floor(containerWidth));
+  if (!previewBaseHeight) {
+    const initialHeight = canvas?.clientHeight || 0;
+    previewBaseHeight = Math.max(1, Math.floor(initialHeight || 220));
+  }
+  return { width, height: previewBaseHeight || 220 };
+}
+
+function copyCanvasMetadata(source, target) {
+  if (!source || !target) return;
+  if (source.dataset?.latex) target.dataset.latex = source.dataset.latex;
+  if (source.dataset?.renderer) target.dataset.renderer = source.dataset.renderer;
+  if (source.dataset?.rendererBuildId) target.dataset.rendererBuildId = source.dataset.rendererBuildId;
+}
+
+async function renderFormulaPreviewToCanvas(ast, canvas, options = {}) {
+  if (!canvas) return;
+  const { width, height } = getPreviewRenderSize(canvas);
+  const dpr = (typeof window !== 'undefined' && Number.isFinite(window.devicePixelRatio) && window.devicePixelRatio > 0)
+    ? window.devicePixelRatio
+    : 1;
+
+  const scratch = document.createElement('canvas');
+  scratch.width = width;
+  scratch.height = height;
+
+  await renderFormulaToCanvas(ast, scratch, {
+    ...options,
+    drawInsetBackground: false,
+    dpr,
+  });
+
+  const padding = Math.round(PREVIEW_CROP_PADDING_PX * dpr);
+  const bounds = findCanvasContentBounds(scratch, { backgroundHex: options.backgroundHex });
+  const cropped = bounds ? cropCanvasToBounds(scratch, bounds, padding) : scratch;
+
+  const cssWidth = Math.max(1, Math.round(cropped.width / dpr));
+  const cssHeight = Math.max(1, Math.round(cropped.height / dpr));
+
+  canvas.style.width = `${cssWidth}px`;
+  canvas.style.height = `${cssHeight}px`;
+  canvas.style.margin = '0 auto';
+  canvas.style.maxWidth = '100%';
+
+  canvas.width = Math.max(1, Math.round(cssWidth * dpr));
+  canvas.height = Math.max(1, Math.round(cssHeight * dpr));
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(cropped, 0, 0, cropped.width, cropped.height, 0, 0, canvas.width, canvas.height);
+
+  copyCanvasMetadata(scratch, canvas);
 }
 
 function parseComplexString(raw) {
@@ -361,6 +517,7 @@ function clearRender() {
     renderEl.removeAttribute('data-latex');
     renderEl.removeAttribute('data-renderer');
   }
+  lastRenderState = null;
   setDownloadEnabled(false);
 }
 
@@ -377,12 +534,21 @@ async function renderFromSource(source) {
   const renderEl = $('formula-render');
   const inlineFingerConstants = Boolean(inlineFingersToggle?.checked);
   const fingerValues = inlineFingerConstants ? buildInlineFingerValues(parsed.value) : null;
-  await renderFormulaToCanvas(parsed.value, renderEl, {
-    backgroundHex: readCanvasBackgroundHex(),
-    foregroundHex: readCanvasForegroundHex(),
+  const backgroundHex = readCanvasBackgroundHex();
+  const foregroundHex = readCanvasForegroundHex();
+  await renderFormulaPreviewToCanvas(parsed.value, renderEl, {
+    backgroundHex,
+    foregroundHex,
     inlineFingerConstants,
     fingerValues,
   });
+  lastRenderState = {
+    ast: parsed.value,
+    inlineFingerConstants,
+    fingerValues,
+    backgroundHex,
+    foregroundHex,
+  };
   setDownloadEnabled(true);
   return { ok: true };
 }
@@ -471,7 +637,29 @@ async function bootstrap() {
       downloadInProgress = true;
       downloadBtn.disabled = true;
       try {
-        const blob = await canvasToPngBlob(canvas);
+        const renderState = lastRenderState;
+        let sourceCanvas = canvas;
+        let backgroundHex = readCanvasBackgroundHex();
+        if (renderState?.ast) {
+          backgroundHex = renderState.backgroundHex || backgroundHex;
+          const offscreen = document.createElement('canvas');
+          offscreen.width = canvas.width || 1;
+          offscreen.height = canvas.height || 1;
+          await renderFormulaToCanvas(renderState.ast, offscreen, {
+            backgroundHex,
+            foregroundHex: renderState.foregroundHex || readCanvasForegroundHex(),
+            inlineFingerConstants: renderState.inlineFingerConstants,
+            fingerValues: renderState.fingerValues,
+            drawInsetBackground: false,
+            dpr: 1,
+          });
+          sourceCanvas = offscreen;
+        }
+        const padding = Math.round(EXPORT_CROP_PADDING_PX * getCanvasPixelRatio(canvas));
+        const bounds = findCanvasContentBounds(sourceCanvas, { backgroundHex });
+        const cropped = bounds ? cropCanvasToBounds(sourceCanvas, bounds, padding) : null;
+        const outputCanvas = cropped || sourceCanvas;
+        const blob = await canvasToPngBlob(outputCanvas);
         downloadBlob(blob, 'formula.png');
       } catch (e) {
         console.warn('Failed to download canvas PNG.', e);
