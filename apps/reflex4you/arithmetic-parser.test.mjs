@@ -206,6 +206,16 @@ test('renders exp(x) as e^{x} (unless underscore-highlight syntax is used)', () 
   assert.match(highlightedLatex, /\\left\(z\\right\)/);
 });
 
+test('renders exp_(x) as plain exp(x)', () => {
+  const result = parseFormulaInput('exp_(z)');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.kind, 'Exp');
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /\\operatorname\{exp\}/);
+  assert.match(latex, /\\left\(z\\right\)/);
+  assert.doesNotMatch(latex, /^e\^\{z\}$/);
+});
+
 test('renders greek-letter identifiers as symbols (unless underscores are present)', () => {
   const result = parseFormulaInput('set pi = 0 in set tau = 0 in set delta = 0 in set phi = 0 in pi + tau + delta + phi');
   assert.equal(result.ok, true);
@@ -224,6 +234,14 @@ test('renders greek-letter identifiers as symbols (unless underscores are presen
   assert.match(highlightedLatex, /\\pi_\{1\}/);
   // The reference keeps the digit highlight, so the 1 is rendered Huge (in the subscript).
   assert.match(highlightedLatex, /\{\\Huge 1\}/);
+});
+
+test('renders trailing-underscore identifiers in plain text', () => {
+  const result = parseFormulaInput('pi_');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /pi/);
+  assert.doesNotMatch(latex, /\\pi/);
 });
 
 test('renders gamma_1 as "gamma" followed by a big 1', () => {

@@ -73,9 +73,15 @@ function normalizeIdentifierWithHighlights(raw) {
   const highlights = [];
   let normalized = '';
   let highlightNext = false;
+  let forcePlain = false;
 
   for (let i = 0; i < source.length; i += 1) {
     const ch = source[i];
+    if (ch === '_' && i === source.length - 1) {
+      forcePlain = true;
+      highlightNext = false;
+      continue;
+    }
     // In Reflex syntax, underscores are not part of identifiers: they only mean
     // "highlight the next character" (whatever it is).
     if (ch === '_' && i + 1 < source.length) {
@@ -94,14 +100,23 @@ function normalizeIdentifierWithHighlights(raw) {
   return {
     name: normalized,
     highlights,
+    forcePlain,
   };
 }
 
 function attachIdentifierMeta(node, meta) {
-  if (!node || typeof node !== 'object' || !meta || !Array.isArray(meta.highlights) || meta.highlights.length === 0) {
+  if (!node || typeof node !== 'object' || !meta) {
     return node;
   }
-  node.__identifierMeta = { highlights: meta.highlights.map((h) => ({ index: h.index, letter: h.letter })) };
+  const highlights = Array.isArray(meta.highlights) ? meta.highlights : [];
+  const forcePlain = Boolean(meta.forcePlain);
+  if (highlights.length === 0 && !forcePlain) {
+    return node;
+  }
+  node.__identifierMeta = {
+    highlights: highlights.map((h) => ({ index: h.index, letter: h.letter })),
+    forcePlain,
+  };
   return node;
 }
 
@@ -269,11 +284,30 @@ function applyFunctionLiteral(node, argument) {
     } else if (!applied.syntaxLabel && applied.kind === 'Arg' && node.__functionLiteral?.name) {
       applied.syntaxLabel = node.__functionLiteral.name;
     }
-    const highlights = node.__identifierMeta?.highlights;
-    if (Array.isArray(highlights) && highlights.length) {
-      applied.__identifierMeta = {
-        highlights: highlights.map((h) => ({ index: h.index, letter: h.letter })),
-      };
+    const meta = node.__identifierMeta;
+    if (meta && typeof meta === 'object') {
+      const highlights = Array.isArray(meta.highlights) ? meta.highlights : [];
+      const forcePlain = Boolean(meta.forcePlain);
+      if (highlights.length || forcePlain) {
+        applied.__identifierMeta = {
+          highlights: highlights.map((h) => ({ index: h.index, letter: h.letter })),
+          forcePlain,
+        };
+      }
+      const fnName = node.__functionLiteral?.name;
+      if (
+        forcePlain &&
+        fnName &&
+        typeof fnName === 'string'
+      ) {
+        applied.__syntheticCall = { name: fnName, args: [argument] };
+      } else if (
+        fnName &&
+        (fnName === 'abs' || fnName === 'modulus' || fnName === 'gamma' || fnName === 'fact') &&
+        highlights.length
+      ) {
+        applied.__syntheticCall = { name: fnName, args: [argument] };
+      }
     }
   }
   return applied;
@@ -298,6 +332,7 @@ function keywordLiteral(text, options = {}) {
   const ctor = options.ctor ?? `Keyword(${text})`;
   const caseSensitive = options.caseSensitive ?? true;
   const expected = caseSensitive ? String(text) : String(text).toLowerCase();
+  const allowTrailingUnderscore = options.allowTrailingUnderscore ?? false;
 
   return createParser(`Keyword(${text})`, (input) => {
     const wsResult = WS({ ctor: wsCtor }).runNormalized(input);
@@ -307,6 +342,7 @@ function keywordLiteral(text, options = {}) {
 
     let cursor = wsResult.next;
     const highlights = [];
+    let forcePlain = false;
     let normalizedIndex = 0;
 
     for (let i = 0; i < expected.length; i += 1) {
@@ -350,6 +386,14 @@ function keywordLiteral(text, options = {}) {
       normalizedIndex += 1;
     }
 
+    if (allowTrailingUnderscore) {
+      const nextChar = cursor.peek();
+      if (nextChar === '_' && (!cursor.peek(1) || !IDENTIFIER_CHAR.test(cursor.peek(1)))) {
+        forcePlain = true;
+        cursor = cursor.advance(1);
+      }
+    }
+
     const nextChar = cursor.peek();
     if (nextChar && IDENTIFIER_CHAR.test(nextChar)) {
       return new ParseFailure({
@@ -363,7 +407,7 @@ function keywordLiteral(text, options = {}) {
     }
     return new ParseSuccess({
       ctor,
-      value: { text: String(text), highlights },
+      value: { text: String(text), highlights, forcePlain },
       span: spanBetween(input, cursor),
       next: cursor,
     });
@@ -377,7 +421,11 @@ const numberToken = wsRegex(NUMBER_REGEX, {
 
 // Allow underscore-highlighting on the imaginary unit so `_i` renders as a huge letter,
 // while still keeping the semantics of the imaginary unit constant.
-const imagUnit = keywordLiteral('i', { ctor: 'ImagUnit', caseSensitive: false });
+const imagUnit = keywordLiteral('i', {
+  ctor: 'ImagUnit',
+  caseSensitive: false,
+  allowTrailingUnderscore: true,
+});
 const tightImagUnit = Literal('i', { ctor: 'ImagUnitTight', caseSensitive: false });
 
 const signParser = Choice([
@@ -402,7 +450,7 @@ const unitImagLiteral = Sequence([
   attachIdentifierMeta(withSpan(Const(0, sign), result.span), meta),
 );
 
-const jLiteral = keywordLiteral('j', { ctor: 'ConstJ', caseSensitive: false })
+const jLiteral = keywordLiteral('j', { ctor: 'ConstJ', caseSensitive: false, allowTrailingUnderscore: true })
   .Map((token, result) => attachIdentifierMeta(withSpan(Const(-0.5, SQRT3_OVER_2), result.span), token));
 
 const literalParser = Choice([
@@ -458,17 +506,17 @@ const fingerLiteralParser = createParser('FingerLiteral', (input) => {
 
 const su2RotationPrimitiveParser = Choice([
   // Device (relative) SU(2) rotation (QA/QB)
-  keywordLiteral('QA', { ctor: 'DeviceQA', caseSensitive: true }).Map((token, result) =>
+  keywordLiteral('QA', { ctor: 'DeviceQA', caseSensitive: true, allowTrailingUnderscore: true }).Map((token, result) =>
     attachIdentifierMeta(withSyntax(withSpan(DeviceRotation('A'), result.span), token.text), token),
   ),
-  keywordLiteral('QB', { ctor: 'DeviceQB', caseSensitive: true }).Map((token, result) =>
+  keywordLiteral('QB', { ctor: 'DeviceQB', caseSensitive: true, allowTrailingUnderscore: true }).Map((token, result) =>
     attachIdentifierMeta(withSyntax(withSpan(DeviceRotation('B'), result.span), token.text), token),
   ),
   // Trackball (draggable) SU(2) rotation (RA/RB)
-  keywordLiteral('RA', { ctor: 'TrackballRA', caseSensitive: true }).Map((token, result) =>
+  keywordLiteral('RA', { ctor: 'TrackballRA', caseSensitive: true, allowTrailingUnderscore: true }).Map((token, result) =>
     attachIdentifierMeta(withSyntax(withSpan(TrackballRotation('A'), result.span), token.text), token),
   ),
-  keywordLiteral('RB', { ctor: 'TrackballRB', caseSensitive: true }).Map((token, result) =>
+  keywordLiteral('RB', { ctor: 'TrackballRB', caseSensitive: true, allowTrailingUnderscore: true }).Map((token, result) =>
     attachIdentifierMeta(withSyntax(withSpan(TrackballRotation('B'), result.span), token.text), token),
   ),
 ], { ctor: 'SU2RotationPrimitive' });
@@ -600,25 +648,25 @@ const boundIdentifierParser = createParser('BoundIdentifier', (input) => {
 });
 
 const primitiveParser = Choice([
-  keywordLiteral('x', { ctor: 'VarX' }).Map((token, result) =>
+  keywordLiteral('x', { ctor: 'VarX', allowTrailingUnderscore: true }).Map((token, result) =>
     attachIdentifierMeta(withSyntax(withSpan(VarX(), result.span), token.text), token),
   ),
-  keywordLiteral('y', { ctor: 'VarY' }).Map((token, result) =>
+  keywordLiteral('y', { ctor: 'VarY', allowTrailingUnderscore: true }).Map((token, result) =>
     attachIdentifierMeta(withSyntax(withSpan(VarY(), result.span), token.text), token),
   ),
-  keywordLiteral('re', { ctor: 'VarRe' }).Map((token, result) =>
+  keywordLiteral('re', { ctor: 'VarRe', allowTrailingUnderscore: true }).Map((token, result) =>
     attachIdentifierMeta(withSyntax(withSpan(VarX(), result.span), token.text), token),
   ),
-  keywordLiteral('im', { ctor: 'VarIm' }).Map((token, result) =>
+  keywordLiteral('im', { ctor: 'VarIm', allowTrailingUnderscore: true }).Map((token, result) =>
     attachIdentifierMeta(withSyntax(withSpan(VarY(), result.span), token.text), token),
   ),
-  keywordLiteral('real', { ctor: 'VarReal' }).Map((token, result) =>
+  keywordLiteral('real', { ctor: 'VarReal', allowTrailingUnderscore: true }).Map((token, result) =>
     attachIdentifierMeta(withSyntax(withSpan(VarX(), result.span), token.text), token),
   ),
-  keywordLiteral('imag', { ctor: 'VarImag' }).Map((token, result) =>
+  keywordLiteral('imag', { ctor: 'VarImag', allowTrailingUnderscore: true }).Map((token, result) =>
     attachIdentifierMeta(withSyntax(withSpan(VarY(), result.span), token.text), token),
   ),
-  keywordLiteral('z', { ctor: 'VarZ' }).Map((token, result) =>
+  keywordLiteral('z', { ctor: 'VarZ', allowTrailingUnderscore: true }).Map((token, result) =>
     attachIdentifierMeta(withSpan(VarZ(), result.span), token),
   ),
   su2RotationPrimitiveParser,
@@ -641,7 +689,7 @@ const groupedParser = Sequence([
 }).Map((expr, result) => withSpan(expr, result.span));
 
 const explicitComposeParser = Sequence([
-  keywordLiteral('o', { ctor: 'ComposeKeyword' }),
+  keywordLiteral('o', { ctor: 'ComposeKeyword', allowTrailingUnderscore: true }),
   wsLiteral('(', { ctor: 'ComposeOpen' }),
   expressionRef,
   wsLiteral(',', { ctor: 'ComposeComma' }),
@@ -658,7 +706,8 @@ const explicitComposeParser = Sequence([
 });
 
 const explicitRepeatComposeParser = createParser('ExplicitRepeatCompose', (input) => {
-  const keyword = keywordLiteral('oo', { ctor: 'RepeatComposeKeyword' }).runNormalized(input);
+  const keyword = keywordLiteral('oo', { ctor: 'RepeatComposeKeyword', allowTrailingUnderscore: true })
+    .runNormalized(input);
   if (!keyword.ok) {
     return keyword;
   }
@@ -785,7 +834,7 @@ const ifParser = createParser('If', (input) => {
 
 function createBinaryFunctionParser(name, factory) {
   return Sequence([
-    keywordLiteral(name, { ctor: `${name}Keyword` }),
+    keywordLiteral(name, { ctor: `${name}Keyword`, allowTrailingUnderscore: true }),
     wsLiteral('(', { ctor: `${name}Open` }),
     expressionRef,
     wsLiteral(',', { ctor: `${name}Comma` }),
@@ -805,7 +854,7 @@ function createBinaryFunctionParser(name, factory) {
 
 function createUnaryFunctionParser(name, factory) {
   return Sequence([
-    keywordLiteral(name, { ctor: `${name}Keyword` }),
+    keywordLiteral(name, { ctor: `${name}Keyword`, allowTrailingUnderscore: true }),
     wsLiteral('(', { ctor: `${name}Open` }),
     expressionRef,
     wsLiteral(')', { ctor: `${name}Close` }),
@@ -815,6 +864,10 @@ function createUnaryFunctionParser(name, factory) {
   }).Map(({ meta, expr }, result) => {
     const node = withSpan(factory(expr), result.span);
     const withMeta = attachIdentifierMeta(node, meta);
+    if (meta?.forcePlain) {
+      withMeta.__syntheticCall = { name, args: [expr] };
+      return withMeta;
+    }
     // For abs/modulus we render as |z| by default, but if the user added underscore
     // highlights (e.g. `_abs(z)` / `_modulus(z)`), preserve call syntax so the
     // function name can be rendered (with Huge highlighted letters).
@@ -836,7 +889,8 @@ function createUnaryFunctionParsers(names, factory) {
 
 function createArgParser(name) {
   return createParser(`${name}Call`, (input) => {
-    const keyword = keywordLiteral(name, { ctor: `${name}Keyword` }).runNormalized(input);
+    const keyword = keywordLiteral(name, { ctor: `${name}Keyword`, allowTrailingUnderscore: true })
+      .runNormalized(input);
     if (!keyword.ok) {
       return keyword;
     }
@@ -870,9 +924,16 @@ function createArgParser(name) {
 
     const span = spanBetween(input, close.next);
     const node = withSyntax(withSpan(Arg(valueResult.value, branchNode), span), name);
+    const withMeta = attachIdentifierMeta(node, keyword.value);
+    if (keyword.value?.forcePlain) {
+      withMeta.__syntheticCall = {
+        name,
+        args: branchNode ? [valueResult.value, branchNode] : [valueResult.value],
+      };
+    }
     return new ParseSuccess({
       ctor: `${name}Call`,
-      value: attachIdentifierMeta(node, keyword.value),
+      value: withMeta,
       span,
       next: close.next,
     });
@@ -880,7 +941,8 @@ function createArgParser(name) {
 }
 
 const lnParser = createParser('LnCall', (input) => {
-  const keyword = keywordLiteral('ln', { ctor: 'lnKeyword' }).runNormalized(input);
+  const keyword = keywordLiteral('ln', { ctor: 'lnKeyword', allowTrailingUnderscore: true })
+    .runNormalized(input);
   if (!keyword.ok) {
     return keyword;
   }
@@ -913,16 +975,24 @@ const lnParser = createParser('LnCall', (input) => {
   }
 
   const span = spanBetween(input, close.next);
+  const node = attachIdentifierMeta(withSpan(Ln(valueResult.value, branchNode), span), keyword.value);
+  if (keyword.value?.forcePlain) {
+    node.__syntheticCall = {
+      name: 'ln',
+      args: branchNode ? [valueResult.value, branchNode] : [valueResult.value],
+    };
+  }
   return new ParseSuccess({
     ctor: 'LnCall',
-    value: attachIdentifierMeta(withSpan(Ln(valueResult.value, branchNode), span), keyword.value),
+    value: node,
     span,
     next: close.next,
   });
 });
 
 const sqrtParser = createParser('SqrtCall', (input) => {
-  const keyword = keywordLiteral('sqrt', { ctor: 'sqrtKeyword' }).runNormalized(input);
+  const keyword = keywordLiteral('sqrt', { ctor: 'sqrtKeyword', allowTrailingUnderscore: true })
+    .runNormalized(input);
   if (!keyword.ok) {
     return keyword;
   }
@@ -1033,7 +1103,7 @@ function createSumOrProdParser(name, kind) {
       kind,
       body: bodyResult.value,
       varName: varResult.value.name,
-      varMetaHighlights: varResult.value.meta?.highlights || null,
+      varMeta: varResult.value.meta || null,
       min: minResult.value,
       max: maxResult.value,
       step: stepFinal,
@@ -1080,7 +1150,7 @@ const elementaryFunctionParser = Choice([
 
 const builtinFunctionLiteralParser = Choice(
   BUILTIN_FUNCTION_DEFINITIONS.map(({ name, factory }) =>
-    keywordLiteral(name, { ctor: `${name}FunctionLiteral` }).Map((token, result) => {
+    keywordLiteral(name, { ctor: `${name}FunctionLiteral`, allowTrailingUnderscore: true }).Map((token, result) => {
       const node = createBuiltinFunctionLiteral(name, factory, result.span);
       const withMeta = attachIdentifierMeta(node, token);
       // For some literals, default rendering is "special" (e.g. abs -> |z|, gamma -> Γ(z), fact -> z!).
@@ -1092,6 +1162,9 @@ const builtinFunctionLiteralParser = Choice(
         Array.isArray(token.highlights) &&
         token.highlights.length
       ) {
+        withMeta.__syntheticCall = { name, args: [withSpan(VarZ(), result.span)] };
+      }
+      if (token?.forcePlain) {
         withMeta.__syntheticCall = { name, args: [withSpan(VarZ(), result.span)] };
       }
       return withMeta;
