@@ -38,18 +38,29 @@ const PRECACHE_URLS = [
   './explore-page.mjs',
   './image-export.mjs',
   './core-engine.mjs',
+  './constant-eval.mjs',
   './ast-utils.mjs',
   './arithmetic-parser.mjs',
   './parser-combinators.mjs',
   './parser-primitives.mjs',
   './parse-error-format.mjs',
   './formula-url.mjs',
+  './finger-url-prune.mjs',
   './formula-page.mjs',
   './formula-renderer.mjs',
 ];
 
 function isSameOrigin(url) {
   return url && url.origin === self.location.origin;
+}
+
+function isScriptRequest(request, url) {
+  const destination = request?.destination || '';
+  if (destination === 'script' || destination === 'worker') {
+    return true;
+  }
+  const path = (url?.pathname || '').toLowerCase();
+  return path.endsWith('.js') || path.endsWith('.mjs');
 }
 
 async function matchFromNamedCaches(request) {
@@ -60,7 +71,20 @@ async function matchFromNamedCaches(request) {
   const hitRuntime = await runtime.match(request);
   if (hitRuntime) return hitRuntime;
   const precache = await caches.open(PRECACHE_NAME);
-  return await precache.match(request);
+  const hitPrecache = await precache.match(request);
+  if (hitPrecache) return hitPrecache;
+
+  // Support cache-busted module URLs (e.g. main.js?build=...) when offline by
+  // falling back to the non-query precache entry.
+  const url = request?.url ? new URL(request.url) : null;
+  if (url && url.search && isScriptRequest(request, url)) {
+    const strippedUrl = `${url.origin}${url.pathname}`;
+    const strippedRuntime = await runtime.match(strippedUrl);
+    if (strippedRuntime) return strippedRuntime;
+    const strippedPrecache = await precache.match(strippedUrl);
+    if (strippedPrecache) return strippedPrecache;
+  }
+  return null;
 }
 
 self.addEventListener('install', (event) => {
@@ -250,6 +274,7 @@ self.addEventListener('fetch', (event) => {
     request.destination === 'script' ||
     path.endsWith('.js') ||
     path.endsWith('.mjs');
+  const offline = typeof self !== 'undefined' && self.navigator?.onLine === false;
 
   // Manifest updates are important for install metadata (including orientation).
   // Prefer network-first so updates take effect without "reinstall" friction.
@@ -261,7 +286,11 @@ self.addEventListener('fetch', (event) => {
   // For code assets, prefer network-first so PR previews update quickly even if a
   // previous service worker version is still controlling the scope.
   if (isJsModule) {
-    event.respondWith(networkFirst(request, { timeoutMs: 1500 }));
+    // If we're offline, skip the timeout and use the cached module immediately.
+    const responsePromise = offline
+      ? cacheFirst(request)
+      : networkFirst(request, { timeoutMs: 1500 });
+    event.respondWith(responsePromise);
     return;
   }
 
