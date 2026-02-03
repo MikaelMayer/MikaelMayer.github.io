@@ -2,6 +2,7 @@ import { parseFormulaInput } from './arithmetic-parser.mjs';
 import { visitAst } from './ast-utils.mjs';
 import { formatCaretIndicator, getCaretSelection } from './parse-error-format.mjs';
 import { renderFormulaToCanvas } from './formula-renderer.mjs';
+import { canvasToPngBlob, downloadBlob } from './image-export.mjs';
 import {
   FORMULA_PARAM,
   FORMULA_B64_PARAM,
@@ -57,6 +58,8 @@ let parseErrorSelection = null;
 let initialFormulaFromUrl = null;
 
 const FINGER_LABEL_REGEX = /^(?:[FD]\d+|W[012])$/;
+let downloadInProgress = false;
+let canDownload = false;
 
 function clearPersistedFormulaSearch() {
   try {
@@ -250,8 +253,9 @@ function updateForegroundForBackgroundHex(bgHex, presetMap) {
 
 function setDownloadEnabled(enabled) {
   const btn = $('download-png');
+  canDownload = Boolean(enabled);
   if (!btn) return;
-  btn.disabled = !enabled;
+  btn.disabled = !canDownload;
 }
 
 function setParseErrorSelection(selection) {
@@ -458,19 +462,22 @@ async function bootstrap() {
   // Download.
   const downloadBtn = $('download-png');
   if (downloadBtn) {
-    downloadBtn.addEventListener('click', () => {
+    downloadBtn.addEventListener('click', async () => {
+      if (downloadInProgress || !canDownload) {
+        return;
+      }
       const canvas = $('formula-render');
-      if (!canvas || typeof canvas.toDataURL !== 'function') return;
+      if (!canvas || typeof canvas.getContext !== 'function') return;
+      downloadInProgress = true;
+      downloadBtn.disabled = true;
       try {
-        const href = canvas.toDataURL('image/png');
-        const a = document.createElement('a');
-        a.href = href;
-        a.download = 'formula.png';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
+        const blob = await canvasToPngBlob(canvas);
+        downloadBlob(blob, 'formula.png');
       } catch (e) {
         console.warn('Failed to download canvas PNG.', e);
+      } finally {
+        downloadInProgress = false;
+        downloadBtn.disabled = !canDownload;
       }
     });
   }
