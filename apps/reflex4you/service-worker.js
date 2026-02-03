@@ -7,7 +7,7 @@
 // PR previews under `/pr-preview/...`). If we use a single global cache name, different
 // deployments can overwrite each other and serve stale/mismatched assets.
 // Include the service worker registration scope in cache keys to isolate deployments.
-const CACHE_MINOR = '45.0';
+const CACHE_MINOR = '45.1';
 const SCOPE =
   typeof self !== 'undefined' && self.registration && typeof self.registration.scope === 'string'
     ? self.registration.scope
@@ -38,18 +38,29 @@ const PRECACHE_URLS = [
   './explore-page.mjs',
   './image-export.mjs',
   './core-engine.mjs',
+  './constant-eval.mjs',
   './ast-utils.mjs',
   './arithmetic-parser.mjs',
   './parser-combinators.mjs',
   './parser-primitives.mjs',
   './parse-error-format.mjs',
   './formula-url.mjs',
+  './finger-url-prune.mjs',
   './formula-page.mjs',
   './formula-renderer.mjs',
 ];
 
 function isSameOrigin(url) {
   return url && url.origin === self.location.origin;
+}
+
+function isScriptRequest(request, url) {
+  const destination = request?.destination || '';
+  if (destination === 'script' || destination === 'worker') {
+    return true;
+  }
+  const path = (url?.pathname || '').toLowerCase();
+  return path.endsWith('.js') || path.endsWith('.mjs');
 }
 
 async function matchFromNamedCaches(request) {
@@ -60,7 +71,20 @@ async function matchFromNamedCaches(request) {
   const hitRuntime = await runtime.match(request);
   if (hitRuntime) return hitRuntime;
   const precache = await caches.open(PRECACHE_NAME);
-  return await precache.match(request);
+  const hitPrecache = await precache.match(request);
+  if (hitPrecache) return hitPrecache;
+
+  // Support cache-busted module URLs (e.g. main.js?build=...) when offline by
+  // falling back to the non-query precache entry.
+  const url = request?.url ? new URL(request.url) : null;
+  if (url && url.search && isScriptRequest(request, url)) {
+    const strippedUrl = `${url.origin}${url.pathname}`;
+    const strippedRuntime = await runtime.match(strippedUrl);
+    if (strippedRuntime) return strippedRuntime;
+    const strippedPrecache = await precache.match(strippedUrl);
+    if (strippedPrecache) return strippedPrecache;
+  }
+  return null;
 }
 
 self.addEventListener('install', (event) => {
