@@ -43,7 +43,11 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 const DEFAULT_FORMULA_TEXT = 'z';
 const DEFAULT_CANVAS_BG_HEX = 'ffffff80';
 const DEFAULT_CANVAS_FG_HEX = '000000ff';
+const EXPORT_CROP_PADDING_PX = 8;
+const EXPORT_CROP_COLOR_TOLERANCE = 10;
+const EXPORT_CROP_ALPHA_TOLERANCE = 10;
 let currentCanvasFgHex = DEFAULT_CANVAS_FG_HEX;
+let lastRenderState = null;
 
 function $(id) {
   return document.getElementById(id);
