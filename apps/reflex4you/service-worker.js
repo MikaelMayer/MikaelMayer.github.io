@@ -7,7 +7,7 @@
 // PR previews under `/pr-preview/...`). If we use a single global cache name, different
 // deployments can overwrite each other and serve stale/mismatched assets.
 // Include the service worker registration scope in cache keys to isolate deployments.
-const CACHE_MINOR = '45.1';
+const CACHE_MINOR = '45.2';
 const SCOPE =
   typeof self !== 'undefined' && self.registration && typeof self.registration.scope === 'string'
     ? self.registration.scope
@@ -274,6 +274,7 @@ self.addEventListener('fetch', (event) => {
     request.destination === 'script' ||
     path.endsWith('.js') ||
     path.endsWith('.mjs');
+  const offline = typeof self !== 'undefined' && self.navigator?.onLine === false;
 
   // Manifest updates are important for install metadata (including orientation).
   // Prefer network-first so updates take effect without "reinstall" friction.
@@ -285,7 +286,11 @@ self.addEventListener('fetch', (event) => {
   // For code assets, prefer network-first so PR previews update quickly even if a
   // previous service worker version is still controlling the scope.
   if (isJsModule) {
-    event.respondWith(networkFirst(request, { timeoutMs: 1500 }));
+    // If we're offline, skip the timeout and use the cached module immediately.
+    const responsePromise = offline
+      ? cacheFirst(request)
+      : networkFirst(request, { timeoutMs: 1500 });
+    event.respondWith(responsePromise);
     return;
   }
 
