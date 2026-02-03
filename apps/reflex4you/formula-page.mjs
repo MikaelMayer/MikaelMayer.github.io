@@ -362,7 +362,7 @@ function clearRender() {
 
 async function renderFromSource(source) {
   const normalized = String(source || '');
-  const parsed = parseFormulaInput(normalized);
+  const parsed = parseFormulaInput(normalized, { resolveRepeatComposeCounts: false });
   if (!parsed.ok) {
     showParseError(normalized, parsed);
     clearRender();

@@ -2483,6 +2483,7 @@ function findBindingForName(env, name) {
 function normalizeParseOptions(options = {}) {
   return {
     fingerValues: normalizeFingerValuesSource(options.fingerValues),
+    resolveRepeatComposeCounts: options.resolveRepeatComposeCounts !== false,
   };
 }
 
@@ -2565,9 +2566,12 @@ function resolveRepeatPlaceholders(ast, parseOptions, input) {
           node.countSpan ||
           node.span ||
           (parent?.span ?? input.createSpan(0, 0));
-        const count = evaluateRepeatCountExpression(node.countExpression, span, context, input);
-        if (count instanceof ParseFailure) {
-          return count;
+        let count;
+        if (parseOptions.resolveRepeatComposeCounts) {
+          count = evaluateRepeatCountExpression(node.countExpression, span, context, input);
+          if (count instanceof ParseFailure) {
+            return count;
+          }
         }
         const composeMultiple = createComposeMultipleNode({
           base: node.base,
