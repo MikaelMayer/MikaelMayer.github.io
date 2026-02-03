@@ -109,9 +109,32 @@ const GREEK_IDENTIFIER_LATEX = Object.freeze({
   omega: '\\omega',
 });
 
+function normalizeIdentifierMeta(metaOrHighlights) {
+  if (Array.isArray(metaOrHighlights)) {
+    return { highlights: metaOrHighlights, forcePlain: false };
+  }
+  if (metaOrHighlights && typeof metaOrHighlights === 'object') {
+    return {
+      highlights: Array.isArray(metaOrHighlights.highlights) ? metaOrHighlights.highlights : [],
+      forcePlain: Boolean(metaOrHighlights.forcePlain),
+    };
+  }
+  return { highlights: [], forcePlain: false };
+}
+
+function identifierMeta(node) {
+  if (!node || typeof node !== 'object') {
+    return { highlights: [], forcePlain: false };
+  }
+  return normalizeIdentifierMeta(node.__identifierMeta);
+}
+
 function identifierHighlights(node) {
-  const highlights = node && typeof node === 'object' ? node.__identifierMeta?.highlights : null;
-  return Array.isArray(highlights) ? highlights : [];
+  return identifierMeta(node).highlights;
+}
+
+function identifierForcePlain(node) {
+  return identifierMeta(node).forcePlain;
 }
 
 function escapeLatexTextChar(ch) {
@@ -144,7 +167,9 @@ function renderTextWithHighlights(text, highlights) {
 }
 
 function latexIdentifierWithMetadata(name, metaHighlights) {
-  const highlights = Array.isArray(metaHighlights) ? metaHighlights : [];
+  const meta = normalizeIdentifierMeta(metaHighlights);
+  const highlights = meta.highlights;
+  const allowGreek = !meta.forcePlain;
   const raw = String(name || '?');
   const { base: primeBase, count: primeCount } = splitPrimeSuffix(raw);
   const baseRaw = primeCount ? primeBase : raw;
@@ -180,7 +205,10 @@ function latexIdentifierWithMetadata(name, metaHighlights) {
     // has no highlighted characters (highlights may still apply to the digits).
     const baseLower = base.toLowerCase();
     const baseLatex =
-      baseHighlightsForDigits.length === 0 && baseLower !== 'gamma' && GREEK_IDENTIFIER_LATEX[baseLower]
+      allowGreek &&
+      baseHighlightsForDigits.length === 0 &&
+      baseLower !== 'gamma' &&
+      GREEK_IDENTIFIER_LATEX[baseLower]
         ? GREEK_IDENTIFIER_LATEX[baseLower]
         : baseHighlightsForDigits.length
           ? renderTextWithHighlights(base, baseHighlightsForDigits)
@@ -193,7 +221,7 @@ function latexIdentifierWithMetadata(name, metaHighlights) {
   if (!baseHighlights.length) {
     // Render common greek-letter identifiers as their TeX symbols.
     // Do not remap "gamma" (it is reserved for the Euler Gamma function).
-    if (baseRaw !== 'gamma') {
+    if (allowGreek && baseRaw !== 'gamma') {
       const greek = GREEK_IDENTIFIER_LATEX[baseRaw];
       if (greek) return `${greek}${primeLatex}`;
     }
@@ -416,6 +444,8 @@ function resolveFingerValue(slot, options = {}) {
 function functionCallLatex(name, args, options, metaHighlights = null) {
   const renderedArgs = (args || []).map((arg) => nodeToLatex(arg, 0, options));
   const fn = String(name || '?');
+  const meta = normalizeIdentifierMeta(metaHighlights);
+  const forcePlain = meta.forcePlain;
 
   // Prefer native TeX operators for common functions.
   const operatorMap = {
@@ -433,19 +463,19 @@ function functionCallLatex(name, args, options, metaHighlights = null) {
   // highlighted letters can render.
   if (fn === 'exp') {
     const value = renderedArgs[0] ?? '?';
-    if (Array.isArray(metaHighlights) && metaHighlights.length) {
-      return `${operatorNameWithMetadata('exp', metaHighlights)}\\left(${value}\\right)`;
+    if (forcePlain || meta.highlights.length) {
+      return `${operatorNameWithMetadata('exp', meta)}\\left(${value}\\right)`;
     }
     return `e^{${value}}`;
   }
 
-  if (fn === 'sqrt') {
+  if (fn === 'sqrt' && !forcePlain) {
     const value = renderedArgs[0] ?? '?';
     const branch = renderedArgs[1] ?? null;
     return branch ? `\\sqrt[${branch}]{${value}}` : `\\sqrt{${value}}`;
   }
 
-  if (fn in operatorMap) {
+  if (!forcePlain && fn in operatorMap) {
     const op = operatorMap[fn];
     if (fn === 'ln' && args?.[1]) {
       // ln(z, k) is rendered as ln_k(z)
@@ -459,8 +489,8 @@ function functionCallLatex(name, args, options, metaHighlights = null) {
 
   // Generic function call.
   const opName =
-    Array.isArray(metaHighlights) && metaHighlights.length
-      ? operatorNameWithMetadata(fn, metaHighlights)
+    meta.highlights.length || forcePlain
+      ? operatorNameWithMetadata(fn, meta)
       : `\\operatorname{${escapeLatexIdentifierWithPrimeSuffix(fn)}}`;
   return `${opName}\\left(${renderedArgs.join(', ')}\\right)`;
 }
@@ -473,7 +503,7 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
       node.__syntheticCall.name,
       node.__syntheticCall.args,
       options,
-      identifierHighlights(node),
+      identifierMeta(node),
     );
   }
 
@@ -486,20 +516,20 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
       }
       return constToLatex(node, options);
     case 'Var':
-      return latexIdentifierWithMetadata(node.name || 'z', identifierHighlights(node));
+      return latexIdentifierWithMetadata(node.name || 'z', identifierMeta(node));
     case 'VarX':
-      return latexIdentifierWithMetadata('x', identifierHighlights(node));
+      return latexIdentifierWithMetadata('x', identifierMeta(node));
     case 'VarY':
-      return latexIdentifierWithMetadata('y', identifierHighlights(node));
+      return latexIdentifierWithMetadata('y', identifierMeta(node));
     case 'Identifier':
     case 'SetRef':
     case 'ParamRef':
-      return latexIdentifierWithMetadata(node.name || '?', identifierHighlights(node));
+      return latexIdentifierWithMetadata(node.name || '?', identifierMeta(node));
     case 'Call': {
       const args = Array.isArray(node.args) ? node.args : [];
       const callee = node.callee;
       if (callee && typeof callee === 'object' && (callee.kind === 'Identifier' || callee.kind === 'SetRef')) {
-        return functionCallLatex(callee.name || '?', args, options, identifierHighlights(callee));
+        return functionCallLatex(callee.name || '?', args, options, identifierMeta(callee));
       }
       const calleeLatex = nodeToLatex(callee, precedence(node), options);
       const renderedArgs = args.map((arg) => nodeToLatex(arg, 0, options));
@@ -518,7 +548,7 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
       // Show the token as written (QA/QB/RA/RB) when available.
       const slot = node.slot || '?';
       const prefix = node.kind === 'DeviceRotation' ? 'Q' : 'R';
-      return latexIdentifierWithMetadata(`${prefix}${slot}`, identifierHighlights(node));
+      return latexIdentifierWithMetadata(`${prefix}${slot}`, identifierMeta(node));
     }
 
     case 'Pow': {
@@ -541,15 +571,15 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
     case 'Sum':
     case 'Prod': {
       const name = node.kind === 'Sum' ? 'sum' : 'prod';
-      const fnMeta = identifierHighlights(node);
+      const fnMeta = identifierMeta(node);
       const bodyLatex = nodeToLatex(node.body, 0, options);
-      const varLatex = latexIdentifierWithMetadata(node.varName || '?', node.varMetaHighlights || null);
+      const varLatex = latexIdentifierWithMetadata(node.varName || '?', node.varMeta || null);
       const minLatex = nodeToLatex(node.min, 0, options);
       const maxLatex = nodeToLatex(node.max, 0, options);
 
       // If the user used underscore-highlight syntax like `_sum(...)`, keep the
       // function-call rendering so highlighted letters can be shown.
-      if (fnMeta.length) {
+      if (fnMeta.forcePlain || fnMeta.highlights.length) {
         const args = [bodyLatex, varLatex, minLatex, maxLatex];
         if (!node.stepWasImplicit) {
           args.push(nodeToLatex(node.step, 0, options));
@@ -646,7 +676,7 @@ function nodeToLatex(node, parentPrec = 0, options = {}) {
     case 'Conjugate':
       return `\\overline{${nodeToLatex(node.value, 0, options)}}`;
     case 'IsNaN':
-      return functionCallLatex('isnan', [node.value], options, identifierHighlights(node));
+      return functionCallLatex('isnan', [node.value], options, identifierMeta(node));
 
     case 'Compose': {
       // Dot-syntax rendering (a.b): prefer a more "method call" look for common accessors,

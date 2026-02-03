@@ -98,10 +98,18 @@ function normalizeIdentifierWithHighlights(raw) {
 }
 
 function attachIdentifierMeta(node, meta) {
-  if (!node || typeof node !== 'object' || !meta || !Array.isArray(meta.highlights) || meta.highlights.length === 0) {
+  if (!node || typeof node !== 'object' || !meta) {
     return node;
   }
-  node.__identifierMeta = { highlights: meta.highlights.map((h) => ({ index: h.index, letter: h.letter })) };
+  const highlights = Array.isArray(meta.highlights) ? meta.highlights : [];
+  const forcePlain = Boolean(meta.forcePlain);
+  if (highlights.length === 0 && !forcePlain) {
+    return node;
+  }
+  node.__identifierMeta = {
+    highlights: highlights.map((h) => ({ index: h.index, letter: h.letter })),
+    forcePlain,
+  };
   return node;
 }
 
@@ -240,6 +248,25 @@ const BUILTIN_FUNCTION_DEFINITIONS = [
   { name: 'heav', factory: (value) => createHeavExpression(value) },
 ];
 
+const PLAIN_RENDER_FUNCTION_NAMES = new Set([
+  'exp',
+  'sqrt',
+  'abs',
+  'modulus',
+  'abs2',
+  'floor',
+  'conj',
+  'gamma',
+  'fact',
+  'heav',
+  'sum',
+  'prod',
+]);
+
+function allowTrailingUnderscoreForName(name) {
+  return PLAIN_RENDER_FUNCTION_NAMES.has(String(name || ''));
+}
+
 function createBuiltinFunctionLiteral(name, factory, span) {
   const identityVar = withSpan(VarZ(), span);
   const node = withSpan(factory(identityVar), span);
@@ -269,11 +296,30 @@ function applyFunctionLiteral(node, argument) {
     } else if (!applied.syntaxLabel && applied.kind === 'Arg' && node.__functionLiteral?.name) {
       applied.syntaxLabel = node.__functionLiteral.name;
     }
-    const highlights = node.__identifierMeta?.highlights;
-    if (Array.isArray(highlights) && highlights.length) {
-      applied.__identifierMeta = {
-        highlights: highlights.map((h) => ({ index: h.index, letter: h.letter })),
-      };
+    const meta = node.__identifierMeta;
+    if (meta && typeof meta === 'object') {
+      const highlights = Array.isArray(meta.highlights) ? meta.highlights : [];
+      const forcePlain = Boolean(meta.forcePlain);
+      if (highlights.length || forcePlain) {
+        applied.__identifierMeta = {
+          highlights: highlights.map((h) => ({ index: h.index, letter: h.letter })),
+          forcePlain,
+        };
+      }
+      const fnName = node.__functionLiteral?.name;
+      if (
+        forcePlain &&
+        fnName &&
+        typeof fnName === 'string'
+      ) {
+        applied.__syntheticCall = { name: fnName, args: [argument] };
+      } else if (
+        fnName &&
+        (fnName === 'abs' || fnName === 'modulus' || fnName === 'gamma' || fnName === 'fact') &&
+        highlights.length
+      ) {
+        applied.__syntheticCall = { name: fnName, args: [argument] };
+      }
     }
   }
   return applied;
@@ -298,6 +344,7 @@ function keywordLiteral(text, options = {}) {
   const ctor = options.ctor ?? `Keyword(${text})`;
   const caseSensitive = options.caseSensitive ?? true;
   const expected = caseSensitive ? String(text) : String(text).toLowerCase();
+  const allowTrailingUnderscore = options.allowTrailingUnderscore ?? false;
 
   return createParser(`Keyword(${text})`, (input) => {
     const wsResult = WS({ ctor: wsCtor }).runNormalized(input);
@@ -307,6 +354,7 @@ function keywordLiteral(text, options = {}) {
 
     let cursor = wsResult.next;
     const highlights = [];
+    let forcePlain = false;
     let normalizedIndex = 0;
 
     for (let i = 0; i < expected.length; i += 1) {
@@ -350,6 +398,14 @@ function keywordLiteral(text, options = {}) {
       normalizedIndex += 1;
     }
 
+    if (allowTrailingUnderscore) {
+      const nextChar = cursor.peek();
+      if (nextChar === '_' && (!cursor.peek(1) || !IDENTIFIER_CHAR.test(cursor.peek(1)))) {
+        forcePlain = true;
+        cursor = cursor.advance(1);
+      }
+    }
+
     const nextChar = cursor.peek();
     if (nextChar && IDENTIFIER_CHAR.test(nextChar)) {
       return new ParseFailure({
@@ -363,7 +419,7 @@ function keywordLiteral(text, options = {}) {
     }
     return new ParseSuccess({
       ctor,
-      value: { text: String(text), highlights },
+      value: { text: String(text), highlights, forcePlain },
       span: spanBetween(input, cursor),
       next: cursor,
     });
@@ -785,7 +841,10 @@ const ifParser = createParser('If', (input) => {
 
 function createBinaryFunctionParser(name, factory) {
   return Sequence([
-    keywordLiteral(name, { ctor: `${name}Keyword` }),
+    keywordLiteral(name, {
+      ctor: `${name}Keyword`,
+      allowTrailingUnderscore: allowTrailingUnderscoreForName(name),
+    }),
     wsLiteral('(', { ctor: `${name}Open` }),
     expressionRef,
     wsLiteral(',', { ctor: `${name}Comma` }),
@@ -805,7 +864,10 @@ function createBinaryFunctionParser(name, factory) {
 
 function createUnaryFunctionParser(name, factory) {
   return Sequence([
-    keywordLiteral(name, { ctor: `${name}Keyword` }),
+    keywordLiteral(name, {
+      ctor: `${name}Keyword`,
+      allowTrailingUnderscore: allowTrailingUnderscoreForName(name),
+    }),
     wsLiteral('(', { ctor: `${name}Open` }),
     expressionRef,
     wsLiteral(')', { ctor: `${name}Close` }),
@@ -815,6 +877,10 @@ function createUnaryFunctionParser(name, factory) {
   }).Map(({ meta, expr }, result) => {
     const node = withSpan(factory(expr), result.span);
     const withMeta = attachIdentifierMeta(node, meta);
+    if (meta?.forcePlain) {
+      withMeta.__syntheticCall = { name, args: [expr] };
+      return withMeta;
+    }
     // For abs/modulus we render as |z| by default, but if the user added underscore
     // highlights (e.g. `_abs(z)` / `_modulus(z)`), preserve call syntax so the
     // function name can be rendered (with Huge highlighted letters).
@@ -836,7 +902,10 @@ function createUnaryFunctionParsers(names, factory) {
 
 function createArgParser(name) {
   return createParser(`${name}Call`, (input) => {
-    const keyword = keywordLiteral(name, { ctor: `${name}Keyword` }).runNormalized(input);
+    const keyword = keywordLiteral(name, {
+      ctor: `${name}Keyword`,
+      allowTrailingUnderscore: allowTrailingUnderscoreForName(name),
+    }).runNormalized(input);
     if (!keyword.ok) {
       return keyword;
     }
@@ -870,9 +939,16 @@ function createArgParser(name) {
 
     const span = spanBetween(input, close.next);
     const node = withSyntax(withSpan(Arg(valueResult.value, branchNode), span), name);
+    const withMeta = attachIdentifierMeta(node, keyword.value);
+    if (keyword.value?.forcePlain) {
+      withMeta.__syntheticCall = {
+        name,
+        args: branchNode ? [valueResult.value, branchNode] : [valueResult.value],
+      };
+    }
     return new ParseSuccess({
       ctor: `${name}Call`,
-      value: attachIdentifierMeta(node, keyword.value),
+      value: withMeta,
       span,
       next: close.next,
     });
@@ -880,7 +956,10 @@ function createArgParser(name) {
 }
 
 const lnParser = createParser('LnCall', (input) => {
-  const keyword = keywordLiteral('ln', { ctor: 'lnKeyword' }).runNormalized(input);
+  const keyword = keywordLiteral('ln', {
+    ctor: 'lnKeyword',
+    allowTrailingUnderscore: allowTrailingUnderscoreForName('ln'),
+  }).runNormalized(input);
   if (!keyword.ok) {
     return keyword;
   }
@@ -913,16 +992,26 @@ const lnParser = createParser('LnCall', (input) => {
   }
 
   const span = spanBetween(input, close.next);
+  const node = attachIdentifierMeta(withSpan(Ln(valueResult.value, branchNode), span), keyword.value);
+  if (keyword.value?.forcePlain) {
+    node.__syntheticCall = {
+      name: 'ln',
+      args: branchNode ? [valueResult.value, branchNode] : [valueResult.value],
+    };
+  }
   return new ParseSuccess({
     ctor: 'LnCall',
-    value: attachIdentifierMeta(withSpan(Ln(valueResult.value, branchNode), span), keyword.value),
+    value: node,
     span,
     next: close.next,
   });
 });
 
 const sqrtParser = createParser('SqrtCall', (input) => {
-  const keyword = keywordLiteral('sqrt', { ctor: 'sqrtKeyword' }).runNormalized(input);
+  const keyword = keywordLiteral('sqrt', {
+    ctor: 'sqrtKeyword',
+    allowTrailingUnderscore: allowTrailingUnderscoreForName('sqrt'),
+  }).runNormalized(input);
   if (!keyword.ok) {
     return keyword;
   }
@@ -962,7 +1051,10 @@ const sqrtParser = createParser('SqrtCall', (input) => {
 
 function createSumOrProdParser(name, kind) {
   return createParser(`${name}Call`, (input) => {
-    const keyword = keywordLiteral(name, { ctor: `${name}Keyword` }).runNormalized(input);
+    const keyword = keywordLiteral(name, {
+      ctor: `${name}Keyword`,
+      allowTrailingUnderscore: allowTrailingUnderscoreForName(name),
+    }).runNormalized(input);
     if (!keyword.ok) {
       return keyword;
     }
@@ -1033,7 +1125,7 @@ function createSumOrProdParser(name, kind) {
       kind,
       body: bodyResult.value,
       varName: varResult.value.name,
-      varMetaHighlights: varResult.value.meta?.highlights || null,
+      varMeta: varResult.value.meta || null,
       min: minResult.value,
       max: maxResult.value,
       step: stepFinal,
@@ -1080,7 +1172,10 @@ const elementaryFunctionParser = Choice([
 
 const builtinFunctionLiteralParser = Choice(
   BUILTIN_FUNCTION_DEFINITIONS.map(({ name, factory }) =>
-    keywordLiteral(name, { ctor: `${name}FunctionLiteral` }).Map((token, result) => {
+    keywordLiteral(name, {
+      ctor: `${name}FunctionLiteral`,
+      allowTrailingUnderscore: allowTrailingUnderscoreForName(name),
+    }).Map((token, result) => {
       const node = createBuiltinFunctionLiteral(name, factory, result.span);
       const withMeta = attachIdentifierMeta(node, token);
       // For some literals, default rendering is "special" (e.g. abs -> |z|, gamma -> Γ(z), fact -> z!).
@@ -1092,6 +1187,9 @@ const builtinFunctionLiteralParser = Choice(
         Array.isArray(token.highlights) &&
         token.highlights.length
       ) {
+        withMeta.__syntheticCall = { name, args: [withSpan(VarZ(), result.span)] };
+      }
+      if (token?.forcePlain) {
         withMeta.__syntheticCall = { name, args: [withSpan(VarZ(), result.span)] };
       }
       return withMeta;
@@ -2483,6 +2581,7 @@ function findBindingForName(env, name) {
 function normalizeParseOptions(options = {}) {
   return {
     fingerValues: normalizeFingerValuesSource(options.fingerValues),
+    resolveRepeatComposeCounts: options.resolveRepeatComposeCounts !== false,
   };
 }
 
@@ -2565,9 +2664,12 @@ function resolveRepeatPlaceholders(ast, parseOptions, input) {
           node.countSpan ||
           node.span ||
           (parent?.span ?? input.createSpan(0, 0));
-        const count = evaluateRepeatCountExpression(node.countExpression, span, context, input);
-        if (count instanceof ParseFailure) {
-          return count;
+        let count;
+        if (parseOptions.resolveRepeatComposeCounts) {
+          count = evaluateRepeatCountExpression(node.countExpression, span, context, input);
+          if (count instanceof ParseFailure) {
+            return count;
+          }
         }
         const composeMultiple = createComposeMultipleNode({
           base: node.base,
