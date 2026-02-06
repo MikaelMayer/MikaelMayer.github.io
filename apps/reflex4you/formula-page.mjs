@@ -48,6 +48,7 @@ const EXPORT_CROP_COLOR_TOLERANCE = 10;
 const EXPORT_CROP_ALPHA_TOLERANCE = 10;
 const PREVIEW_CROP_PADDING_PX = EXPORT_CROP_PADDING_PX;
 const MAX_EXPORT_CANVAS_DIM = 20000;
+const MIN_EXPORT_FORMULA_HEIGHT_PX = 600;
 let currentCanvasFgHex = DEFAULT_CANVAS_FG_HEX;
 let lastRenderState = null;
 let previewBaseHeight = null;
@@ -232,6 +233,30 @@ function clampExportCanvasSize(width, height) {
     width: Math.max(1, Math.floor(w * scale)),
     height: Math.max(1, Math.floor(h * scale)),
     scale,
+  };
+}
+
+function applyMinimumExportHeight(size, minHeight) {
+  if (!size) return null;
+  const width = Number(size.width);
+  const height = Number(size.height);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return size;
+  }
+  if (!Number.isFinite(minHeight) || minHeight <= 0) {
+    return size;
+  }
+  const pad = Number.isFinite(size.pad) ? size.pad : 0;
+  const innerWidth = Math.max(1, width - pad * 2);
+  const innerHeight = Math.max(1, height - pad * 2);
+  if (innerHeight >= minHeight) {
+    return size;
+  }
+  const scale = minHeight / innerHeight;
+  return {
+    width: Math.ceil(innerWidth * scale + pad * 2),
+    height: Math.ceil(innerHeight * scale + pad * 2),
+    pad,
   };
 }
 
@@ -670,6 +695,9 @@ async function bootstrap() {
             exportSize = await measureFormulaCanvasSize(renderState.ast, renderOptions);
           } catch (err) {
             console.warn('Failed to measure formula size for export.', err);
+          }
+          if (exportSize) {
+            exportSize = applyMinimumExportHeight(exportSize, MIN_EXPORT_FORMULA_HEIGHT_PX);
           }
           const clamped = exportSize ? clampExportCanvasSize(exportSize.width, exportSize.height) : null;
           if (clamped) {
