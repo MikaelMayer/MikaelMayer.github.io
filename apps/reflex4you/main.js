@@ -273,6 +273,13 @@ const APP_VERSION = 46;
 const CONTEXT_LOSS_RELOAD_KEY = `reflex4you:contextLossReloaded:v${APP_VERSION}`;
 const RESUME_RELOAD_KEY = `reflex4you:resumeReloaded:v${APP_VERSION}`;
 const LAST_HIDDEN_AT_KEY = `reflex4you:lastHiddenAtMs:v${APP_VERSION}`;
+const SKIP_FORMULA_ON_NEXT_LOAD_KEY = `reflex4you:skipFormulaOnce:v${APP_VERSION}`;
+// When a formula is extremely expensive to evaluate per-pixel (e.g. heavy `repeat` usage),
+// rendering at full resolution can trigger GPU watchdog resets/context loss on some devices.
+// Start such formulas in reduced-resolution mode and only promote to full-res when safe.
+const SAFE_RENDER_SCALE = 0.25;
+const SAFE_RENDER_ESTIMATED_FULLRES_BUDGET_MS = 80;
+const SAFE_RENDER_PROBE_FINISH = true;
 // Empirically, some mobile PWAs end up in a broken/blank state after being backgrounded
 // long enough for the OS to suspend/kill GPU resources. Reloading on resume is the most
 // reliable recovery. The user reports the issue begins around 20s.
@@ -1662,6 +1669,7 @@ function refreshFingerIndicator(label) {
 
 const DEFAULT_FORMULA_TEXT = 'z';
 let lastAppliedFormulaSource = DEFAULT_FORMULA_TEXT;
+let lastSafetyProbeSource = null;
 
 const defaultParseResult = parseFormulaInput(DEFAULT_FORMULA_TEXT, getParserOptionsFromFingers());
 const fallbackDefaultAST = defaultParseResult.ok ? defaultParseResult.value : createDefaultFormulaAST();
@@ -2525,7 +2533,8 @@ function handleRendererInitializationFailure(error) {
     'Reflex4You could not initialize the WebGL2 renderer.',
     'Rendering and gesture controls are disabled.',
     `Details: ${reason}`,
-    'Try enabling WebGL2 or switch to a browser/device that supports it.',
+    'This can happen if WebGL2 is disabled/unsupported, or if the GPU/browser is temporarily unable to create a WebGL2 context (e.g. after a GPU reset).',
+    'Try reloading, closing other GPU-heavy tabs, or switching to a browser/device with WebGL2 support.',
   ].join('\n');
   if (canvas) {
     canvas.classList.add('glcanvas--unavailable');
@@ -2762,6 +2771,31 @@ function cancelScheduledApply() {
   scheduledApplyHandleKind = null;
 }
 
+function astHasRepeat(ast) {
+  if (!ast || typeof ast !== 'object') return false;
+  let has = false;
+  try {
+    visitAst(ast, (node) => {
+      if (node?.kind === 'Repeat') {
+        has = true;
+      }
+    });
+  } catch (_) {
+    // ignore traversal errors; treat as not having repeat
+  }
+  return has;
+}
+
+function sourceLooksExpensiveForFullResRender(source) {
+  const text = String(source || '');
+  // Heuristic: formulas with `repeat` tend to be algorithmic/root-finding and can be extremely
+  // expensive per pixel (easy to trip mobile GPU watchdogs at full resolution).
+  if (/\brepeat\b/.test(text)) return true;
+  // Very large formulas are also more likely to be expensive / compile slowly.
+  if (text.length > 6000) return true;
+  return false;
+}
+
 function scheduleApplyCompiledFormula(compiled, { preserveFingerState, updateQuery, applyMode } = {}) {
   if (!compiled || !compiled.ok) {
     return;
@@ -2776,13 +2810,56 @@ function scheduleApplyCompiledFormula(compiled, { preserveFingerState, updateQue
           : reflexCore?.getFormulaAST?.() ?? fallbackDefaultAST;
 
       clearError();
-      lastAppliedFormulaSource = String(meta?.source || formulaTextarea.value || DEFAULT_FORMULA_TEXT);
+      const nextSource = String(meta?.source || formulaTextarea.value || DEFAULT_FORMULA_TEXT);
+
+      // Safety: some formulas are so expensive per pixel that a single full-resolution draw
+      // can reset the GPU / lose the WebGL context (which then looks like "WebGL2 unsupported").
+      const shouldStartSafe =
+        sourceLooksExpensiveForFullResRender(nextSource) ||
+        (meta?.ast && astHasRepeat(meta.ast));
+      if (reflexCore && typeof reflexCore.setRenderScale === 'function') {
+        reflexCore.setRenderScale(shouldStartSafe ? SAFE_RENDER_SCALE : 1, { triggerRender: false });
+      }
+
+      lastAppliedFormulaSource = nextSource;
 
       reflexCore?.setCompiledFormula({
         ast: astForDisplay,
         fragmentSource: compiled.fragmentSource,
         uniformCounts: compiled.uniformCounts,
       });
+
+      // If we started in reduced-res mode, do a quick probe render (with gl.finish) and
+      // only promote to full resolution when the estimated cost is safe.
+      if (
+        shouldStartSafe &&
+        reflexCore &&
+        typeof reflexCore.getRenderScale === 'function' &&
+        typeof reflexCore.setRenderScale === 'function' &&
+        typeof reflexCore.render === 'function' &&
+        typeof performance !== 'undefined' &&
+        lastSafetyProbeSource !== nextSource
+      ) {
+        const scale = reflexCore.getRenderScale();
+        if (scale < 1) {
+          const t0 = performance.now();
+          reflexCore.render({ finish: SAFE_RENDER_PROBE_FINISH });
+          const dt = performance.now() - t0;
+          const estimatedFull = dt / (scale * scale);
+          if (Number.isFinite(estimatedFull) && estimatedFull <= SAFE_RENDER_ESTIMATED_FULLRES_BUDGET_MS) {
+            reflexCore.setRenderScale(1, { triggerRender: true });
+          } else if (Number.isFinite(estimatedFull)) {
+            showError(
+              `Formula is very expensive; rendering at ${Math.round(scale * 100)}% resolution to avoid GPU reset (est. ${Math.round(estimatedFull)}ms/frame at full-res).`,
+            );
+          } else {
+            showError(
+              `Formula is very expensive; rendering at ${Math.round(scale * 100)}% resolution to avoid GPU reset.`,
+            );
+          }
+          lastSafetyProbeSource = nextSource;
+        }
+      }
 
       if (!preserveFingerState && meta?.nextFingerState) {
         applyFingerState(meta.nextFingerState);
@@ -3198,11 +3275,36 @@ async function bootstrapReflexApplication() {
   const params = new URLSearchParams(window.location.search);
   animationSeconds = parseSecondsFromQuery(params.get(ANIMATION_TIME_PARAM)) ?? DEFAULT_ANIMATION_SECONDS;
 
-  let initialFormulaSource = await readFormulaFromQuery({
-    onDecodeError: () => {
-      showError('We could not decode the formula embedded in this link. Resetting to the default formula.');
-    },
-  });
+  // If we just recovered from a WebGL context loss, avoid immediately loading a potentially
+  // GPU-crashing formula from the URL. Also clear the URL params so manual reloads won't
+  // re-trigger the same crash loop.
+  let skipFormulaOnce = false;
+  try {
+    skipFormulaOnce = Boolean(window.sessionStorage?.getItem(SKIP_FORMULA_ON_NEXT_LOAD_KEY));
+    if (skipFormulaOnce) {
+      window.sessionStorage?.removeItem(SKIP_FORMULA_ON_NEXT_LOAD_KEY);
+    }
+  } catch (_) {
+    skipFormulaOnce = false;
+  }
+  if (skipFormulaOnce) {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete(FORMULA_PARAM);
+      url.searchParams.delete(FORMULA_B64_PARAM);
+      replaceUrlSearch(url.search);
+    } catch (_) {
+      // ignore URL rewrite failures
+    }
+  }
+
+  let initialFormulaSource = skipFormulaOnce
+    ? DEFAULT_FORMULA_TEXT
+    : await readFormulaFromQuery({
+      onDecodeError: () => {
+        showError('We could not decode the formula embedded in this link. Resetting to the default formula.');
+      },
+    });
   if (!initialFormulaSource || !initialFormulaSource.trim()) {
     initialFormulaSource = DEFAULT_FORMULA_TEXT;
   }
@@ -3401,6 +3503,14 @@ if (canvas) {
         event.preventDefault();
       } catch (_) {
         // ignore
+      }
+      // Context loss can be triggered by GPU resets (including shaders that are too expensive).
+      // On the next load, skip restoring the potentially-crashing formula from the URL so the
+      // user can recover without waiting for the GPU to stabilize.
+      try {
+        window.sessionStorage?.setItem(SKIP_FORMULA_ON_NEXT_LOAD_KEY, String(Date.now()));
+      } catch (_) {
+        // ignore storage failures
       }
       showFatalError(
         [

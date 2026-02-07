@@ -3627,7 +3627,10 @@ export class ReflexCore {
     this.canvas = canvas;
     this.gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true }) || canvas.getContext('webgl2');
     if (!this.gl) {
-      throw new Error('WebGL2 not supported in this browser');
+      // Note: getContext('webgl2') can fail even on browsers that support WebGL2,
+      // e.g. when the GPU process crashed/reset, when too many contexts exist,
+      // or when the driver temporarily blocks context creation.
+      throw new Error('Unable to create a WebGL2 context (unsupported or temporarily unavailable)');
     }
 
     this._contextLost = false;
@@ -3655,6 +3658,11 @@ export class ReflexCore {
     this.viewXMax = 4.0;
     this.viewYMin = -4.0;
     this.viewYMax = 4.0;
+
+    // Rendering scale factor applied to the canvas backing store (not CSS size).
+    // 1.0 = native (devicePixelRatio-scaled) resolution; lower values reduce GPU load
+    // for very expensive formulas and can help avoid GPU watchdog resets.
+    this.renderScale = 1.0;
 
     this.fingerValues = new Map();
     this.fingerListeners = new Map();
@@ -4312,8 +4320,10 @@ export class ReflexCore {
       return { layoutReady: false, resized: false };
     }
 
-    const displayWidth = Math.floor(cssWidth * dpr);
-    const displayHeight = Math.floor(cssHeight * dpr);
+    const rawScale = Number(this.renderScale);
+    const scale = Number.isFinite(rawScale) ? Math.max(0.05, Math.min(1, rawScale)) : 1;
+    const displayWidth = Math.max(1, Math.floor(cssWidth * dpr * scale));
+    const displayHeight = Math.max(1, Math.floor(cssHeight * dpr * scale));
     const resized = this.canvas.width !== displayWidth || this.canvas.height !== displayHeight;
 
     if (resized) {
@@ -4323,6 +4333,22 @@ export class ReflexCore {
     }
 
     return { layoutReady: true, resized };
+  }
+
+  setRenderScale(scale, { triggerRender = true } = {}) {
+    const raw = Number(scale);
+    const next = Number.isFinite(raw) ? Math.max(0.05, Math.min(1, raw)) : 1;
+    if (this.renderScale === next) {
+      return;
+    }
+    this.renderScale = next;
+    if (triggerRender) {
+      this.render();
+    }
+  }
+
+  getRenderScale() {
+    return Number(this.renderScale) || 1;
   }
 
   updateView() {
@@ -4386,7 +4412,7 @@ export class ReflexCore {
     if (this.uRB_Loc) this.gl.uniform2f(this.uRB_Loc, rB.x, rB.y);
   }
 
-  render() {
+  render({ finish = false } = {}) {
     if (!this.program) return;
     if (
       this._contextLost ||
@@ -4412,6 +4438,9 @@ export class ReflexCore {
     this.gl.clearColor(0, 0, 0, 1);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 3);
+    if (finish && this.gl && typeof this.gl.finish === 'function') {
+      this.gl.finish();
+    }
   }
 
   renderToPixelSize(width, height) {
