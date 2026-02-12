@@ -17,7 +17,7 @@ import { setupMenuDropdown } from './menu-ui.mjs';
 // on the formula page (e.g. from a shared link).
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
   // Version the SW script URL so updates can't get stuck behind a cached SW script.
-  const SW_URL = './service-worker.js?sw=46.0';
+  const SW_URL = './service-worker.js?sw=47.0';
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(SW_URL).then((registration) => {
       // Match the viewer page behavior: activate updated workers ASAP so
@@ -605,9 +605,11 @@ async function bootstrap() {
     },
   });
 
+  let initialFormulaDecodeMessage = null;
   const decoded = await readFormulaFromQuery({
-    onDecodeError: () => {
-      showError('We could not decode the formula embedded in this link.');
+    onDecodeError: (_error, message) => {
+      initialFormulaDecodeMessage =
+        message || 'Could not decode formulab64 query parameter. Loaded the default formula.';
     },
   });
   initialFormulaFromUrl = decoded;
@@ -725,7 +727,10 @@ async function bootstrap() {
     });
   }
 
-  await renderFromSource(source);
+  const initialRender = await renderFromSource(source);
+  if (initialRender.ok && initialFormulaDecodeMessage) {
+    showError(initialFormulaDecodeMessage);
+  }
 
   // Live edit + render loop.
   if (inputEl) {

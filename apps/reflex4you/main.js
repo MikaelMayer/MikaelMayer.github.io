@@ -269,7 +269,7 @@ function setCompileOverlayVisible(visible, message = null) {
 // Show a cold-start loading indicator only if it hangs > 1s.
 setCompileOverlayPhase('Loading…', { resetStart: true });
 
-const APP_VERSION = 46;
+const APP_VERSION = 47;
 const CONTEXT_LOSS_RELOAD_KEY = `reflex4you:contextLossReloaded:v${APP_VERSION}`;
 const RESUME_RELOAD_KEY = `reflex4you:resumeReloaded:v${APP_VERSION}`;
 const LAST_HIDDEN_AT_KEY = `reflex4you:lastHiddenAtMs:v${APP_VERSION}`;
@@ -3198,9 +3198,11 @@ async function bootstrapReflexApplication() {
   const params = new URLSearchParams(window.location.search);
   animationSeconds = parseSecondsFromQuery(params.get(ANIMATION_TIME_PARAM)) ?? DEFAULT_ANIMATION_SECONDS;
 
+  let initialFormulaDecodeMessage = null;
   let initialFormulaSource = await readFormulaFromQuery({
-    onDecodeError: () => {
-      showError('We could not decode the formula embedded in this link. Resetting to the default formula.');
+    onDecodeError: (_error, message) => {
+      initialFormulaDecodeMessage =
+        message || 'Could not decode formulab64 query parameter. Loaded the default formula.';
     },
   });
   if (!initialFormulaSource || !initialFormulaSource.trim()) {
@@ -3223,6 +3225,8 @@ async function bootstrapReflexApplication() {
   const initialFingerState = deriveFingerState(initialUsage);
   if (initialFingerState.mode === 'invalid') {
     showError(initialFingerState.error);
+  } else if (initialParse.ok && initialFormulaDecodeMessage) {
+    showError(initialFormulaDecodeMessage);
   }
 
   formulaTextarea.value = initialFormulaSource;
@@ -4524,7 +4528,7 @@ function triggerImageDownload(url, filename, shouldRevoke) {
 
 if ('serviceWorker' in navigator) {
   // Version the SW script URL so updates can't get stuck behind a cached SW script.
-  const SW_URL = './service-worker.js?sw=46.0';
+  const SW_URL = './service-worker.js?sw=47.0';
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(SW_URL).then((registration) => {
       // Auto-activate updated workers so cache/version bumps take effect quickly.

@@ -116,6 +116,47 @@ function base64UrlDecodeToBytes(encoded) {
   return bytes;
 }
 
+function normalizeDecodeErrorReason(error) {
+  if (!error) {
+    return '';
+  }
+  const raw =
+    typeof error === 'string'
+      ? error
+      : typeof error?.message === 'string'
+        ? error.message
+        : String(error);
+  const compact = String(raw || '').replace(/\s+/g, ' ').trim();
+  if (!compact || compact === '[object Object]' || compact === 'Error') {
+    return '';
+  }
+  if (compact.length > 120) {
+    return `${compact.slice(0, 117)}...`;
+  }
+  return compact;
+}
+
+function formatFormulab64DecodeErrorMessage(error, fallbackDescription) {
+  const fallback = String(fallbackDescription || 'the default formula');
+  const reason = normalizeDecodeErrorReason(error);
+  if (reason) {
+    return `Could not decode formulab64 query parameter (${reason}). Loaded ${fallback}.`;
+  }
+  return `Could not decode formulab64 query parameter. Loaded ${fallback}.`;
+}
+
+function notifyFormulab64DecodeError(options, error, fallbackDescription) {
+  if (!error || typeof options?.onDecodeError !== 'function') {
+    return;
+  }
+  const message = formatFormulab64DecodeErrorMessage(error, fallbackDescription);
+  try {
+    options.onDecodeError(error, message);
+  } catch (_) {
+    // ignore errors in callback
+  }
+}
+
 async function transformWithStream(bytes, StreamConstructor) {
   if (typeof Blob === 'undefined' || typeof ReadableStream === 'undefined') {
     throw new Error('Streaming compression not supported');
@@ -240,27 +281,24 @@ export async function readFormulaFromQuery(options = {}) {
   }
   const params = new URLSearchParams(location.search);
   const encoded = params.get(FORMULA_B64_PARAM);
+  let formulab64DecodeError = null;
   if (encoded) {
     const decoded = await decodeFormulaFromCompressedParam(encoded);
     if (decoded.ok) {
       return decoded.value;
     }
+    formulab64DecodeError = decoded.error;
     console.warn(
       'Failed to decode formulab64 parameter, falling back to default formula.',
       decoded.error,
     );
-    if (typeof options.onDecodeError === 'function') {
-      try {
-        options.onDecodeError(decoded.error);
-      } catch (_) {
-        // ignore errors in callback
-      }
-    }
     params.delete(FORMULA_B64_PARAM);
     replaceUrlSearch(params, options);
   }
   const raw = params.get(FORMULA_PARAM);
+  const hasLegacyFormulaFallback = typeof raw === 'string' && raw.trim().length > 0;
   if (!raw) {
+    notifyFormulab64DecodeError(options, formulab64DecodeError, 'the default formula');
     return null;
   }
   let decoded = raw;
@@ -269,6 +307,11 @@ export async function readFormulaFromQuery(options = {}) {
   } catch (_) {
     // Already decoded.
   }
+  notifyFormulab64DecodeError(
+    options,
+    formulab64DecodeError,
+    hasLegacyFormulaFallback ? 'the legacy formula parameter' : 'the default formula',
+  );
   if (options.upgradeLegacy !== false) {
     await upgradeLegacyFormulaParam(decoded, options);
   }

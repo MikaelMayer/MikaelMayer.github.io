@@ -260,6 +260,19 @@ test('reflex4you loads formulas from query string on startup', async ({ page }) 
   await expectNoRendererError(page);
 });
 
+test('formula page reports invalid formulab64 while loading default formula', async ({ page }) => {
+  // "hello" as base64url decodes, but is not valid gzip payload for formulab64.
+  await page.goto('/formula.html?formulab64=aGVsbG8');
+
+  const textarea = page.locator('#formula-input');
+  await expect(textarea).toHaveValue('z');
+
+  const error = page.locator('#formula-error');
+  await expect(error).toBeVisible();
+  await expect(error).toContainText('formulab64');
+  await expect(error).toContainText('default formula');
+});
+
 test('reflex4you upgrades legacy formula query param to formulab64', async ({ page }) => {
   const supportsCompression = await detectCompressionCapability(page);
   await page.goto(`/index.html?formula=${encodeURIComponent(SEEDED_FORMULA)}`);
