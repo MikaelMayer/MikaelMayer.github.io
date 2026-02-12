@@ -1360,8 +1360,12 @@ async function bootstrap() {
   await verifyCompressionSupport();
 
   // Read formula from URL.
+  let initialFormulaDecodeMessage = null;
   const decoded = await readFormulaFromQuery({
-    onDecodeError: () => showError('We could not decode the formula embedded in this link.'),
+    onDecodeError: (_error, message) => {
+      initialFormulaDecodeMessage =
+        message || 'Could not decode formulab64 query parameter. Loaded the default formula.';
+    },
   });
   activeFormulaSource = (decoded && String(decoded).trim()) ? String(decoded) : 'z';
 
@@ -1393,6 +1397,9 @@ async function bootstrap() {
   if (fingerState.mode === 'invalid') {
     showError(fingerState.error);
     return;
+  }
+  if (parsed.ok && initialFormulaDecodeMessage) {
+    showError(initialFormulaDecodeMessage);
   }
 
   allUsedLabels = sortedLabels([

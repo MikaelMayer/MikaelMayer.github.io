@@ -605,9 +605,11 @@ async function bootstrap() {
     },
   });
 
+  let initialFormulaDecodeMessage = null;
   const decoded = await readFormulaFromQuery({
-    onDecodeError: () => {
-      showError('We could not decode the formula embedded in this link.');
+    onDecodeError: (_error, message) => {
+      initialFormulaDecodeMessage =
+        message || 'Could not decode formulab64 query parameter. Loaded the default formula.';
     },
   });
   initialFormulaFromUrl = decoded;
@@ -725,7 +727,10 @@ async function bootstrap() {
     });
   }
 
-  await renderFromSource(source);
+  const initialRender = await renderFromSource(source);
+  if (initialRender.ok && initialFormulaDecodeMessage) {
+    showError(initialFormulaDecodeMessage);
+  }
 
   // Live edit + render loop.
   if (inputEl) {

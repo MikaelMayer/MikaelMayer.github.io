@@ -3198,9 +3198,11 @@ async function bootstrapReflexApplication() {
   const params = new URLSearchParams(window.location.search);
   animationSeconds = parseSecondsFromQuery(params.get(ANIMATION_TIME_PARAM)) ?? DEFAULT_ANIMATION_SECONDS;
 
+  let initialFormulaDecodeMessage = null;
   let initialFormulaSource = await readFormulaFromQuery({
-    onDecodeError: () => {
-      showError('We could not decode the formula embedded in this link. Resetting to the default formula.');
+    onDecodeError: (_error, message) => {
+      initialFormulaDecodeMessage =
+        message || 'Could not decode formulab64 query parameter. Loaded the default formula.';
     },
   });
   if (!initialFormulaSource || !initialFormulaSource.trim()) {
@@ -3223,6 +3225,8 @@ async function bootstrapReflexApplication() {
   const initialFingerState = deriveFingerState(initialUsage);
   if (initialFingerState.mode === 'invalid') {
     showError(initialFingerState.error);
+  } else if (initialParse.ok && initialFormulaDecodeMessage) {
+    showError(initialFormulaDecodeMessage);
   }
 
   formulaTextarea.value = initialFormulaSource;
