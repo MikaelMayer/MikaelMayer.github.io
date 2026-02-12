@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Experimental git fetch</title>
+</head>
+<body>
+<script src="https://unpkg.com/browserfs"></script>
+<script src="https://unpkg.com/isomorphic-git"></script>
+<script>
+BrowserFS.configure({ fs: "IndexedDB", options: {} }, function (err) {
+  if (err) return console.log(err);
+  window.fs = BrowserFS.BFSRequire("fs");
+  git.plugins.set('fs', window.fs);
+});
+/*await */
+/*git.clone({
+  dir: '.',
+  corsProxy: 'https://cors.isomorphic-git.org',
+  url: 'https://github.com/MikaelMayer/MikaelMayer.github.io',
+  singleBranch: true,
+  depth: 1
+})*/
+// All the -sync methods of fs do not work, I need to use the regular (async) methods.
+// e.g."
+// fs.writeFile("a.txt", "hello-world", "utf8", function(err) { console.log(err) });
+// fs.readdir(".", "utf8", function(err, result) { console.log(result) })
+// Will contain the .git and everything else.
+
+</script>
+  
+</body>
+</html>
