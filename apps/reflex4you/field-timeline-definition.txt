@@ -48,7 +48,7 @@ set tBackEnd   = 12 in
 set tZoomBackStart = tBackEnd + 1 in
 set tZoomBackEnd   = tZoomBackStart + 1 in
 set tLoopBackStart = tZoomBackEnd + 1 in
-set tLoopBackEnd   = tLoopBackStart + 1 in
+set tLoopBackEnd   = tLoopBackStart + 2 in
 
 # ---- rotation
 
@@ -108,12 +108,7 @@ in
 set d1 = d0 in
 set d2 = d0 * exp(-i*pi*uSep) in
 set d1Pole = d1 in
-set d2Pole =
-  if t<9 then d2
-  else if t<tLoopBackStart then -d1Pole
-  else if t<tLoopBackEnd then interpOut(-d1Pole,d2,tLoopBackStart,tLoopBackEnd)
-  else d2
-in
+set d2Pole = d2 in
 
 # ---- series build (shortened)
 
@@ -158,14 +153,12 @@ in
 let g =
   if t<9 then gDip
   else if t<tLoopBackStart then tans
-  else if t<tLoopBackEnd then interpOut(tans,gDip,tLoopBackStart,tLoopBackEnd)
   else gDip
 in
 
 let dg =
   if t<9 then dgDip
   else if t<tLoopBackStart then tansDeriv
-  else if t<tLoopBackEnd then interpOut(tansDeriv,dgDip,tLoopBackStart,tLoopBackEnd)
   else dgDip
 in
 
@@ -246,7 +239,7 @@ if y>yDiv then
 
   if abs(z1)<poleR then -1
   else if abs(z1)<ringR then 0
-  else if s0>0 && abs(z2)<poleR then -1
+  else if s0>0 && abs(z2)<poleR then -s0
   else if s0>0 && abs(z2)<ringR then 0
   else
     (
