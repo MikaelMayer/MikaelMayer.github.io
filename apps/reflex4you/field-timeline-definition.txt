@@ -46,8 +46,8 @@ set rot =
     set s=t-8 in
     8+(-s*s*s+s*s+s)
   else if t<tLoopBackStart then 9
-  else if t<tLoopBackEnd then interp(9,0,tLoopBackStart,tLoopBackEnd)
-  else 0
+  else if t<tLoopBackEnd then interp(9,6,tLoopBackStart,tLoopBackEnd)
+  else 6
 in
 
 # ---- fat
@@ -95,6 +95,13 @@ in
 
 set d1 = d0 in
 set d2 = d0 * exp(-i*pi*uSep) in
+set d1Pole = d1 in
+set d2Pole =
+  if t<9 then d2
+  else if t<tLoopBackStart then -d1Pole
+  else if t<tLoopBackEnd then interp(-d1Pole,d2,tLoopBackStart,tLoopBackEnd)
+  else d2
+in
 
 # ---- series build (shortened)
 
@@ -106,8 +113,8 @@ set nFrac = n - nInt in
 let step(k,acc)=
   if k<=nInt+1 then
     set term=
-      -1/(z-(2*k+1)*d1)
-      -1/(z+(2*k+1)*d1)
+      -1/(z-(2*k+1)*d1Pole)
+      -1/(z+(2*k+1)*d1Pole)
     in
     if k==nInt+1 then term*nFrac+acc
     else term+acc
@@ -117,8 +124,8 @@ in
 let stepDeriv(k,acc)=
   if k<=nInt+1 then
     set term=
-      1/(z-(2*k+1)*d1)^2
-      +1/(z+(2*k+1)*d1)^2
+      1/(z-(2*k+1)*d1Pole)^2
+      +1/(z+(2*k+1)*d1Pole)^2
     in
     if k==nInt+1 then term*nFrac+acc
     else term+acc
@@ -129,11 +136,11 @@ let tans = repeat 5 from 0 by step in
 let tansDeriv = repeat 5 from 0 by stepDeriv in
 
 let gDip =
-  -1/(z-d1) - s0/(z-d2)
+  -1/(z-d1Pole) - s0/(z-d2Pole)
 in
 
 let dgDip =
-  1/(z-d1)^2 + s0/(z-d2)^2
+  1/(z-d1Pole)^2 + s0/(z-d2Pole)^2
 in
 
 let g =
@@ -222,8 +229,8 @@ if y>yDiv then
   set poleR=0.24 in
   set ringR=0.32 in
 
-  set z1=z-back*d1 in
-  set z2=z-back*d2 in
+  set z1=z-back*d1Pole in
+  set z2=z-back*d2Pole in
 
   if abs(z1)<poleR then -1
   else if abs(z1)<ringR then 0
