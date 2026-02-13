@@ -1,0 +1,234 @@
+set pi = 3.141592653589793 in
+set t = D1.x in
+
+let interp(set a,set b,set t0,set t1)=
+  if t<t0 then a
+  else if t>t1 then b
+  else a+(b-a)*(t-t0)/(t1-t0)
+in
+
+let ease(set t0,set t1)=
+  if t<t0 then 0
+  else if t>t1 then 1
+  else
+    set s=(t-t0)/(t1-t0) in
+    3*s*s-2*s*s*s
+in
+
+# ---- timeline
+
+set tContStart = 2.5 in
+set tContEnd   = 3.5 in
+
+set tGrowStart = 4 in
+set tGrowEnd   = 4.5 in
+set tSepEnd    = 6.5 in
+
+# 1 second breathing AFTER separation
+set tFieldAfterSep = tSepEnd + 1 in
+
+set tTanStart = 10 in
+set tTanEnd   = 11.5 in
+
+set tBackStart = 11.5 in
+set tBackEnd   = 12 in
+
+set tZoomBackStart = tBackEnd + 1 in
+set tZoomBackEnd   = tZoomBackStart + 1 in
+
+# ---- rotation
+
+set rot =
+  if t<8 then t
+  else if t<9 then
+    set s=t-8 in
+    8+(-s*s*s+s*s+s)
+  else 9
+in
+
+# ---- fat
+
+set fat0=1 in
+set fatMax=20 in
+
+set fat=
+  if t<2 then fat0
+  else if t<2.5 then interp(fat0,fatMax,2,2.5)
+  else if t<3.5 then fatMax
+  else if t<4 then interp(fatMax,fat0,3.5,4)
+  else if t<8 then fat0
+  else if t<8.5 then interp(fat0,fatMax,8,8.5)
+  else if t<tBackStart then fatMax
+  else if t<tBackEnd then interp(fatMax,fat0,tBackStart,tBackEnd)
+  else fat0
+in
+
+# ---- zoom back
+
+set zoomBack =
+  if t<tZoomBackStart then (1+3*ease(9,10))
+  else if t<tZoomBackEnd then interp((1+3*ease(9,10)),1,tZoomBackStart,tZoomBackEnd)
+  else 1
+in
+
+# ---- dipole
+
+set d0=(pi/2)*exp(i*(pi/3)*rot) in
+
+set s0=
+  if t<tGrowStart then 0
+  else if t<tGrowEnd then interp(0,1,tGrowStart,tGrowEnd)
+  else 1
+in
+
+set uSep = ease(tGrowEnd,tSepEnd) in
+
+set d1 = d0 in
+set d2 = d0 * exp(-i*pi*uSep) in
+
+# ---- series build (shortened)
+
+set N = 10 in
+set n = ease(tTanStart,tTanEnd)*N in
+set nInt = n.floor in
+set nFrac = n - nInt in
+
+let step(k,acc)=
+  if k<=nInt+1 then
+    set term=
+      -1/(z-(2*k+1)*d1)
+      -1/(z+(2*k+1)*d1)
+    in
+    if k==nInt+1 then term*nFrac+acc
+    else term+acc
+  else acc
+in
+
+let stepDeriv(k,acc)=
+  if k<=nInt+1 then
+    set term=
+      1/(z-(2*k+1)*d1)^2
+      +1/(z+(2*k+1)*d1)^2
+    in
+    if k==nInt+1 then term*nFrac+acc
+    else term+acc
+  else acc
+in
+
+let tans = repeat 5 from 0 by step in
+let tansDeriv = repeat 5 from 0 by stepDeriv in
+
+let g =
+  if t<9 then
+    -1/(z-d1) - s0/(z-d2)
+  else
+    tans
+in
+
+let dg =
+  if t<9 then
+    1/(z-d1)^2 + s0/(z-d2)^2
+  else
+    tansDeriv
+in
+
+let field = conj $ g in
+let df = conj $ dg in
+
+# ---- arrow shape
+
+let arrowShape=
+  set d1s=(-0.1335+0.6425i)*fat in
+  set d2s=(-1.9251+0.2385i)*fat in
+  set d3=1.01*fat in
+  set h=d2s.y/2 in
+  set w=d2s.x/2 in
+  set ax=d1s.x/2 in
+  set ay=d1s.y/2 in
+  set ap=d3.x/2 in
+  set m=ap/(ax+ay) in
+  ((y>-h && y<h && x>w && x<d1s.x)
+   || (x>d1s.x && y<(-x/m+ax)+ay && y>(x/m-ax)-ay))
+in
+
+let arrow(c)=if arrowShape then c else 0 in
+
+set back=2.5 in
+
+let arrowFor(set vDisc,set vCont)=
+  set r=abs(vDisc) in
+  if r>100 then
+    if abs(z)<fat/4 then vCont else 0
+  else
+    set zw=r/(r+1)*exp(i*arg(vDisc)) in
+    arrow(vCont)$(z/zw)
+in
+
+# ---- divider
+
+set uDiv=ease(9,10) in
+set yDiv=
+  if t<9 then -10
+  else -4+5*uDiv
+in
+
+# ---- real graph
+
+let realScene=
+  set fx=field$x in
+  set dfx=df$x in
+  set dist=abs(y-fx.x)/sqrt(1+abs(dfx)^2) in
+  set eps=0.02 in
+  set graph=if dist<eps then fx else 0 in
+
+  set axisW=0.005 in
+  set tickW=0.011 in
+  set tickL=0.05 in
+  set xAxis=if abs(y)<axisW then 100 else 0 in
+  set yAxis=if abs(x)<axisW then 100 else 0 in
+  set xTicks=if abs((x+tickW-floor(x+tickW)))<tickW && abs(y)<tickL then 100 else 0 in
+  set yTicks=if abs((y+tickW-floor(y+tickW)))<tickW && abs(x)<tickL then 100 else 0 in
+
+  graph+xAxis+yAxis+xTicks+yTicks
+in
+
+# ---- rendering
+
+if y>yDiv then
+(
+  set poleR=0.24 in
+  set ringR=0.32 in
+
+  set z1=z-back*d1 in
+  set z2=z-back*d2 in
+
+  if abs(z1)<poleR then -1
+  else if abs(z1)<ringR then 0
+  else if s0>0 && abs(z2)<poleR then -1
+  else if s0>0 && abs(z2)<ringR then 0
+  else
+    (
+      set zx=(z+0.5+0.5i).floor in
+      set zyDisc=field$z/back$zx in
+      set zyCont=field$z/back in
+
+      # early complex phase
+      if t<tContStart then arrowFor(zyDisc,zyCont)$(z-zx)
+      else if t<tContEnd then zyCont
+
+      # separation phase
+      else if t<tSepEnd then arrowFor(zyDisc,zyCont)$(z-zx)
+
+      # 1 second breathing AFTER separation
+      else if t<tFieldAfterSep+1 then arrowFor(zyDisc,zyCont)$(z-zx)
+
+      # complex after breathing
+      else if t<tBackStart then zyCont
+
+      # final return to field
+      else arrowFor(zyDisc,zyCont)$(z-zx)
+    )
+)
+$(zoomBack*back*(z-2*i*uDiv))
+else
+  realScene$(zoomBack*(z+i))
