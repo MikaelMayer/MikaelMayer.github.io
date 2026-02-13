@@ -187,7 +187,9 @@ set back=2.5 in
 
 let arrowFor(set vDisc,set vCont)=
   set r=abs(vDisc) in
-  if r>100 then
+  set rHigh=100 in
+  set rLow=1/rHigh in
+  if r>rHigh || r<rLow then
     if abs(z)<fat/4 then vCont else 0
   else
     set zw=r/(r+1)*exp(i*arg(vDisc)) in
