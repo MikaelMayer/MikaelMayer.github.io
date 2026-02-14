@@ -54,7 +54,7 @@ set tCardEnd      = 13.5 in
 set tBackStart = 14 in
 set tBackEnd   = 14.5 in
 
-set tZoomBackStart = tBackEnd + 1 in
+set tZoomBackStart = tBackEnd + 0.5 in
 set tZoomBackEnd   = tZoomBackStart + 1 in
 set tLoopBackStart = tZoomBackEnd + 1 in
 set tLoopBackEnd   = tLoopBackStart + 2 in
@@ -92,7 +92,7 @@ in
 
 set zoomBack =
   if t<tZoomBackStart then (1+3*ease(9,10))
-  else if t<tZoomBackEnd then interp((1+3*ease(9,10)),1,tZoomBackStart,tZoomBackEnd)
+  else if t<tZoomBackEnd then interpOut((1+3*ease(9,10)),1,tZoomBackStart,tZoomBackEnd)
   else 1
 in
 
@@ -283,11 +283,12 @@ if y>yDiv then
 
   set z1=z-back*d1Pole in
   set z2=z-back*d2Pole in
+  set showDisks=if t>=11 && t<tBackEnd then 0 else 1 in
 
-  if abs(z1)<poleR then -1
-  else if abs(z1)<ringR then 0
-  else if s0>0 && abs(z2)<poleR then -s0
-  else if s0>0 && abs(z2)<ringR then 0
+  if showDisks>0 && abs(z1)<poleR then -1
+  else if showDisks>0 && abs(z1)<ringR then 0
+  else if showDisks>0 && s0>0 && abs(z2)<poleR then -s0
+  else if showDisks>0 && s0>0 && abs(z2)<ringR then 0
   else
     (
       set zx=(z+0.5+0.5i).floor in
