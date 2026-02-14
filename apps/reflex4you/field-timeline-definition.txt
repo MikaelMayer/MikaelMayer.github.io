@@ -207,7 +207,7 @@ in
 
 let fieldComplex =
   if t<tCardStart || t>=tCardEnd then field
-  else g$card
+  else field$card
 in
 
 # ---- arrow shape
