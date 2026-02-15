@@ -132,7 +132,7 @@ set uSep =
 in
 
 set d1 = d0 in
-set d2 = d0 * exp(i*pi*uSep) in
+set d2 = d0 * exp(-i*pi*uSep) in
 set d1Pole = d1 in
 set d2Pole = d2 in
 
