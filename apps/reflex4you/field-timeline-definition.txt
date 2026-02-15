@@ -66,6 +66,7 @@ set tCardStart    = 10.5 in
 set tCardFlipEnd  = 11.5 in
 set tCardHoldEnd  = 12.5 in
 set tCardEnd      = 13.5 in
+set tTanExactStart = (tCardStart+tCardFlipEnd)/2 in
 
 set tBackStart = 14 in
 set tBackEnd   = 14.5 in
@@ -175,14 +176,29 @@ let dgDip =
   1/(z-d1Pole)^2 + s0/(z-d2Pole)^2
 in
 
+let gTan =
+  set a=pi/(2*d1Pole) in
+  a*tan(a*z)
+in
+
+let dgTan =
+  set a=pi/(2*d1Pole) in
+  set tz=tan(a*z) in
+  a*a*(1+tz*tz)
+in
+
 let g =
   if t<9 then gDip
+  else if t<tTanExactStart then tans
+  else if t<tZoomBackStart then gTan
   else if t<tLoopBackStart then tans
   else gDip
 in
 
 let dg =
   if t<9 then dgDip
+  else if t<tTanExactStart then tansDeriv
+  else if t<tZoomBackStart then dgTan
   else if t<tLoopBackStart then tansDeriv
   else dgDip
 in
