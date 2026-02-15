@@ -39,6 +39,10 @@ let interpIn(set a,set b,set t0,set t1)=
   a+(b-a)*easeIn(t0,t1)
 in
 
+let interpEase(set a,set b,set t0,set t1)=
+  a+(b-a)*ease(t0,t1)
+in
+
 let ease01(set u)=
   u*u*(3-2*u)
 in
@@ -79,7 +83,7 @@ set rot =
     set s=t-8 in
     8+(-s*s*s+s*s+s)
   else if t<tLoopBackStart then 9
-  else if t<tLoopBackEnd then interpIn(9,6,tLoopBackStart,tLoopBackEnd)
+  else if t<tLoopBackEnd then interpEase(9,6,tLoopBackStart,tLoopBackEnd)
   else 6
 in
 
@@ -116,13 +120,13 @@ set s0=
   if t<tGrowStart then 0
   else if t<tGrowEnd then interp(0,1,tGrowStart,tGrowEnd)
   else if t<tLoopBackStart then 1
-  else if t<tLoopBackEnd then interpIn(1,0,tLoopBackStart,tLoopBackEnd)
+  else if t<tLoopBackEnd then interpEase(1,0,tLoopBackStart,tLoopBackEnd)
   else 0
 in
 
 set uSep =
   if t<tLoopBackStart then ease(tGrowEnd,tSepEnd)
-  else if t<tLoopBackEnd then interpIn(1,0,tLoopBackStart,tLoopBackEnd)
+  else if t<tLoopBackEnd then interpEase(1,0,tLoopBackStart,tLoopBackEnd)
   else 0
 in
 
@@ -259,7 +263,7 @@ set uDiv=
   if t<9 then 0
   else if t<10 then ease(9,10)
   else if t<tLoopBackStart then 1
-  else if t<tLoopBackEnd then interpIn(1,0,tLoopBackStart,tLoopBackEnd)
+  else if t<tLoopBackEnd then interpEase(1,0,tLoopBackStart,tLoopBackEnd)
   else 0
 in
 set yDiv=
