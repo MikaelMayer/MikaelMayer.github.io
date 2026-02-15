@@ -296,20 +296,8 @@ if y>yDiv then
       set zyCont=fieldComplex$z/back in
 
       let complexScene=
-        # early complex phase
-        if t<tContStart then arrowFor(zyDisc,zyCont)$(z-zx)
-        else if t<tContEnd then zyCont
-
-        # separation phase
-        else if t<tSepEnd then arrowFor(zyDisc,zyCont)$(z-zx)
-
-        # 1 second breathing AFTER separation
-        else if t<tFieldAfterSep+1 then arrowFor(zyDisc,zyCont)$(z-zx)
-
-        # complex after breathing
-        else if t<tBackStart-0.5 then zyCont
-
-        # final return to field
+        set isCont=fat>fatMax-1e-6 in
+        if isCont then zyCont
         else arrowFor(zyDisc,zyCont)$(z-zx)
       in
       complexScene
