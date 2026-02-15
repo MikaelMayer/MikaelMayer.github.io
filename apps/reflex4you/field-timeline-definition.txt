@@ -56,8 +56,8 @@ set tBackEnd   = 14.5 in
 
 set tZoomBackStart = tBackEnd + 0.5 in
 set tZoomBackEnd   = tZoomBackStart + 1 in
-set tLoopBackStart = tZoomBackEnd + 1 in
-set tLoopBackEnd   = tLoopBackStart + 2 in
+set tLoopBackStart = tZoomBackEnd + 0.25 in
+set tLoopBackEnd   = tZoomBackEnd + 3 in
 
 # ---- rotation
 
