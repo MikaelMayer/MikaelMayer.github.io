@@ -166,8 +166,19 @@ let stepDeriv(k,acc)=
   else acc
 in
 
-let tans = repeat 5 from 0 by step in
-let tansDeriv = repeat 5 from 0 by stepDeriv in
+let stepOddSq(k,acc)=
+  if k<N then
+    acc+2/((2*k+1)^2)
+  else acc
+in
+
+set oddSqPartial = repeat N from 0 by stepOddSq in
+set tailCoeff = pi*pi/4-oddSqPartial in
+
+let tansRaw = repeat N from 0 by step in
+let tansDerivRaw = repeat N from 0 by stepDeriv in
+let tans = tansRaw + tailCoeff*z/(d1Pole*d1Pole) in
+let tansDeriv = tansDerivRaw + tailCoeff/(d1Pole*d1Pole) in
 
 let gDip =
   -1/(z-d1Pole) - s0/(z-d2Pole)
