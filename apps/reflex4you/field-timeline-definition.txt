@@ -307,7 +307,7 @@ if y>yDiv then
         else if t<tFieldAfterSep+1 then arrowFor(zyDisc,zyCont)$(z-zx)
 
         # complex after breathing
-        else if t<tBackStart then zyCont
+        else if t<tBackStart-0.5 then zyCont
 
         # final return to field
         else arrowFor(zyDisc,zyCont)$(z-zx)
