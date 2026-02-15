@@ -84,8 +84,8 @@ set rot =
     set s=t-8 in
     8+(-s*s*s+s*s+s)
   else if t<tLoopBackStart then 9
-  else if t<tLoopBackEnd then interpEase(9,6,tLoopBackStart,tLoopBackEnd)
-  else 6
+  else if t<tLoopBackEnd then interpEase(9,12,tLoopBackStart,tLoopBackEnd)
+  else 12
 in
 
 # ---- fat
@@ -115,7 +115,7 @@ in
 
 # ---- dipole
 
-set d0=(pi/2)*exp(i*(pi/3)*rot) in
+set d0=(pi/2)*exp(-i*(pi/3)*rot) in
 
 set s0=
   if t<tGrowStart then 0
@@ -132,7 +132,7 @@ set uSep =
 in
 
 set d1 = d0 in
-set d2 = d0 * exp(-i*pi*uSep) in
+set d2 = d0 * exp(i*pi*uSep) in
 set d1Pole = d1 in
 set d2Pole = d2 in
 
