@@ -172,13 +172,23 @@ let stepOddSq(k,acc)=
   else acc
 in
 
+let stepOddPow4(k,acc)=
+  if k<N then
+    acc+2/((2*k+1)^4)
+  else acc
+in
+
 set oddSqPartial = repeat N from 0 by stepOddSq in
 set tailCoeff = pi*pi/4-oddSqPartial in
+set oddPow4Partial = repeat N from 0 by stepOddPow4 in
+set tailCoeff3 = pi*pi*pi*pi/48-oddPow4Partial in
 
 let tansRaw = repeat N from 0 by step in
 let tansDerivRaw = repeat N from 0 by stepDeriv in
-let tans = tansRaw + tailCoeff*z/(d1Pole*d1Pole) in
-let tansDeriv = tansDerivRaw + tailCoeff/(d1Pole*d1Pole) in
+set d1Sq = d1Pole*d1Pole in
+set d1Pow4 = d1Sq*d1Sq in
+let tans = tansRaw + tailCoeff*z/d1Sq + tailCoeff3*z*z*z/d1Pow4 in
+let tansDeriv = tansDerivRaw + tailCoeff/d1Sq + 3*tailCoeff3*z*z/d1Pow4 in
 
 let gDip =
   -1/(z-d1Pole) - s0/(z-d2Pole)
