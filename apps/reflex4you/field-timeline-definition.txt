@@ -341,17 +341,20 @@ if y>yDiv then
           else arrowFor(zyDisc,zyCont)$(z-zx)
         in
         if isCont && t>=tGuideStart then
-          set yGap=0.03 in
+          set zGuide=z/back in
+          set xGuide=zGuide.x in
+          set yGuide=zGuide.y in
+          set yGap=0.4 in
           set yTop=yGap in
           set yBot=-yGap in
-          set lineW=0.005 in
-          set tickW=0.011 in
-          set tickL=0.05 in
-          set xTick=abs((x+tickW-floor(x+tickW)))<tickW in
-          set topLine=abs(y-yTop)<lineW in
-          set botLine=abs(y-yBot)<lineW in
-          set topTicks=xTick && y>yTop && y<yTop+tickL in
-          set botTicks=xTick && y<yBot && y>yBot-tickL in
+          set lineW=0.05 in
+          set tickW=0.02 in
+          set tickL=0.5 in
+          set xTick=abs(xGuide-floor(xGuide+0.5))<tickW in
+          set topLine=abs(yGuide-yTop)<lineW in
+          set botLine=abs(yGuide-yBot)<lineW in
+          set topTicks=xTick && yGuide>yTop && yGuide<yTop+tickL in
+          set botTicks=xTick && yGuide<yBot && yGuide>yBot-tickL in
           set guides=topLine || botLine || topTicks || botTicks in
           if guides then 0 else baseScene
         else
