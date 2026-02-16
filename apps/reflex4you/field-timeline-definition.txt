@@ -140,7 +140,12 @@ set d2Pole = d2 in
 # ---- series build (mittag-leffler, truncated)
 
 set N = 25 in
-set n = ease(tTanStart,tTanEnd)*N in
+set nIntroMax = 5 in
+set n =
+  if t<tTanStart then 0
+  else if t<tTanExactStart then ease(tTanStart,tTanExactStart)*nIntroMax
+  else N
+in
 set nInt = n.floor in
 set nFrac = n - nInt in
 
