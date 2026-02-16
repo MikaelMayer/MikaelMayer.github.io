@@ -137,9 +137,9 @@ set d2 = d0 * exp(i*pi*d2Sign*uSep) in
 set d1Pole = d1 in
 set d2Pole = d2 in
 
-# ---- series build (shortened)
+# ---- series build (mittag-leffler, truncated)
 
-set N = 5 in
+set N = 25 in
 set n = ease(tTanStart,tTanEnd)*N in
 set nInt = n.floor in
 set nFrac = n - nInt in
@@ -166,29 +166,8 @@ let stepDeriv(k,acc)=
   else acc
 in
 
-let stepOddSq(k,acc)=
-  if k<N then
-    acc+2/((2*k+1)^2)
-  else acc
-in
-
-let stepOddPow4(k,acc)=
-  if k<N then
-    acc+2/((2*k+1)^4)
-  else acc
-in
-
-set oddSqPartial = repeat N from 0 by stepOddSq in
-set tailCoeff = pi*pi/4-oddSqPartial in
-set oddPow4Partial = repeat N from 0 by stepOddPow4 in
-set tailCoeff3 = pi*pi*pi*pi/48-oddPow4Partial in
-
-let tansRaw = repeat N from 0 by step in
-let tansDerivRaw = repeat N from 0 by stepDeriv in
-set d1Sq = d1Pole*d1Pole in
-set d1Pow4 = d1Sq*d1Sq in
-let tans = tansRaw + tailCoeff*z/d1Sq + tailCoeff3*z*z*z/d1Pow4 in
-let tansDeriv = tansDerivRaw + tailCoeff/d1Sq + 3*tailCoeff3*z*z/d1Pow4 in
+let tans = repeat N from 0 by step in
+let tansDeriv = repeat N from 0 by stepDeriv in
 
 let gDip =
   -1/(z-d1Pole) - s0/(z-d2Pole)
