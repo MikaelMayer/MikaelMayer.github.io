@@ -66,6 +66,7 @@ set tCardStart    = 10.5 in
 set tCardFlipEnd  = 11.5 in
 set tCardHoldEnd  = 12.5 in
 set tCardEnd      = 13.5 in
+set tGuideStart   = tCardFlipEnd + 0.5 in
 set tTanExactStart = (tCardStart+tCardFlipEnd)/2 in
 
 set tBackStart = 14 in
@@ -335,8 +336,26 @@ if y>yDiv then
 
       let complexScene=
         set isCont=fat>fatMax-1e-6 in
-        if isCont then zyCont
-        else arrowFor(zyDisc,zyCont)$(z-zx)
+        set baseScene=
+          if isCont then zyCont
+          else arrowFor(zyDisc,zyCont)$(z-zx)
+        in
+        if isCont && t>=tGuideStart then
+          set yGap=0.03 in
+          set yTop=yGap in
+          set yBot=-yGap in
+          set lineW=0.005 in
+          set tickW=0.011 in
+          set tickL=0.05 in
+          set xTick=abs((x+tickW-floor(x+tickW)))<tickW in
+          set topLine=abs(y-yTop)<lineW in
+          set botLine=abs(y-yBot)<lineW in
+          set topTicks=xTick && y>yTop && y<yTop+tickL in
+          set botTicks=xTick && y<yBot && y>yBot-tickL in
+          set guides=topLine || botLine || topTicks || botTicks in
+          if guides then 0 else baseScene
+        else
+          baseScene
       in
       complexScene
     )
