@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Back to Blue</title>
+  <style>
+    /* Basic reset */
+    * {
+      margin: 0; padding: 0; box-sizing: border-box;
+    }
+    /* Starry background */
+    body {
+      font-family: sans-serif;
+      height: 100vh; overflow: hidden;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #000;
+      background-image:
+        radial-gradient(#444 1px,transparent 1px),
+        radial-gradient(#444 1px,transparent 1px),
+        radial-gradient(#444 1px,transparent 1px),
+        radial-gradient(#444 1px,transparent 1px);
+      background-size: 10px 10px,18px 18px,25px 25px,60px 60px;
+      background-position:0 0,9px 18px,15px 5px,30px 25px;
+    }
+    h1 {
+      color: #ccc; margin-bottom: 10px; text-align: center; font-size:1.2rem;
+    }
+    .scene {
+      width:100vw; height:60vh;
+      display:flex; justify-content:center; align-items:center;
+      perspective:1000px;
+    }
+    .cube {
+      position:relative; width:200px; height:200px;
+      transform-style:preserve-3d; transition:transform .1s;
+    }
+    .face {
+      position:absolute; width:200px; height:200px; border:2px solid #fff;
+    }
+    .message-overlay {
+      position:absolute; top:50%; left:50%;
+      transform:translate(-50%,-50%);
+      background:rgba(0,0,0,.75); color:#fff;
+      padding:15px 25px; border-radius:8px; display:none; text-align:center;
+    }
+    .show { display:block!important; }
+  </style>
+</head>
+<body>
+
+<h1>
+  Level <span id="levelIndex"></span>/<span id="totalLevels"></span><br/>
+  <i>Tap faces back to blue</i>
+</h1>
+
+<div class="scene">
+  <div id="cube" class="cube">
+    <div class="face"></div>
+    <div class="face"></div>
+    <div class="face"></div>
+    <div class="face"></div>
+    <div class="face"></div>
+    <div class="face"></div>
+  </div>
+</div>
+
+<div id="messageBox" class="message-overlay">
+  Congratulations, you saved the planet!
+</div>
+
+<script>
+/************************************************************
+ * 1) Configuration
+ ************************************************************/
+
+/* 6 total puzzle levels. Index=0 => Blue only, Index=1 => Blue+Red, etc. */
+const colorList = [
+  "#00f",      // Blue (the "clean" color)
+  "#f00",      // Red
+  "#800080",   // Purple
+  "#ffa500",   // Orange
+  "#ff0",      // Yellow
+  "#b5651d"    // Brown
+];
+const totalLevels = colorList.length; // 6
+let currentLevel = 0; // will map to "Level 1..6" in display
+
+/* Face adjacency (0=front,1=right,2=back,3=left,4=top,5=bottom) */
+const adjacency = [
+  [0,1,3,4,5], // front
+  [1,0,2,4,5], // right
+  [2,1,3,4,5], // back
+  [3,0,2,4,5], // left
+  [4,0,1,2,3], // top
+  [5,0,1,2,3]  // bottom
+];
+
+/* Rotation State */
+let startX=0, startY=0;
+let currentX=0, currentY=0;
+let baseX=0, baseY=0;
+let isTap=false;
+const tapThreshold=5;
+let faceColors=[0,0,0,0,0,0];
+
+/* Celebration Spin */
+let spinning=false;
+let spinStartTime=0, spinPhase="idle", spinVelocity=0;
+let spinDirX=0, spinDirY=0;
+const maxSpinVelocity=3600, spinDuration=2000;
+const spinAccel=maxSpinVelocity/spinDuration;
+
+/* DOM Elements */
+const levelIndexSpan=document.getElementById("levelIndex");
+const totalLevelsSpan=document.getElementById("totalLevels");
+const messageBox=document.getElementById("messageBox");
+const cube=document.getElementById("cube");
+const faces=[...document.querySelectorAll(".face")];
+
+/************************************************************
+ * 2) Initialize
+ ************************************************************/
+
+/* Show total levels */
+totalLevelsSpan.textContent=totalLevels;
+
+/* 3D face transforms in JS */
+const faceTransforms=[
+  "rotateY(0deg)   translateZ(100px)",   // front
+  "rotateY(90deg)  translateZ(100px)",   // right
+  "rotateY(180deg) translateZ(100px)",   // back
+  "rotateY(-90deg) translateZ(100px)",   // left
+  "rotateX(90deg)  translateZ(100px)",   // top
+  "rotateX(-90deg) translateZ(100px)"    // bottom
+];
+faces.forEach((f,i)=>f.style.transform=faceTransforms[i]);
+
+/************************************************************
+ * 2.1) Unified "Input Mode" Approach
+ ************************************************************/
+/* We only attach *both* sets of listeners initially, then whichever event fires first (touch/mouse)
+   "locks in" that input mode and removes the other set. This prevents double triggers on mobile. */
+
+let inputMode="none"; // "touch" or "mouse" once decided
+
+function lockInputMode(mode){
+  inputMode=mode;
+  if(mode==="touch"){
+    // remove mouse listeners entirely
+    document.removeEventListener("mousedown",onMouseDown);
+    document.removeEventListener("mousemove",onMouseMove);
+    document.removeEventListener("mouseup",onMouseUp);
+  } else {
+    // remove touch listeners entirely
+    document.removeEventListener("touchstart",onTouchStart);
+    document.removeEventListener("touchmove",onTouchMove);
+    document.removeEventListener("touchend",onTouchEnd);
+  }
+}
+
+/************************************************************
+ * 3) Touch Event Handlers
+ ************************************************************/
+
+function onTouchStart(e){
+  if(spinning)return;
+  if(inputMode==="none") lockInputMode("touch");
+
+  const t=e.touches[0];
+  startX=t.clientX; startY=t.clientY;
+  isTap=true;
+}
+function onTouchMove(e){
+  if(spinning||inputMode!=="touch")return;
+  const t=e.touches[0];
+  const dx=t.clientX-startX, dy=t.clientY-startY;
+  if(Math.abs(dx)>tapThreshold||Math.abs(dy)>tapThreshold) isTap=false;
+
+  currentX=baseX-(dy*0.5);
+  currentY=baseY+(dx*0.5);
+  cube.style.transform=`rotateX(${currentX}deg) rotateY(${currentY}deg)`;
+}
+function onTouchEnd(e){
+  if(spinning||inputMode!=="touch")return;
+  if(isTap){
+    const t=e.changedTouches[0];
+    const el=document.elementFromPoint(t.clientX,t.clientY);
+    if(el&&el.classList.contains("face")){
+      const i=faces.indexOf(el);
+      handleFaceTap(i);
+    }
+  }
+  baseX=currentX; baseY=currentY;
+}
+
+/************************************************************
+ * 4) Mouse Event Handlers
+ ************************************************************/
+let mouseDown=false;
+
+function onMouseDown(e){
+  if(spinning)return;
+  if(inputMode==="none") lockInputMode("mouse");
+
+  mouseDown=true; isTap=true;
+  startX=e.clientX; startY=e.clientY;
+}
+function onMouseMove(e){
+  if(spinning||!mouseDown||inputMode!=="mouse")return;
+  const dx=e.clientX-startX, dy=e.clientY-startY;
+  if(Math.abs(dx)>tapThreshold||Math.abs(dy)>tapThreshold) isTap=false;
+
+  currentX=baseX-(dy*0.5);
+  currentY=baseY+(dx*0.5);
+  cube.style.transform=`rotateX(${currentX}deg) rotateY(${currentY}deg)`;
+}
+function onMouseUp(e){
+  if(!mouseDown||spinning||inputMode!=="mouse")return;
+  mouseDown=false;
+  if(isTap){
+    const el=document.elementFromPoint(e.clientX,e.clientY);
+    if(el&&el.classList.contains("face")){
+      const i=faces.indexOf(el);
+      handleFaceTap(i);
+    }
+  }
+  baseX=currentX; baseY=currentY;
+}
+
+/* Attach all listeners from the start. We'll remove the unused set once the user picks. */
+document.addEventListener("touchstart",onTouchStart);
+document.addEventListener("touchmove",onTouchMove);
+document.addEventListener("touchend",onTouchEnd);
+document.addEventListener("mousedown",onMouseDown);
+document.addEventListener("mousemove",onMouseMove);
+document.addEventListener("mouseup",onMouseUp);
+
+/************************************************************
+ * 5) Puzzle Logic
+ ************************************************************/
+
+/* Load puzzle for a level: sets all to 0(blue), scrambles, hides message */
+function loadLevel(lv){
+  levelIndexSpan.textContent=lv+1;
+  faceColors=[0,0,0,0,0,0];
+  for(let i=0;i<6;i++) updateFaceColor(i);
+  scramblePuzzle();
+  hideMessage();
+}
+
+/* The color set for current level. (0=>only colorList[0], etc.) */
+function getColorSet(){ return colorList.slice(0,currentLevel+1); }
+
+/* Scramble puzzle by random taps */
+function scramblePuzzle(){
+  const cArr=getColorSet();
+  const count=cArr.length;
+  for(let i=0;i<6;i++){
+    let r=Math.floor(Math.random()*count);
+    while(r-->0){
+      cycleFaceColors(i);
+    }
+  }
+}
+
+/* Tapping a face => cycle that face + adjacency by +1 mod #colors */
+function cycleFaceColors(faceIdx){
+  const cArr=getColorSet();
+  adjacency[faceIdx].forEach(idx=>{
+    faceColors[idx]=(faceColors[idx]+1)%cArr.length;
+    updateFaceColor(idx);
+  });
+}
+
+/* Update single face color in DOM */
+function updateFaceColor(i){
+  const cArr=getColorSet();
+  faces[i].style.background=cArr[ faceColors[i] ];
+}
+
+/* A face was tapped */
+function handleFaceTap(i){
+  cycleFaceColors(i);
+  checkSolved();
+}
+
+/* Solved => all faceColors==0 => spin & next level */
+function checkSolved(){
+  const allBlue=faceColors.every(c=>c===0);
+  if(allBlue){
+    showMessage("Congratulations, you saved the planet!");
+    startSpinAnimation();
+  }
+}
+
+/************************************************************
+ * 6) Celebration Spin
+ ************************************************************/
+function startSpinAnimation(){
+  spinning=true;
+  spinStartTime=performance.now();
+  spinPhase="acc";
+  spinVelocity=0;
+
+  // random direction
+  spinDirX=Math.random()*2-1;
+  spinDirY=Math.random()*2-1;
+  if(!spinDirX&&!spinDirY) spinDirX=1; // fallback
+
+  // normalize
+  const len=Math.hypot(spinDirX,spinDirY);
+  spinDirX/=len; spinDirY/=len;
+
+  requestAnimationFrame(spinLoop);
+}
+
+function spinLoop(ts){
+  const dt=ts-spinStartTime;
+  spinStartTime=ts;
+
+  if(spinPhase==="acc"){
+    spinVelocity+=spinAccel*dt;
+    if(spinVelocity>=maxSpinVelocity){
+      spinVelocity=maxSpinVelocity;
+      goToNextLevel();
+      spinPhase="dec";
+    }
+  } else if(spinPhase==="dec"){
+    spinVelocity-=spinAccel*dt;
+    if(spinVelocity<=0){
+      spinVelocity=0; spinPhase="idle"; spinning=false;
+      // fix snap glitch
+      baseX=currentX; baseY=currentY;
+      return;
+    }
+  }
+
+  // apply rotation
+  const rotDelta=(spinVelocity*dt)/1000;
+  currentX+=spinDirX*rotDelta;
+  currentY+=spinDirY*rotDelta;
+  cube.style.transform=`rotateX(${currentX}deg) rotateY(${currentY}deg)`;
+
+  if(spinPhase!=="idle") requestAnimationFrame(spinLoop);
+}
+
+function goToNextLevel(){
+  if(currentLevel<totalLevels-1){
+    currentLevel++;
+    loadLevel(currentLevel);
+  } else {
+    showMessage("All levels complete! You saved the planet for good!");
+  }
+}
+
+/************************************************************
+ * 7) Show/Hide Message
+ ************************************************************/
+function showMessage(txt){
+  messageBox.textContent=txt;
+  messageBox.classList.add("show");
+}
+function hideMessage(){
+  messageBox.classList.remove("show");
+}
+
+/* Start with level 0 => "1/6" on screen */
+loadLevel(currentLevel);
+</script>
+</body>

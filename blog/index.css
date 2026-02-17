@@ -1,0 +1,29 @@
+body > div {
+  /*overflow-x: hidden;*/
+}
+body a {
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+:root {
+  font-family: medium-content-serif-font,Georgia,Cambria,"Times New Roman",Times,serif;
+  letter-spacing: .01rem;
+  font-weight: 400;
+  font-style: normal;
+  font-size: 21px;
+  line-height: 1.58;
+  letter-spacing: -.003em;
+}
+div.menu > a {
+  position: fixed;
+  right: 1em;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 0.2em;
+}
+@media all and (max-width:30em){
+	a.button3{
+		display:block;
+		margin:0.2em auto;
+	}
+}

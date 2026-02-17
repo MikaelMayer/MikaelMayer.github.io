@@ -1,0 +1,583 @@
+
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bedtime stories with GPT-3</title>
+<style>
+body {
+  position:relative;
+}
+.message {
+  display: block;
+  max-width: 400px;
+  width: 300px;
+  padding: 5px;
+  margin: 1em 0;
+  text-align: center;
+  color: white;
+  overflow: hidden;
+}
+
+p {
+max-width: 400px;
+}
+textarea {
+  font-family: serif;
+  max-width: 100%;
+  width: 350px;
+  border: none;
+  display: block;
+}
+textarea:focus {
+ border: none !important;
+}
+.thinking {
+  outline: 2px solid red;
+  animation-name: example;
+  animation-duration: 0.5s;
+  animation-iteration-count: infinite;
+}
+@keyframes example {
+  from {outline-color: red;}
+  to {outline-color: yellow;}
+}
+button {
+  background-color: #4CAF50; /* Green */
+  border: none;
+  color: white;
+  padding: 15px 32px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  cursor: pointer;
+}
+button.completion {
+  background-color: #F9CCCA;
+  color: black;
+}
+button:not(.disabled):hover {
+  opacity: 0.7;
+}
+button.disabled, #quick_complete select.disabled {
+  background-color: #888 !important;
+  color: #aaa !important;
+  cursor: auto;
+}
+#retry {
+  background-color: #b49300;
+}
+#deleteLast {
+  background-color: #f44336;
+}
+#conversation {
+  position: relative;
+}
+#read {
+  background-color: #008CBA;
+}
+#quick_complete select, #quick_complete option {
+  padding: 15px;
+}
+</style>
+</head>
+<body>
+<p><label for="key">GPT-3 key:<input id="key" type="password" placeholder="Your GPT-3 key here" onchange="keyChange()"></label><br>
+<label for="key">Temperature:<input id="temperature" type="number" min="0" max="1" step="0.1" value="0.5"></label> <label for="key">Freq penalty:<input id="frequency_penalty" type="number" min="0" max="1" step="0.1" value="0.8"></label>
+<br>
+If you check this box: <input type="checkbox" id="save" onchange="keyChange()">, this key will be kept in localStorage. In any case it is never sent to a server beside the GPT-3 official endpoint.<button id="" onclick="copyPrompt()">Copy conversation</button></p>
+<select onchange="applySelection()" id="languageSelection">
+<option value="en" selected>English</option>
+<option value="fr">Français</option>
+</select>
+<h1 id="the_title">Bedtime story GPT-3</h1>
+<button id="randomize" onclick="applySelection(true)"></button>
+<div id="conversation">
+<textarea class="context input" id="first" spellcheck="false"></textarea>
+<textarea class="context input" id="second" spellcheck="false"></textarea>
+<textarea class="input" id="defaultinput" spellcheck="false"></textarea>
+</div>
+<div id="quick_complete">
+</div>
+<button id="complete" onclick="next()">Continue!</button>
+<button id="retry" onclick="retry()">Retry</button>
+<button id="deleteLast" onclick="deleteLast()">Delete</button>
+<button id="read" onclick="read()">Read</button>
+</div>
+<script>
+var current_language = "en";
+var button_complete = document.querySelector("#complete");
+var button_deleteLast = document.querySelector("#deleteLast");
+var button_retry = document.querySelector("#retry");
+var button_read = document.querySelector("#read");
+var templates = {
+  "en": {
+    "first": "Below is a long bedtime story which a hero who gets out of his comfort zone because of an event, who meets people who teach him truths he needed to learn, who has ups and downs, and finally solves the situation. This uplifting story talks about",
+    "second": "a boy going on an adventure in the forest.",
+    "defaultinput": "Once upon a time,",
+    "waitalittle": "...wait a little till the engine generate a story idea...",
+    "randomize": "Randomize topic",
+    "second-random": [
+      "a boy going on an adventure in the forest.",
+      "a girl who discovers a hidden castle.",
+      "a boy and a girl who resolve together a mystery in an attic.",
+      "a girl who learns to like someone she hated.",
+      "a boy who learns through robots that feelings are ok."
+    ],
+    "completions": [
+      "One day,",
+      "However,",
+      "In the meantime,",
+      "It killed two birds with one stone; indeed,",
+      "At the same time,",
+      "Anyway,",
+      "Suddenly,",
+      "Unfortunately,",
+      "Fortunately,",
+      "Luckily,",
+      "And then,"
+    ],
+    "completionName": "Preposition...",
+    "deleteLast": "Cancel last",
+    "retry": "Retry",
+    "complete": "Tell me  more!",
+    "read": "Read aloud",
+    "the_title": "Bedtime stories by GPT-3"
+  },
+  "fr": {
+    "first": "Ci-dessous se trouve une longue histoire pour dormir d'un héros qui sort de sa zone de confort à cause d'un événement, qui rencontre des gens qui lui enseignent des vérités qu'il avait besoin d'apprendre, qui a des hauts et des bas, et qui finalement résout la situation. Cette histoire édifiante mentionne",
+    "second": "un garçon qui part pour l'aventure dans une forêt.",
+    "defaultinput": "Il étais une fois",
+    "waitalittle": "...attendez un peu que le moteur trouve une idée d'histoire...",
+    "randomize": "Choisir un sujet au hasard",
+    "second-random": [
+      "un garçon qui part pour l'aventure dans une forêt.",
+      "une fille qui découvre un château caché.",
+      "un garçon et une fille qui résolvent ensemble un mystère dans un grenier.",
+      "une fille qui apprend à apprécier quelqu'un qu'elle détestait.",
+      "un garçon qui apprend à travers les robots que les sentiments, c'est ok."
+    ],
+    "completions": [
+      "Un jour,",
+      "Cependant,",
+      "Pendant ce temps-là,",
+      "Cela fit d'une pierre deux coups; en effet,",
+      "Au même moment,",
+      "D'ailleurs,",
+      "Soudain,",
+      "Malheureusement,",
+      "Par bonheur,",
+      "Heureusement,",
+      "Et ainsi,"
+    ],
+    "completionName": "Préposition...",
+    "deleteLast": "Annuler dernier",
+    "retry": "Réessayer",
+    "complete": "La suite!",
+    "read": "Lire à voix haute",
+    "the_title": "Histoires pour dormir par GPT-3"
+  }
+};
+function applySelection(isRandom) {
+  var select = document.querySelector("#languageSelection");
+  saveOptions();
+  var options = select.options;
+  var selectedOption = options[select.selectedIndex];
+  var l = selectedOption.value;
+  current_language = l;
+  var template = templates[l];
+  for(let obj in template) {
+    let elem = document.getElementById(obj);
+    if(elem) {
+      if(isRandom && ((obj + "-random") in template)) {
+        var randomSeeds = template[obj + "-random"];
+        elem.value = template["waitalittle"];
+        elem.classList.toggle("thinking", true);
+        serenpidity(randomSeeds, value => {
+          elem.value = value;
+        elem.classList.toggle("thinking", false);
+        });
+      } else if(elem.tagName == "BUTTON" || elem.tagName == "H1") {
+        elem.innerHTML = template[obj];
+      } else {
+        elem.value = template[obj];
+      }
+    }
+  }
+  var quick_complete = document.getElementById("quick_complete");
+  quick_complete.innerHTML = "";
+  var selectCompletions = document.createElement("select");
+  var firstOption = document.createElement("option");
+  firstOption.innerHTML = template["completionName"];
+  selectCompletions.appendChild(firstOption);
+  for(let completion of template["completions"]) {
+    var b = document.createElement("option");
+    b.classList.toggle("completion", true);
+    b.innerHTML = completion;
+    selectCompletions.append(b);
+  }
+  selectCompletions.onchange = function() {
+    if(this.selectedIndex == 0) return;
+    if(selectCompletions.classList.contains("disabled")) return;
+    var option = selectCompletions.childNodes[this.selectedIndex];
+    var toAdd = option.innerHTML;
+    addTextArea(toAdd);
+    complete();
+    selectCompletions.selectedIndex = 0;
+  }
+  quick_complete.append(selectCompletions);
+  changeButtons()
+}
+applySelection();
+function serenpidity(inputs, callback) {
+  var oReq = new XMLHttpRequest();
+  oReq.addEventListener("load", function() {
+    let response = JSON.parse(this.responseText);
+    console.log(response);
+    let stopped = response.choices[0].finish_reason == "stop";
+    let answer = response.choices[0].text.trim();
+    if(answer.startsWith("* ")) answer = answer.substring(2);
+    var first = answer.split(/\n(?:\* )?/);
+    
+    callback(first[0]);
+  });
+  var theprompt = "*"+inputs.join("\n* ") + "\n";
+  console.log("prompt: ", theprompt);
+  //davinci-instruct-beta-v3
+  oReq.open("POST", "https://api.openai.com/v1/engines/davinci/completions");
+  oReq.setRequestHeader("Content-Type", "application/json");
+  oReq.setRequestHeader("Authorization", "Bearer "+api_key());
+  oReq.send(JSON.stringify({
+    "prompt": theprompt,
+    "max_tokens": 128,
+    "temperature": 0.8,
+    "stop": undefined,//["\n"],
+    "frequency_penalty": 0.8,
+  }));
+}
+
+var GPT3_KEY = 'GPT3-key';
+var STORED_LANGUAGE = 'GPT3-STORED_LANGUAGE';
+var keyInput = document.querySelector("#key");
+var checkSaveOptionsInput = document.querySelector("#save");
+var languageSelection = document.querySelector("#languageSelection");
+
+function api_key() {
+  return keyInput.value;
+}
+function keyChange() {
+  let k = keyInput.value;
+  saveOptions(k);
+}
+function initRetrieveKey() {
+  let result = localStorage.getItem(GPT3_KEY);
+  if(result) {
+    checkSaveOptionsInput.checked = true;
+  }
+  keyInput.value = result;
+  
+  let l = localStorage.getItem(STORED_LANGUAGE);
+  if(l) {
+    l = parseInt(l);
+    var prevSelectedIndex = languageSelection.selectedIndex;
+    if(prevSelectedIndex != l) {
+      languageSelection.selectedIndex = parseInt(l);
+      languageSelection.onchange();
+    }
+  }
+}
+function saveOptions() {
+  if(typeof checkSaveOptionsInput === "undefined") return;
+  if(checkSaveOptionsInput.checked) {
+    localStorage.setItem(GPT3_KEY, keyInput.value);
+    localStorage.setItem(STORED_LANGUAGE, languageSelection.selectedIndex);
+  } else {
+    localStorage.removeItem(GPT3_KEY);
+    localStorage.removeItem(STORED_LANGUAGE);
+  }
+}
+initRetrieveKey();
+
+var observe;
+if (window.attachEvent) {
+    observe = function (element, event, handler) {
+        element.attachEvent('on'+event, handler);
+    };
+}
+else {
+    observe = function (element, event, handler) {
+        element.addEventListener(event, handler, false);
+    };
+}
+function autoresize(text) {
+    function resize () {
+        if(text.scrollHeight+'px' != text.style.height) {
+          text.style.height = 'auto';
+          text.style.height = text.scrollHeight+'px';
+        }
+        changeButtons();
+    }
+    /* 0-timeout to get the already changed text */
+    function delayedResize () {
+        window.setTimeout(resize, 0);
+    }
+    observe(text, 'change',  resize);
+    observe(text, 'cut',     delayedResize);
+    observe(text, 'paste',   delayedResize);
+    observe(text, 'drop',    delayedResize);
+    observe(text, 'keydown', delayedResize);
+    text.doResize = resize;
+    if(text.value != "") {
+      text.focus();
+      text.select();
+    }
+    resize();
+}
+
+
+function autoresize_init() {
+  let all_textareas = document.querySelectorAll("#conversation > textarea");
+  let input = "";
+  for(var i = 0; i < all_textareas.length; i++) {
+    let textarea = all_textareas[i];
+    autoresize(textarea);
+  }
+}
+
+autoresize_init();
+document.getElementById("second").focus();
+
+function changeButtons() {
+  var t = get_last_message();
+  var init = t.classList.contains("context");
+  button_deleteLast.classList.toggle("disabled", init);
+  button_retry.classList.toggle("disabled", init);
+  button_read.classList.toggle("disabled", init);
+  
+  var quick_completes = document.querySelectorAll("#quick_complete select, #quick_complete option");
+  var canCompleteChar = {".": true, "?": true, "!": true};
+  var canComplete = !init && t.value.length > 0 && canCompleteChar[t.value[t.value.length - 1]];
+  for(let b of [...quick_completes]) {
+    b.classList.toggle("disabled", !canComplete);
+  }
+}
+changeButtons();
+
+var conversation = document.querySelector("#conversation");
+conversation.addEventListener("keydown", function(event) {
+  // Number 13 is the "Enter" key on the keyboard
+  /*if (event.keyCode === 13 && document.activeElement && document.activeElement.matches(".me")) {
+    // Cancel the default action, if needed
+    event.preventDefault();
+    event.stopPropagation();
+    // Trigger the button element with a click
+    button_complete.click();
+    return true;
+  }*/
+  if(event.keyCode === 27) { // ESC
+    deleteLast();
+  }
+}, true);
+function deleteLast() {
+  let t = get_last_message();
+  while(t.prevValue && t.prevValue.head === t.value) {
+    t.prevValue = t.prevValue.tail;
+  }
+  if(!t.prevValue) t.remove();
+  else {
+    t.value = t.prevValue.head;
+    t.prevValue = t.prevValue.tail;
+    t.doResize();
+  }
+  changeButtons();
+  focus_last();
+}
+function get_intro() {
+  let messages = document.querySelectorAll("textarea");
+  return messages[0].value;
+}
+function get_last_message() {
+  let messages = document.querySelectorAll("textarea");
+  return messages[messages.length - 1];
+}
+function focus_last() {
+  let t = get_last_message();
+  t.focus();
+  return t;
+}
+
+function current_input(withContext = true) {
+  let all_textareas = document.querySelectorAll("#conversation > textarea.input");
+  let input = "";
+  for(var i = 0; i < all_textareas.length; i++) {
+    let textarea = all_textareas[i];
+    let isContext = textarea.classList.contains("context");
+    if(!isContext || withContext) {
+      input = input.trim() + (input != "" ? (isContext ? " " : "\n\n") : "") + textarea.value;
+    }
+  }
+  return input;
+}
+
+function addTextArea(value, thinking = false) {
+  t = document.createElement("textarea");
+  t.setAttribute("class", "input");
+  t.setAttribute("spellcheck", "false");
+  t.value = value;
+  conversation.appendChild(t);
+  t.classList.toggle("thinking", thinking);
+  autoresize(t);
+  changeButtons();
+  return t;
+}
+
+function modifyTextArea(value, thinking = false) {
+  let t = get_last_message();
+  let values = value.split(/\n\n/i);
+  if(values.length > 1) {
+    for(let i in values) {
+      let value = values[i];
+      if(value.trim() == "") continue;
+      // We modify the first one if it's not the context.
+      if((i == 0 || (i == 1 && values[0].trim() == "")) && !t.classList.contains("context") && (t.value == "" || t.value[t.value.length - 1] != ".")) {
+        t = modifyTextArea(value);
+      } else {
+        modifyTextArea("", false);
+        t = addTextArea(value, thinking && i === values.length - 1);
+      }
+    }
+    return t;
+  }
+  var possibleIntroIndex = value.indexOf(get_intro());
+  if(possibleIntroIndex >= 0) {
+    value = value.substring(0, possibleIntroIndex);
+  }
+  let newValue = value;
+  if(t.prevValue === undefined || t.prevValue.head != t.value) {
+    t.prevValue = {head: t.value, tail: t.prevValue};
+  }
+  t.value = t.value + newValue;
+  t.doResize();
+  t.classList.toggle("thinking", thinking);
+  changeButtons();
+  return t;
+}
+
+function listLength(list) {
+  if(!list) return 0;
+  return 1 + listLength(list.prevValue);
+}
+
+var reqListener = (input) => function() {
+  let response = JSON.parse(this.responseText);
+  console.log(response);
+  let stopped = response.choices[0].finish_reason == "stop";
+  let answer = response.choices[0].text;
+  let t = modifyTextArea(answer);
+  if(!stopped && answer != "" && false && listLength(t.prevValue) < 5) {
+    t.classList.toggle("thinking", true);
+    setTimeout(() => complete(true), 100);
+  } else {
+    t.classList.toggle("thinking", false);
+    focus_last();
+  }
+}
+function current_prompt() {
+  return current_input().trim();
+}
+function complete(amend = false) {
+  let input = current_prompt();
+  var t = get_last_message();
+  if(t.classList.contains("context")) {
+    addTextArea("", true);
+  } else {
+    modifyTextArea("", true);
+  }
+  var oReq = new XMLHttpRequest();
+  oReq.addEventListener("load", reqListener(input));
+  //davinci-instruct-beta-v3
+  oReq.open("POST", "https://api.openai.com/v1/engines/davinci/completions");
+  oReq.setRequestHeader("Content-Type", "application/json");
+  oReq.setRequestHeader("Authorization", "Bearer "+api_key());
+  oReq.send(JSON.stringify({
+    "prompt": input,
+    "max_tokens": 128,
+    "temperature": parseFloat(document.querySelector("#temperature").value),
+    "stop": ["The end.", "The End."],
+    "frequency_penalty": parseFloat(document.querySelector("#frequency_penalty").value),
+  }));
+}
+function next() {
+  complete();
+}
+function say(m) {
+  var msg = new SpeechSynthesisUtterance();
+  //var voices = window.speechSynthesis.getVoices();
+  //msg.voice = voices[1];
+  msg.volume = 1;
+  msg.rate = 1;
+  msg.pitch = 0.8;
+  msg.text = m;
+  if(current_language == "en") {
+    msg.lang = 'en-US';
+  } else {
+    msg.lang = 'fr-FR';
+  }
+  speechSynthesis.speak(msg);
+}
+function read() {
+  say(current_input(false));
+}
+function retry() {
+  let t = get_last_message();
+  while(t.prevValue && t.prevValue.head === t.value) {
+    t.prevValue = t.prevValue.tail;
+  }
+  if(t.prevValue) {
+    t.value = t.prevValue.head;
+    t.prevValue = t.prevValue.tail;
+  } else {
+    t.value = "";
+  }
+  t.doResize();
+  complete();
+}
+// Copies a string to the clipboard. Must be called from within an
+// event handler such as click. May return false if it failed, but
+// this is not always possible. Browser support for Chrome 43+,
+// Firefox 42+, Safari 10+, Edge and Internet Explorer 10+.
+// Internet Explorer: The clipboard feature may be disabled by
+// an administrator. By default a prompt is shown the first
+// time the clipboard is used (per session).
+function copyToClipboard(text) {
+    if (window.clipboardData && window.clipboardData.setData) {
+        // Internet Explorer-specific code path to prevent textarea being shown while dialog is visible.
+        return window.clipboardData.setData("Text", text);
+
+    }
+    else if (document.queryCommandSupported && document.queryCommandSupported("copy")) {
+        var textarea = document.createElement("textarea");
+        textarea.textContent = text;
+        textarea.style.position = "fixed";  // Prevent scrolling to bottom of page in Microsoft Edge.
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            return document.execCommand("copy");  // Security exception may be thrown by some browsers.
+        }
+        catch (ex) {
+            console.warn("Copy to clipboard failed.", ex);
+            return false;
+        }
+        finally {
+            document.body.removeChild(textarea);
+        }
+    }
+}
+function copyPrompt() {
+  let prompt = current_prompt();
+  copyToClipboard(prompt);
+}
+</script>
+</body>
+</html>
