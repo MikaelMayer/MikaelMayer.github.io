@@ -236,6 +236,14 @@ test('renders greek-letter identifiers as symbols (unless underscores are presen
   assert.match(highlightedLatex, /\{\\Huge 1\}/);
 });
 
+test('renders Infinity identifier as the infinity symbol', () => {
+  const result = parseFormulaInput('set Infinity = 0 in Infinity');
+  assert.equal(result.ok, true);
+  const latex = formulaAstToLatex(result.value);
+  assert.match(latex, /\\infty/);
+  assert.doesNotMatch(latex, /Infinity/);
+});
+
 test('renders gamma_1 as "gamma" followed by a big 1', () => {
   const result = parseFormulaInput('set gamma_1 = 0 in gamma_1');
   assert.equal(result.ok, true);

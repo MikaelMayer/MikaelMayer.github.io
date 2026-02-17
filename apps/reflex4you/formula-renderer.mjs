@@ -4,7 +4,7 @@
 import { FINGER_DECIMAL_PLACES } from './core-engine.mjs';
 
 // Bump this when changing renderer logic so users can verify cached assets.
-export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2026-01-28.1';
+export const FORMULA_RENDERER_BUILD_ID = 'reflex4you/formula-renderer build 2026-02-17.1';
 
 const DEFAULT_MATHJAX_LOAD_TIMEOUT_MS = 9000;
 const DEFAULT_CANVAS_BG_HEX = 'ffffff80';
@@ -110,6 +110,11 @@ const GREEK_IDENTIFIER_LATEX = Object.freeze({
   omega: '\\omega',
 });
 
+const IDENTIFIER_SYMBOL_LATEX = Object.freeze({
+  Infinity: '\\infty',
+  infinity: '\\infty',
+});
+
 function normalizeIdentifierMeta(metaOrHighlights) {
   if (Array.isArray(metaOrHighlights)) {
     return { highlights: metaOrHighlights, forcePlain: false };
@@ -205,12 +210,17 @@ function latexIdentifierWithMetadata(name, metaHighlights) {
     // Use greek-letter symbols when the base is a greek name and the base itself
     // has no highlighted characters (highlights may still apply to the digits).
     const baseLower = base.toLowerCase();
+    const baseSymbol = baseHighlightsForDigits.length === 0
+      ? IDENTIFIER_SYMBOL_LATEX[base]
+      : null;
     const baseLatex =
-      allowGreek &&
-      baseHighlightsForDigits.length === 0 &&
-      baseLower !== 'gamma' &&
-      GREEK_IDENTIFIER_LATEX[baseLower]
-        ? GREEK_IDENTIFIER_LATEX[baseLower]
+      baseSymbol
+        ? baseSymbol
+        : allowGreek &&
+          baseHighlightsForDigits.length === 0 &&
+          baseLower !== 'gamma' &&
+          GREEK_IDENTIFIER_LATEX[baseLower]
+          ? GREEK_IDENTIFIER_LATEX[baseLower]
         : baseHighlightsForDigits.length
           ? renderTextWithHighlights(base, baseHighlightsForDigits)
           : escapeLatexIdentifier(base);
@@ -220,6 +230,8 @@ function latexIdentifierWithMetadata(name, metaHighlights) {
   }
 
   if (!baseHighlights.length) {
+    const symbol = IDENTIFIER_SYMBOL_LATEX[baseRaw];
+    if (symbol) return `${symbol}${primeLatex}`;
     // Render common greek-letter identifiers as their TeX symbols.
     // Do not remap "gamma" (it is reserved for the Euler Gamma function).
     if (allowGreek && baseRaw !== 'gamma') {
