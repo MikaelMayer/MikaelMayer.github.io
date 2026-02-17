@@ -1,0 +1,369 @@
+set pi = 3.141592653589793 in
+set t = D1.x in
+
+let interp(set a,set b,set t0,set t1)=
+  if t<t0 then a
+  else if t>t1 then b
+  else a+(b-a)*(t-t0)/(t1-t0)
+in
+
+let ease(set t0,set t1)=
+  if t<t0 then 0
+  else if t>t1 then 1
+  else
+    set s=(t-t0)/(t1-t0) in
+    3*s*s-2*s*s*s
+in
+
+let easeOut(set t0,set t1)=
+  if t<t0 then 0
+  else if t>t1 then 1
+  else
+    set s=(t-t0)/(t1-t0) in
+    1-(1-s)*(1-s)*(1-s)
+in
+
+let easeIn(set t0,set t1)=
+  if t<t0 then 0
+  else if t>t1 then 1
+  else
+    set s=(t-t0)/(t1-t0) in
+    s*s*s
+in
+
+let interpOut(set a,set b,set t0,set t1)=
+  a+(b-a)*easeOut(t0,t1)
+in
+
+let interpIn(set a,set b,set t0,set t1)=
+  a+(b-a)*easeIn(t0,t1)
+in
+
+let interpEase(set a,set b,set t0,set t1)=
+  a+(b-a)*ease(t0,t1)
+in
+
+let ease01(set u)=
+  u*u*(3-2*u)
+in
+
+# ---- timeline
+
+set tContStart = 2.5 in
+set tContEnd   = 3.5 in
+
+set tGrowStart = 4 in
+set tGrowEnd   = 4.5 in
+set tSepEnd    = 6.5 in
+
+# 1 second breathing AFTER separation
+set tFieldAfterSep = tSepEnd + 1 in
+
+set tanRevealScale = 2 in
+set tTanStart = 10 in
+set tCardStart    = tTanStart + 0.5*tanRevealScale in
+set tTanExactStart = tTanStart + 1*tanRevealScale in
+set tCardFlipEnd  = tCardStart + 1*tanRevealScale in
+set tTanEnd   = tCardFlipEnd in
+
+set tCardHoldEnd  = tCardFlipEnd + 1 in
+set tCardEnd      = tCardHoldEnd + 1 in
+set tGuideStart   = tCardFlipEnd + 0.5 in
+
+set tBackStart = tCardEnd + 0.5 in
+set tBackEnd   = tBackStart + 0.5 in
+
+set tZoomBackStart = tBackEnd + 0.5 in
+set tZoomBackEnd   = tZoomBackStart + 1 in
+set tLoopBackStart = tZoomBackEnd + 0.25 in
+set tLoopBackEnd   = tZoomBackEnd + 3 in
+
+# ---- rotation
+
+set rot =
+  if t<8 then t
+  else if t<9 then
+    set s=t-8 in
+    8+(-s*s*s+s*s+s)
+  else if t<tLoopBackStart then 9
+  else if t<tLoopBackEnd then interpEase(9,12,tLoopBackStart,tLoopBackEnd)
+  else 12
+in
+
+# ---- fat
+
+set fat0=1 in
+set fatMax=10 in
+
+set fat=
+  if t<2 then fat0
+  else if t<2.5 then interp(fat0,fatMax,2,2.5)
+  else if t<3.5 then fatMax
+  else if t<4 then interp(fatMax,fat0,3.5,4)
+  else if t<8 then fat0
+  else if t<8.5 then interp(fat0,fatMax,8,8.5)
+  else if t<tCardEnd then fatMax
+  else if t<tBackEnd then interp(fatMax,fat0,tCardEnd,tBackEnd)
+  else fat0
+in
+
+# ---- zoom back
+
+set zoomBack =
+  if t<tZoomBackStart then (1+3*ease(9,10))
+  else if t<tZoomBackEnd then interpOut((1+3*ease(9,10)),1,tZoomBackStart,tZoomBackEnd)
+  else 1
+in
+
+# ---- dipole
+
+set d0=(pi/2)*exp(-i*(pi/3)*rot) in
+
+set s0=
+  if t<tGrowStart then 0
+  else if t<tGrowEnd then interp(0,1,tGrowStart,tGrowEnd)
+  else if t<tLoopBackStart then 1
+  else if t<tLoopBackEnd then interpEase(1,0,tLoopBackStart,tLoopBackEnd)
+  else 0
+in
+
+set uSep =
+  if t<tLoopBackStart then ease(tGrowEnd,tSepEnd)
+  else if t<tLoopBackEnd then interpEase(1,0,tLoopBackStart,tLoopBackEnd)
+  else 0
+in
+
+set d1 = d0 in
+set d2Sign = if t<tLoopBackStart then 1 else -1 in
+set d2 = d0 * exp(i*pi*d2Sign*uSep) in
+set d1Pole = d1 in
+set d2Pole = d2 in
+
+# ---- series build (mittag-leffler, truncated)
+
+set N = 25 in
+set nIntroMax = 5 in
+set n =
+  if t<tTanStart then 0
+  else if t<tTanExactStart then ease(tTanStart,tTanExactStart)*nIntroMax
+  else N
+in
+set nInt = n.floor in
+set nFrac = n - nInt in
+
+let step(k,acc)=
+  if k<=nInt+1 then
+    set term=
+      -1/(z-(2*k+1)*d1Pole)
+      -1/(z+(2*k+1)*d1Pole)
+    in
+    if k==nInt+1 then term*nFrac+acc
+    else term+acc
+  else acc
+in
+
+let stepDeriv(k,acc)=
+  if k<=nInt+1 then
+    set term=
+      1/(z-(2*k+1)*d1Pole)^2
+      +1/(z+(2*k+1)*d1Pole)^2
+    in
+    if k==nInt+1 then term*nFrac+acc
+    else term+acc
+  else acc
+in
+
+let tans = repeat N from 0 by step in
+let tansDeriv = repeat N from 0 by stepDeriv in
+
+let gDip =
+  -1/(z-d1Pole) - s0/(z-d2Pole)
+in
+
+let dgDip =
+  1/(z-d1Pole)^2 + s0/(z-d2Pole)^2
+in
+
+let gTan =
+  set a=pi/(2*d1Pole) in
+  a*tan(a*z)
+in
+
+let dgTan =
+  set a=pi/(2*d1Pole) in
+  set tz=tan(a*z) in
+  a*a*(1+tz*tz)
+in
+
+let g =
+  if t<9 then gDip
+  else if t<tTanExactStart then tans
+  else if t<tZoomBackStart then gTan
+  else if t<tLoopBackStart then tans
+  else gDip
+in
+
+let dg =
+  if t<9 then dgDip
+  else if t<tTanExactStart then tansDeriv
+  else if t<tZoomBackStart then dgTan
+  else if t<tLoopBackStart then tansDeriv
+  else dgDip
+in
+
+let field = conj $ g in
+let df = conj $ dg in
+
+# card flip timeline
+set uCard=
+  if t<tCardStart then 0
+  else if t<tCardFlipEnd then ease(tCardStart,tCardFlipEnd)
+  else if t<tCardHoldEnd then 1
+  else if t<tCardEnd then 1-ease(tCardHoldEnd,tCardEnd)
+  else 0
+in
+
+let card=
+  set hw=2 in
+  set hh=2 in
+  set uu=if uCard<0 then 0 else if uCard>1 then 1 else uCard in
+  set d=2*hh in
+  set dx=x in
+  set dy=y in
+  set dz=d in
+  set ue=ease01(uu) in
+  set c=cos(pi*ue) in
+  set s=sin(pi*ue) in
+  set denom=dy*s+dz*c in
+  if abs(denom)<1e-4 then z else
+  set k=(d*c)/denom in
+  set X=k*dx in
+  set Y=k*dy in
+  set Z=-d+k*dz in
+  set u0=X in
+  set v0=Y*c-Z*s in
+  u0+i*v0
+in
+
+let fieldComplex =
+  if t<tCardStart || t>=tCardEnd then field
+  else field$card
+in
+
+# ---- arrow shape
+
+let arrowShape=
+  set d1s=(-0.1335+0.6425i)*fat in
+  set d2s=(-1.9251+0.2385i)*fat in
+  set d3=1.01*fat in
+  set h=d2s.y/2 in
+  set w=d2s.x/2 in
+  set ax=d1s.x/2 in
+  set ay=d1s.y/2 in
+  set ap=d3.x/2 in
+  set m=ap/(ax+ay) in
+  ((y>-h && y<h && x>w && x<d1s.x)
+   || (x>d1s.x && y<(-x/m+ax)+ay && y>(x/m-ax)-ay))
+in
+
+let arrow(c)=if arrowShape then c else 0 in
+
+set back=2.5 in
+
+let arrowFor(set vDisc,set vCont)=
+  set r=abs(vDisc) in
+  set rHigh=100 in
+  set rLow=1/rHigh in
+  if r>rHigh || r<rLow then
+    if abs(z)<fat/4 then vCont else 0
+  else
+    set zw=r/(r+1)*exp(i*arg(vDisc)) in
+    arrow(vCont)$(z/zw)
+in
+
+# ---- divider
+
+set uDiv=
+  if t<9 then 0
+  else if t<10 then ease(9,10)
+  else if t<tLoopBackStart then 1
+  else if t<tLoopBackEnd then interpEase(1,0,tLoopBackStart,tLoopBackEnd)
+  else 0
+in
+set yDiv=
+  -10+11*uDiv
+in
+
+# ---- real graph
+
+let realScene=
+  set fx=field$x in
+  set dfx=df$x in
+  set dist=abs(y-fx.x)/sqrt(1+abs(dfx)^2) in
+  set eps=0.02 in
+  set graph=if dist<eps then fx else 0 in
+
+  set axisW=0.005 in
+  set tickW=0.011 in
+  set tickL=0.05 in
+  set xAxis=if abs(y)<axisW then 100 else 0 in
+  set yAxis=if abs(x)<axisW then 100 else 0 in
+  set xTicks=if abs((x+tickW-floor(x+tickW)))<tickW && abs(y)<tickL then 100 else 0 in
+  set yTicks=if abs((y+tickW-floor(y+tickW)))<tickW && abs(x)<tickL then 100 else 0 in
+
+  graph+xAxis+yAxis+xTicks+yTicks
+in
+
+# ---- rendering
+
+if y>yDiv then
+(
+  set poleR=0.24 in
+  set ringR=0.32 in
+
+  set z1=z-back*d1Pole in
+  set z2=z-back*d2Pole in
+  set showDisks=if t>=11 && t<tBackEnd then 0 else 1 in
+
+  if showDisks>0 && abs(z1)<poleR then -1
+  else if showDisks>0 && abs(z1)<ringR then 0
+  else if showDisks>0 && s0>0 && abs(z2)<poleR then -s0
+  else if showDisks>0 && s0>0 && abs(z2)<ringR then 0
+  else
+    (
+      set zx=(z+0.5+0.5i).floor in
+      set zyDisc=fieldComplex$z/back$zx in
+      set zyCont=fieldComplex$z/back in
+
+      let complexScene=
+        set isCont=fat>fatMax-1e-6 in
+        set baseScene=
+          if isCont then zyCont
+          else arrowFor(zyDisc,zyCont)$(z-zx)
+        in
+        if isCont && t>=tGuideStart then
+          set zGuide=z/back in
+          set xGuide=zGuide.x in
+          set yGuide=zGuide.y in
+          set yGap=0.4 in
+          set yTop=yGap in
+          set yBot=-yGap in
+          set lineW=0.05 in
+          set tickW=0.02 in
+          set tickL=0.5 in
+          set xTick=abs(xGuide-floor(xGuide+0.5))<tickW in
+          set topLine=abs(yGuide-yTop)<lineW in
+          set botLine=abs(yGuide-yBot)<lineW in
+          set topTicks=xTick && yGuide>yTop && yGuide<yTop+tickL in
+          set botTicks=xTick && yGuide<yBot && yGuide>yBot-tickL in
+          set guides=topLine || botLine || topTicks || botTicks in
+          if guides then 0 else baseScene
+        else
+          baseScene
+      in
+      complexScene
+    )
+)
+$(zoomBack*back*(z-2*i*uDiv))
+else
+  realScene$(zoomBack*(z+i))
