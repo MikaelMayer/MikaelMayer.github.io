@@ -275,10 +275,10 @@
     el.style.position = 'absolute';
     el.style.top = '0';
     el.style.left = '0';
+    el.style.bottom = 'auto';
+    el.style.right = 'auto';
     el.style.width = '100vw';
     el.style.height = '100vh';
-    el.style.bottom = '';
-    el.style.right = '';
     el.style.borderRadius = '0';
     el.style.zIndex = '1';
     el.style.boxSizing = 'border-box';
@@ -288,8 +288,8 @@
 
   function setThumbPosition(el) {
     el.style.position = 'absolute';
-    el.style.top = '';
-    el.style.left = '';
+    el.style.top = 'auto';
+    el.style.left = 'auto';
     el.style.bottom = '10px';
     el.style.right = '10px';
     el.style.width = '25vw';
