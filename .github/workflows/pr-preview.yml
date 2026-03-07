@@ -23,29 +23,66 @@ jobs:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.sha }}
 
+      - name: Detect changed app directories
+        id: detect
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CHANGED_FILES=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --paginate --jq '.[].filename')
+          APPS=$(echo "$CHANGED_FILES" | grep '^apps/' | cut -d/ -f1-2 | sort -u | tr '\n' ' ' | xargs)
+          echo "apps=$APPS" >> "$GITHUB_OUTPUT"
+          echo "has_apps=$( [ -n "$APPS" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+          echo "Detected changed apps: ${APPS:-<none>}"
+
       - name: Inject build id into Reflex4You HTML (cache-bust JS)
+        if: contains(steps.detect.outputs.apps, 'apps/reflex4you')
         run: |
           node -e "const fs=require('fs'); const build=process.env.BUILD_ID; const files=['apps/reflex4you/index.html','apps/reflex4you/formula.html','apps/reflex4you/explore.html']; for (const f of files){ const s=fs.readFileSync(f,'utf8'); fs.writeFileSync(f, s.replace(/__REFLEX_BUILD_ID__/g, build)); }"
         env:
           BUILD_ID: pr${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
 
+      - name: Prepare staging directory
+        if: steps.detect.outputs.has_apps == 'true'
+        run: |
+          mkdir -p _preview_staging
+          for APP_DIR in ${{ steps.detect.outputs.apps }}; do
+            if [ -d "$APP_DIR" ]; then
+              mkdir -p "_preview_staging/$APP_DIR"
+              cp -r "$APP_DIR/"* "_preview_staging/$APP_DIR/"
+            fi
+          done
+
       - name: Deploy preview to gh-pages
+        if: steps.detect.outputs.has_apps == 'true'
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: gh-pages
-          folder: apps/reflex4you
-          target-folder: pr-preview/pr-${{ github.event.pull_request.number }}/apps/reflex4you
+          folder: _preview_staging
+          target-folder: pr-preview/pr-${{ github.event.pull_request.number }}
           clean: false
           single-commit: false
 
+      - name: Build preview comment body
+        if: steps.detect.outputs.has_apps == 'true'
+        id: comment-body
+        run: |
+          BASE_URL="https://${{ github.repository_owner }}.github.io/pr-preview/pr-${{ github.event.pull_request.number }}"
+          {
+            echo 'body<<EOF'
+            echo '✅ **PR Preview deployed**'
+            for APP_DIR in ${{ steps.detect.outputs.apps }}; do
+              echo "- **${APP_DIR}**: ${BASE_URL}/${APP_DIR}/"
+            done
+            echo "- **Commit**: ${{ github.event.pull_request.head.sha }}"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Comment preview URL on PR
+        if: steps.detect.outputs.has_apps == 'true'
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.pull_request.number }}
-          body: |
-            ✅ **PR Preview deployed**
-            - **Preview URL**: https://${{ github.repository_owner }}.github.io/pr-preview/pr-${{ github.event.pull_request.number }}/apps/reflex4you/
-            - **Commit**: ${{ github.event.pull_request.head.sha }}
+          body: ${{ steps.comment-body.outputs.body }}
 
   no_preview_for_forks:
     if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name != github.repository
