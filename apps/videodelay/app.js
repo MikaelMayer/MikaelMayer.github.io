@@ -27,6 +27,7 @@
   let firstChunkBlob;
 
   let isRecording = false;
+  let recordStartTime = 0;
   let readyToSaveBlob = null;
   let suppressMiniClick = false;
 
@@ -566,6 +567,7 @@
       try { recBtn.classList.add('recording'); } catch (_) {}
       recordDot.style.display = 'block';
       try { cancelBtn.style.display = 'inline-block'; } catch (_) {}
+      recordStartTime = performance.now();
       if (recordingStrategy === 'element-capture' && delayedVideo.captureStream) {
         startElementCaptureRecording();
       } else if (recordingStrategy === 'canvas-capture') {
@@ -587,6 +589,7 @@
       try { recBtn.classList.remove('recording'); } catch (_) {}
 
       let blob = null;
+      const recordStopTime = performance.now();
       if (recordingStrategy === 'element-capture') {
         blob = await stopElementCaptureRecording();
       } else if (recordingStrategy === 'canvas-capture') {
@@ -594,6 +597,8 @@
       }
 
       if (blob && blob.size > 0) {
+        const actualDurationMs = recordStopTime - recordStartTime;
+        blob = await DelayCamLogic.fixWebmDuration(blob, actualDurationMs);
         readyToSaveBlob = blob;
         // Label should reflect share capability when available
         const supportsShare = (function () {
