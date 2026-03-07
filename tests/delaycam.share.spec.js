@@ -1,11 +1,13 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
 
-// Grant permissions per test (aligns with existing spec)
-test.beforeEach(async ({ context, baseURL }) => {
+test.beforeEach(async ({ context, baseURL, page }) => {
   if (baseURL) {
     await context.grantPermissions(['camera'], { origin: baseURL });
   }
+  await page.addInitScript(() => {
+    localStorage.setItem('videodelay_seconds', '1');
+  });
 });
 
 async function navigateToDelayCam(page) {
@@ -19,10 +21,9 @@ async function navigateToDelayCam(page) {
 
 async function goToDelayedMode(page) {
   await navigateToDelayCam(page);
-  await page.locator('#liveVideo').click({ position: { x: 20, y: 700 }, force: true });
-  await page.waitForTimeout(300);
-  await page.locator('#liveVideo').click({ position: { x: 20, y: 700 }, force: true });
-  await page.waitForTimeout(250);
+  await page.locator('#delayedVideo').waitFor({ state: 'visible', timeout: 10000 });
+  await page.locator('#delayedVideo').click({ force: true });
+  await page.waitForTimeout(200);
 }
 
 async function clickRec(page) {
@@ -32,8 +33,8 @@ async function clickRec(page) {
 // When share isn't available, SAVE should download and have a sane extension
 test('SAVE triggers download with correct extension when share unsupported', async ({ page }) => {
   await goToDelayedMode(page);
+  await expect(page.locator('#recBtn')).toBeVisible({ timeout: 5000 });
 
-  // Start and stop to get a blob ready to save
   await clickRec(page);
   await page.waitForTimeout(700);
   await clickRec(page); // shows SAVE
@@ -54,8 +55,8 @@ test('SAVE triggers download with correct extension when share unsupported', asy
 // When share is available, SAVE should call navigator.share with a File
 test('SAVE uses Web Share API when available and passes a File', async ({ page }) => {
   await goToDelayedMode(page);
+  await expect(page.locator('#recBtn')).toBeVisible({ timeout: 5000 });
 
-  // Start and stop to get a blob ready to save
   await clickRec(page);
   await page.waitForTimeout(700);
   await clickRec(page); // shows SAVE
@@ -66,7 +67,6 @@ test('SAVE uses Web Share API when available and passes a File', async ({ page }
     window.__shareCalled = false;
     window.__sharedFiles = [];
     const nav = navigator;
-    // Simple canShare implementation: return true if files present
     nav.canShare = (data) => !!(data && data.files && data.files.length);
     nav.share = async (data) => {
       window.__shareCalled = true;

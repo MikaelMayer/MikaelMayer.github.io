@@ -6,6 +6,9 @@ test.beforeEach(async ({ context, baseURL, page }) => {
   if (baseURL) {
     await context.grantPermissions(['camera'], { origin: baseURL });
   }
+  await page.addInitScript(() => {
+    localStorage.setItem('videodelay_seconds', '1');
+  });
   // Disable PTZ so CSS transform path is used in tests
   await page.addInitScript(() => {
     try {
@@ -41,10 +44,10 @@ function zoomButtonByLabel(page, label) {
 }
 
 async function enterDelayedMode(page) {
-  // Default click position is the element center; use force to avoid hit-target issues in headless.
-  await page.locator('#liveVideo').click({ force: true });
-  await page.waitForTimeout(200);
-  await page.locator('#liveVideo').click({ force: true });
+  // Wait for delayed video to appear in the thumbnail after countdown
+  await page.locator('#delayedVideo').waitFor({ state: 'visible', timeout: 10000 });
+  // Click the delayed video thumbnail to switch it to main view
+  await page.locator('#delayedVideo').click({ force: true });
   await page.waitForTimeout(300);
 }
 
@@ -68,11 +71,11 @@ test('clicking 2x selects it and applies display zoom', async ({ page }) => {
   expect(liveTransform).toContain('scale(2)');
 });
 
-// Controls persist in delayed mode and apply to delayedVideo as well
+// Controls persist in delayed mode and apply to delayedVideo when it's in main position
 test('zoom controls persist in delayed mode and affect delayedVideo', async ({ page }) => {
   await navigateToDelayCam(page);
   await zoomButtonByLabel(page, '1.7x').click();
-  // Enter delayed mode
+  // Enter delayed mode (switches delayed video to main)
   await enterDelayedMode(page);
   await expect(page.locator('#delayedVideo')).toBeVisible({ timeout: 10000 });
   await expect(page.locator('#zoomControls')).toBeVisible();
@@ -85,7 +88,6 @@ test('zoom controls persist in delayed mode and affect delayedVideo', async ({ p
 });
 
 // Basic record flow after zoom to ensure pipeline still works
-// (We do not assert visual zoom inside recorded file here.)
 const fs = require('fs');
 
 test('recording still works after applying zoom', async ({ page }) => {

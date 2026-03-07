@@ -2,10 +2,12 @@
 (function () {
   'use strict';
 
+  // ---- DOM references ----
   const liveVideo = document.getElementById('liveVideo');
   const delayedVideo = document.getElementById('delayedVideo');
-  const miniLive = document.getElementById('miniLive');
-  const overlay = document.getElementById('overlay');
+  const frozenView = document.getElementById('frozenView');
+  const countdownText = document.getElementById('countdownText');
+  const delayLabel = document.getElementById('delayLabel');
   const switchBtn = document.getElementById('switchBtn');
   const copyLinkBtn = document.getElementById('copyLinkBtn');
   const recBtn = document.getElementById('recBtn');
@@ -13,23 +15,48 @@
   const recordDot = document.getElementById('recordDot');
   const zoomControls = document.getElementById('zoomControls');
 
+  // ---- Camera state ----
   let stream;
   let currentFacingMode = 'environment';
   let currentZoomScale = 1;
   let lastAppliedZoomScale = 1;
   let ptzSupportedOnCurrentTrack = false;
-  let tapCount = 0;
-  let delayStartTime = null;
-  let delayTimerInterval = null;
-  let delayMs = 5000;
+
+  // ---- Delay configuration (localStorage) ----
+  const DELAY_STORAGE_KEY = 'videodelay_seconds';
+  let delayMs = (function () {
+    try {
+      const stored = localStorage.getItem(DELAY_STORAGE_KEY);
+      if (stored) {
+        const val = parseInt(stored, 10);
+        if (val > 0) return val * 1000;
+      }
+    } catch (_) {}
+    return 10000;
+  })();
+
+  // ---- View state ----
+  let mainIsLive = true;
+  let delayReady = false;
+  let delayProcessActive = false;
+  let delayGeneration = 0;
+  let countdownRemaining = 0;
+  let countdownInterval = null;
+  let countdownDone = false;
+  let firstChunkReady = false;
+  let firstChunkBlob = null;
+
+  // ---- First-chunk recording state (delay mechanism) ----
   let firstRecorder;
   let firstChunkPromise;
-  let firstChunkBlob;
+  let firstRecorderUsesCanvas = false;
+  let firstRecorderCleanup = null;
 
+  // ---- User recording state (save/share) ----
   let isRecording = false;
   let recordStartTime = 0;
   let readyToSaveBlob = null;
-  let suppressMiniClick = false;
+  let recordingStrategy = DelayCamLogic.chooseRecordingStrategy({});
 
   // Element-capture strategy state
   let elementRecorder = null;
@@ -45,20 +72,22 @@
   let canvasRecorderChunks = [];
   let canvasRecorderStopResolve = null;
 
-  // Live zoom canvas used to pre-process camera frames for chunk recording when PTZ is unavailable
+  // Live zoom canvas for chunk recording when PTZ is unavailable
   let liveZoomCanvasEl = null;
   let liveZoomCanvasCtx = null;
   let liveZoomCanvasRafId = null;
   let liveZoomCanvasStream = null;
-  let firstRecorderUsesCanvas = false;
-  let firstRecorderCleanup = null;
 
-  // Optional silent audio to make containers more widely acceptable (e.g., WhatsApp)
+  // Silent audio for recording compatibility
   let silenceAudioContext = null;
   let silenceOscillator = null;
   let silenceGain = null;
   let silenceDestination = null;
   let silenceAudioTrack = null;
+
+  // ========================================================================
+  // Silence audio helpers
+  // ========================================================================
 
   function ensureSilenceAudioTrack() {
     try {
@@ -69,7 +98,6 @@
       silenceDestination = silenceAudioContext.createMediaStreamDestination();
       silenceOscillator = silenceAudioContext.createOscillator();
       silenceGain = silenceAudioContext.createGain();
-      // Keep frames flowing but inaudible
       silenceGain.gain.value = 0.00001;
       silenceOscillator.connect(silenceGain).connect(silenceDestination);
       try { silenceOscillator.start(); } catch (_) { /* already started */ }
@@ -92,14 +120,15 @@
     silenceAudioContext = null;
   }
 
+  // ========================================================================
+  // MIME type and file helpers
+  // ========================================================================
+
   function chooseBestMimeType() {
-    // Prefer MP4/H.264 when available (better compatibility e.g., WhatsApp/iOS)
     const candidates = [
-      // Common H.264 profiles (some browsers only expose bare video/mp4)
       'video/mp4; codecs="avc1.42E01E,mp4a.40.2"',
       'video/mp4; codecs="avc1.42E01E"',
       'video/mp4',
-      // WebM fallbacks
       'video/webm; codecs=vp9',
       'video/webm; codecs=vp8',
       'video/webm'
@@ -133,8 +162,11 @@
     }
   }
 
+  // ========================================================================
+  // Save / Share helpers
+  // ========================================================================
+
   async function saveBlobAs(blob, suggestedName) {
-    // Prefer modern File System Access API when available (desktop Chrome/Edge, some Android browsers)
     const w = /** @type {any} */ (window);
     if (typeof w.showSaveFilePicker === 'function') {
       try {
@@ -157,7 +189,6 @@
       }
     }
 
-    // Fallback: anchor download with object URL (same-tab; no target)
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -169,10 +200,8 @@
       a.click();
       clicked = true;
     } catch (_) {
-      // Last resort: open new tab (may be blocked in some PWAs/iOS)
       try { window.open(url, '_blank', 'noopener'); } catch (_) {}
     } finally {
-      // Revoke after a generous delay to avoid races on slow devices
       setTimeout(() => {
         try { a.remove(); } catch (_) {}
         try { URL.revokeObjectURL(url); } catch (_) {}
@@ -182,7 +211,6 @@
   }
 
   async function shareBlobOrSave(blob, suggestedName) {
-    // Try native share first (better UX and direct handoff to WhatsApp)
     try {
       const file = new File([blob], suggestedName, { type: blob.type || 'video/mp4' });
       const canShareFiles = typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] });
@@ -194,9 +222,9 @@
     return saveBlobAs(blob, suggestedName);
   }
 
-  function formatTime(ms) {
-    return DelayCamLogic.formatTime(ms);
-  }
+  // ========================================================================
+  // Camera
+  // ========================================================================
 
   async function getCameraStream(facingMode) {
     const attempts = [
@@ -220,39 +248,254 @@
     try {
       stream = await getCameraStream(currentFacingMode);
       liveVideo.srcObject = stream;
-      miniLive.srcObject = stream;
       await liveVideo.play();
-      // Re-apply desired zoom on the new track (if any)
       try { await applyZoom(currentZoomScale); } catch (_) {}
+
+      function onReady() {
+        if (!delayProcessActive) beginDelayProcess();
+      }
+      liveVideo.addEventListener('loadeddata', onReady, { once: true });
+      if (liveVideo.readyState >= 2) onReady();
     } catch (e) {
-      overlay.textContent = 'Camera error';
+      delayLabel.textContent = 'Camera error';
       console.error(e);
     }
   }
 
-  function startStopwatch() {
-    delayStartTime = performance.now();
-    overlay.textContent = '0.0';
-    delayTimerInterval = setInterval(() => {
-      const ms = performance.now() - delayStartTime;
-      overlay.textContent = formatTime(ms);
-    }, 100);
+  // ========================================================================
+  // Layout management
+  // ========================================================================
+
+  function updateDelayLabel() {
+    const seconds = Math.round(delayMs / 1000);
+    delayLabel.textContent = `Delay ${seconds}s`;
   }
 
-  function freezeDelay() {
-    clearInterval(delayTimerInterval);
-    delayMs = DelayCamLogic.computeDelayMs(delayStartTime, performance.now());
-    overlay.textContent = `Delay: ${formatTime(delayMs)}`;
+  function setMainPosition(el) {
+    el.style.position = 'absolute';
+    el.style.top = '0';
+    el.style.left = '0';
+    el.style.width = '100vw';
+    el.style.height = '100vh';
+    el.style.bottom = '';
+    el.style.right = '';
+    el.style.borderRadius = '0';
+    el.style.zIndex = '1';
+    el.style.boxSizing = 'border-box';
+    el.style.cursor = 'default';
+    el.style.overflow = 'hidden';
   }
 
-  function startRecording() {
+  function setThumbPosition(el) {
+    el.style.position = 'absolute';
+    el.style.top = '';
+    el.style.left = '';
+    el.style.bottom = '10px';
+    el.style.right = '10px';
+    el.style.width = '25vw';
+    el.style.height = '20vh';
+    el.style.borderRadius = '8px';
+    el.style.zIndex = '2';
+    el.style.boxSizing = 'border-box';
+    el.style.cursor = 'pointer';
+    el.style.overflow = 'hidden';
+  }
+
+  function updateLayout() {
+    if (!delayProcessActive) {
+      setMainPosition(liveVideo);
+      liveVideo.style.display = 'block';
+      liveVideo.style.border = 'none';
+      delayedVideo.style.display = 'none';
+      frozenView.style.display = 'none';
+      recBtn.style.display = 'none';
+      cancelBtn.style.display = 'none';
+      return;
+    }
+
+    const showFrozen = !delayReady;
+
+    if (mainIsLive) {
+      // Big view: live
+      setMainPosition(liveVideo);
+      liveVideo.style.display = 'block';
+      liveVideo.style.border = 'none';
+
+      if (showFrozen) {
+        // Thumb: frozen frame with countdown
+        setThumbPosition(frozenView);
+        frozenView.style.display = 'flex';
+        frozenView.style.border = '4px solid yellow';
+        delayedVideo.style.display = 'none';
+      } else {
+        // Thumb: delayed video
+        setThumbPosition(delayedVideo);
+        delayedVideo.style.display = 'block';
+        delayedVideo.style.border = '4px solid yellow';
+        frozenView.style.display = 'none';
+      }
+    } else {
+      // Thumb: live
+      setThumbPosition(liveVideo);
+      liveVideo.style.display = 'block';
+      liveVideo.style.border = '2px solid white';
+
+      if (showFrozen) {
+        // Big view: frozen frame with countdown
+        setMainPosition(frozenView);
+        frozenView.style.display = 'flex';
+        frozenView.style.border = '4px solid yellow';
+        delayedVideo.style.display = 'none';
+      } else {
+        // Big view: delayed video
+        setMainPosition(delayedVideo);
+        delayedVideo.style.display = 'block';
+        delayedVideo.style.border = '4px solid yellow';
+        frozenView.style.display = 'none';
+      }
+    }
+
+    // Countdown text size adapts to which slot frozenView occupies
+    if (showFrozen) {
+      const frozenIsMain = !mainIsLive;
+      countdownText.style.fontSize = frozenIsMain ? '20vmin' : '8vh';
+    }
+
+    // REC button: visible only when big=delayed AND delayed stream is ready
+    const showRec = !mainIsLive && delayReady;
+    recBtn.style.display = showRec ? 'block' : 'none';
+    if (!showRec && !isRecording && !readyToSaveBlob) {
+      cancelBtn.style.display = 'none';
+    }
+
+    // Re-apply CSS zoom to the element in main position only
+    try { applyCssZoomToMainOnly(); } catch (_) {}
+  }
+
+  function applyCssZoomToMainOnly() {
+    const scale = currentZoomScale;
+    if (ptzSupportedOnCurrentTrack) {
+      liveVideo.style.transform = '';
+      delayedVideo.style.transform = '';
+      return;
+    }
+    [liveVideo, delayedVideo].forEach(el => {
+      if (el.style.zIndex === '1' && el.style.display !== 'none') {
+        el.style.transformOrigin = 'center center';
+        el.style.transform = scale > 1 ? `scale(${scale})` : '';
+      } else {
+        el.style.transform = '';
+      }
+    });
+  }
+
+  // ========================================================================
+  // Delay process
+  // ========================================================================
+
+  function beginDelayProcess() {
+    delayProcessActive = true;
+    delayGeneration++;
+    const gen = delayGeneration;
+
+    // Reset state
+    if (countdownInterval) clearInterval(countdownInterval);
+    stopFirstChunkRecording();
+    countdownDone = false;
+    firstChunkReady = false;
+    firstChunkBlob = null;
+    delayReady = false;
+
+    // Hide setup-phase buttons
+    switchBtn.style.display = 'none';
+    if (copyLinkBtn) copyLinkBtn.style.display = 'none';
+
+    // Capture first frame for frozen view background
+    captureFirstFrame();
+
+    // Start recording the first chunk
+    firstChunkPromise = startFirstChunkRecording();
+    firstChunkPromise.then(blob => {
+      if (gen !== delayGeneration) return;
+      firstChunkBlob = blob;
+      firstChunkReady = true;
+      tryStartDelayed();
+    });
+
+    // Auto-stop recording after delayMs
+    setTimeout(() => {
+      if (gen !== delayGeneration) return;
+      stopFirstChunkRecording();
+    }, delayMs);
+
+    // Countdown
+    countdownRemaining = Math.ceil(delayMs / 1000);
+    updateCountdownDisplay();
+    countdownInterval = setInterval(() => {
+      if (gen !== delayGeneration) { clearInterval(countdownInterval); return; }
+      countdownRemaining--;
+      if (countdownRemaining <= 0) {
+        countdownRemaining = 0;
+        clearInterval(countdownInterval);
+        countdownDone = true;
+        updateCountdownDisplay();
+        tryStartDelayed();
+        return;
+      }
+      updateCountdownDisplay();
+    }, 1000);
+
+    updateLayout();
+  }
+
+  function captureFirstFrame() {
+    try {
+      const vw = liveVideo.videoWidth || 640;
+      const vh = liveVideo.videoHeight || 480;
+      const maxDim = 640;
+      const scale = Math.min(maxDim / vw, maxDim / vh, 1);
+      const w = Math.round(vw * scale);
+      const h = Math.round(vh * scale);
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      c.getContext('2d').drawImage(liveVideo, 0, 0, w, h);
+      frozenView.style.backgroundImage = `url(${c.toDataURL('image/jpeg', 0.7)})`;
+    } catch (_) {
+      frozenView.style.backgroundColor = '#333';
+    }
+  }
+
+  function updateCountdownDisplay() {
+    countdownText.textContent = countdownRemaining > 0 ? String(countdownRemaining) : '';
+  }
+
+  function tryStartDelayed() {
+    if (delayReady) return;
+    if (!countdownDone || !firstChunkReady) return;
+    delayReady = true;
+
+    recordingStrategy = DelayCamLogic.chooseRecordingStrategy({
+      canCaptureElement: !!(delayedVideo && delayedVideo.captureStream),
+      canCaptureCanvas: !!(typeof HTMLCanvasElement !== 'undefined' &&
+        HTMLCanvasElement.prototype && HTMLCanvasElement.prototype.captureStream)
+    });
+
+    updateLayout();
+    playAndRecordLoop(firstChunkBlob, delayMs);
+  }
+
+  // ========================================================================
+  // First-chunk recording (for delay mechanism)
+  // ========================================================================
+
+  function startFirstChunkRecording() {
     return new Promise(resolve => {
-      // When PTZ is not supported, record from a zoomed canvas so chunks reflect zoom
       const useCanvas = !ptzSupportedOnCurrentTrack && typeof HTMLCanvasElement !== 'undefined';
       firstRecorderUsesCanvas = useCanvas;
       let sourceStream;
+
       if (useCanvas) {
-        // Setup a persistent canvas drawing from liveVideo with cropping based on currentZoomScale
         const sw = liveVideo.videoWidth || 1280;
         const sh = liveVideo.videoHeight || 720;
         if (!liveZoomCanvasEl) {
@@ -311,14 +554,17 @@
     });
   }
 
-  function stopRecording() {
+  function stopFirstChunkRecording() {
     if (firstRecorder && firstRecorder.state === 'recording') {
       firstRecorder.stop();
     }
-    // Cleanup any live-zoom canvas stream used for initial chunk
     try { if (firstRecorderCleanup) firstRecorderCleanup(); } catch (_) {}
     firstRecorderCleanup = null;
   }
+
+  // ========================================================================
+  // Chunk recording for playback loop
+  // ========================================================================
 
   async function recordChunk(durationMs) {
     return new Promise(resolve => {
@@ -375,6 +621,10 @@
     });
   }
 
+  // ========================================================================
+  // Playback loop
+  // ========================================================================
+
   async function playAndRecordLoop(initialChunk, durationMs) {
     let nextChunkPromise = recordChunk(durationMs);
 
@@ -401,8 +651,9 @@
     }
   }
 
-  // Choose strategy once UI switches to delayed mode
-  let recordingStrategy = DelayCamLogic.chooseRecordingStrategy({});
+  // ========================================================================
+  // User recording – element-capture strategy
+  // ========================================================================
 
   function startElementCaptureRecording() {
     const srcStream = delayedVideo.captureStream ? delayedVideo.captureStream() : null;
@@ -430,7 +681,6 @@
         elementRecorderStopResolve = null;
       }
     };
-    // timeslice to ensure data is flushed periodically in headless/fake devices
     elementRecorder.start(200);
   }
 
@@ -443,21 +693,23 @@
       } else {
         resolve(new Blob([], { type: 'video/webm' }));
       }
-      // Clean up optional audio generators
       cleanupSilenceAudioTrack();
     });
   }
+
+  // ========================================================================
+  // User recording – canvas-capture strategy
+  // ========================================================================
 
   function startCanvasCaptureRecording() {
     if (!delayedVideo) return;
     const sourceWidth = delayedVideo.videoWidth || 1280;
     const sourceHeight = delayedVideo.videoHeight || 720;
-    // Constrain to 720p for broad compatibility and shareability
     const maxWidth = 1280;
     const maxHeight = 720;
-    const scale = Math.min(maxWidth / sourceWidth, maxHeight / sourceHeight, 1);
-    const width = Math.max(2, Math.floor(sourceWidth * scale));
-    const height = Math.max(2, Math.floor(sourceHeight * scale));
+    const scl = Math.min(maxWidth / sourceWidth, maxHeight / sourceHeight, 1);
+    const width = Math.max(2, Math.floor(sourceWidth * scl));
+    const height = Math.max(2, Math.floor(sourceHeight * scl));
     if (!canvasEl) {
       canvasEl = document.createElement('canvas');
       canvasEl.width = width;
@@ -484,9 +736,7 @@
             canvasCtx.drawImage(delayedVideo, 0, 0, canvasEl.width, canvasEl.height);
           }
         }
-      } catch (_) {
-        // ignore draw errors (e.g., while switching sources)
-      }
+      } catch (_) {}
       canvasRafId = requestAnimationFrame(drawFrame);
     }
     canvasRafId = requestAnimationFrame(drawFrame);
@@ -517,7 +767,6 @@
         canvasRecorderStopResolve = null;
       }
     };
-    // timeslice ensures non-empty blob in short recordings
     canvasRecorder.start(200);
   }
 
@@ -538,10 +787,13 @@
       } else {
         resolve(new Blob([], { type: 'video/webm' }));
       }
-      // Clean up optional audio generators
       cleanupSilenceAudioTrack();
     });
   }
+
+  // ========================================================================
+  // Toggle user recording (REC / STOP / SHARE|SAVE)
+  // ========================================================================
 
   async function toggleRecording() {
     if (!isRecording) {
@@ -573,12 +825,10 @@
       } else if (recordingStrategy === 'canvas-capture') {
         startCanvasCaptureRecording();
       } else {
-        // Unsupported: keep button label consistent but do nothing
         recBtn.textContent = 'REC';
         try { recBtn.classList.remove('recording'); } catch (_) {}
         recordDot.style.display = 'none';
         isRecording = false;
-        overlay.textContent = 'Recording unsupported on this browser';
         return;
       }
     } else {
@@ -600,7 +850,6 @@
         const actualDurationMs = recordStopTime - recordStartTime;
         blob = await DelayCamLogic.fixWebmDuration(blob, actualDurationMs);
         readyToSaveBlob = blob;
-        // Label should reflect share capability when available
         const supportsShare = (function () {
           try {
             const file = new File([new Blob(['x'], { type: 'video/webm' })], 'x.webm', { type: 'video/webm' });
@@ -616,43 +865,60 @@
     }
   }
 
-  // UI wiring
-  liveVideo.addEventListener('click', async () => {
-    tapCount++;
-    if (tapCount === 1) {
-      switchBtn.style.display = 'none';
-      if (copyLinkBtn) copyLinkBtn.style.display = 'none';
-      startStopwatch();
-      firstChunkPromise = startRecording();
-    } else if (tapCount === 2) {
-      freezeDelay();
-      stopRecording();
-      firstChunkBlob = await firstChunkPromise;
+  // ========================================================================
+  // Event handlers
+  // ========================================================================
 
-      liveVideo.style.display = 'none';
-      delayedVideo.style.display = 'block';
-      miniLive.style.display = 'block';
-      recBtn.style.display = 'block';
-
-      // Decide based on runtime capability; hide record button if unsupported
-      recordingStrategy = DelayCamLogic.chooseRecordingStrategy({
-        canCaptureElement: !!(delayedVideo && delayedVideo.captureStream),
-        canCaptureCanvas: !!(typeof HTMLCanvasElement !== 'undefined' && HTMLCanvasElement.prototype && HTMLCanvasElement.prototype.captureStream)
-      });
-      if (recordingStrategy === 'unsupported') {
-        recBtn.style.display = 'none';
-        overlay.textContent = 'Recording not supported in this browser';
-      }
-      playAndRecordLoop(firstChunkBlob, delayMs);
+  // Thumbnail click: toggle which feed is in big view vs thumbnail.
+  // liveVideo is the thumbnail when mainIsLive is false.
+  liveVideo.addEventListener('click', () => {
+    if (!mainIsLive && delayProcessActive) {
+      mainIsLive = true;
+      updateLayout();
     }
   });
 
+  // delayedVideo is the thumbnail when mainIsLive is true and delayReady.
+  delayedVideo.addEventListener('click', () => {
+    if (mainIsLive && delayProcessActive) {
+      mainIsLive = false;
+      updateLayout();
+    }
+  });
+
+  // frozenView is the thumbnail when mainIsLive is true and !delayReady.
+  frozenView.addEventListener('click', () => {
+    if (mainIsLive && delayProcessActive) {
+      mainIsLive = false;
+      updateLayout();
+    }
+  });
+
+  // Delay label: click to change delay value via prompt
+  delayLabel.addEventListener('click', () => {
+    const currentSeconds = Math.round(delayMs / 1000);
+    const input = prompt('Set delay in seconds:', String(currentSeconds));
+    if (input === null) return;
+    const newSeconds = parseInt(input, 10);
+    if (isNaN(newSeconds) || newSeconds < 1) return;
+
+    delayMs = newSeconds * 1000;
+    try { localStorage.setItem(DELAY_STORAGE_KEY, String(newSeconds)); } catch (_) {}
+    updateDelayLabel();
+
+    if (!delayReady && delayProcessActive) {
+      // Restart countdown and recording with the new delay
+      beginDelayProcess();
+    }
+  });
+
+  // Switch camera
   switchBtn.addEventListener('click', async () => {
     currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
     await startCamera();
   });
 
-  // Share/Copy app link button: show early; prefer native share; fallback to clipboard
+  // Share/Copy app link button
   if (copyLinkBtn) {
     const HARD_CODED_APP_URL = 'https://mikaelmayer.github.io/apps/videodelay/';
     const canNativeShareLink = (() => {
@@ -668,15 +934,15 @@
     } catch (_) {}
 
     copyLinkBtn.addEventListener('click', async () => {
-      const url = HARD_CODED_APP_URL; // avoid PWA scope issues
+      const url = HARD_CODED_APP_URL;
       try {
         if (canNativeShareLink) {
           try {
-              await navigator.share({
-                url,
-                title: 'Capture key moments without filling your phone',
-                text: 'Record key soccer moments or catch shooting stars with a delayed camera.'
-              });
+            await navigator.share({
+              url,
+              title: 'Capture key moments without filling your phone',
+              text: 'Record key soccer moments or catch shooting stars with a delayed camera.'
+            });
             return;
           } catch (_) {
             // fall through to clipboard
@@ -705,49 +971,13 @@
     });
   }
 
-  miniLive.addEventListener('click', (e) => {
-    if (suppressMiniClick) {
-      try { e.preventDefault(); } catch (_) {}
-      return;
-    }
-    location.reload();
-  });
-
-  // Press-and-hold behavior on the miniature: while pointer is down on #miniLive,
-  // show the live feed on the big screen; when released, restore dual view.
-  (function setupPressHoldSwap() {
-    function showLiveFull() {
-      // Show live in big, hide delayed
-      liveVideo.style.display = 'block';
-      delayedVideo.style.display = 'none';
-      // Hide miniature to avoid recursion/overlay
-      miniLive.style.opacity = '0.4';
-      suppressMiniClick = true;
-    }
-    function restoreDual() {
-      // Restore delayed big + mini live
-      delayedVideo.style.display = 'block';
-      liveVideo.style.display = 'none';
-      miniLive.style.opacity = '1';
-      // Briefly suppress click to avoid accidental reload after press-hold
-      suppressMiniClick = true;
-      setTimeout(() => { suppressMiniClick = false; }, 200);
-    }
-    ['pointerdown','mousedown','touchstart'].forEach(evt => {
-      miniLive.addEventListener(evt, (e) => { e.preventDefault(); showLiveFull(); }, { passive: false });
-    });
-    ['pointerup','pointercancel','mouseleave','mouseup','touchend','touchcancel'].forEach(evt => {
-      miniLive.addEventListener(evt, (e) => { e.preventDefault(); restoreDual(); }, { passive: false });
-    });
-  }());
-
+  // REC button
   recBtn.addEventListener('click', () => { void toggleRecording(); });
 
-  // Cancel button: stop current recording (if any) and reset UI to REC
+  // Cancel button: stop current recording and reset UI
   if (cancelBtn) {
     cancelBtn.addEventListener('click', async () => {
       if (isRecording) {
-        // Stop underlying recorders but discard any ready blob
         isRecording = false;
         recBtn.textContent = '…';
         try { recBtn.disabled = true; } catch (_) {}
@@ -759,20 +989,29 @@
           await stopCanvasCaptureRecording();
         }
       }
-      readyToSaveBlob = null; // discard any staged blob
+      readyToSaveBlob = null;
       recBtn.textContent = 'REC';
       try { recBtn.disabled = false; } catch (_) {}
       try { cancelBtn.style.display = 'none'; } catch (_) {}
     });
   }
 
+  // ========================================================================
+  // Initialization
+  // ========================================================================
+
+  updateDelayLabel();
+  updateLayout();
   startCamera();
 
   if ('serviceWorker' in navigator) {
     try { navigator.serviceWorker.register('service-worker.js'); } catch (_) {}
   }
 
-  // ---- Zoom controls ----
+  // ========================================================================
+  // Zoom controls
+  // ========================================================================
+
   const ZOOM_STEPS = Array.from({ length: 5 }, (_, i) => Math.pow(2, i / 4));
 
   function labelForZoom(scale) {
@@ -791,11 +1030,15 @@
   }
 
   function applyCssZoom(scale) {
-    // Keep origin centered while preserving absolute positioning
-    try { liveVideo.style.transformOrigin = 'center center'; } catch (_) {}
-    try { delayedVideo.style.transformOrigin = 'center center'; } catch (_) {}
-    try { liveVideo.style.transform = `scale(${scale})`; } catch (_) {}
-    try { delayedVideo.style.transform = `scale(${scale})`; } catch (_) {}
+    // Apply CSS zoom to whichever video is in main position (z-index 1)
+    [liveVideo, delayedVideo].forEach(el => {
+      if (el.style.zIndex === '1' && el.style.display !== 'none') {
+        el.style.transformOrigin = 'center center';
+        el.style.transform = scale > 1 ? `scale(${scale})` : '';
+      } else {
+        el.style.transform = '';
+      }
+    });
   }
 
   function getCurrentVideoTrack() {
@@ -838,10 +1081,7 @@
     const appliedPtz = await applyPtzZoomIfSupported(scale);
     if (!appliedPtz) {
       applyCssZoom(scale);
-      // If we are recording via canvas, ensure subsequent frames reflect new zoom
-      // (drawFrame reads currentZoomScale each tick).
     } else {
-      // Clear CSS transforms when PTZ active
       try { liveVideo.style.transform = ''; } catch (_) {}
       try { delayedVideo.style.transform = ''; } catch (_) {}
     }
@@ -860,7 +1100,6 @@
       btn.addEventListener('click', () => { void applyZoom(scale); });
       zoomControls.appendChild(btn);
     });
-    // Default selection 1x
     markSelectedZoom(currentZoomScale);
   }
 
