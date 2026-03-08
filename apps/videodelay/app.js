@@ -1113,10 +1113,13 @@
   async function applyZoom(scale) {
     currentZoomScale = scale;
     markSelectedZoom(scale);
+    // Start CSS animation synchronously before any await, so the
+    // interval id is set and updateLayout won't jump to the target.
+    applyCssZoom(scale);
     const appliedPtz = await applyPtzZoomIfSupported(scale);
-    if (!appliedPtz) {
-      applyCssZoom(scale);
-    } else {
+    if (appliedPtz) {
+      // PTZ succeeded — cancel CSS animation and clear transforms
+      if (zoomAnimIntervalId) { clearInterval(zoomAnimIntervalId); zoomAnimIntervalId = null; }
       try { liveVideo.style.transform = ''; } catch (_) {}
       try { delayedVideo.style.transform = ''; } catch (_) {}
     }
