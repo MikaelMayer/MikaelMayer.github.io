@@ -926,50 +926,47 @@
     }
   }
 
-  function nearestStepIndex(val) {
-    let best = 0;
-    for (let i = 1; i < ZOOM_STEPS.length; i++) {
-      if (Math.abs(ZOOM_STEPS[i] - val) < Math.abs(ZOOM_STEPS[best] - val)) best = i;
-    }
-    return best;
+  function easeInOut(t) {
+    return t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t);
   }
 
   function applyZoom(scale) {
     if (zoomAnimIntervalId) { clearInterval(zoomAnimIntervalId); zoomAnimIntervalId = null; }
 
     markSelectedZoom(scale);
-
-    const startIdx = nearestStepIndex(lastAppliedZoomScale);
-    const targetIdx = nearestStepIndex(scale);
-    const direction = targetIdx > startIdx ? 1 : -1;
-
     currentZoomScale = scale;
 
-    if (startIdx === targetIdx) {
+    const startZoom = lastAppliedZoomScale;
+    if (Math.abs(startZoom - scale) < 1e-6) {
       applyPtzZoom(scale);
-      lastAppliedZoomScale = scale;
       return;
     }
 
-    // Apply first intermediate step immediately
-    let currentIdx = startIdx + direction;
-    applyPtzZoom(ZOOM_STEPS[currentIdx]);
+    // Interpolate in log-space so perceptual speed is uniform.
+    // Duration: 500ms per x2 factor (i.e. per 1.0 in log2-space).
+    const logStart = Math.log2(startZoom);
+    const logTarget = Math.log2(scale);
+    const logDist = Math.abs(logTarget - logStart);
+    const duration = Math.max(100, logDist * 500);
 
-    if (currentIdx === targetIdx) {
-      lastAppliedZoomScale = scale;
-      return;
-    }
+    const TICK_MS = 62.5;
+    const startTime = Date.now();
 
-    // Step through remaining zoom levels every 500ms
+    applyPtzZoom(startZoom);
+
     zoomAnimIntervalId = setInterval(() => {
-      currentIdx += direction;
-      applyPtzZoom(ZOOM_STEPS[currentIdx]);
-      if (currentIdx === targetIdx) {
+      const elapsed = Date.now() - startTime;
+      const t = Math.min(1, elapsed / duration);
+      const eased = easeInOut(t);
+      const logCurrent = logStart + (logTarget - logStart) * eased;
+      const currentZoom = Math.pow(2, logCurrent);
+      applyPtzZoom(currentZoom);
+      if (t >= 1) {
         clearInterval(zoomAnimIntervalId);
         zoomAnimIntervalId = null;
         lastAppliedZoomScale = scale;
       }
-    }, 500);
+    }, TICK_MS);
   }
 
   function setupZoomControls() {
