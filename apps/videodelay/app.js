@@ -252,7 +252,7 @@
       try { await applyZoom(currentZoomScale); } catch (_) {}
 
       function onReady() {
-        if (!delayProcessActive) beginDelayProcess();
+        if (!delayProcessActive || !delayReady) beginDelayProcess();
       }
       liveVideo.addEventListener('loadeddata', onReady, { once: true });
       if (liveVideo.readyState >= 2) onReady();
@@ -406,8 +406,7 @@
     firstChunkBlob = null;
     delayReady = false;
 
-    // Hide setup-phase buttons
-    switchBtn.style.display = 'none';
+    // Hide copy-link button once delay process starts
     if (copyLinkBtn) copyLinkBtn.style.display = 'none';
 
     // Capture first frame for frozen view background
