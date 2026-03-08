@@ -30,8 +30,11 @@ jobs:
         run: |
           CHANGED_FILES=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --paginate --jq '.[].filename')
           APPS=$(echo "$CHANGED_FILES" | grep '^apps/' | cut -d/ -f1-2 | sort -u | tr '\n' ' ' | xargs)
+          SHORT_SHA="${{ github.event.pull_request.head.sha }}"
+          SHORT_SHA="${SHORT_SHA:0:7}"
           echo "apps=$APPS" >> "$GITHUB_OUTPUT"
           echo "has_apps=$( [ -n "$APPS" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
           echo "Detected changed apps: ${APPS:-<none>}"
 
       - name: Inject build id into Reflex4You HTML (cache-bust JS)
@@ -44,11 +47,12 @@ jobs:
       - name: Prepare staging directory
         if: steps.detect.outputs.has_apps == 'true'
         run: |
+          SHORT_SHA="${{ steps.detect.outputs.short_sha }}"
           mkdir -p _preview_staging
           for APP_DIR in ${{ steps.detect.outputs.apps }}; do
             if [ -d "$APP_DIR" ]; then
-              mkdir -p "_preview_staging/$APP_DIR"
-              cp -r "$APP_DIR/"* "_preview_staging/$APP_DIR/"
+              mkdir -p "_preview_staging/${SHORT_SHA}/${APP_DIR}"
+              cp -r "$APP_DIR/"* "_preview_staging/${SHORT_SHA}/${APP_DIR}/"
             fi
           done
 
@@ -59,14 +63,15 @@ jobs:
           branch: gh-pages
           folder: _preview_staging
           target-folder: pr-preview/pr-${{ github.event.pull_request.number }}
-          clean: false
+          clean: true
           single-commit: false
 
       - name: Build preview comment body
         if: steps.detect.outputs.has_apps == 'true'
         id: comment-body
         run: |
-          BASE_URL="https://${{ github.repository_owner }}.github.io/pr-preview/pr-${{ github.event.pull_request.number }}"
+          SHORT_SHA="${{ steps.detect.outputs.short_sha }}"
+          BASE_URL="https://${{ github.repository_owner }}.github.io/pr-preview/pr-${{ github.event.pull_request.number }}/${SHORT_SHA}"
           {
             echo 'body<<EOF'
             echo '✅ **PR Preview deployed**'
