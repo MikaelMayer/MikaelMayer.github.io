@@ -1023,7 +1023,7 @@
     });
   }
 
-  let zoomAnimFrameId = null;
+  let zoomAnimIntervalId = null;
   let currentVisualZoom = 1;
 
   function setVisualZoom(scale) {
@@ -1039,23 +1039,22 @@
   }
 
   function applyCssZoom(targetScale) {
-    if (zoomAnimFrameId) { cancelAnimationFrame(zoomAnimFrameId); zoomAnimFrameId = null; }
+    if (zoomAnimIntervalId) { clearInterval(zoomAnimIntervalId); zoomAnimIntervalId = null; }
 
     const startScale = currentVisualZoom;
     const diff = Math.abs(targetScale - startScale);
     if (diff < 0.01) { setVisualZoom(targetScale); return; }
 
-    const duration = Math.max(150, diff * 500);
-    const startTime = performance.now();
+    const TICK_MS = 67;
+    const duration = Math.max(200, diff * 500);
+    const startTime = Date.now();
 
-    function tick(now) {
-      const t = Math.min(1, (now - startTime) / duration);
+    zoomAnimIntervalId = setInterval(() => {
+      const t = Math.min(1, (Date.now() - startTime) / duration);
       const eased = 1 - Math.pow(1 - t, 3);
       setVisualZoom(startScale + (targetScale - startScale) * eased);
-      if (t < 1) { zoomAnimFrameId = requestAnimationFrame(tick); }
-      else { zoomAnimFrameId = null; }
-    }
-    zoomAnimFrameId = requestAnimationFrame(tick);
+      if (t >= 1) { clearInterval(zoomAnimIntervalId); zoomAnimIntervalId = null; }
+    }, TICK_MS);
   }
 
   function getCurrentVideoTrack() {
