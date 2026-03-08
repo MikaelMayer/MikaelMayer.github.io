@@ -361,6 +361,9 @@
       countdownText.style.fontSize = frozenIsMain ? '20vmin' : '8vh';
     }
 
+    // Zoom controls: visible only when live is the big view
+    zoomControls.style.display = mainIsLive ? 'flex' : 'none';
+
     // REC button: visible only when big=delayed AND delayed stream is ready
     const showRec = !mainIsLive && delayReady;
     recBtn.style.display = showRec ? 'block' : 'none';

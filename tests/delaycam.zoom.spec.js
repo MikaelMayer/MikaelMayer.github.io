@@ -73,14 +73,18 @@ test('clicking 2x selects it and applies display zoom', async ({ page }) => {
   expect(liveTransform).toContain('scale(2)');
 });
 
-// Controls persist in delayed mode and apply to delayedVideo when it's in main position
-test('zoom controls persist in delayed mode and affect delayedVideo', async ({ page }) => {
+// Zoom set in live mode carries over to delayedVideo when switched to main
+test('zoom set in live mode persists and affects delayedVideo in main', async ({ page }) => {
   await navigateToDelayCam(page);
   await zoomButtonByLabel(page, '1.7x').click();
-  // Enter delayed mode (switches delayed video to main)
+  await page.waitForTimeout(700);
+  // Zoom controls visible while live is main
+  await expect(page.locator('#zoomControls')).toBeVisible();
+  // Switch delayed video to main
   await enterDelayedMode(page);
   await expect(page.locator('#delayedVideo')).toBeVisible({ timeout: 10000 });
-  await expect(page.locator('#zoomControls')).toBeVisible();
+  // Zoom controls hidden when delayed is main
+  await expect(page.locator('#zoomControls')).toBeHidden();
   const delayedTransform = await page.evaluate(() => document.getElementById('delayedVideo').style.transform || '');
   const m = /scale\(([^)]+)\)/.exec(delayedTransform);
   expect(m).not.toBeNull();

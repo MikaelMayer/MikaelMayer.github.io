@@ -67,15 +67,18 @@
     }
     #zoomControls {
       position: absolute;
-      top: 80px;
-      right: 15px;
-      z-index: 4;
+      bottom: 10px;
+      left: 10px;
+      z-index: 5;
       display: flex;
+      flex-direction: column-reverse;
       gap: 8px;
     }
     @media (orientation: portrait) {
       #zoomControls {
-        margin-top: 50px;
+        left: auto;
+        right: 10px;
+        bottom: calc(20vh + 25px);
       }
     }
     .zoomBtn {
