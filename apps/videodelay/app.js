@@ -1043,32 +1043,37 @@
   function applyCssZoom(targetScale) {
     if (zoomAnimIntervalId) { clearInterval(zoomAnimIntervalId); zoomAnimIntervalId = null; }
 
-    const startScale = currentVisualZoom;
-    const diff = Math.abs(targetScale - startScale);
-    if (diff < 0.01) { setVisualZoom(targetScale); return; }
+    // Find the start and target indices in ZOOM_STEPS
+    function nearestStepIndex(val) {
+      let best = 0;
+      for (let i = 1; i < ZOOM_STEPS.length; i++) {
+        if (Math.abs(ZOOM_STEPS[i] - val) < Math.abs(ZOOM_STEPS[best] - val)) best = i;
+      }
+      return best;
+    }
+    const startIdx = nearestStepIndex(currentVisualZoom);
+    const targetIdx = nearestStepIndex(targetScale);
+    const direction = targetIdx > startIdx ? 1 : -1;
 
-    const TICK_MS = 67;
-    const duration = Math.max(200, diff * 500);
-    const startTime = Date.now();
+    // If already there or adjacent, just jump
+    if (startIdx === targetIdx) { setVisualZoom(targetScale); return; }
+
+    // Walk through each intermediate zoom step, one every 500ms
+    let currentIdx = startIdx;
+    // Apply the first intermediate step immediately
+    currentIdx += direction;
+    setVisualZoom(ZOOM_STEPS[currentIdx]);
+
+    if (currentIdx === targetIdx) return;
 
     zoomAnimIntervalId = setInterval(() => {
-      const t = Math.min(1, (Date.now() - startTime) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);
-      const scale = startScale + (targetScale - startScale) * eased;
-      currentVisualZoom = scale;
-      [liveVideo, delayedVideo].forEach(el => {
-        if (el.style.zIndex === '1' && el.style.display !== 'none') {
-          el.style.transformOrigin = 'center center';
-          el.style.transform = `scale(${scale})`;
-          void el.offsetWidth;
-        }
-      });
-      if (t >= 1) {
+      currentIdx += direction;
+      setVisualZoom(ZOOM_STEPS[currentIdx]);
+      if (currentIdx === targetIdx) {
         clearInterval(zoomAnimIntervalId);
         zoomAnimIntervalId = null;
-        setVisualZoom(targetScale);
       }
-    }, TICK_MS);
+    }, 500);
   }
 
   function getCurrentVideoTrack() {
