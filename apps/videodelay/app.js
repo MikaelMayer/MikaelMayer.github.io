@@ -373,20 +373,12 @@
   }
 
   function applyCssZoomToMainOnly() {
-    const scale = currentZoomScale;
     if (ptzSupportedOnCurrentTrack) {
       liveVideo.style.transform = '';
       delayedVideo.style.transform = '';
       return;
     }
-    [liveVideo, delayedVideo].forEach(el => {
-      if (el.style.zIndex === '1' && el.style.display !== 'none') {
-        el.style.transformOrigin = 'center center';
-        el.style.transform = scale > 1 ? `scale(${scale})` : '';
-      } else {
-        el.style.transform = '';
-      }
-    });
+    setVisualZoom(currentZoomScale);
   }
 
   // ========================================================================
@@ -1028,8 +1020,11 @@
     });
   }
 
-  function applyCssZoom(scale) {
-    // Apply CSS zoom to whichever video is in main position (z-index 1)
+  let zoomAnimFrameId = null;
+  let currentVisualZoom = 1;
+
+  function setVisualZoom(scale) {
+    currentVisualZoom = scale;
     [liveVideo, delayedVideo].forEach(el => {
       if (el.style.zIndex === '1' && el.style.display !== 'none') {
         el.style.transformOrigin = 'center center';
@@ -1038,6 +1033,26 @@
         el.style.transform = '';
       }
     });
+  }
+
+  function applyCssZoom(targetScale) {
+    if (zoomAnimFrameId) { cancelAnimationFrame(zoomAnimFrameId); zoomAnimFrameId = null; }
+
+    const startScale = currentVisualZoom;
+    const diff = Math.abs(targetScale - startScale);
+    if (diff < 0.01) { setVisualZoom(targetScale); return; }
+
+    const duration = Math.max(150, diff * 500);
+    const startTime = performance.now();
+
+    function tick(now) {
+      const t = Math.min(1, (now - startTime) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setVisualZoom(startScale + (targetScale - startScale) * eased);
+      if (t < 1) { zoomAnimFrameId = requestAnimationFrame(tick); }
+      else { zoomAnimFrameId = null; }
+    }
+    zoomAnimFrameId = requestAnimationFrame(tick);
   }
 
   function getCurrentVideoTrack() {

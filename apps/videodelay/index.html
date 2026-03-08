@@ -14,9 +14,6 @@
       object-fit: cover;
       box-sizing: border-box;
     }
-    video {
-      transition: transform 0.3s ease;
-    }
     #liveVideo {
       top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1;
     }
@@ -124,6 +121,18 @@
       border: 2px solid #888; font-size: 1.1em;
       padding: 0.7em 1.1em; border-radius: 14px;
       cursor: pointer; display: none;
+    }
+    @media (orientation: portrait) {
+      #recBtn {
+        left: auto;
+        right: 10px;
+        bottom: calc(20vh + 25px);
+      }
+      #cancelBtn {
+        left: auto;
+        right: 130px;
+        bottom: calc(20vh + 25px);
+      }
     }
     #recordDot {
       position: absolute; top: 15px; left: 15px; width: 20px; height: 20px;

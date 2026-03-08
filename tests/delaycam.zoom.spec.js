@@ -67,6 +67,8 @@ test('clicking 2x selects it and applies display zoom', async ({ page }) => {
   await navigateToDelayCam(page);
   await zoomButtonByLabel(page, '2x').click();
   await expect(page.locator('#zoomControls .zoomBtn.selected')).toHaveText('2x');
+  // Wait for the zoom animation to finish
+  await page.waitForTimeout(700);
   const liveTransform = await page.evaluate(() => document.getElementById('liveVideo').style.transform || '');
   expect(liveTransform).toContain('scale(2)');
 });
