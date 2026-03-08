@@ -20,7 +20,6 @@
   let currentFacingMode = 'environment';
   let currentZoomScale = 1;
   let lastAppliedZoomScale = 1;
-  let ptzSupportedOnCurrentTrack = false;
 
   // ---- Delay configuration (localStorage) ----
   const DELAY_STORAGE_KEY = 'videodelay_seconds';
@@ -49,8 +48,6 @@
   // ---- First-chunk recording state (delay mechanism) ----
   let firstRecorder;
   let firstChunkPromise;
-  let firstRecorderUsesCanvas = false;
-  let firstRecorderCleanup = null;
 
   // ---- User recording state (save/share) ----
   let isRecording = false;
@@ -71,12 +68,6 @@
   let canvasRecorder = null;
   let canvasRecorderChunks = [];
   let canvasRecorderStopResolve = null;
-
-  // Live zoom canvas for chunk recording when PTZ is unavailable
-  let liveZoomCanvasEl = null;
-  let liveZoomCanvasCtx = null;
-  let liveZoomCanvasRafId = null;
-  let liveZoomCanvasStream = null;
 
   // Silent audio for recording compatibility
   let silenceAudioContext = null;
@@ -249,7 +240,7 @@
       stream = await getCameraStream(currentFacingMode);
       liveVideo.srcObject = stream;
       await liveVideo.play();
-      try { await applyZoom(currentZoomScale); } catch (_) {}
+      try { applyZoom(currentZoomScale); } catch (_) {}
 
       function onReady() {
         if (!delayProcessActive || !delayReady) beginDelayProcess();
@@ -372,18 +363,6 @@
       cancelBtn.style.display = 'none';
     }
 
-    // Re-apply CSS zoom to the element in main position only
-    try { applyCssZoomToMainOnly(); } catch (_) {}
-  }
-
-  function applyCssZoomToMainOnly() {
-    if (ptzSupportedOnCurrentTrack) {
-      liveVideo.style.transform = '';
-      delayedVideo.style.transform = '';
-      return;
-    }
-    // Use the animated value if an animation is in progress, otherwise the target
-    setVisualZoom(zoomAnimIntervalId ? currentVisualZoom : currentZoomScale);
   }
 
   // ========================================================================
@@ -487,64 +466,12 @@
 
   function startFirstChunkRecording() {
     return new Promise(resolve => {
-      const useCanvas = !ptzSupportedOnCurrentTrack && typeof HTMLCanvasElement !== 'undefined';
-      firstRecorderUsesCanvas = useCanvas;
-      let sourceStream;
-
-      if (useCanvas) {
-        const sw = liveVideo.videoWidth || 1280;
-        const sh = liveVideo.videoHeight || 720;
-        if (!liveZoomCanvasEl) {
-          liveZoomCanvasEl = document.createElement('canvas');
-          liveZoomCanvasEl.width = Math.max(2, sw);
-          liveZoomCanvasEl.height = Math.max(2, sh);
-          liveZoomCanvasCtx = liveZoomCanvasEl.getContext('2d');
-        } else {
-          liveZoomCanvasEl.width = Math.max(2, sw);
-          liveZoomCanvasEl.height = Math.max(2, sh);
-        }
-
-        function drawLiveZoomed() {
-          try {
-            const scale = Math.max(1, Number(currentZoomScale) || 1);
-            const vw = liveVideo.videoWidth || sw;
-            const vh = liveVideo.videoHeight || sh;
-            if (vw > 0 && vh > 0) {
-              if (scale > 1) {
-                const srcW = Math.max(2, Math.floor(vw / scale));
-                const srcH = Math.max(2, Math.floor(vh / scale));
-                const srcX = Math.floor((vw - srcW) / 2);
-                const srcY = Math.floor((vh - srcH) / 2);
-                liveZoomCanvasCtx.drawImage(liveVideo, srcX, srcY, srcW, srcH, 0, 0, liveZoomCanvasEl.width, liveZoomCanvasEl.height);
-              } else {
-                liveZoomCanvasCtx.drawImage(liveVideo, 0, 0, liveZoomCanvasEl.width, liveZoomCanvasEl.height);
-              }
-            }
-          } catch (_) {}
-          liveZoomCanvasRafId = requestAnimationFrame(drawLiveZoomed);
-        }
-        liveZoomCanvasRafId = requestAnimationFrame(drawLiveZoomed);
-        liveZoomCanvasStream = liveZoomCanvasEl.captureStream ? liveZoomCanvasEl.captureStream(30) : null;
-        sourceStream = liveZoomCanvasStream || stream;
-        firstRecorderCleanup = () => {
-          if (liveZoomCanvasRafId) { cancelAnimationFrame(liveZoomCanvasRafId); liveZoomCanvasRafId = null; }
-          try { if (liveZoomCanvasStream) liveZoomCanvasStream.getTracks().forEach(t => t.stop()); } catch (_) {}
-          liveZoomCanvasStream = null;
-        };
-      } else {
-        sourceStream = stream;
-        firstRecorderCleanup = null;
-      }
-
-      const recorder = new MediaRecorder(sourceStream, { mimeType: 'video/webm; codecs=vp8' });
+      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp8' });
       let blob;
       recorder.ondataavailable = e => {
         if (e.data && e.data.size > 0) blob = e.data;
       };
-      recorder.onstop = () => {
-        try { if (firstRecorderCleanup) firstRecorderCleanup(); } catch (_) {}
-        resolve(blob);
-      };
+      recorder.onstop = () => resolve(blob);
       recorder.start();
       firstRecorder = recorder;
     });
@@ -554,8 +481,6 @@
     if (firstRecorder && firstRecorder.state === 'recording') {
       firstRecorder.stop();
     }
-    try { if (firstRecorderCleanup) firstRecorderCleanup(); } catch (_) {}
-    firstRecorderCleanup = null;
   }
 
   // ========================================================================
@@ -564,54 +489,12 @@
 
   async function recordChunk(durationMs) {
     return new Promise(resolve => {
-      const useCanvas = !ptzSupportedOnCurrentTrack && typeof HTMLCanvasElement !== 'undefined';
-      let localRaf = null;
-      let localCanvas = null;
-      let localCtx = null;
-      let srcStream = stream;
-      if (useCanvas) {
-        const sw = liveVideo.videoWidth || 1280;
-        const sh = liveVideo.videoHeight || 720;
-        localCanvas = document.createElement('canvas');
-        localCanvas.width = Math.max(2, sw);
-        localCanvas.height = Math.max(2, sh);
-        localCtx = localCanvas.getContext('2d');
-        function drawOnce() {
-          try {
-            const scale = Math.max(1, Number(currentZoomScale) || 1);
-            const vw = liveVideo.videoWidth || sw;
-            const vh = liveVideo.videoHeight || sh;
-            if (vw > 0 && vh > 0) {
-              if (scale > 1) {
-                const srcW = Math.max(2, Math.floor(vw / scale));
-                const srcH = Math.max(2, Math.floor(vh / scale));
-                const srcX = Math.floor((vw - srcW) / 2);
-                const srcY = Math.floor((vh - srcH) / 2);
-                localCtx.drawImage(liveVideo, srcX, srcY, srcW, srcH, 0, 0, localCanvas.width, localCanvas.height);
-              } else {
-                localCtx.drawImage(liveVideo, 0, 0, localCanvas.width, localCanvas.height);
-              }
-            }
-          } catch (_) {}
-          localRaf = requestAnimationFrame(drawOnce);
-        }
-        localRaf = requestAnimationFrame(drawOnce);
-        const cap = localCanvas.captureStream ? localCanvas.captureStream(30) : null;
-        if (cap) srcStream = cap;
-      }
-
-      const recorder = new MediaRecorder(srcStream, { mimeType: 'video/webm; codecs=vp8' });
+      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp8' });
       let blob;
       recorder.ondataavailable = e => {
         if (e.data && e.data.size > 0) blob = e.data;
       };
-      recorder.onstop = () => {
-        if (localRaf) { cancelAnimationFrame(localRaf); localRaf = null; }
-        if (srcStream && srcStream !== stream) {
-          try { srcStream.getTracks().forEach(t => t.stop()); } catch (_) {}
-        }
-        resolve(blob);
-      };
+      recorder.onstop = () => resolve(blob);
       recorder.start();
       setTimeout(() => recorder.stop(), durationMs);
     });
@@ -718,19 +601,10 @@
 
     function drawFrame() {
       try {
-        const scale = ptzSupportedOnCurrentTrack ? 1 : Math.max(1, Number(currentZoomScale) || 1);
         const sw = delayedVideo.videoWidth || sourceWidth;
         const sh = delayedVideo.videoHeight || sourceHeight;
         if (sw > 0 && sh > 0) {
-          if (scale > 1) {
-            const srcW = Math.max(2, Math.floor(sw / scale));
-            const srcH = Math.max(2, Math.floor(sh / scale));
-            const srcX = Math.floor((sw - srcW) / 2);
-            const srcY = Math.floor((sh - srcH) / 2);
-            canvasCtx.drawImage(delayedVideo, srcX, srcY, srcW, srcH, 0, 0, canvasEl.width, canvasEl.height);
-          } else {
-            canvasCtx.drawImage(delayedVideo, 0, 0, canvasEl.width, canvasEl.height);
-          }
+          canvasCtx.drawImage(delayedVideo, 0, 0, canvasEl.width, canvasEl.height);
         }
       } catch (_) {}
       canvasRafId = requestAnimationFrame(drawFrame);
@@ -1026,55 +900,6 @@
   }
 
   let zoomAnimIntervalId = null;
-  let currentVisualZoom = 1;
-
-  function setVisualZoom(scale) {
-    currentVisualZoom = scale;
-    [liveVideo, delayedVideo].forEach(el => {
-      if (el.style.zIndex === '1' && el.style.display !== 'none') {
-        el.style.transformOrigin = 'center center';
-        el.style.transform = scale > 1 ? `scale(${scale})` : '';
-      } else {
-        el.style.transform = '';
-      }
-    });
-  }
-
-  function applyCssZoom(targetScale) {
-    if (zoomAnimIntervalId) { clearInterval(zoomAnimIntervalId); zoomAnimIntervalId = null; }
-
-    // Find the start and target indices in ZOOM_STEPS
-    function nearestStepIndex(val) {
-      let best = 0;
-      for (let i = 1; i < ZOOM_STEPS.length; i++) {
-        if (Math.abs(ZOOM_STEPS[i] - val) < Math.abs(ZOOM_STEPS[best] - val)) best = i;
-      }
-      return best;
-    }
-    const startIdx = nearestStepIndex(currentVisualZoom);
-    const targetIdx = nearestStepIndex(targetScale);
-    const direction = targetIdx > startIdx ? 1 : -1;
-
-    // If already there or adjacent, just jump
-    if (startIdx === targetIdx) { setVisualZoom(targetScale); return; }
-
-    // Walk through each intermediate zoom step, one every 500ms
-    let currentIdx = startIdx;
-    // Apply the first intermediate step immediately
-    currentIdx += direction;
-    setVisualZoom(ZOOM_STEPS[currentIdx]);
-
-    if (currentIdx === targetIdx) return;
-
-    zoomAnimIntervalId = setInterval(() => {
-      currentIdx += direction;
-      setVisualZoom(ZOOM_STEPS[currentIdx]);
-      if (currentIdx === targetIdx) {
-        clearInterval(zoomAnimIntervalId);
-        zoomAnimIntervalId = null;
-      }
-    }, 500);
-  }
 
   function getCurrentVideoTrack() {
     try {
@@ -1084,46 +909,67 @@
     }
   }
 
-  async function applyPtzZoomIfSupported(scale) {
+  function applyPtzZoom(scale) {
     const track = getCurrentVideoTrack();
-    if (!track || typeof track.getCapabilities !== 'function') return false;
+    if (!track || typeof track.getCapabilities !== 'function') return;
     let caps;
-    try { caps = track.getCapabilities(); } catch (_) { caps = null; }
-    if (!caps || caps.zoom == null) return false;
+    try { caps = track.getCapabilities(); } catch (_) { return; }
+    if (!caps || caps.zoom == null) return;
     const zoomCaps = typeof caps.zoom === 'number' ? { min: 1, max: caps.zoom } : caps.zoom;
     const min = Number.isFinite(zoomCaps.min) ? zoomCaps.min : 1;
     const max = Number.isFinite(zoomCaps.max) ? zoomCaps.max : Math.max(2, scale);
     const clamped = Math.min(Math.max(scale, min), max);
     try {
-      await track.applyConstraints({ advanced: [{ zoom: clamped }] });
-      ptzSupportedOnCurrentTrack = true;
-      return true;
+      track.applyConstraints({ advanced: [{ zoom: clamped }] });
     } catch (_) {
-      try {
-        await track.applyConstraints({ zoom: clamped });
-        ptzSupportedOnCurrentTrack = true;
-        return true;
-      } catch (_) {
-        ptzSupportedOnCurrentTrack = false;
-        return false;
-      }
+      try { track.applyConstraints({ zoom: clamped }); } catch (_) {}
     }
   }
 
-  async function applyZoom(scale) {
-    currentZoomScale = scale;
-    markSelectedZoom(scale);
-    // Start CSS animation synchronously before any await, so the
-    // interval id is set and updateLayout won't jump to the target.
-    applyCssZoom(scale);
-    const appliedPtz = await applyPtzZoomIfSupported(scale);
-    if (appliedPtz) {
-      // PTZ succeeded — cancel CSS animation and clear transforms
-      if (zoomAnimIntervalId) { clearInterval(zoomAnimIntervalId); zoomAnimIntervalId = null; }
-      try { liveVideo.style.transform = ''; } catch (_) {}
-      try { delayedVideo.style.transform = ''; } catch (_) {}
+  function nearestStepIndex(val) {
+    let best = 0;
+    for (let i = 1; i < ZOOM_STEPS.length; i++) {
+      if (Math.abs(ZOOM_STEPS[i] - val) < Math.abs(ZOOM_STEPS[best] - val)) best = i;
     }
-    lastAppliedZoomScale = scale;
+    return best;
+  }
+
+  function applyZoom(scale) {
+    if (zoomAnimIntervalId) { clearInterval(zoomAnimIntervalId); zoomAnimIntervalId = null; }
+
+    markSelectedZoom(scale);
+
+    const startIdx = nearestStepIndex(lastAppliedZoomScale);
+    const targetIdx = nearestStepIndex(scale);
+    const direction = targetIdx > startIdx ? 1 : -1;
+
+    currentZoomScale = scale;
+
+    if (startIdx === targetIdx) {
+      applyPtzZoom(scale);
+      lastAppliedZoomScale = scale;
+      return;
+    }
+
+    // Apply first intermediate step immediately
+    let currentIdx = startIdx + direction;
+    applyPtzZoom(ZOOM_STEPS[currentIdx]);
+
+    if (currentIdx === targetIdx) {
+      lastAppliedZoomScale = scale;
+      return;
+    }
+
+    // Step through remaining zoom levels every 500ms
+    zoomAnimIntervalId = setInterval(() => {
+      currentIdx += direction;
+      applyPtzZoom(ZOOM_STEPS[currentIdx]);
+      if (currentIdx === targetIdx) {
+        clearInterval(zoomAnimIntervalId);
+        zoomAnimIntervalId = null;
+        lastAppliedZoomScale = scale;
+      }
+    }, 500);
   }
 
   function setupZoomControls() {
@@ -1135,7 +981,7 @@
       btn.type = 'button';
       btn.setAttribute('data-zoom', String(scale));
       btn.textContent = labelForZoom(scale);
-      btn.addEventListener('click', () => { void applyZoom(scale); });
+      btn.addEventListener('click', () => { applyZoom(scale); });
       zoomControls.appendChild(btn);
     });
     markSelectedZoom(currentZoomScale);

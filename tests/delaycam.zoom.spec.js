@@ -9,16 +9,6 @@ test.beforeEach(async ({ context, baseURL, page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('videodelay_seconds', '1');
   });
-  // Disable PTZ so CSS transform path is used in tests
-  await page.addInitScript(() => {
-    try {
-      Object.defineProperty(MediaStreamTrack.prototype, 'getCapabilities', {
-        configurable: true,
-        writable: true,
-        value: function () { return {}; }
-      });
-    } catch (_) {}
-  });
 });
 
 async function navigateToDelayCam(page) {
@@ -62,35 +52,20 @@ test('zoom controls visible with 5 buttons and default 1x selected', async ({ pa
   await expect(page.locator('#zoomControls .zoomBtn.selected')).toHaveText('1x');
 });
 
-// Clicking a zoom button selects it and applies CSS transform (PTZ off)
-test('clicking 2x selects it and applies display zoom', async ({ page }) => {
+// Clicking a zoom button selects it (PTZ-only zoom, no CSS transform)
+test('clicking 2x selects it', async ({ page }) => {
   await navigateToDelayCam(page);
   await zoomButtonByLabel(page, '2x').click();
   await expect(page.locator('#zoomControls .zoomBtn.selected')).toHaveText('2x');
-  // Wait for the zoom animation to step through all levels (4 steps × 500ms)
-  await page.waitForTimeout(2500);
-  const liveTransform = await page.evaluate(() => document.getElementById('liveVideo').style.transform || '');
-  expect(liveTransform).toContain('scale(2)');
 });
 
-// Zoom set in live mode carries over to delayedVideo when switched to main
-test('zoom set in live mode persists and affects delayedVideo in main', async ({ page }) => {
+// Zoom controls visible when live is main, hidden when delayed is main
+test('zoom controls toggle visibility with view switch', async ({ page }) => {
   await navigateToDelayCam(page);
-  await zoomButtonByLabel(page, '1.7x').click();
-  await page.waitForTimeout(700);
-  // Zoom controls visible while live is main
   await expect(page.locator('#zoomControls')).toBeVisible();
-  // Switch delayed video to main
   await enterDelayedMode(page);
   await expect(page.locator('#delayedVideo')).toBeVisible({ timeout: 10000 });
-  // Zoom controls hidden when delayed is main
   await expect(page.locator('#zoomControls')).toBeHidden();
-  const delayedTransform = await page.evaluate(() => document.getElementById('delayedVideo').style.transform || '');
-  const m = /scale\(([^)]+)\)/.exec(delayedTransform);
-  expect(m).not.toBeNull();
-  const scale = Number(m && m[1]);
-  expect(Number.isFinite(scale)).toBeTruthy();
-  expect(Math.abs(scale - 1.7)).toBeLessThan(0.05);
 });
 
 // Basic record flow after zoom to ensure pipeline still works
