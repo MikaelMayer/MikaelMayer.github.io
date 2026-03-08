@@ -899,7 +899,7 @@
     });
   }
 
-  let zoomAnimIntervalId = null;
+  let zoomAnimFrameId = null;
 
   function getCurrentVideoTrack() {
     try {
@@ -931,7 +931,7 @@
   }
 
   function applyZoom(scale) {
-    if (zoomAnimIntervalId) { clearInterval(zoomAnimIntervalId); zoomAnimIntervalId = null; }
+    if (zoomAnimFrameId) { cancelAnimationFrame(zoomAnimFrameId); zoomAnimFrameId = null; }
 
     markSelectedZoom(scale);
     currentZoomScale = scale;
@@ -942,31 +942,25 @@
       return;
     }
 
-    // Interpolate in log-space so perceptual speed is uniform.
-    // Duration: 500ms per x2 factor (i.e. per 1.0 in log2-space).
     const logStart = Math.log2(startZoom);
     const logTarget = Math.log2(scale);
     const logDist = Math.abs(logTarget - logStart);
     const duration = Math.max(100, logDist * 500);
+    const startTime = performance.now();
 
-    const TICK_MS = 62.5;
-    const startTime = Date.now();
-
-    applyPtzZoom(startZoom);
-
-    zoomAnimIntervalId = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const t = Math.min(1, elapsed / duration);
+    function tick(now) {
+      const t = Math.min(1, (now - startTime) / duration);
       const eased = easeInOut(t);
       const logCurrent = logStart + (logTarget - logStart) * eased;
-      const currentZoom = Math.pow(2, logCurrent);
-      applyPtzZoom(currentZoom);
-      if (t >= 1) {
-        clearInterval(zoomAnimIntervalId);
-        zoomAnimIntervalId = null;
+      applyPtzZoom(Math.pow(2, logCurrent));
+      if (t < 1) {
+        zoomAnimFrameId = requestAnimationFrame(tick);
+      } else {
+        zoomAnimFrameId = null;
         lastAppliedZoomScale = scale;
       }
-    }, TICK_MS);
+    }
+    zoomAnimFrameId = requestAnimationFrame(tick);
   }
 
   function setupZoomControls() {
