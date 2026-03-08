@@ -2,15 +2,17 @@
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 
-test.beforeEach(async ({ context, baseURL }) => {
+test.beforeEach(async ({ context, baseURL, page }) => {
   if (baseURL) {
     await context.grantPermissions(['camera'], { origin: baseURL });
   }
+  // Use a short delay for faster tests
+  await page.addInitScript(() => {
+    localStorage.setItem('videodelay_seconds', '1');
+  });
 });
 
-// Smoke test: page loads and UI elements exist
 async function navigateToDelayCam(page) {
-  // Prefer the PWA path; fallback to top-level html
   const firstPath = '/apps/videodelay/index.html';
   const secondPath = '/apps/videodelay.html';
   let res = await page.goto(firstPath);
@@ -19,35 +21,37 @@ async function navigateToDelayCam(page) {
   }
 }
 
-async function clickVideo(page) {
-  await page.locator('#liveVideo').click({ position: { x: 20, y: 700 }, force: true });
+async function waitForDelayedReady(page) {
+  await page.locator('#delayedVideo').waitFor({ state: 'visible', timeout: 10000 });
+}
+
+async function switchToDelayedMain(page) {
+  await page.locator('#delayedVideo').click({ force: true });
+  await page.waitForTimeout(200);
 }
 
 async function clickRec(page) {
   await page.locator('#recBtn').click({ force: true });
 }
 
-test('loads and can tap to set delay', async ({ page }) => {
+test('loads with auto delay and shows delayed video after countdown', async ({ page }) => {
   await navigateToDelayCam(page);
   await expect(page.locator('#liveVideo')).toBeVisible();
   await expect(page.locator('#versionLabel')).toHaveText(/\d+\.\d+\.\d+/);
-  await clickVideo(page); // start stopwatch
-  await page.waitForTimeout(500);
-  await clickVideo(page); // freeze delay and switch UI
-  await page.waitForTimeout(200); // allow UI to switch
+  await expect(page.locator('#delayLabel')).toBeVisible();
+  // Wait for delayed stream to become available in the thumbnail
+  await waitForDelayedReady(page);
   await expect(page.locator('#delayedVideo')).toBeVisible();
-  await expect(page.locator('#miniLive')).toBeVisible();
+  // Click thumbnail to switch delayed to main view
+  await switchToDelayedMain(page);
   await expect(page.locator('#recBtn')).toBeVisible();
 });
 
-// Optional quick record/stop smoke: just toggles without verifying file integrity
-// (fake media will not produce real frames)
 test('can record then save without error', async ({ page }) => {
   await navigateToDelayCam(page);
-  await clickVideo(page);
-  await page.waitForTimeout(300);
-  await clickVideo(page);
-  await page.waitForTimeout(200);
+  await waitForDelayedReady(page);
+  await switchToDelayedMain(page);
+  await expect(page.locator('#recBtn')).toBeVisible({ timeout: 5000 });
   await clickRec(page); // start
   await page.waitForTimeout(700);
   await clickRec(page); // stop -> shows SAVE
@@ -64,10 +68,8 @@ test('can record then save without error', async ({ page }) => {
 
 test('two consecutive recordings produce two distinct non-empty downloads', async ({ page }) => {
   await navigateToDelayCam(page);
-  await clickVideo(page);
-  await page.waitForTimeout(300);
-  await clickVideo(page);
-  await page.waitForTimeout(200);
+  await waitForDelayedReady(page);
+  await switchToDelayedMain(page);
 
   const paths = [];
   // First recording

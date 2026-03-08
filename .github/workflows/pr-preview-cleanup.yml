@@ -5,6 +5,7 @@ on:
     types: [closed]
 
 permissions:
+  contents: write
   pull-requests: write
 
 concurrency:
@@ -13,10 +14,30 @@ concurrency:
 
 jobs:
   cleanup:
-    name: Mark PR preview as closed
+    name: Remove PR preview from gh-pages
     runs-on: ubuntu-latest
     if: github.event.pull_request.head.repo.full_name == github.repository
     steps:
+      - name: Checkout gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+
+      - name: Delete preview folder
+        run: |
+          PREVIEW_DIR="pr-preview/pr-${{ github.event.pull_request.number }}"
+          if [ -d "$PREVIEW_DIR" ]; then
+            rm -rf "$PREVIEW_DIR"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git diff --staged --quiet || git commit -m "Remove preview for PR #${{ github.event.pull_request.number }}"
+            git push
+            echo "Removed $PREVIEW_DIR"
+          else
+            echo "No preview folder found at $PREVIEW_DIR — nothing to clean up"
+          fi
+
       - name: Find existing preview comment
         id: preview-comment
         uses: peter-evans/find-comment@v3
@@ -25,7 +46,7 @@ jobs:
           comment-author: github-actions[bot]
           body-includes: "PR Preview deployed"
 
-      - name: Update comment (preview closed)
+      - name: Update comment (preview removed)
         if: steps.preview-comment.outputs.comment-id != ''
         uses: peter-evans/create-or-update-comment@v4
         with:
@@ -33,6 +54,6 @@ jobs:
           comment-id: ${{ steps.preview-comment.outputs.comment-id }}
           edit-mode: replace
           body: |
-            💤 **PR Preview closed**
+            🗑️ **PR Preview removed**
 
-            This PR is closed, so its preview deployment may no longer be available.
+            This PR was closed and its preview deployment has been deleted from GitHub Pages.
