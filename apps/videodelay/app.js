@@ -382,7 +382,8 @@
       delayedVideo.style.transform = '';
       return;
     }
-    setVisualZoom(currentZoomScale);
+    // Use the animated value if an animation is in progress, otherwise the target
+    setVisualZoom(zoomAnimIntervalId ? currentVisualZoom : currentZoomScale);
   }
 
   // ========================================================================
@@ -1053,8 +1054,20 @@
     zoomAnimIntervalId = setInterval(() => {
       const t = Math.min(1, (Date.now() - startTime) / duration);
       const eased = 1 - Math.pow(1 - t, 3);
-      setVisualZoom(startScale + (targetScale - startScale) * eased);
-      if (t >= 1) { clearInterval(zoomAnimIntervalId); zoomAnimIntervalId = null; }
+      const scale = startScale + (targetScale - startScale) * eased;
+      currentVisualZoom = scale;
+      [liveVideo, delayedVideo].forEach(el => {
+        if (el.style.zIndex === '1' && el.style.display !== 'none') {
+          el.style.transformOrigin = 'center center';
+          el.style.transform = `scale(${scale})`;
+          void el.offsetWidth;
+        }
+      });
+      if (t >= 1) {
+        clearInterval(zoomAnimIntervalId);
+        zoomAnimIntervalId = null;
+        setVisualZoom(targetScale);
+      }
     }, TICK_MS);
   }
 
