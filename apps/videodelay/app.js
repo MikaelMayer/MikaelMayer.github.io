@@ -281,7 +281,7 @@
 
   async function takePicture() {
     if (!picBtn) return;
-    const previous = picBtn.textContent || 'PIC';
+    const previous = picBtn.textContent || '📸';
     try {
       picBtn.disabled = true;
       picBtn.textContent = '...';
