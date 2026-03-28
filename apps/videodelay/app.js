@@ -10,6 +10,7 @@
   const delayLabel = document.getElementById('delayLabel');
   const switchBtn = document.getElementById('switchBtn');
   const copyLinkBtn = document.getElementById('copyLinkBtn');
+  const picBtn = document.getElementById('picBtn');
   const recBtn = document.getElementById('recBtn');
   const cancelBtn = document.getElementById('cancelBtn');
   const recordDot = document.getElementById('recordDot');
@@ -147,6 +148,12 @@
         return 'mp4';
       case 'video/ogg':
         return 'ogv';
+      case 'image/jpeg':
+        return 'jpg';
+      case 'image/png':
+        return 'png';
+      case 'image/webp':
+        return 'webp';
       case 'video/webm':
       default:
         return 'webm';
@@ -166,7 +173,7 @@
           suggestedName,
           types: [
             {
-              description: 'Video',
+              description: 'Media',
               accept: { [normalizeMimeType(blob.type)]: [ext] }
             }
           ]
@@ -201,16 +208,92 @@
     return clicked;
   }
 
-  async function shareBlobOrSave(blob, suggestedName) {
+  async function shareBlobOrSave(blob, suggestedName, shareTitle) {
     try {
-      const file = new File([blob], suggestedName, { type: blob.type || 'video/mp4' });
+      const file = new File([blob], suggestedName, { type: blob.type || 'application/octet-stream' });
       const canShareFiles = typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] });
       if (canShareFiles && typeof navigator.share === 'function') {
-        await navigator.share({ files: [file], title: 'Delayed recording' });
+        await navigator.share({ files: [file], title: shareTitle || 'Delayed capture' });
         return true;
       }
     } catch (_) { /* fallback to save */ }
     return saveBlobAs(blob, suggestedName);
+  }
+
+  function extractCssUrl(value) {
+    const m = /^url\((['"]?)(.+?)\1\)$/.exec(String(value || '').trim());
+    return m ? m[2] : '';
+  }
+
+  function imageFromUrl(url) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = url;
+    });
+  }
+
+  function getCurrentMainViewSource() {
+    if (!delayProcessActive || mainIsLive) return liveVideo;
+    if (delayReady) return delayedVideo;
+    return frozenView;
+  }
+
+  async function capturePhotoBlobFromCurrentView() {
+    const source = getCurrentMainViewSource();
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas not supported');
+
+    if (source === frozenView) {
+      const bgUrl = extractCssUrl(frozenView.style.backgroundImage);
+      if (bgUrl) {
+        const img = await imageFromUrl(bgUrl);
+        const w = img.naturalWidth || 1280;
+        const h = img.naturalHeight || 720;
+        canvas.width = w;
+        canvas.height = h;
+        ctx.drawImage(img, 0, 0, w, h);
+      } else {
+        const w = liveVideo.videoWidth || 1280;
+        const h = liveVideo.videoHeight || 720;
+        canvas.width = w;
+        canvas.height = h;
+        ctx.drawImage(liveVideo, 0, 0, w, h);
+      }
+    } else {
+      const w = source.videoWidth || 0;
+      const h = source.videoHeight || 0;
+      if (!w || !h) throw new Error('Video frame not ready');
+      canvas.width = w;
+      canvas.height = h;
+      ctx.drawImage(source, 0, 0, w, h);
+    }
+
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(blob => {
+        if (blob && blob.size > 0) resolve(blob);
+        else reject(new Error('Could not encode image'));
+      }, 'image/jpeg', 0.92);
+    });
+  }
+
+  async function takePicture() {
+    if (!picBtn) return;
+    const previous = picBtn.textContent || '📸';
+    try {
+      picBtn.disabled = true;
+      picBtn.textContent = '...';
+      const blob = await capturePhotoBlobFromCurrentView();
+      const filename = `delayed-picture-${Date.now()}.${getExtensionFromMime(blob.type)}`;
+      await shareBlobOrSave(blob, filename, 'Delayed snapshot');
+    } catch (e) {
+      console.error('Picture capture failed', e);
+    } finally {
+      picBtn.disabled = false;
+      picBtn.textContent = previous;
+    }
   }
 
   // ========================================================================
@@ -675,7 +758,7 @@
         const filename = `delayed-recording-${Date.now()}.${ext}`;
         try {
           recBtn.disabled = true;
-          await shareBlobOrSave(blob, filename);
+          await shareBlobOrSave(blob, filename, 'Delayed recording');
         } finally {
           recBtn.disabled = false;
           recBtn.textContent = 'REC';
@@ -844,6 +927,11 @@
   // REC button
   recBtn.addEventListener('click', () => { void toggleRecording(); });
 
+  // Picture button
+  if (picBtn) {
+    picBtn.addEventListener('click', () => { void takePicture(); });
+  }
+
   // Cancel button: stop current recording and reset UI
   if (cancelBtn) {
     cancelBtn.addEventListener('click', async () => {
@@ -882,10 +970,10 @@
   // Zoom controls
   // ========================================================================
 
-  const ZOOM_STEPS = Array.from({ length: 5 }, (_, i) => Math.pow(2, i / 4));
+  const ZOOM_STEPS = [1, 1.4, 2, 2.8, 4];
 
   function labelForZoom(scale) {
-    const fixed = (scale === 1 || Math.abs(scale - 2) < 1e-9) ? scale.toFixed(0) : scale.toFixed(1);
+    const fixed = Number.isInteger(scale) ? String(scale) : scale.toFixed(1);
     return `${fixed}x`;
   }
 
