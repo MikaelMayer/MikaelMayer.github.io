@@ -21,6 +21,11 @@
   let currentFacingMode = 'environment';
   let currentZoomScale = 1;
   let lastAppliedZoomScale = 1;
+  const CAMERA_QUALITY_PROFILES = [
+    { width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: { ideal: 30, max: 60 }, aspectRatio: { ideal: 16 / 9 }, resizeMode: 'none' },
+    { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30, max: 60 }, aspectRatio: { ideal: 16 / 9 }, resizeMode: 'none' }
+  ];
+  const LOOP_RECORDING_OPTIONS = { mimeType: 'video/webm; codecs=vp8', videoBitsPerSecond: 12_000_000 };
 
   // ---- Delay configuration (localStorage) ----
   const DELAY_STORAGE_KEY = 'videodelay_seconds';
@@ -301,11 +306,14 @@
   // ========================================================================
 
   async function getCameraStream(facingMode) {
-    const attempts = [
-      { video: { facingMode: { exact: facingMode } }, audio: false },
-      { video: { facingMode }, audio: false },
-      { video: true, audio: false }
-    ];
+    const attempts = [];
+    CAMERA_QUALITY_PROFILES.forEach(profile => {
+      attempts.push({ video: { ...profile, facingMode: { exact: facingMode } }, audio: false });
+      attempts.push({ video: { ...profile, facingMode }, audio: false });
+    });
+    attempts.push({ video: { facingMode: { exact: facingMode } }, audio: false });
+    attempts.push({ video: { facingMode }, audio: false });
+    attempts.push({ video: true, audio: false });
     let lastError;
     for (const constraints of attempts) {
       try {
@@ -322,6 +330,12 @@
     try {
       stream = await getCameraStream(currentFacingMode);
       liveVideo.srcObject = stream;
+      try {
+        const videoTrack = stream.getVideoTracks && stream.getVideoTracks()[0];
+        if (videoTrack && typeof videoTrack.contentHint === 'string') {
+          videoTrack.contentHint = 'detail';
+        }
+      } catch (_) {}
       await liveVideo.play();
       try { applyZoom(currentZoomScale); } catch (_) {}
 
@@ -510,7 +524,7 @@
     try {
       const vw = liveVideo.videoWidth || 640;
       const vh = liveVideo.videoHeight || 480;
-      const maxDim = 640;
+      const maxDim = 1280;
       const scale = Math.min(maxDim / vw, maxDim / vh, 1);
       const w = Math.round(vw * scale);
       const h = Math.round(vh * scale);
@@ -518,7 +532,7 @@
       c.width = w;
       c.height = h;
       c.getContext('2d').drawImage(liveVideo, 0, 0, w, h);
-      frozenView.style.backgroundImage = `url(${c.toDataURL('image/jpeg', 0.7)})`;
+      frozenView.style.backgroundImage = `url(${c.toDataURL('image/jpeg', 0.9)})`;
     } catch (_) {
       frozenView.style.backgroundColor = '#333';
     }
@@ -549,7 +563,7 @@
 
   function startFirstChunkRecording() {
     return new Promise(resolve => {
-      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp8' });
+      const recorder = new MediaRecorder(stream, LOOP_RECORDING_OPTIONS);
       let blob;
       recorder.ondataavailable = e => {
         if (e.data && e.data.size > 0) blob = e.data;
@@ -572,7 +586,7 @@
 
   async function recordChunk(durationMs) {
     return new Promise(resolve => {
-      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp8' });
+      const recorder = new MediaRecorder(stream, LOOP_RECORDING_OPTIONS);
       let blob;
       recorder.ondataavailable = e => {
         if (e.data && e.data.size > 0) blob = e.data;
@@ -628,7 +642,7 @@
       try { recStream.addTrack(silentTrack); } catch (_) {}
     }
     const mimeType = chooseBestMimeType();
-    const options = mimeType ? { mimeType, videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 96_000 } : { videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 96_000 };
+    const options = mimeType ? { mimeType, videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 128_000 } : { videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 128_000 };
     elementRecorder = new MediaRecorder(recStream, options);
     elementRecorder.ondataavailable = e => {
       if (e.data && e.data.size > 0) {
@@ -667,8 +681,8 @@
     if (!delayedVideo) return;
     const sourceWidth = delayedVideo.videoWidth || 1280;
     const sourceHeight = delayedVideo.videoHeight || 720;
-    const maxWidth = 1280;
-    const maxHeight = 720;
+    const maxWidth = 1920;
+    const maxHeight = 1080;
     const scl = Math.min(maxWidth / sourceWidth, maxHeight / sourceHeight, 1);
     const width = Math.max(2, Math.floor(sourceWidth * scl));
     const height = Math.max(2, Math.floor(sourceHeight * scl));
@@ -705,7 +719,7 @@
       try { recStream.addTrack(silentTrack); } catch (_) {}
     }
     const mimeType = chooseBestMimeType();
-    const options = mimeType ? { mimeType, videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 96_000 } : { videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 96_000 };
+    const options = mimeType ? { mimeType, videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 128_000 } : { videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 128_000 };
     canvasRecorder = new MediaRecorder(recStream, options);
     canvasRecorder.ondataavailable = e => {
       if (e.data && e.data.size > 0) {
