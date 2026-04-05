@@ -35,6 +35,12 @@ test('SAVE triggers download with correct extension when share unsupported', asy
   await goToDelayedMode(page);
   await expect(page.locator('#recBtn')).toBeVisible({ timeout: 5000 });
 
+  await page.evaluate(() => {
+    const nav = navigator;
+    nav.share = undefined;
+    nav.canShare = undefined;
+  });
+
   await clickRec(page);
   await page.waitForTimeout(700);
   await clickRec(page); // shows SAVE
@@ -52,15 +58,22 @@ test('SAVE triggers download with correct extension when share unsupported', asy
   await expect(page.locator('#recBtn')).toHaveText('REC');
 });
 
-// When share is available, SAVE should call navigator.share with a File
-test('SAVE uses Web Share API when available and passes a File', async ({ page }) => {
+// When share is available, SHARE should call navigator.share with a File
+test('SHARE uses Web Share API when available and passes a File', async ({ page }) => {
   await goToDelayedMode(page);
   await expect(page.locator('#recBtn')).toBeVisible({ timeout: 5000 });
 
+  // Make share available before stopping so the button can switch to SHARE.
+  await page.evaluate(() => {
+    const nav = navigator;
+    nav.canShare = (data) => !!(data && data.files && data.files.length);
+    nav.share = async () => {};
+  });
+
   await clickRec(page);
   await page.waitForTimeout(700);
-  await clickRec(page); // shows SAVE
-  await expect(page.locator('#recBtn')).toHaveText('SAVE');
+  await clickRec(page); // shows SHARE
+  await expect(page.locator('#recBtn')).toHaveText('SHARE');
 
   // Stub share APIs in the page to capture the shared file
   await page.evaluate(() => {
@@ -75,7 +88,7 @@ test('SAVE uses Web Share API when available and passes a File', async ({ page }
     };
   });
 
-  // Click SAVE; this should call navigator.share and NOT download
+  // Click SHARE; this should call navigator.share and NOT download
   await clickRec(page);
 
   // Give the promise chain a moment to resolve

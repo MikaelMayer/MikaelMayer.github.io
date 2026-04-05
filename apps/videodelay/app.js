@@ -216,8 +216,16 @@
   async function shareBlobOrSave(blob, suggestedName, shareTitle) {
     try {
       const file = new File([blob], suggestedName, { type: blob.type || 'application/octet-stream' });
-      const canShareFiles = typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] });
-      if (canShareFiles && typeof navigator.share === 'function') {
+      const canShareFiles = (function () {
+        try {
+          if (typeof navigator === 'undefined' || typeof navigator.share !== 'function') return false;
+          if (typeof navigator.canShare !== 'function') return true;
+          return !!navigator.canShare({ files: [file] });
+        } catch (_) {
+          return false;
+        }
+      }());
+      if (canShareFiles) {
         await navigator.share({ files: [file], title: shareTitle || 'Delayed capture' });
         return true;
       }
@@ -819,8 +827,7 @@
         readyToSaveBlob = blob;
         const supportsShare = (function () {
           try {
-            const file = new File([new Blob(['x'], { type: 'video/webm' })], 'x.webm', { type: 'video/webm' });
-            return !!(navigator && navigator.canShare && navigator.share && navigator.canShare({ files: [file] }));
+            return typeof navigator !== 'undefined' && typeof navigator.share === 'function';
           } catch (_) { return false; }
         }());
         recBtn.textContent = supportsShare ? 'SHARE' : 'SAVE';
