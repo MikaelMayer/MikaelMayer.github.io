@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="description" content="Reflex4You explore mode – thumbnail maze for parameters." />
+  <link rel="manifest" href="./manifest.json" />
+  <script src="./orientation-lock.js"></script>
+  <script src="./wake-lock.js"></script>
+  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
+  <title>Reflex4You – Explore parameters</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      font-family: system-ui, sans-serif;
+      color: rgba(255,255,255,0.92);
+    }
+
+    :root {
+      --safe-area-top: 0px;
+      --safe-area-bottom: 0px;
+      --top-percent: 66%;
+      --grid-gap: 8px;
+    }
+
+    @supports (top: env(safe-area-inset-top)) {
+      :root {
+        --safe-area-top: env(safe-area-inset-top);
+        --safe-area-bottom: env(safe-area-inset-bottom);
+      }
+    }
+
+    #layout {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #top-pane {
+      position: relative;
+      height: var(--top-percent);
+      min-height: 160px;
+      flex: 0 0 auto;
+      border-bottom: 1px solid rgba(255,255,255,0.10);
+    }
+
+    #bottom-pane {
+      position: relative;
+      flex: 1 1 auto;
+      min-height: 160px;
+      padding: var(--grid-gap);
+      padding-bottom: calc(var(--grid-gap) + var(--safe-area-bottom));
+      box-sizing: border-box;
+      background: rgba(0,0,0,0.92);
+    }
+
+    #main-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+    #error {
+      position: fixed;
+      left: 12px;
+      right: 12px;
+      top: calc(var(--safe-area-top) + 64px);
+      padding: 8px 12px;
+      font-size: 13px;
+      color: #ffb4b4;
+      background: rgba(20, 0, 0, 0.9);
+      box-sizing: border-box;
+      max-height: 40vh;
+      overflow: auto;
+      display: none;
+      pointer-events: none;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      white-space: pre;
+      z-index: 60;
+    }
+
+    /* Reuse menu style (close to index.html). */
+    #menu-container {
+      position: fixed;
+      top: calc(var(--safe-area-top) + 12px);
+      right: 12px;
+      z-index: 70;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+      pointer-events: auto;
+    }
+
+    #menu-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    #menu-anchor {
+      position: relative;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+
+    .icon-button {
+      width: 44px;
+      height: 44px;
+      border-radius: 22px;
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      background: rgba(0, 0, 0, 0.65);
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      padding: 0;
+      color: #fff;
+      touch-action: manipulation;
+      transition: border-color 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+    }
+
+    .icon-button:hover,
+    .icon-button:focus-visible {
+      border-color: rgba(255, 255, 255, 0.9);
+      background: rgba(0, 0, 0, 0.85);
+      outline: none;
+    }
+
+    .icon-button:disabled {
+      opacity: 0.35;
+      cursor: default;
+      pointer-events: none;
+    }
+
+    .icon-button svg {
+      width: 22px;
+      height: 22px;
+      display: block;
+    }
+
+    #menu-button {
+      width: 44px;
+      height: 44px;
+      border-radius: 22px;
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      background: rgba(0, 0, 0, 0.65);
+      display: inline-flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      padding: 0;
+      color: #fff;
+      touch-action: manipulation;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    #menu-button:hover,
+    #menu-button:focus-visible {
+      border-color: rgba(255, 255, 255, 0.9);
+      background: rgba(0, 0, 0, 0.85);
+      outline: none;
+    }
+
+    #menu-button span {
+      width: 20px;
+      height: 2px;
+      border-radius: 2px;
+      background: currentColor;
+      display: block;
+    }
+
+    #menu-dropdown {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      background: rgba(0, 0, 0, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 10px;
+      min-width: 200px;
+      padding: 6px 0;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      opacity: 0;
+      transform: translateY(-6px);
+      pointer-events: none;
+      visibility: hidden;
+      transition: opacity 0.12s ease, transform 0.12s ease;
+    }
+
+    #menu-dropdown.menu-dropdown--open {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+      visibility: visible;
+    }
+
+    .menu-dropdown__item {
+      background: transparent;
+      border: 0;
+      color: #f1f1f1;
+      font-size: 14px;
+      padding: 10px 16px;
+      text-align: right;
+      cursor: pointer;
+      width: 100%;
+    }
+
+    .menu-dropdown__item:hover,
+    .menu-dropdown__item:focus-visible {
+      background: rgba(255, 255, 255, 0.08);
+      outline: none;
+    }
+
+    #choices-grid {
+      height: 100%;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-rows: repeat(2, minmax(0, 1fr));
+      gap: var(--grid-gap);
+    }
+
+    .thumb-button {
+      appearance: none;
+      border: 0;
+      background: transparent;
+      border-radius: 12px;
+      /* Distance is represented as an inset inside the cell. */
+      padding: var(--thumb-inset, 0px);
+      margin: 0;
+      overflow: hidden;
+      position: relative;
+      cursor: pointer;
+      touch-action: manipulation;
+      display: flex;
+      align-items: stretch;
+      justify-content: stretch;
+      min-height: 0;
+      min-width: 0;
+    }
+
+    .thumb-button:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.16);
+    }
+
+    .thumb-button.selected {
+      box-shadow:
+        0 0 0 2px rgba(158, 240, 255, 0.92),
+        0 0 0 6px rgba(158, 240, 255, 0.10);
+    }
+
+    /* When a choice is clicked, hide all other choices immediately. */
+    .thumb-button.thumb-button--hidden {
+      opacity: 0;
+      transform: scale(0.98);
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    /* Global "frozen" mode: avoid hover/active feedback while disabled. */
+    body.ui-frozen .thumb-button,
+    body.ui-frozen .icon-button,
+    body.ui-frozen #menu-button,
+    body.ui-frozen .menu-dropdown__item {
+      cursor: default !important;
+    }
+
+    .thumb-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      border-radius: 8px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .refresh-button {
+      border: 1px dashed rgba(255, 255, 255, 0.24);
+      background: rgba(0, 0, 0, 0.35);
+      color: rgba(255, 255, 255, 0.92);
+      font-size: 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .refresh-button svg {
+      width: 20px;
+      height: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div id="menu-container">
+    <div id="menu-top-row">
+      <button id="undo-button" class="icon-button" type="button" aria-label="Undo" title="Undo" disabled>
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M9 9H4V4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M4 9c1.6-3.4 5-5.5 8.8-5.5 5.4 0 9.7 4.3 9.7 9.7 0 5.4-4.3 9.7-9.7 9.7-3.4 0-6.4-1.6-8.2-4.2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+      <button id="redo-button" class="icon-button" type="button" aria-label="Redo" title="Redo" disabled>
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M15 9h5V4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M20 9c-1.6-3.4-5-5.5-8.8-5.5C5.8 3.5 1.5 7.8 1.5 13.2c0 5.4 4.3 9.7 9.7 9.7 3.4 0 6.4-1.6 8.2-4.2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+      <div id="menu-anchor">
+        <button
+          id="menu-button"
+          type="button"
+          aria-label="Open menu"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          aria-controls="menu-dropdown"
+        >
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+        </button>
+        <div id="menu-dropdown" role="menu" aria-hidden="true">
+          <button type="button" class="menu-dropdown__item" data-menu-action="copy-explore-link" role="menuitem">
+            Copy explore link
+          </button>
+          <button type="button" class="menu-dropdown__item" data-menu-action="back-to-edit" role="menuitem">
+            Back to edit mode
+          </button>
+          <button type="button" class="menu-dropdown__item" data-menu-action="open-readme" role="menuitem">
+            README / docs
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="error"></div>
+
+  <div id="layout">
+    <div id="top-pane">
+      <canvas id="main-canvas"></canvas>
+    </div>
+    <div id="bottom-pane">
+      <div id="choices-grid">
+        <!-- 7 thumbnails + 1 refresh slot, populated by JS -->
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // Cache-bust module import in PR previews (HTML updates sooner than JS sometimes).
+    const HTML_BUILD_ID = 'pr161-c3a986e932ae4f4951cb091180d7062c6773dafa';
+    window.__reflexHtmlBuildId = HTML_BUILD_ID;
+    import(`./explore-page.mjs?build=${encodeURIComponent(HTML_BUILD_ID)}`);
+  </script>
+</body>
+</html>
+

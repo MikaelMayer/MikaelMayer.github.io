@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="description" content="Reflex4You formula view." />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
+  <title>Reflex4You – Formula</title>
+  <!-- MathJax v3 (SVG output) -->
+  <script>
+    window.MathJax = {
+      startup: { typeset: false },
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+      svg: { fontCache: 'none' }, // self-contained-ish SVGs; nicer for copying/export
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg0: #06070a;
+      --bg1: #0b1020;
+      --panel: rgba(10, 12, 18, 0.72);
+      --panel-border: rgba(255, 255, 255, 0.10);
+      --text: rgba(255, 255, 255, 0.90);
+      --muted: rgba(255, 255, 255, 0.62);
+      --accent: #7dd3fc;
+      --danger: #ffb4b4;
+    }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: radial-gradient(1200px 900px at 15% 10%, #162044 0%, var(--bg0) 55%, #020308 100%);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+    }
+
+    mjx-assistive-mml {
+      display: none !important;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .page {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 18px 16px 40px;
+      box-sizing: border-box;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .brand {
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--panel-border);
+      background: rgba(0, 0, 0, 0.22);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1;
+    }
+    .chip strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .card {
+      border: 1px solid var(--panel-border);
+      background: var(--panel);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+    }
+
+    .card__header {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      gap: 12px;
+      align-items: baseline;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .card__header h1 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 650;
+      letter-spacing: 0.01em;
+    }
+
+    .card__body {
+      padding: 18px 16px 16px;
+    }
+
+    .editor {
+      margin: 0 0 12px;
+    }
+
+    .editor__label {
+      margin: 0 0 6px;
+      font-size: 12px;
+      letter-spacing: 0.02em;
+      color: var(--muted);
+    }
+
+    .editor__input {
+      width: 100%;
+      box-sizing: border-box;
+      resize: vertical;
+      min-height: 3.6em;
+      max-height: 40vh;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(0, 0, 0, 0.22);
+      color: rgba(255, 255, 255, 0.92);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 14px;
+      line-height: 1.35;
+      outline: none;
+    }
+
+    .editor__input:focus-visible {
+      border-color: rgba(125, 211, 252, 0.55);
+      box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.12);
+    }
+
+    .error {
+      display: none;
+      margin: 0 0 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 180, 180, 0.35);
+      background: rgba(35, 0, 0, 0.55);
+      color: var(--danger);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      white-space: pre;
+      overflow: auto;
+      max-height: 42vh;
+    }
+
+    .formula {
+      padding: 0;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(0, 0, 0, 0.28);
+      overflow: hidden;
+      color: rgba(255, 255, 255, 0.92);
+    }
+
+    .formula-canvas {
+      display: block;
+      width: 100%;
+      height: 220px;
+    }
+
+    .block-label {
+      margin: 0 0 6px;
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+    }
+
+    .block-help {
+      margin: 0 0 10px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.72);
+      line-height: 1.4;
+    }
+
+    .stale-warning {
+      display: none;
+      margin: 0 0 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 210, 125, 0.35);
+      background: rgba(40, 26, 0, 0.45);
+      color: rgba(255, 235, 200, 0.92);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .stale-actions {
+      display: none;
+      margin: 0 0 12px;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.28);
+      color: rgba(255, 255, 255, 0.9);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      padding: 8px 10px;
+      cursor: pointer;
+    }
+
+    .btn:hover,
+    .btn:focus-visible {
+      border-color: rgba(255, 255, 255, 0.32);
+      outline: none;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin: 10px 0 12px;
+    }
+    .controls__field {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .controls__label {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+    }
+    .controls__input {
+      width: 120px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(0, 0, 0, 0.22);
+      color: rgba(255, 255, 255, 0.92);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      outline: none;
+    }
+    .controls__input:focus-visible {
+      border-color: rgba(125, 211, 252, 0.55);
+      box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.12);
+    }
+    .preset {
+      padding: 6px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(0, 0, 0, 0.18);
+      color: rgba(255, 255, 255, 0.86);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .preset:hover,
+    .preset:focus-visible {
+      border-color: rgba(255, 255, 255, 0.32);
+      outline: none;
+    }
+
+    .build-info {
+      margin: 0 0 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      background: rgba(0, 0, 0, 0.20);
+      color: rgba(255, 255, 255, 0.82);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* Canvas is responsive; JS sizes the backing store to match. */
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="topbar">
+      <div class="brand">Reflex4You</div>
+      <a class="chip" href="./index.html">
+        <strong>Back</strong>
+        <span>to viewer</span>
+      </a>
+    </div>
+
+    <div class="card">
+      <div class="card__body">
+        <pre id="stale-warning" class="stale-warning" aria-live="polite"></pre>
+        <div id="stale-actions" class="stale-actions">
+          <button id="fix-cache" class="btn" type="button">Fix cache now (unregister SW + clear caches)</button>
+          <button id="refresh-build" class="btn" type="button">Re-check build info</button>
+        </div>
+        <pre id="build-info" class="build-info" aria-label="Build info"></pre>
+        <div class="editor">
+          <p class="editor__label">Reflex source (updates live)</p>
+          <textarea id="formula-input" class="editor__input" spellcheck="false" aria-label="Formula source"></textarea>
+        </div>
+        <pre id="formula-error" class="error" aria-live="polite"></pre>
+        <p class="block-label">Preview (Canvas)</p>
+        <p class="block-help">This is rasterized from MathJax’s SVG output and drawn onto a canvas.</p>
+        <div class="controls">
+          <div class="controls__field">
+            <span class="controls__label">Canvas background (RRGGBBAA)</span>
+            <input id="bghex" class="controls__input" type="text" value="ffffff80" spellcheck="false" inputmode="text" aria-label="Canvas background in RRGGBBAA hex" />
+            <button class="preset" type="button" data-bghex="ffffff80">white50</button>
+            <button class="preset" type="button" data-bghex="1e3a8aff">blue</button>
+            <button class="preset" type="button" data-bghex="000000ff">black</button>
+            <button class="preset" type="button" data-bghex="00000000">transparent</button>
+          </div>
+          <button id="download-png" class="btn" type="button" disabled>Download PNG</button>
+        </div>
+        <div class="formula" aria-label="Rendered formula">
+          <canvas id="formula-render" class="formula-canvas"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // Cache-bust module import in PR previews (HTML updates sooner than JS sometimes).
+    const HTML_BUILD_ID = 'pr99-b1b0eefe4ef7ccbd3701f512936c32d4c4bbffac';
+    window.__reflexHtmlBuildId = HTML_BUILD_ID;
+    import(`./formula-page.mjs?build=${encodeURIComponent(HTML_BUILD_ID)}`);
+  </script>
+  <script>
+    // Non-module diagnostics so it still runs even if module caching is stale.
+    (function () {
+      function $(id) { return document.getElementById(id); }
+      const startedAt = Date.now();
+
+      function setText(id, text) {
+        const el = $(id);
+        if (!el) return;
+        el.textContent = String(text || '');
+      }
+
+      function show(id, show) {
+        const el = $(id);
+        if (!el) return;
+        el.style.display = show ? 'block' : 'none';
+      }
+
+      function getControllerInfo() {
+        try {
+          const ctrl = navigator && navigator.serviceWorker && navigator.serviceWorker.controller;
+          if (!ctrl) return 'Controller: none (not controlled)';
+          return `Controller: ${ctrl.scriptURL}`;
+        } catch (_) {
+          return 'Controller: unknown';
+        }
+      }
+
+      async function probeLatestBuildId(url) {
+        try {
+          const res = await fetch(url, { cache: 'no-store' });
+          const text = await res.text();
+          const m = /FORMULA_RENDERER_BUILD_ID\s*=\s*'([^']+)'/.exec(text);
+          return m ? m[1] : null;
+        } catch (_) {
+          return null;
+        }
+      }
+
+      async function refreshBuildInfo() {
+        const render = $('formula-render');
+        const runningBuild = render && render.dataset ? (render.dataset.rendererBuildId || '') : '';
+        const latex = render && render.dataset ? (render.dataset.latex || '') : '';
+
+        const latestBuild = await probeLatestBuildId(`./formula-renderer.mjs?probe=${Date.now()}`);
+        const controller = navigator?.serviceWorker?.controller?.scriptURL || '';
+        const isControlled = Boolean(controller);
+
+        const lines = [
+          getControllerInfo(),
+          `Running renderer build: ${runningBuild || '(missing)'}`,
+          `Latest available renderer build: ${latestBuild || '(unavailable)'}`,
+          latex ? `Latex preview (first 140 chars): ${latex.slice(0, 140)}` : 'Latex preview: (not rendered yet)',
+          '',
+          'Manual verification: open ./formula-renderer.mjs and search for FORMULA_RENDERER_BUILD_ID.',
+        ];
+        setText('build-info', lines.join('\n'));
+
+        // Avoid false positives: on slow/blocked third-party loads, the renderer
+        // may not have populated dataset fields yet. Only warn once we have
+        // evidence of a mismatch, or (when controlled by a SW) a prolonged
+        // failure to initialize.
+        const mismatch = Boolean(latestBuild && runningBuild && latestBuild !== runningBuild);
+        const missingTooLong = !runningBuild && (Date.now() - startedAt) > 2500;
+        const looksOld = mismatch || (isControlled && missingTooLong);
+
+        if (looksOld) {
+          show('stale-warning', true);
+          show('stale-actions', true);
+          setText(
+            'stale-warning',
+            [
+              'WARNING: This page appears to be running stale/mismatched cached JS.',
+              'If you are on a PR preview, cache collisions across deployments are common.',
+              '',
+              mismatch ? `Detected: renderer build mismatch (${runningBuild || 'missing'} != ${latestBuild || 'unknown'}).` : 'Detected: renderer did not initialize (build id missing).',
+              isControlled ? `Controller: ${controller}` : 'Controller: none (not controlled)',
+              '',
+              'Try: hard reload, or Application → Service Workers → Unregister; then reload.',
+            ].join('\n'),
+          );
+
+          // Auto-heal once per tab, but only when we have a *confirmed mismatch*.
+          // (Avoid reload loops when the page is simply still initializing.)
+          if (mismatch) {
+            try {
+              const key = 'reflex4you:autoFixTried';
+              if (!sessionStorage.getItem(key)) {
+                sessionStorage.setItem(key, String(Date.now()));
+                // Defer so the warning is visible briefly.
+                window.setTimeout(() => fixCacheNow(), 250);
+              }
+            } catch (_) {
+              // ignore storage failures; user can still click the button
+            }
+          }
+        } else {
+          show('stale-warning', false);
+          show('stale-actions', false);
+        }
+      }
+
+      async function fixCacheNow() {
+        // Best-effort: unregister any SW whose scope matches this directory, then clear reflex caches.
+        const logs = [];
+        try {
+          if (navigator?.serviceWorker?.getRegistrations) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            const scopePrefix = String(new URL('./', location.href));
+            const pathPrefix = String(location.pathname || '').replace(/[^/]*$/, ''); // "/.../reflex4you/"
+            for (const reg of regs) {
+              const scope = reg?.scope ? String(reg.scope) : '';
+              if (scope && (scope.startsWith(scopePrefix) || (pathPrefix && scope.includes(pathPrefix)))) {
+                const ok = await reg.unregister();
+                logs.push(`unregister ${scope}: ${ok ? 'ok' : 'failed'}`);
+              }
+            }
+          }
+        } catch (e) {
+          logs.push(`unregister failed: ${e?.message || e}`);
+        }
+
+        try {
+          if (window.caches?.keys) {
+            const keys = await caches.keys();
+            for (const key of keys) {
+              if (key.startsWith('reflex4you:') || key.startsWith('reflex4you-')) {
+                await caches.delete(key);
+              }
+            }
+            logs.push('cache delete: ok');
+          }
+        } catch (e) {
+          logs.push(`cache delete failed: ${e?.message || e}`);
+        }
+
+        setText('build-info', `${$('build-info')?.textContent || ''}\n\nFix-cache log:\n${logs.join('\n')}`);
+        // Reload with cache-busting query.
+        location.replace(`${location.pathname}${location.search}${location.hash}`.replace(/([?&])nocache=\d+(&|$)/, '$1').replace(/\?$/, '') + (location.search ? '&' : '?') + `nocache=${Date.now()}`);
+      }
+
+      // Give modules a moment to render, then probe; repeat once.
+      window.addEventListener('load', () => {
+        refreshBuildInfo();
+        window.setTimeout(refreshBuildInfo, 1200);
+
+        const fixBtn = $('fix-cache');
+        if (fixBtn) {
+          fixBtn.addEventListener('click', () => fixCacheNow());
+        }
+        const refreshBtn = $('refresh-build');
+        if (refreshBtn) {
+          refreshBtn.addEventListener('click', () => refreshBuildInfo());
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
+
