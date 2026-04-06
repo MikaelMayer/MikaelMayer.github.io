@@ -21,6 +21,15 @@
   let currentFacingMode = 'environment';
   let currentZoomScale = 1;
   let lastAppliedZoomScale = 1;
+  const CAMERA_QUALITY_PROFILES = [
+    { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30, max: 30 }, aspectRatio: { ideal: 16 / 9 }, resizeMode: 'none' },
+    { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 }, aspectRatio: { ideal: 16 / 9 }, resizeMode: 'none' }
+  ];
+  const LOOP_RECORDING_VIDEO_BITRATE = 4_000_000;
+  const USER_RECORDING_VIDEO_BITRATE = 6_000_000;
+  const USER_RECORDING_AUDIO_BITRATE = 96_000;
+  const USER_RECORDING_TIMESLICE_MS = 250;
+  const RECORDER_STOP_TIMEOUT_MS = 2500;
 
   // ---- Delay configuration (localStorage) ----
   const DELAY_STORAGE_KEY = 'videodelay_seconds';
@@ -55,11 +64,14 @@
   let recordStartTime = 0;
   let readyToSaveBlob = null;
   let recordingStrategy = DelayCamLogic.chooseRecordingStrategy({});
+  let activeLoopGeneration = 0;
+  let lastLoopChunkBlob = null;
 
   // Element-capture strategy state
   let elementRecorder = null;
   let elementRecorderChunks = [];
   let elementRecorderStopResolve = null;
+  let elementRecorderStream = null;
 
   // Canvas-capture strategy state
   let canvasEl = null;
@@ -69,6 +81,7 @@
   let canvasRecorder = null;
   let canvasRecorderChunks = [];
   let canvasRecorderStopResolve = null;
+  let canvasRecorderStream = null;
 
   // Silent audio for recording compatibility
   let silenceAudioContext = null;
@@ -118,12 +131,12 @@
 
   function chooseBestMimeType() {
     const candidates = [
+      'video/webm; codecs=vp8',
+      'video/webm; codecs=vp9',
+      'video/webm',
       'video/mp4; codecs="avc1.42E01E,mp4a.40.2"',
       'video/mp4; codecs="avc1.42E01E"',
-      'video/mp4',
-      'video/webm; codecs=vp9',
-      'video/webm; codecs=vp8',
-      'video/webm'
+      'video/mp4'
     ];
     for (const type of candidates) {
       try {
@@ -158,6 +171,70 @@
       default:
         return 'webm';
     }
+  }
+
+  function makeBlobFromChunks(chunks, fallbackMime) {
+    const nonEmpty = (chunks || []).filter(c => c && c.size > 0);
+    if (!nonEmpty.length) return null;
+    const chunkType = (nonEmpty.find(c => c && c.type) || {}).type || fallbackMime || 'video/webm';
+    return new Blob(nonEmpty, { type: normalizeMimeType(chunkType) });
+  }
+
+  function stopTracksSafe(streamRef) {
+    if (!streamRef) return;
+    try { streamRef.getTracks().forEach(t => t.stop()); } catch (_) {}
+  }
+
+  function createRecorder(targetStream, opts) {
+    const cfg = opts || {};
+    const mimeType = chooseBestMimeType();
+    const primary = cfg.forLoop
+      ? { videoBitsPerSecond: LOOP_RECORDING_VIDEO_BITRATE }
+      : { videoBitsPerSecond: USER_RECORDING_VIDEO_BITRATE, audioBitsPerSecond: USER_RECORDING_AUDIO_BITRATE };
+    if (mimeType) primary.mimeType = mimeType;
+    try {
+      return new MediaRecorder(targetStream, primary);
+    } catch (_) {
+      const fallback = cfg.forLoop
+        ? { videoBitsPerSecond: LOOP_RECORDING_VIDEO_BITRATE }
+        : { videoBitsPerSecond: USER_RECORDING_VIDEO_BITRATE, audioBitsPerSecond: USER_RECORDING_AUDIO_BITRATE };
+      return new MediaRecorder(targetStream, fallback);
+    }
+  }
+
+  function stopRecorderWithTimeout(recorder, timeoutMs) {
+    return new Promise(resolve => {
+      let done = false;
+      let timeoutId = null;
+      function finish() {
+        if (done) return;
+        done = true;
+        if (timeoutId) clearTimeout(timeoutId);
+        resolve();
+      }
+      if (!recorder || recorder.state !== 'recording') {
+        finish();
+        return;
+      }
+      const prevStop = recorder.onstop;
+      const prevError = recorder.onerror;
+      recorder.onstop = ev => {
+        try { if (typeof prevStop === 'function') prevStop.call(recorder, ev); } catch (_) {}
+        finish();
+      };
+      recorder.onerror = ev => {
+        try { if (typeof prevError === 'function') prevError.call(recorder, ev); } catch (_) {}
+        finish();
+      };
+      try { recorder.requestData(); } catch (_) {}
+      timeoutId = setTimeout(() => {
+        if (recorder.state === 'recording') {
+          try { recorder.stop(); } catch (_) {}
+        }
+        finish();
+      }, timeoutMs);
+      try { recorder.stop(); } catch (_) { finish(); }
+    });
   }
 
   // ========================================================================
@@ -211,8 +288,16 @@
   async function shareBlobOrSave(blob, suggestedName, shareTitle) {
     try {
       const file = new File([blob], suggestedName, { type: blob.type || 'application/octet-stream' });
-      const canShareFiles = typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] });
-      if (canShareFiles && typeof navigator.share === 'function') {
+      const canShareFiles = (function () {
+        try {
+          if (typeof navigator === 'undefined' || typeof navigator.share !== 'function') return false;
+          if (typeof navigator.canShare !== 'function') return true;
+          return !!navigator.canShare({ files: [file] });
+        } catch (_) {
+          return false;
+        }
+      }());
+      if (canShareFiles) {
         await navigator.share({ files: [file], title: shareTitle || 'Delayed capture' });
         return true;
       }
@@ -301,11 +386,14 @@
   // ========================================================================
 
   async function getCameraStream(facingMode) {
-    const attempts = [
-      { video: { facingMode: { exact: facingMode } }, audio: false },
-      { video: { facingMode }, audio: false },
-      { video: true, audio: false }
-    ];
+    const attempts = [];
+    CAMERA_QUALITY_PROFILES.forEach(profile => {
+      attempts.push({ video: { ...profile, facingMode: { exact: facingMode } }, audio: false });
+      attempts.push({ video: { ...profile, facingMode }, audio: false });
+    });
+    attempts.push({ video: { facingMode: { exact: facingMode } }, audio: false });
+    attempts.push({ video: { facingMode }, audio: false });
+    attempts.push({ video: true, audio: false });
     let lastError;
     for (const constraints of attempts) {
       try {
@@ -322,6 +410,12 @@
     try {
       stream = await getCameraStream(currentFacingMode);
       liveVideo.srcObject = stream;
+      try {
+        const videoTrack = stream.getVideoTracks && stream.getVideoTracks()[0];
+        if (videoTrack && typeof videoTrack.contentHint === 'string') {
+          videoTrack.contentHint = 'detail';
+        }
+      } catch (_) {}
       await liveVideo.play();
       try { applyZoom(currentZoomScale); } catch (_) {}
 
@@ -456,6 +550,8 @@
     delayProcessActive = true;
     delayGeneration++;
     const gen = delayGeneration;
+    activeLoopGeneration += 1;
+    lastLoopChunkBlob = null;
 
     // Reset state
     if (countdownInterval) clearInterval(countdownInterval);
@@ -510,7 +606,7 @@
     try {
       const vw = liveVideo.videoWidth || 640;
       const vh = liveVideo.videoHeight || 480;
-      const maxDim = 640;
+      const maxDim = 1280;
       const scale = Math.min(maxDim / vw, maxDim / vh, 1);
       const w = Math.round(vw * scale);
       const h = Math.round(vh * scale);
@@ -518,7 +614,7 @@
       c.width = w;
       c.height = h;
       c.getContext('2d').drawImage(liveVideo, 0, 0, w, h);
-      frozenView.style.backgroundImage = `url(${c.toDataURL('image/jpeg', 0.7)})`;
+      frozenView.style.backgroundImage = `url(${c.toDataURL('image/jpeg', 0.9)})`;
     } catch (_) {
       frozenView.style.backgroundColor = '#333';
     }
@@ -540,7 +636,8 @@
     });
 
     updateLayout();
-    playAndRecordLoop(firstChunkBlob, delayMs);
+    const loopGeneration = activeLoopGeneration;
+    playAndRecordLoop(firstChunkBlob, delayMs, loopGeneration);
   }
 
   // ========================================================================
@@ -549,20 +646,24 @@
 
   function startFirstChunkRecording() {
     return new Promise(resolve => {
-      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp8' });
-      let blob;
+      const recorder = createRecorder(stream, { forLoop: true });
+      let blob = null;
       recorder.ondataavailable = e => {
         if (e.data && e.data.size > 0) blob = e.data;
       };
-      recorder.onstop = () => resolve(blob);
-      recorder.start();
+      recorder.onerror = () => resolve(null);
+      recorder.onstop = () => {
+        if (blob && blob.size > 0) lastLoopChunkBlob = blob;
+        resolve(blob);
+      };
+      try { recorder.start(); } catch (_) { resolve(null); return; }
       firstRecorder = recorder;
     });
   }
 
   function stopFirstChunkRecording() {
     if (firstRecorder && firstRecorder.state === 'recording') {
-      firstRecorder.stop();
+      try { firstRecorder.stop(); } catch (_) {}
     }
   }
 
@@ -570,16 +671,38 @@
   // Chunk recording for playback loop
   // ========================================================================
 
-  async function recordChunk(durationMs) {
+  async function recordChunk(durationMs, generationId) {
     return new Promise(resolve => {
-      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp8' });
-      let blob;
+      if (generationId !== activeLoopGeneration) {
+        resolve(null);
+        return;
+      }
+      const recorder = createRecorder(stream, { forLoop: true });
+      const chunks = [];
+      let stopped = false;
+      let stopTimer = null;
+      let settleTimer = null;
+      function done(blob) {
+        if (stopped) return;
+        stopped = true;
+        if (stopTimer) clearTimeout(stopTimer);
+        if (settleTimer) clearTimeout(settleTimer);
+        resolve(blob || null);
+      }
       recorder.ondataavailable = e => {
-        if (e.data && e.data.size > 0) blob = e.data;
+        if (e.data && e.data.size > 0) chunks.push(e.data);
       };
-      recorder.onstop = () => resolve(blob);
-      recorder.start();
-      setTimeout(() => recorder.stop(), durationMs);
+      recorder.onerror = () => done(makeBlobFromChunks(chunks, recorder.mimeType));
+      recorder.onstop = () => done(makeBlobFromChunks(chunks, recorder.mimeType));
+      try { recorder.start(250); } catch (_) { done(null); return; }
+      stopTimer = setTimeout(() => {
+        try { recorder.requestData(); } catch (_) {}
+        settleTimer = setTimeout(() => {
+          if (recorder.state === 'recording') {
+            try { recorder.stop(); } catch (_) { done(makeBlobFromChunks(chunks, recorder.mimeType)); }
+          }
+        }, 120);
+      }, durationMs);
     });
   }
 
@@ -587,29 +710,44 @@
   // Playback loop
   // ========================================================================
 
-  async function playAndRecordLoop(initialChunk, durationMs) {
-    let nextChunkPromise = recordChunk(durationMs);
+  async function playAndRecordLoop(initialChunk, durationMs, generationId) {
+    let currentChunk = initialChunk;
+    if (currentChunk && currentChunk.size > 0) lastLoopChunkBlob = currentChunk;
+    let nextChunkPromise = recordChunk(durationMs, generationId);
 
     async function playChunk(blob) {
       return new Promise(resolve => {
+        if (!(blob && blob.size > 0)) { resolve(); return; }
         const url = URL.createObjectURL(blob);
+        let finished = false;
+        const clean = () => {
+          if (finished) return;
+          finished = true;
+          try { delayedVideo.onloadeddata = null; } catch (_) {}
+          try { delayedVideo.onended = null; } catch (_) {}
+          try { delayedVideo.onerror = null; } catch (_) {}
+          try { URL.revokeObjectURL(url); } catch (_) {}
+          resolve();
+        };
         delayedVideo.src = url;
-        delayedVideo.onloadeddata = () => delayedVideo.play();
-        delayedVideo.onended = () => {
-          URL.revokeObjectURL(url);
-          resolve();
-        };
-        delayedVideo.onerror = () => {
-          URL.revokeObjectURL(url);
-          resolve();
-        };
+        delayedVideo.onloadeddata = () => { void delayedVideo.play().catch(() => {}); };
+        delayedVideo.onended = clean;
+        delayedVideo.onerror = clean;
       });
     }
 
-    while (true) {
-      await playChunk(initialChunk);
-      initialChunk = await nextChunkPromise;
-      nextChunkPromise = recordChunk(durationMs);
+    while (generationId === activeLoopGeneration) {
+      await playChunk(currentChunk);
+      if (generationId !== activeLoopGeneration) break;
+      let nextChunk = await nextChunkPromise;
+      if (generationId !== activeLoopGeneration) break;
+      if (!(nextChunk && nextChunk.size > 0)) {
+        nextChunk = await recordChunk(durationMs, generationId);
+      }
+      if (!(nextChunk && nextChunk.size > 0)) continue;
+      currentChunk = nextChunk;
+      lastLoopChunkBlob = currentChunk;
+      nextChunkPromise = recordChunk(durationMs, generationId);
     }
   }
 
@@ -619,7 +757,7 @@
 
   function startElementCaptureRecording() {
     const srcStream = delayedVideo.captureStream ? delayedVideo.captureStream() : null;
-    if (!srcStream) return;
+    if (!srcStream) return false;
     elementRecorderChunks = [];
     const recStream = new MediaStream();
     try { srcStream.getVideoTracks().forEach(t => recStream.addTrack(t)); } catch (_) {}
@@ -627,36 +765,75 @@
     if (silentTrack) {
       try { recStream.addTrack(silentTrack); } catch (_) {}
     }
-    const mimeType = chooseBestMimeType();
-    const options = mimeType ? { mimeType, videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 96_000 } : { videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 96_000 };
-    elementRecorder = new MediaRecorder(recStream, options);
-    elementRecorder.ondataavailable = e => {
-      if (e.data && e.data.size > 0) {
-        elementRecorderChunks.push(e.data);
-      }
+    let recorder;
+    try {
+      recorder = createRecorder(recStream, { forLoop: false });
+    } catch (_) {
+      stopTracksSafe(srcStream);
+      stopTracksSafe(recStream);
+      cleanupSilenceAudioTrack();
+      return false;
+    }
+    elementRecorderStream = recStream;
+    elementRecorder = recorder;
+    recorder.ondataavailable = e => {
+      if (e.data && e.data.size > 0) elementRecorderChunks.push(e.data);
     };
-    elementRecorder.onstop = () => {
+    recorder.onstop = () => {
       if (elementRecorderStopResolve) {
-        const chunkType = (elementRecorderChunks.find(c => c && c.type) || {}).type || (elementRecorder && elementRecorder.mimeType) || 'video/webm';
-        const normalized = normalizeMimeType(chunkType);
-        elementRecorderStopResolve(new Blob(elementRecorderChunks, { type: normalized }));
+        elementRecorderStopResolve(makeBlobFromChunks(elementRecorderChunks, recorder.mimeType));
+        elementRecorderStopResolve = null;
+      }
+      stopTracksSafe(srcStream);
+      stopTracksSafe(elementRecorderStream);
+      elementRecorderStream = null;
+      elementRecorder = null;
+    };
+    recorder.onerror = () => {
+      if (elementRecorderStopResolve) {
+        elementRecorderStopResolve(makeBlobFromChunks(elementRecorderChunks, recorder.mimeType));
         elementRecorderStopResolve = null;
       }
     };
-    elementRecorder.start(200);
+    try { recorder.start(USER_RECORDING_TIMESLICE_MS); } catch (_) {
+      stopTracksSafe(srcStream);
+      stopTracksSafe(elementRecorderStream);
+      elementRecorderStream = null;
+      elementRecorder = null;
+      cleanupSilenceAudioTrack();
+      return false;
+    }
+    return true;
   }
 
-  function stopElementCaptureRecording() {
-    return new Promise(resolve => {
-      elementRecorderStopResolve = resolve;
-      if (elementRecorder && elementRecorder.state === 'recording') {
-        try { elementRecorder.requestData(); } catch (_) {}
-        elementRecorder.stop();
-      } else {
-        resolve(new Blob([], { type: 'video/webm' }));
-      }
+  async function stopElementCaptureRecording() {
+    const recorder = elementRecorder;
+    if (!recorder || recorder.state !== 'recording') {
+      stopTracksSafe(elementRecorderStream);
+      elementRecorderStream = null;
       cleanupSilenceAudioTrack();
+      return null;
+    }
+    const blob = await new Promise(resolve => {
+      let settled = false;
+      let fallbackTimer = null;
+      elementRecorderStopResolve = result => {
+        if (settled) return;
+        settled = true;
+        if (fallbackTimer) clearTimeout(fallbackTimer);
+        resolve(result || makeBlobFromChunks(elementRecorderChunks, recorder.mimeType));
+      };
+      fallbackTimer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        elementRecorderStopResolve = null;
+        resolve(makeBlobFromChunks(elementRecorderChunks, recorder.mimeType));
+      }, RECORDER_STOP_TIMEOUT_MS);
+      try { recorder.requestData(); } catch (_) {}
+      stopRecorderWithTimeout(recorder, RECORDER_STOP_TIMEOUT_MS).catch(() => {});
     });
+    cleanupSilenceAudioTrack();
+    return blob;
   }
 
   // ========================================================================
@@ -664,7 +841,7 @@
   // ========================================================================
 
   function startCanvasCaptureRecording() {
-    if (!delayedVideo) return;
+    if (!delayedVideo) return false;
     const sourceWidth = delayedVideo.videoWidth || 1280;
     const sourceHeight = delayedVideo.videoHeight || 720;
     const maxWidth = 1280;
@@ -674,19 +851,16 @@
     const height = Math.max(2, Math.floor(sourceHeight * scl));
     if (!canvasEl) {
       canvasEl = document.createElement('canvas');
-      canvasEl.width = width;
-      canvasEl.height = height;
       canvasCtx = canvasEl.getContext('2d');
-    } else {
-      canvasEl.width = width;
-      canvasEl.height = height;
     }
+    canvasEl.width = width;
+    canvasEl.height = height;
 
     function drawFrame() {
       try {
         const sw = delayedVideo.videoWidth || sourceWidth;
         const sh = delayedVideo.videoHeight || sourceHeight;
-        if (sw > 0 && sh > 0) {
+        if (sw > 0 && sh > 0 && canvasCtx) {
           canvasCtx.drawImage(delayedVideo, 0, 0, canvasEl.width, canvasEl.height);
         }
       } catch (_) {}
@@ -695,7 +869,13 @@
     canvasRafId = requestAnimationFrame(drawFrame);
 
     canvasStream = canvasEl.captureStream ? canvasEl.captureStream(30) : null;
-    if (!canvasStream) return;
+    if (!canvasStream) {
+      if (canvasRafId) {
+        cancelAnimationFrame(canvasRafId);
+        canvasRafId = null;
+      }
+      return false;
+    }
 
     canvasRecorderChunks = [];
     const recStream = new MediaStream();
@@ -704,44 +884,90 @@
     if (silentTrack) {
       try { recStream.addTrack(silentTrack); } catch (_) {}
     }
-    const mimeType = chooseBestMimeType();
-    const options = mimeType ? { mimeType, videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 96_000 } : { videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 96_000 };
-    canvasRecorder = new MediaRecorder(recStream, options);
-    canvasRecorder.ondataavailable = e => {
-      if (e.data && e.data.size > 0) {
-        canvasRecorderChunks.push(e.data);
-      }
-    };
-    canvasRecorder.onstop = () => {
-      if (canvasRecorderStopResolve) {
-        const chunkType = (canvasRecorderChunks.find(c => c && c.type) || {}).type || (canvasRecorder && canvasRecorder.mimeType) || 'video/webm';
-        const normalized = normalizeMimeType(chunkType);
-        canvasRecorderStopResolve(new Blob(canvasRecorderChunks, { type: normalized }));
-        canvasRecorderStopResolve = null;
-      }
-    };
-    canvasRecorder.start(200);
-  }
-
-  function stopCanvasCaptureRecording() {
-    return new Promise(resolve => {
-      canvasRecorderStopResolve = resolve;
+    let recorder;
+    try {
+      recorder = createRecorder(recStream, { forLoop: false });
+    } catch (_) {
+      stopTracksSafe(canvasStream);
+      stopTracksSafe(recStream);
       if (canvasRafId) {
         cancelAnimationFrame(canvasRafId);
         canvasRafId = null;
       }
-      if (canvasStream) {
-        try { canvasStream.getTracks().forEach(t => t.stop()); } catch (_) {}
-        canvasStream = null;
+      cleanupSilenceAudioTrack();
+      return false;
+    }
+    canvasRecorderStream = recStream;
+    canvasRecorder = recorder;
+    recorder.ondataavailable = e => {
+      if (e.data && e.data.size > 0) canvasRecorderChunks.push(e.data);
+    };
+    recorder.onstop = () => {
+      if (canvasRecorderStopResolve) {
+        canvasRecorderStopResolve(makeBlobFromChunks(canvasRecorderChunks, recorder.mimeType));
+        canvasRecorderStopResolve = null;
       }
-      if (canvasRecorder && canvasRecorder.state === 'recording') {
-        try { canvasRecorder.requestData(); } catch (_) {}
-        canvasRecorder.stop();
-      } else {
-        resolve(new Blob([], { type: 'video/webm' }));
+      stopTracksSafe(canvasRecorderStream);
+      canvasRecorderStream = null;
+      canvasRecorder = null;
+    };
+    recorder.onerror = () => {
+      if (canvasRecorderStopResolve) {
+        canvasRecorderStopResolve(makeBlobFromChunks(canvasRecorderChunks, recorder.mimeType));
+        canvasRecorderStopResolve = null;
+      }
+    };
+    try { recorder.start(USER_RECORDING_TIMESLICE_MS); } catch (_) {
+      stopTracksSafe(canvasStream);
+      stopTracksSafe(canvasRecorderStream);
+      canvasRecorderStream = null;
+      canvasRecorder = null;
+      if (canvasRafId) {
+        cancelAnimationFrame(canvasRafId);
+        canvasRafId = null;
       }
       cleanupSilenceAudioTrack();
+      return false;
+    }
+    return true;
+  }
+
+  async function stopCanvasCaptureRecording() {
+    if (canvasRafId) {
+      cancelAnimationFrame(canvasRafId);
+      canvasRafId = null;
+    }
+    const recorder = canvasRecorder;
+    if (!recorder || recorder.state !== 'recording') {
+      stopTracksSafe(canvasStream);
+      canvasStream = null;
+      stopTracksSafe(canvasRecorderStream);
+      canvasRecorderStream = null;
+      cleanupSilenceAudioTrack();
+      return null;
+    }
+    const blob = await new Promise(resolve => {
+      let settled = false;
+      let fallbackTimer = null;
+      canvasRecorderStopResolve = result => {
+        if (settled) return;
+        settled = true;
+        if (fallbackTimer) clearTimeout(fallbackTimer);
+        resolve(result || makeBlobFromChunks(canvasRecorderChunks, recorder.mimeType));
+      };
+      fallbackTimer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        canvasRecorderStopResolve = null;
+        resolve(makeBlobFromChunks(canvasRecorderChunks, recorder.mimeType));
+      }, RECORDER_STOP_TIMEOUT_MS);
+      try { recorder.requestData(); } catch (_) {}
+      stopRecorderWithTimeout(recorder, RECORDER_STOP_TIMEOUT_MS).catch(() => {});
     });
+    stopTracksSafe(canvasStream);
+    canvasStream = null;
+    cleanupSilenceAudioTrack();
+    return blob;
   }
 
   // ========================================================================
@@ -773,49 +999,58 @@
       recordDot.style.display = 'block';
       try { cancelBtn.style.display = 'inline-block'; } catch (_) {}
       recordStartTime = performance.now();
+      let started = false;
       if (recordingStrategy === 'element-capture' && delayedVideo.captureStream) {
-        startElementCaptureRecording();
+        started = startElementCaptureRecording();
+        if (!started) started = startCanvasCaptureRecording();
       } else if (recordingStrategy === 'canvas-capture') {
-        startCanvasCaptureRecording();
-      } else {
+        started = startCanvasCaptureRecording();
+        if (!started && delayedVideo.captureStream) started = startElementCaptureRecording();
+      }
+      if (!started) {
         recBtn.textContent = 'REC';
         try { recBtn.classList.remove('recording'); } catch (_) {}
         recordDot.style.display = 'none';
-        isRecording = false;
-        return;
-      }
-    } else {
-      isRecording = false;
-      recBtn.textContent = '…';
-      try { recBtn.disabled = true; } catch (_) {}
-      recordDot.style.display = 'none';
-      try { recBtn.classList.remove('recording'); } catch (_) {}
-
-      let blob = null;
-      const recordStopTime = performance.now();
-      if (recordingStrategy === 'element-capture') {
-        blob = await stopElementCaptureRecording();
-      } else if (recordingStrategy === 'canvas-capture') {
-        blob = await stopCanvasCaptureRecording();
-      }
-
-      if (blob && blob.size > 0) {
-        const actualDurationMs = recordStopTime - recordStartTime;
-        blob = await DelayCamLogic.fixWebmDuration(blob, actualDurationMs);
-        readyToSaveBlob = blob;
-        const supportsShare = (function () {
-          try {
-            const file = new File([new Blob(['x'], { type: 'video/webm' })], 'x.webm', { type: 'video/webm' });
-            return !!(navigator && navigator.canShare && navigator.share && navigator.canShare({ files: [file] }));
-          } catch (_) { return false; }
-        }());
-        recBtn.textContent = supportsShare ? 'SHARE' : 'SAVE';
-      } else {
-        recBtn.textContent = 'REC';
         try { cancelBtn.style.display = 'none'; } catch (_) {}
+        isRecording = false;
       }
-      try { recBtn.disabled = false; } catch (_) {}
+      return;
     }
+
+    isRecording = false;
+    recBtn.textContent = '…';
+    try { recBtn.disabled = true; } catch (_) {}
+    recordDot.style.display = 'none';
+    try { recBtn.classList.remove('recording'); } catch (_) {}
+
+    let blob = null;
+    const recordStopTime = performance.now();
+    if (recordingStrategy === 'element-capture') {
+      blob = await stopElementCaptureRecording();
+      if (!(blob && blob.size > 0)) blob = await stopCanvasCaptureRecording();
+    } else if (recordingStrategy === 'canvas-capture') {
+      blob = await stopCanvasCaptureRecording();
+      if (!(blob && blob.size > 0)) blob = await stopElementCaptureRecording();
+    }
+    if (!(blob && blob.size > 0) && lastLoopChunkBlob && lastLoopChunkBlob.size > 0) {
+      blob = lastLoopChunkBlob;
+    }
+
+    if (blob && blob.size > 0) {
+      const actualDurationMs = recordStopTime - recordStartTime;
+      blob = await DelayCamLogic.fixWebmDuration(blob, actualDurationMs);
+      readyToSaveBlob = blob;
+      const supportsShare = (function () {
+        try {
+          return typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+        } catch (_) { return false; }
+      }());
+      recBtn.textContent = supportsShare ? 'SHARE' : 'SAVE';
+    } else {
+      recBtn.textContent = 'REC';
+      try { cancelBtn.style.display = 'none'; } catch (_) {}
+    }
+    try { recBtn.disabled = false; } catch (_) {}
   }
 
   // ========================================================================
