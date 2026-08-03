@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CASHFLOW Solo — engine tests</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .wrap { max-width: 900px; margin: 0 auto; padding: 16px; }
+  .result { display: flex; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .result .tag { font-family: var(--mono); font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 4px; height: fit-content; }
+  .result .tag.p { background: var(--accent); color: #fff; }
+  .result .tag.f { background: var(--danger); color: #fff; }
+  .result .why { color: var(--danger); font-family: var(--mono); font-size: 12px; }
+  .result .note { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+  .summary { font-size: 18px; font-weight: 700; margin: 16px 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>CASHFLOW <span>Solo</span> — engine tests</h1>
+  <span class="spacer"></span>
+  <a href="index.html"><button>Back to the game</button></a>
+</header>
+
+<div class="wrap">
+  <p style="color:var(--muted)">
+    Every rule in <code>js/engine.js</code>, checked here. The last two run thousands of
+    complete games: one player picks at random to prove the engine cannot be broken, the
+    other plays sensibly to prove the game can be won. Nothing here touches the network.
+  </p>
+  <div class="summary" id="summary">Running…</div>
+  <div id="results"></div>
+</div>
+
+<script src="js/rng.js"></script>
+<script src="js/data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/tests.js"></script>
+<script>
+(function () {
+  // Let the browser paint "Running…" before the long simulations start.
+  setTimeout(function () {
+    var t0 = performance.now();
+    var results = window.CF.runTests();
+    var ms = Math.round(performance.now() - t0);
+    var host = document.getElementById('results');
+    var failed = 0;
+
+    results.forEach(function (r) {
+      if (!r.pass) failed++;
+      var row = document.createElement('div');
+      row.className = 'result';
+
+      var tag = document.createElement('span');
+      tag.className = 'tag ' + (r.pass ? 'p' : 'f');
+      tag.textContent = r.pass ? 'PASS' : 'FAIL';
+      row.appendChild(tag);
+
+      var body = document.createElement('div');
+      body.appendChild(document.createTextNode(r.name));
+      if (r.note) {
+        var n = document.createElement('div');
+        n.className = 'note';
+        n.textContent = r.note;
+        body.appendChild(n);
+      }
+      if (!r.pass) {
+        var w = document.createElement('div');
+        w.className = 'why';
+        w.textContent = r.error;
+        body.appendChild(w);
+      }
+      row.appendChild(body);
+      host.appendChild(row);
+    });
+
+    var s = document.getElementById('summary');
+    s.textContent = (results.length - failed) + ' passed, ' + failed + ' failed, ' +
+      results.length + ' total (' + ms + ' ms)';
+    s.style.color = failed ? 'var(--danger)' : 'var(--accent)';
+  }, 50);
+})();
+</script>
+</body>
+</html>

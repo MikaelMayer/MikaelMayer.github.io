@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="mobile-web-app-capable" content="yes">
+<title>CASHFLOW Solo</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>CASHFLOW <span>Solo</span></h1>
+    <span class="seedtag" id="seedtag">seed —</span>
+  </div>
+  <div class="tools">
+    <button id="undo-btn" title="Undo the last action (u)">Undo</button>
+    <button id="save-btn">Save</button>
+    <button id="load-btn">Load</button>
+    <button id="export-btn" class="hide-sm" title="Download this game as a file">Export</button>
+    <label class="filebtn hide-sm">
+      Import<input type="file" id="import-input" accept="application/json" hidden>
+    </label>
+    <button id="new-btn" class="primary">New game</button>
+  </div>
+</header>
+
+<div class="banner error hidden" id="error-banner"></div>
+<div class="banner error hidden" id="invariant-banner"></div>
+
+<main>
+  <div class="col">
+    <div class="panel" id="board-wrap">
+      <div class="board rat" id="board"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="panel">
+      <h2>This turn</h2>
+      <div id="action"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Bank</h2>
+      <div id="bank"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Portfolio</h2>
+      <div class="assets" id="assets"></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="panel">
+      <h2>Financial statement</h2>
+      <div class="headline" id="headline"></div>
+      <div class="stmt" id="statement"></div>
+    </div>
+
+    <div class="panel">
+      <h2>History</h2>
+      <div id="log"></div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  A single-player financial-education game inspired by cash-flow board games.
+  Independent implementation — not affiliated with or endorsed by Rich Dad Company.
+  Runs entirely offline; nothing leaves your browser.
+  <a href="tests.html">Run the engine tests</a>.
+</footer>
+
+<dialog id="setup">
+  <form class="dlg-body" method="dialog">
+    <h2>Start a game</h2>
+    <p style="color:var(--muted);margin-top:0">
+      One goal: build passive income greater than your monthly expenses. Do it in as
+      few months as you can.
+    </p>
+
+    <div class="field">
+      <label for="prof-select">Profession</label>
+      <select id="prof-select"></select>
+    </div>
+
+    <div class="field">
+      <div class="prof-preview" id="prof-preview"></div>
+    </div>
+
+    <div class="field">
+      <label for="dream-select">Your dream (the Fast Track goal)</label>
+      <select id="dream-select"></select>
+    </div>
+
+    <div class="field">
+      <label for="seed-input">Seed — leave blank for random</label>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="seed-input" placeholder="e.g. 8814" inputmode="numeric">
+        <button id="random-seed-btn" class="ghost" type="button">Random</button>
+      </div>
+      <div class="hint">
+        The same seed with the same choices always plays out identically — useful for
+        teaching a specific scenario, or for reporting a bug that someone else can reproduce.
+      </div>
+    </div>
+
+    <div class="dlg-actions">
+      <button id="start-btn" class="primary" type="submit">Start</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="js/rng.js"></script>
+<script src="js/data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
