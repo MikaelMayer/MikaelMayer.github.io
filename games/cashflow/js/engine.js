@@ -362,6 +362,7 @@
       position: 0,
       cash: profession.savings,
       children: 0,
+      refused: 0,            // total value of optional doodads declined
       extraExpenses: 0,      // permanent monthly expenses picked up along the way
       bankLoan: 0,
       charityTurns: 0,       // turns remaining where you may roll 1 or 2 dice
@@ -997,6 +998,15 @@
     },
 
     acknowledge: function (state) {
+      /* Refusing a luxury is the single behaviour the optional-doodad split
+       * exists to teach, and it used to leave no trace anywhere. Record it, so
+       * the player can see what their discipline was worth. */
+      var p = state.pending;
+      if (p && p.kind === 'doodadOptional') {
+        state.refused = (state.refused || 0) + p.amount;
+        log(state, 'Declined ' + p.title + '. ' + money(p.amount) +
+          ' stayed in your pocket (' + money(state.refused) + ' refused so far).', 'gain');
+      }
       state.pending = null;
       afterAction(state);
     }

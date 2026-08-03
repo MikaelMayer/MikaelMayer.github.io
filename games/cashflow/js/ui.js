@@ -24,6 +24,10 @@
   var undoStack = [];
   var MAX_UNDO = 60;
 
+  // Bank panel: null when idle, 'borrow' or 'repay' while a loan is being set up.
+  var bankMode = null;
+  var bankAmount = 1000;
+
   /* ------------------------------------------------------------------ *
    * Tiny DOM helpers
    * ------------------------------------------------------------------ */
@@ -80,6 +84,32 @@
     DOWNSIZED: 'Job loss'
   };
 
+  /* Tapping a square explains it. A touch device has no hover, so the `title`
+   * tooltip the board used to rely on reached nobody on a phone -- and the
+   * game shipped with no legend and no rules anywhere in the interface. */
+  var SQUARE_HELP = {
+    OPPORTUNITY: 'Choose a Small Deal or a Big Deal, then look at the card. Small Deals need a few thousand down; Big Deals need much more and pay much more. Looking is always free and you can always say no.',
+    PAYDAY: 'You collect your monthly cash flow — salary plus passive income, less every expense. You collect it whenever you PASS a payday square as well as when you land on one, so there are three per lap.',
+    MARKET: 'Something happens to the things you own. Usually a buyer appears for one type of asset and you may sell; sometimes a cost lands on every property or business you hold. If you own nothing that matches, nothing happens.',
+    DOODAD: 'An expense. Bills — a car repair, a dentist — are paid and shown to you. Anything expensive is a luxury you are offered and may refuse, and refusing costs nothing. This is where most paycheques quietly go.',
+    CHARITY: 'You may donate 10% of your total income. If you do, then for the next three turns you may roll one die or two — more control over where you land, and more chances at an Opportunity.',
+    BABY: 'A child joins your household, up to three. Each one adds your profession\'s per-child cost to your expenses every month, for good, which raises the bar you have to clear to get out.',
+    DOWNSIZED: 'You lose your job. Pay one full month of total expenses and lose your next two turns. The lower your cash flow, the harder this lands.'
+  };
+
+  var squareInfo = null;
+
+  function squareHelpCard(type) {
+    return el('div', { class: 'card info' }, [
+      el('span', { class: 'tagline', text: 'Board square' }),
+      el('h3', { text: SQUARE_LABEL[type] }),
+      el('p', { text: SQUARE_HELP[type] }),
+      el('div', { class: 'buttons' }, [
+        el('button', { onclick: function () { squareInfo = null; render(); }, text: 'Close' })
+      ])
+    ]);
+  }
+
   /* ------------------------------------------------------------------ *
    * Actions: every mutation goes through here so undo always works.
    * ------------------------------------------------------------------ */
@@ -89,41 +119,100 @@
     if (undoStack.length > MAX_UNDO) undoStack.shift();
   }
 
-  function showError(msg) {
+  /* Errors are shown inside the card that caused them, not in a banner far up
+   * the page that disappears after five seconds. `cardError` is cleared by the
+   * next successful action. */
+  var cardError = null;
+
+  function showBanner(msg, kind) {
     var b = $('#error-banner');
     b.textContent = msg;
-    b.classList.remove('hidden');
-    clearTimeout(showError._t);
-    showError._t = setTimeout(function () { b.classList.add('hidden'); }, 5000);
+    b.className = 'banner ' + (kind || 'error');
+    clearTimeout(showBanner._t);
+    showBanner._t = setTimeout(function () { b.classList.add('hidden'); }, 6000);
+  }
+
+  /* ---- Turn receipt -------------------------------------------------
+   *
+   * Half the squares in the game resolve with no decision to make: payday
+   * pays, a baby arrives, the market ignores you. Those turns used to end
+   * with the money changed and nothing on screen to say what happened, which
+   * is bad teaching and indistinguishable from a bug. So the whole turn is
+   * recorded and replayed back to the player as a receipt.
+   *
+   * The engine's log is the source: everything that moves a dollar writes a
+   * line, so slicing the log around an action captures the turn exactly,
+   * without the UI having to know what any square does. */
+  var receipt = null;
+
+  function beginTurn() {
+    receipt = {
+      cashStart: state.cash,
+      passiveStart: E.stats(state).passiveIncome,
+      square: null,
+      entries: []
+    };
+  }
+
+  function recordSince(mark) {
+    if (!receipt) return;
+    for (var i = mark; i < state.log.length; i++) {
+      var entry = state.log[i];
+      if (entry.type === 'roll') continue;          // the dice are drawn separately
+      receipt.entries.push(entry);
+    }
+  }
+
+  function currentSquareLabel() {
+    if (state.phase === 'fasttrack' || state.phase === 'won') {
+      var sq = D.FAST_TRACK_BOARD[state.ftPosition];
+      if (sq.type === 'INVESTMENT') return E.findById(D.FT_INVESTMENTS, sq.investment).name;
+      if (sq.type === 'DREAM') return E.findById(D.DREAMS, sq.dream).name;
+      return sq.label || sq.type;
+    }
+    return SQUARE_LABEL[D.RAT_RACE_BOARD[state.position]] || '';
   }
 
   function doAction(type, payload) {
     snapshot();
+    var mark = state.log.length;
     var res = E.act(state, type, payload);
     if (!res.ok) {
       undoStack.pop();          // nothing changed, so nothing to undo
-      showError(res.error);
+      cardError = res.error;
+      render();
       return false;
     }
+    cardError = null;
+    recordSince(mark);
     render();
     return true;
   }
 
   function doRoll(dice) {
+    squareInfo = null;
     snapshot();
+    beginTurn();
+    var mark = state.log.length;
     try {
       E.roll(state, dice);
     } catch (e) {
       undoStack.pop();
-      showError(e.message);
+      receipt = null;
+      showBanner(e.message);
       return;
     }
+    cardError = null;
+    recordSince(mark);
+    receipt.square = currentSquareLabel();
     render();
   }
 
   function undo() {
     if (!undoStack.length) return;
     state = JSON.parse(undoStack.pop());
+    receipt = null;
+    cardError = null;
     render();
   }
 
@@ -133,15 +222,49 @@
 
   function render() {
     if (!state) return;
-    renderHeader();
-    renderBoard();
-    renderStatement();
-    renderPending();
-    renderAssets();
-    renderBank();
-    renderLog();
-    renderInvariants();
-    maybeScrollToAction();
+    /* A throw anywhere in here used to leave whichever panel was mid-rebuild
+     * empty and the game unplayable, with the reason only in the console. A
+     * blank screen is the worst possible failure mode; say what happened and
+     * keep the game recoverable through Undo. */
+    try {
+      renderHeader();
+      renderBoard();
+      renderStatement();
+      renderPending();
+      renderAssets();
+      renderBank();
+      renderLog();
+      renderInvariants();
+      maybeScrollToAction();
+      focusNewDecision();
+      autosave();
+    } catch (e) {
+      showBanner('The interface hit an error drawing this turn (' + e.message +
+        '). Your game is safe — press Undo to step back, and please report seed ' +
+        state.seed + ' at month ' + state.months + '.');
+      if (window.console) console.error(e);
+    }
+  }
+
+  /* Save on every change rather than on a button.
+   *
+   * Manual-only saving meant closing the tab at month 50 with a Save from
+   * month 20 silently threw away thirty months of decisions -- with no
+   * warning, because the game resumed from the old slot without a word. */
+  function autosave() {
+    try {
+      localStorage.setItem(SAVE_KEY, E.serialize(state));
+    } catch (e) { /* private mode or quota; the game still plays */ }
+  }
+
+  /* A full redraw destroys whatever had focus, so a keyboard player was
+   * returned to the top of the document after every single action. Put focus
+   * on the new decision instead. */
+  function focusNewDecision() {
+    if (!focusPending) return;
+    focusPending = false;
+    var h = $('#action').querySelector('h3');
+    if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
   }
 
   /* On a phone the columns stack, so a new card can land below the fold and
@@ -149,6 +272,7 @@
    * decision itself has changed, so the page never moves under a player who is
    * deliberately reading their financial statement. */
   var lastPendingKey = null;
+  var focusPending = false;
 
   function pendingKey() {
     var p = state.pending;
@@ -160,6 +284,7 @@
     var key = pendingKey();
     var changed = key !== lastPendingKey;
     lastPendingKey = key;
+    if (changed) focusPending = true;
     if (!changed || key === null) return;
 
     // Single-column layout only; on a wide screen everything is already visible.
@@ -227,14 +352,21 @@
 
       // Both labels are rendered; the stylesheet shows whichever fits the
       // screen. Doing it in CSS means no resize listener and no reflow bugs.
-      var node = el('div', {
+      var explains = isRat && SQUARE_HELP[type];
+      var node = el(explains ? 'button' : 'div', {
         class: 'sq ' + type + (i === pos ? ' here' : '') + (mine ? ' mine' : ''),
         style: 'grid-row:' + cell[0] + ';grid-column:' + cell[1],
-        title: label
+        title: explains ? label + ' — tap to see what this square does' : label,
+        'aria-label': label + (i === pos ? ', you are here' : '')
       }, [
         el('span', { class: 'lbl-full', text: label }),
         el('span', { class: 'lbl-short', text: short })
       ]);
+      if (i === pos) node.setAttribute('aria-current', 'true');
+      if (explains) {
+        node.type = 'button';
+        (function (t) { node.addEventListener('click', function () { squareInfo = t; render(); }); })(type);
+      }
       if (i === pos) node.appendChild(el('span', { class: 'pawn' }));
       wrap.appendChild(node);
     }
@@ -267,18 +399,33 @@
 
     var s = E.stats(state);
     if (state.phase === 'ratrace') {
-      centre.appendChild(el('div', { class: 'sub', text: 'Monthly cash flow' }));
-      var cf = el('div', { class: 'big' });
-      cf.appendChild(signed(s.cashflow));
-      centre.appendChild(cf);
+      /* Passive income is the number that ends the game, so it is the number
+       * that gets the 34px treatment. Monthly cash flow used to be here, and
+       * a player optimising the biggest number on screen would have been
+       * optimising the wrong one -- cash flow goes UP when you sell the
+       * assets that were going to free you. */
+      centre.appendChild(el('div', { class: 'sub', text: 'Passive income' }));
+      centre.appendChild(el('div', { class: 'big', text: money(s.passiveIncome) }));
+
+      var gap = s.totalExpenses - s.passiveIncome;
       centre.appendChild(el('div', {
         class: 'sub',
-        text: 'Passive ' + money(s.passiveIncome) + ' of ' + money(s.totalExpenses) + ' needed'
+        text: gap > 0
+          ? money(gap) + ' a month short of your ' + money(s.totalExpenses) + ' of expenses'
+          : 'Clear of your ' + money(s.totalExpenses) + ' of expenses'
       }));
-      var bar = el('div', { class: 'progress' });
+
       var pct = s.totalExpenses > 0 ? Math.min(100, (s.passiveIncome / s.totalExpenses) * 100) : 0;
+      var bar = el('div', {
+        class: 'progress', role: 'progressbar',
+        'aria-valuemin': '0', 'aria-valuemax': '100',
+        'aria-valuenow': String(Math.round(pct)),
+        'aria-valuetext': money(s.passiveIncome) + ' of ' + money(s.totalExpenses) + ' needed to leave the Rat Race'
+      });
       bar.appendChild(el('i', { style: 'width:' + pct.toFixed(1) + '%' }));
       centre.appendChild(bar);
+      centre.appendChild(el('div', { class: 'sub', text: Math.round(pct) + '% of the way out' }));
+      centre.appendChild(statusChips());
     } else {
       var f = E.ftStats(state);
       centre.appendChild(el('div', { class: 'sub', text: 'Cash Flow Day income' }));
@@ -288,8 +435,13 @@
         text: 'New investment income ' + money(f.addedIncome) + ' of ' +
           money(E.constants.FAST_TRACK_CASHFLOW_GOAL)
       }));
-      var bar2 = el('div', { class: 'progress' });
       var pct2 = Math.min(100, (f.addedIncome / E.constants.FAST_TRACK_CASHFLOW_GOAL) * 100);
+      var bar2 = el('div', {
+        class: 'progress', role: 'progressbar',
+        'aria-valuemin': '0', 'aria-valuemax': '100',
+        'aria-valuenow': String(Math.round(pct2)),
+        'aria-valuetext': money(f.addedIncome) + ' of ' + money(E.constants.FAST_TRACK_CASHFLOW_GOAL) + ' of new income'
+      });
       bar2.appendChild(el('i', { style: 'width:' + pct2.toFixed(1) + '%' }));
       centre.appendChild(bar2);
     }
@@ -302,25 +454,57 @@
     return centre;
   }
 
+  /* Modes the player is in right now. These used to be mentioned only on the
+   * roll card, so the dice choice you paid 10% of your income for vanished the
+   * moment any other card appeared. */
+  function statusChips() {
+    var wrap = el('div', { class: 'chips' });
+    if (state.charityTurns > 0) {
+      wrap.appendChild(el('span', {
+        class: 'chip good',
+        text: 'Dice choice: this turn' + (state.charityTurns > 1 ? ' and ' + (state.charityTurns - 1) + ' more' : '')
+      }));
+    }
+    if (state.skipTurns > 0) {
+      wrap.appendChild(el('span', { class: 'chip bad', text: 'Downsized: ' + state.skipTurns + ' turn' + (state.skipTurns > 1 ? 's' : '') + ' lost' }));
+    }
+    if (state.children > 0) {
+      wrap.appendChild(el('span', { class: 'chip', text: state.children + ' child' + (state.children > 1 ? 'ren' : '') }));
+    }
+    if (state.bankLoan > 0) {
+      wrap.appendChild(el('span', { class: 'chip bad', text: 'Bank debt ' + money(state.bankLoan) }));
+    }
+    return wrap;
+  }
+
   function renderStatement() {
     var s = E.stats(state);
     var head = $('#headline');
     clear(head);
 
-    function box(k, v, cls) {
-      var b = el('div', { class: 'box' }, [el('div', { class: 'k', text: k })]);
-      var val = el('div', { class: 'v' + (cls ? ' ' + cls : '') });
+    function box(k, v, cls, sub) {
+      var b = el('div', { class: 'box' + (cls === 'hero' ? ' hero' : '') }, [el('div', { class: 'k', text: k })]);
+      var val = el('div', { class: 'v' + (cls && cls !== 'hero' ? ' ' + cls : '') });
       val.appendChild(typeof v === 'string' ? document.createTextNode(v) : v);
       b.appendChild(val);
+      if (sub) b.appendChild(el('div', { class: 'boxsub', text: sub }));
       return b;
     }
 
-    head.appendChild(box('Cash', money(state.cash)));
     if (state.phase === 'fasttrack' || state.phase === 'won') {
       var f = E.ftStats(state);
+      head.appendChild(box('Cash', money(state.cash)));
       head.appendChild(box('Cash Flow Day', money(f.totalIncome), 'pos'));
     } else {
-      head.appendChild(box('Monthly cash flow', signed(s.cashflow)));
+      /* The win condition, side by side, as the first thing in the panel --
+       * because "passive income vs total expenses" IS the game, and it used to
+       * be a 13px grey subline while cash flow got two large displays. */
+      var gap = s.totalExpenses - s.passiveIncome;
+      head.appendChild(box('Passive income', money(s.passiveIncome), 'hero',
+        gap > 0 ? money(gap) + ' short' : 'you are clear'));
+      head.appendChild(box('Total expenses', money(s.totalExpenses), 'hero', 'the bar to clear'));
+      head.appendChild(box('Cash', money(state.cash)));
+      head.appendChild(box('Monthly cash flow', signed(s.cashflow), null, 'what payday pays'));
     }
 
     var st = $('#statement');
@@ -432,8 +616,12 @@
       return;
     }
 
+    if (squareInfo) host.appendChild(squareHelpCard(squareInfo));
+
     var p = state.pending;
     if (!p) {
+      // What just happened, then what to do next.
+      if (receipt && receipt.entries.length) host.appendChild(receiptCard());
       host.appendChild(rollCard());
       return;
     }
@@ -458,6 +646,40 @@
           ])
         ]));
     }
+  }
+
+  /* The turn just played, replayed back. This is the only place a player can
+   * see WHY their numbers changed without reading the history log. */
+  function receiptCard() {
+    var cashDelta = state.cash - receipt.cashStart;
+    var passiveDelta = E.stats(state).passiveIncome - receipt.passiveStart;
+    var tone = cashDelta > 0 ? 'gold' : (cashDelta < 0 ? 'danger' : 'info');
+
+    var card = el('div', { class: 'card receipt ' + tone }, [
+      el('span', { class: 'tagline', text: 'Last turn — ' + (receipt.square || 'result') })
+    ]);
+
+    if (cashDelta !== 0) {
+      card.appendChild(el('div', { class: 'receipt-headline' }, [
+        el('span', { class: cashDelta > 0 ? 'pos' : 'neg', text: (cashDelta > 0 ? '+' : '') + money(cashDelta) }),
+        el('span', { class: 'receipt-sub', text: 'cash, now ' + money(state.cash) })
+      ]));
+    }
+
+    var lines = el('div', { class: 'receipt-lines' });
+    receipt.entries.forEach(function (entry) {
+      lines.appendChild(el('div', { class: 'receipt-line ' + entry.type, text: entry.text }));
+    });
+    card.appendChild(lines);
+
+    if (passiveDelta !== 0) {
+      card.appendChild(el('div', {
+        class: 'hint',
+        text: 'Passive income ' + (passiveDelta > 0 ? 'rose ' : 'fell ') + money(Math.abs(passiveDelta)) +
+          ' a month. That is the number that ends the Rat Race.'
+      }));
+    }
+    return card;
   }
 
   function rollCard() {
@@ -506,6 +728,50 @@
     ]);
   }
 
+  /* Distinct, useful quantities rather than a slider of every integer.
+   * Always offers the maximum first, because "as many as I can" is the most
+   * common intent and the hardest to type on a phone. */
+  function buyAmounts(max) {
+    var out = [max];
+    [Math.floor(max / 2), 100, 50, 10, 1].forEach(function (n) {
+      if (n >= 1 && n < max && out.indexOf(n) === -1) out.push(n);
+    });
+    return out.slice(0, 5);
+  }
+
+  function sellAmounts(held) {
+    var out = [held];
+    [Math.floor(held / 2), 10, 1].forEach(function (n) {
+      if (n >= 1 && n < held && out.indexOf(n) === -1) out.push(n);
+    });
+    return out.slice(0, 4);
+  }
+
+  function quantityRow(label, amounts, unitPrice, onPick) {
+    var row = el('div', { class: 'qtyrow' }, [el('span', { class: 'qtylabel', text: label })]);
+    amounts.forEach(function (n, i) {
+      row.appendChild(el('button', {
+        class: i === 0 ? 'primary' : '',
+        onclick: function () { onPick(n); },
+        title: label + ' ' + n + ' for ' + money(n * unitPrice)
+      }, [
+        el('span', { class: 'qty', text: (i === 0 ? (label === 'Sell' ? 'All ' : 'Max ') : '') + n }),
+        el('span', { class: 'qtycost', text: money(n * unitPrice) })
+      ]));
+    });
+    return row;
+  }
+
+  /* Errors belong next to the control that produced them, not in a banner two
+   * screens up that erases itself after five seconds. */
+  /* Returns an empty DocumentFragment rather than null when there is nothing
+   * to show: appending an empty fragment is a no-op, whereas appendChild(null)
+   * throws and takes the whole render down with it. */
+  function errorSlot() {
+    if (!cardError) return document.createDocumentFragment();
+    return el('div', { class: 'carderror', role: 'alert', text: cardError });
+  }
+
   function terms(pairs) {
     var box = el('div', { class: 'terms' });
     pairs.forEach(function (pr) {
@@ -535,31 +801,33 @@
         ['You own', shares + ' shares' + (held ? ' (paid ' + money(held.invested) + ')' : '')],
         ['You can afford', maxBuy + ' shares']
       ]));
-      var qty = el('input', { type: 'number', id: 'qty', min: '1', value: String(Math.min(maxBuy || 1, 10)) });
-      buttons.appendChild(qty);
-      var stockBuy = el('button', {
-        class: 'primary',
-        onclick: function () { doAction('buyStock', { qty: qty.value }); },
-        text: maxBuy < 1 ? 'Cannot afford a share' : 'Buy'
-      });
-      if (maxBuy < 1) stockBuy.disabled = true;
-      buttons.appendChild(stockBuy);
-      if (shares > 0) {
-        buttons.appendChild(el('button', {
-          onclick: function () { doAction('sellStock', { qty: qty.value }); },
-          text: 'Sell'
+      /* Preset amounts rather than one shared number field.
+       *
+       * The old card had a single input used by Buy, Sell and Sell-all, which
+       * meant the same box could hold a quantity that was legal for one
+       * operation and impossible for another, and its default of 10 was
+       * absurd on a $5 share you could buy 300 of. Each button now carries
+       * its own quantity, so nothing can be typed into the wrong operation. */
+      if (maxBuy >= 1) {
+        card.appendChild(quantityRow('Buy', buyAmounts(maxBuy), c.price, function (n) {
+          doAction('buyStock', { qty: n });
         }));
-        buttons.appendChild(el('button', {
-          class: 'ghost',
-          onclick: function () { doAction('sellStock', { qty: shares }); },
-          text: 'Sell all ' + shares
+      } else {
+        card.appendChild(el('div', { class: 'hint', text: 'One share costs ' + money(c.price) + ' and you have ' + money(state.cash) + '.' }));
+      }
+      if (shares > 0) {
+        card.appendChild(quantityRow('Sell', sellAmounts(shares), c.price, function (n) {
+          doAction('sellStock', { qty: n });
         }));
       }
-      card.appendChild(cardFooter(card, buttons, 'Pass'));
+      card.appendChild(errorSlot());
+      card.appendChild(el('div', { class: 'buttons' }, [
+        el('button', { class: 'ghost', onclick: function () { doAction('pass'); }, text: 'Pass' })
+      ]));
       if (c.price >= c.range[1] * 0.8) {
-        card.appendChild(el('div', { class: 'hint', text: 'This price is near the top of its range.' }));
+        card.appendChild(el('div', { class: 'hint', text: 'This price is near the top of its range. A good moment to sell, a poor one to buy.' }));
       } else if (c.price <= c.range[0] * 1.5) {
-        card.appendChild(el('div', { class: 'hint', text: 'This price is near the bottom of its range.' }));
+        card.appendChild(el('div', { class: 'hint', text: 'This price is near the bottom of its range. A good moment to buy, if you can hold it.' }));
       }
       return card;
     }
@@ -570,17 +838,20 @@
         ['Maximum', c.maxQty + ' coins'],
         ['Monthly income', 'none']
       ]));
-      var maxCoins = Math.floor(state.cash / c.unitPrice);
-      var gq = el('input', { type: 'number', id: 'qty', min: '1', max: String(c.maxQty), value: '1' });
-      buttons.appendChild(gq);
-      var goldBuy = el('button', {
-        class: 'primary',
-        onclick: function () { doAction('buyGold', { qty: gq.value }); },
-        text: maxCoins < 1 ? 'Cannot afford a coin' : 'Buy coins'
-      });
-      if (maxCoins < 1) goldBuy.disabled = true;
-      buttons.appendChild(goldBuy);
-      card.appendChild(cardFooter(card, buttons, 'Pass'));
+      var maxCoins = Math.min(c.maxQty, Math.floor(state.cash / c.unitPrice));
+      if (maxCoins >= 1) {
+        var coinAmounts = [];
+        for (var n = maxCoins; n >= 1 && coinAmounts.length < 5; n--) coinAmounts.push(n);
+        card.appendChild(quantityRow('Buy', coinAmounts, c.unitPrice, function (q) {
+          doAction('buyGold', { qty: q });
+        }));
+      } else {
+        card.appendChild(el('div', { class: 'hint', text: 'One coin costs ' + money(c.unitPrice) + ' and you have ' + money(state.cash) + '.' }));
+      }
+      card.appendChild(errorSlot());
+      card.appendChild(el('div', { class: 'buttons' }, [
+        el('button', { class: 'ghost', onclick: function () { doAction('pass'); }, text: 'Pass' })
+      ]));
       return card;
     }
 
@@ -607,8 +878,13 @@
         ['Monthly income', money(0)],
         c.addExpense ? ['Added monthly expense', money(c.addExpense)] : null
       ]));
-      buttons.appendChild(el('button', { onclick: function () { doAction('buyDeal'); }, text: 'Do it anyway' }));
-      card.appendChild(cardFooter(card, buttons, 'Walk away'));
+      /* Refusing is the right answer and gets the primary button, exactly as
+       * on the optional-doodad card. These two cards teach the same lesson and
+       * used to give opposite visual instructions. */
+      buttons.appendChild(el('button', { class: 'primary', onclick: function () { doAction('pass'); }, text: 'Walk away' }));
+      buttons.appendChild(el('button', { class: 'ghost', onclick: function () { doAction('buyDeal'); }, text: 'Do it anyway' }));
+      card.appendChild(errorSlot());
+      card.appendChild(buttons);
       card.appendChild(el('div', { class: 'hint', text: 'Money out, nothing coming back. An asset puts money in your pocket; this does the opposite.' }));
       return card;
     }
@@ -633,6 +909,7 @@
     });
     if (outOfReach) buyBtn.disabled = true;
     buttons.appendChild(buyBtn);
+    card.appendChild(errorSlot());
     card.appendChild(cardFooter(card, buttons, 'Pass'));
     if (short > 0) {
       card.appendChild(el('div', {
@@ -683,6 +960,7 @@
         ['Your cash', money(state.cash)],
         p.addExpense ? ['Added monthly expense', money(p.addExpense) + ' forever'] : null
       ]),
+      errorSlot(),
       el('div', { class: 'buttons' }, [
         el('button', { class: 'primary', onclick: function () { doAction('acknowledge'); }, text: 'No thanks' }),
         el('button', { onclick: function () { doAction('doodadAccept'); }, text: 'Buy it (' + money(p.amount) + ')' })
@@ -696,6 +974,7 @@
       el('h3', { text: p.title }),
       el('p', { text: p.text }),
       p.amount !== undefined ? terms([['Cost', money(p.amount)], p.addExpense ? ['Added monthly expense', money(p.addExpense)] : null]) : null,
+      errorSlot(),
       el('div', { class: 'buttons' }, [
         el('button', { class: 'primary', onclick: function () { doAction(yesAction); }, text: yesLabel }),
         el('button', { class: 'ghost', onclick: function () { doAction('acknowledge'); }, text: noLabel })
@@ -703,31 +982,44 @@
     ]);
   }
 
+  /* Keeping is the default and gets the primary button. Selling is
+   * irreversible, lowers the number that wins, and every row spells out what
+   * it costs you in monthly income before you can tap it.
+   *
+   * One compact row per offer rather than a six-row table each: with four
+   * houses the old card was 24 term rows and five buttons, and after a sale
+   * the card reflowed shorter so the next Sell button landed under the finger
+   * that had just tapped one. */
   function sellAssetCard(p) {
     var card = el('div', { class: 'card info' }, [
       el('h3', { text: p.title }),
       el('p', { text: p.text })
     ]);
-    p.offers.forEach(function (o) {
+
+    var offers = p.offers.slice().sort(function (a, b) { return b.netCash - a.netCash; });
+
+    offers.forEach(function (o) {
       var gain = o.price - o.cost;
-      card.appendChild(terms([
-        [o.name, ''],
-        ['Sale price', money(o.price)],
-        ['Mortgage cleared', money(o.mortgage)],
-        ['Cash to you', money(o.netCash)],
-        ['Against purchase price', (gain >= 0 ? '+' : '') + money(gain)],
-        ['Passive income lost', money(o.cashflowLost) + ' / month']
-      ]));
-      card.appendChild(el('div', { class: 'buttons' }, [
+      var loss = o.netCash < 0;
+      var row = el('div', { class: 'offer' + (loss ? ' loss' : '') }, [
+        el('div', { class: 'offername', text: o.name }),
+        el('div', { class: 'offerfacts' }, [
+          el('span', { class: loss ? 'neg' : 'pos', text: (o.netCash >= 0 ? '+' : '') + money(o.netCash) + ' cash' }),
+          el('span', { class: 'neg', text: '−' + money(o.cashflowLost) + '/mo income' }),
+          el('span', { class: 'muted', text: (gain >= 0 ? 'gain ' : 'loss ') + money(Math.abs(gain)) + ' vs the ' + money(o.cost) + ' you paid' })
+        ]),
         el('button', {
-          class: 'primary',
+          class: loss ? 'danger-btn' : '',
           onclick: function () { doAction('sellAsset', { assetId: o.assetId }); },
-          text: 'Sell ' + o.name
+          text: loss ? 'Sell at a loss' : 'Sell'
         })
-      ]));
+      ]);
+      card.appendChild(row);
     });
+
+    card.appendChild(errorSlot());
     card.appendChild(el('div', { class: 'buttons' }, [
-      el('button', { class: 'ghost', onclick: function () { doAction('acknowledge'); }, text: 'Keep everything' })
+      el('button', { class: 'primary', onclick: function () { doAction('acknowledge'); }, text: 'Keep everything' })
     ]));
     card.appendChild(el('div', {
       class: 'hint',
@@ -737,17 +1029,21 @@
   }
 
   function sellGoldCard(p) {
-    var qty = el('input', { type: 'number', id: 'qty', min: '1', max: String(p.maxQty), value: String(p.maxQty) });
-    return el('div', { class: 'card gold' }, [
+    var card = el('div', { class: 'card gold' }, [
       el('h3', { text: p.title }),
       el('p', { text: p.text }),
-      terms([['Price per coin', money(p.unitPrice)], ['Coins you own', String(p.maxQty)]]),
-      el('div', { class: 'buttons' }, [
-        qty,
-        el('button', { class: 'primary', onclick: function () { doAction('sellGold', { qty: qty.value }); }, text: 'Sell coins' }),
-        el('button', { class: 'ghost', onclick: function () { doAction('acknowledge'); }, text: 'Hold' })
-      ])
+      terms([['Price per coin', money(p.unitPrice)], ['Coins you own', String(p.maxQty)]])
     ]);
+    var amounts = [];
+    for (var n = p.maxQty; n >= 1 && amounts.length < 5; n--) amounts.push(n);
+    card.appendChild(quantityRow('Sell', amounts, p.unitPrice, function (q) {
+      doAction('sellGold', { qty: q });
+    }));
+    card.appendChild(errorSlot());
+    card.appendChild(el('div', { class: 'buttons' }, [
+      el('button', { class: 'primary', onclick: function () { doAction('acknowledge'); }, text: 'Hold' })
+    ]));
+    return card;
   }
 
   function ftInvestmentCard(p) {
@@ -760,6 +1056,7 @@
         ['Annual return', ((p.cashflow * 12 / p.cost) * 100).toFixed(1) + '%'],
         ['Your cash', money(state.cash)]
       ]),
+      errorSlot(),
       el('div', { class: 'buttons' }, [
         el('button', { class: 'primary', onclick: function () { doAction('buyInvestment'); }, text: 'Buy' }),
         el('button', { class: 'ghost', onclick: function () { doAction('acknowledge'); }, text: 'Pass' })
@@ -772,6 +1069,7 @@
       el('h3', { text: p.title }),
       el('p', { text: p.text }),
       terms([['Cost', money(p.cost)], ['Your cash', money(state.cash)]]),
+      errorSlot(),
       el('div', { class: 'buttons' }, [
         el('button', { class: 'primary', onclick: function () { doAction('buyDream'); }, text: 'Buy my dream' }),
         el('button', { class: 'ghost', onclick: function () { doAction('acknowledge'); }, text: 'Not yet' })
@@ -787,41 +1085,61 @@
     var host = $('#assets');
     clear(host);
 
-    var items = [];
+    /* Split by the only question that matters: does this put money in your
+     * pocket every month, or does it only pay if someone later pays you more
+     * for it? A flat list made a $0-dividend share look identical to an
+     * eight-plex, which is the exact confusion the game exists to clear up. */
+    var earning = [];
+    var speculative = [];
 
     for (var sym in state.stocks) {
       var h = state.stocks[sym];
-      items.push([sym + ' - ' + D.STOCK_SYMBOLS[sym].name, h.shares + ' shares, paid ' + money(h.invested),
-        D.STOCK_SYMBOLS[sym].dividend ? money(h.shares * D.STOCK_SYMBOLS[sym].dividend) + '/mo' : '']);
+      var meta = D.STOCK_SYMBOLS[sym];
+      var monthly = h.shares * meta.dividend;
+      var row = [sym + ' — ' + meta.name, h.shares + ' shares, paid ' + money(h.invested), monthly];
+      (monthly > 0 ? earning : speculative).push(row);
     }
 
     if (state.phase === 'fasttrack' || state.phase === 'won') {
       state.ftInvestments.forEach(function (i) {
-        items.push([i.name, money(i.cost), money(i.cashflow) + '/mo']);
+        earning.push([i.name, money(i.cost), i.cashflow]);
       });
     }
 
     state.assets.forEach(function (a) {
       if (a.category === 'gold') {
-        items.push([a.name, a.qty + ' coins, paid ' + money(a.cost), '']);
+        speculative.push([a.name, a.qty + ' coins, paid ' + money(a.cost), 0]);
       } else {
-        items.push([a.name,
-          money(a.cost) + (a.mortgage ? ', ' + money(a.mortgage) + ' owed' : ' owned outright'),
-          money(a.cashflow) + '/mo']);
+        var detail = money(a.cost) + (a.mortgage ? ', ' + money(a.mortgage) + ' owed' : ', owned outright');
+        (a.cashflow > 0 ? earning : speculative).push([a.name, detail, a.cashflow]);
       }
     });
 
-    if (!items.length) {
+    if (!earning.length && !speculative.length) {
       host.appendChild(el('div', { class: 'empty', text: 'Nothing yet. Every Opportunity square is a chance to start.' }));
       return;
     }
-    items.forEach(function (it) {
-      host.appendChild(el('div', { class: 'item' }, [
-        el('span', { class: 'n', text: it[0] }),
-        el('span', { class: 'm', text: it[1] }),
-        el('span', { class: 'm ' + (it[2] ? 'pos' : ''), text: it[2] })
+
+    function section(title, rows, note) {
+      if (!rows.length) return;
+      var total = rows.reduce(function (sum, r) { return sum + r[2]; }, 0);
+      host.appendChild(el('div', { class: 'assetgroup' }, [
+        el('span', { text: title }),
+        el('span', { class: total > 0 ? 'pos' : '', text: total > 0 ? money(total) + '/mo' : '' })
       ]));
-    });
+      rows.forEach(function (r) {
+        host.appendChild(el('div', { class: 'item' }, [
+          el('span', { class: 'n', text: r[0] }),
+          el('span', { class: 'm', text: r[1] }),
+          el('span', { class: 'm ' + (r[2] > 0 ? 'pos' : 'muted'), text: r[2] > 0 ? money(r[2]) + '/mo' : '$0/mo' })
+        ]));
+      });
+      if (note) host.appendChild(el('div', { class: 'hint', text: note }));
+    }
+
+    section('Paying you every month', earning);
+    section('Pays nothing until you sell it', speculative,
+      'These only pay off if someone later pays you more than you did.');
   }
 
   function renderBank() {
@@ -838,18 +1156,98 @@
       return;
     }
 
-    var amt = el('input', { type: 'number', id: 'loan-amount', min: '1000', step: '1000', value: '1000' });
-    host.appendChild(el('div', { class: 'buttons' }, [
-      amt,
-      el('button', { onclick: function () { doAction('borrow', { amount: amt.value }); }, text: 'Borrow' }),
-      el('button', { onclick: function () { doAction('repay', { amount: amt.value }); }, text: 'Repay' })
+    var available = E.availableCredit(state);
+    var owed = state.bankLoan;
+
+    /* Idle state: a status line, not a form.
+     *
+     * This panel used to render a number input pre-filled with 1000 next to
+     * Borrow and Repay on every single turn of the game, whether or not the
+     * player had any debt or any reason to take some on. A control with no
+     * context and no call to action does not earn permanent space. */
+    if (!bankMode) {
+      var status = el('div', { class: 'bankstatus' });
+      status.appendChild(el('div', { class: 'bankline' }, [
+        el('span', { text: 'Debt' }),
+        el('span', { class: owed > 0 ? 'neg' : '', text: money(owed) + (owed > 0 ? '  (' + money(owed / 1000 * 100) + '/mo)' : '') })
+      ]));
+      status.appendChild(el('div', { class: 'bankline' }, [
+        el('span', { text: 'Can still borrow' }),
+        el('span', { text: money(available) })
+      ]));
+      host.appendChild(status);
+
+      var actions = el('div', { class: 'buttons' });
+      var borrowBtn = el('button', {
+        onclick: function () { bankMode = 'borrow'; bankAmount = 1000; render(); },
+        text: 'Borrow…'
+      });
+      if (available < 1000) {
+        borrowBtn.disabled = true;
+        borrowBtn.title = 'You are at your credit limit of ' + money(E.creditLimit(state)) + '.';
+      }
+      actions.appendChild(borrowBtn);
+      if (owed > 0) {
+        actions.appendChild(el('button', {
+          onclick: function () { bankMode = 'repay'; bankAmount = Math.min(owed, Math.floor(state.cash / 1000) * 1000) || 1000; render(); },
+          text: 'Repay…'
+        }));
+      }
+      host.appendChild(actions);
+      host.appendChild(el('div', {
+        class: 'hint',
+        text: owed > 0
+          ? 'Bank money costs $100 a month per $1,000 — 120% a year. Clearing it is usually the best return available to you.'
+          : 'The bank lends at $100 a month per $1,000 — 120% a year, the most expensive money in the game.'
+      }));
+      return;
+    }
+
+    /* Active state: a stepper, and the consequence stated before you commit. */
+    var repaying = bankMode === 'repay';
+    var ceiling = repaying ? Math.min(owed, Math.floor(state.cash / 1000) * 1000) : available;
+    bankAmount = Math.max(1000, Math.min(bankAmount, ceiling));
+
+    var stepper = el('div', { class: 'stepper' }, [
+      el('button', {
+        onclick: function () { bankAmount = Math.max(1000, bankAmount - 1000); render(); },
+        'aria-label': 'Less', text: '−'
+      }),
+      el('span', { class: 'stepval', 'aria-live': 'polite', text: money(bankAmount) }),
+      el('button', {
+        onclick: function () { bankAmount = Math.min(ceiling, bankAmount + 1000); render(); },
+        'aria-label': 'More', text: '+'
+      })
+    ]);
+    host.appendChild(el('div', { class: 'banktitle', text: repaying ? 'Repay the bank' : 'Borrow from the bank' }));
+    host.appendChild(stepper);
+
+    var s = E.stats(state);
+    var deltaExpense = (repaying ? -1 : 1) * (bankAmount / 1000) * 100;
+    host.appendChild(terms([
+      ['Cash afterwards', money(state.cash + (repaying ? -bankAmount : bankAmount))],
+      ['Monthly expenses', money(s.totalExpenses) + '  →  ' + money(s.totalExpenses + deltaExpense)],
+      ['Monthly cash flow', money(s.cashflow) + '  →  ' + money(s.cashflow - deltaExpense)]
     ]));
-    host.appendChild(el('div', {
-      class: 'hint',
-      text: '$1,000 blocks at $100 a month each - 120% a year, the most expensive money in the game. ' +
-        'You owe ' + money(state.bankLoan) + ' of a ' + money(E.creditLimit(state)) +
-        ' limit, so you can still borrow ' + money(E.availableCredit(state)) + '.'
-    }));
+    host.appendChild(errorSlot());
+    host.appendChild(el('div', { class: 'buttons' }, [
+      el('button', {
+        class: 'primary',
+        onclick: function () {
+          var amount = bankAmount;
+          if (doAction(repaying ? 'repay' : 'borrow', { amount: amount })) bankMode = null;
+          render();
+        },
+        text: (repaying ? 'Repay ' : 'Borrow ') + money(bankAmount)
+      }),
+      el('button', { class: 'ghost', onclick: function () { bankMode = null; cardError = null; render(); }, text: 'Cancel' })
+    ]));
+    if (ceiling < 1000) {
+      host.appendChild(el('div', {
+        class: 'hint',
+        text: repaying ? 'You need at least $1,000 in cash to repay a block.' : 'No credit available.'
+      }));
+    }
   }
 
   function renderLog() {
@@ -914,6 +1312,10 @@
   }
 
   function startGame() {
+    if (state && !E.isOver(state) && state.months > 0 &&
+        !window.confirm('Abandon the current game at month ' + state.months + '?')) {
+      return;
+    }
     var seedRaw = $('#seed-input').value.trim();
     state = E.createGame({
       seed: seedRaw === '' ? null : seedRaw,
@@ -930,30 +1332,6 @@
   /* ------------------------------------------------------------------ *
    * Save / load
    * ------------------------------------------------------------------ */
-
-  function save() {
-    try {
-      localStorage.setItem(SAVE_KEY, E.serialize(state));
-      showError('Game saved to this browser.');
-    } catch (e) {
-      showError('Could not save: ' + e.message);
-    }
-  }
-
-  function load() {
-    try {
-      var text = localStorage.getItem(SAVE_KEY);
-      if (!text) { showError('No saved game found.'); return; }
-      state = E.deserialize(text);
-      undoStack = [];
-      lastPendingKey = null;
-      $('#setup').close();
-      renderBank();
-      render();
-    } catch (e) {
-      showError('Could not load: ' + e.message);
-    }
-  }
 
   function exportGame() {
     var blob = new Blob([E.serialize(state)], { type: 'application/json' });
@@ -976,7 +1354,7 @@
         renderBank();
         render();
       } catch (e) {
-        showError('Could not import: ' + e.message);
+        showBanner('Could not import: ' + e.message);
       }
     };
     reader.readAsText(file);
@@ -989,8 +1367,6 @@
   function init() {
     $('#new-btn').addEventListener('click', openSetup);
     $('#undo-btn').addEventListener('click', undo);
-    $('#save-btn').addEventListener('click', save);
-    $('#load-btn').addEventListener('click', load);
     $('#export-btn').addEventListener('click', exportGame);
     $('#import-input').addEventListener('change', function (e) {
       if (e.target.files[0]) importGame(e.target.files[0]);

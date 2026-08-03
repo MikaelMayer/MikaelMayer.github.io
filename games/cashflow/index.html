@@ -16,19 +16,21 @@
     <span class="seedtag" id="seedtag">seed —</span>
   </div>
   <div class="tools">
+    <!-- The game autosaves, so there is no Save button and no Load button to
+         restore a stale one. Undo is the recovery path; Export is for sending
+         a game to someone else. New game is deliberately NOT the primary
+         button: it is the destructive one. -->
     <button id="undo-btn" title="Undo the last action (u)">Undo</button>
-    <button id="save-btn">Save</button>
-    <button id="load-btn">Load</button>
     <button id="export-btn" class="hide-sm" title="Download this game as a file">Export</button>
     <label class="filebtn hide-sm">
       Import<input type="file" id="import-input" accept="application/json" hidden>
     </label>
-    <button id="new-btn" class="primary">New game</button>
+    <button id="new-btn">New game</button>
   </div>
 </header>
 
-<div class="banner error hidden" id="error-banner"></div>
-<div class="banner error hidden" id="invariant-banner"></div>
+<div class="banner error hidden" id="error-banner" role="status"></div>
+<div class="banner error hidden" id="invariant-banner" role="alert"></div>
 
 <main>
   <div class="col">
@@ -40,12 +42,7 @@
   <div class="col">
     <div class="panel">
       <h2>This turn</h2>
-      <div id="action"></div>
-    </div>
-
-    <div class="panel">
-      <h2>Bank</h2>
-      <div id="bank"></div>
+      <div id="action" aria-live="polite"></div>
     </div>
 
     <div class="panel">
@@ -62,9 +59,43 @@
     </div>
 
     <div class="panel">
+      <h2>Bank</h2>
+      <div id="bank"></div>
+    </div>
+
+    <div class="panel">
       <h2>History</h2>
       <div id="log"></div>
     </div>
+
+    <details class="panel rules">
+      <summary>How to play</summary>
+      <p>
+        You are trying to build <strong>passive income</strong> — money that arrives whether
+        or not you go to work — until it is greater than your <strong>total monthly
+        expenses</strong>. The moment it is, you are out of the Rat Race. Do it in as few
+        months as you can.
+      </p>
+      <p>
+        A salary is not passive income. Neither is a lump sum from selling something.
+        Only rent, dividends, interest and business profit count, which is why selling a
+        property for a good price can still move you backwards.
+      </p>
+      <p>
+        Roll, move, and resolve the square you land on. <strong>Tap any square on the
+        board to see what it does.</strong> You may always look at a deal and then decline
+        it, and you may always refuse a luxury.
+      </p>
+      <p>
+        The bank will lend you money in $1,000 blocks at $100 a month each — 120% a year.
+        That interest is an expense like any other, so borrowing raises the bar you are
+        trying to clear.
+      </p>
+      <p class="muted-note">
+        Keyboard: <kbd>r</kbd> rolls, <kbd>u</kbd> undoes.
+        Your game saves itself in this browser as you play.
+      </p>
+    </details>
   </div>
 </main>
 

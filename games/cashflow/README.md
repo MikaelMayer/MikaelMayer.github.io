@@ -55,8 +55,52 @@ decks conserving their cards, no fractional shares, no numbers running away. If 
 engine ever contradicts itself, a red banner says so with the seed, instead of quietly
 paying you the wrong salary for the next hour.
 
-Plus **Undo** (60 steps), **Save/Load** to the browser, and **Export/Import** to a JSON
-file you can attach to a bug report.
+Plus **Undo** (60 steps), **autosave** to the browser on every action, and
+**Export/Import** to a JSON file you can attach to a bug report. There is no Save
+button, because a manual save is a trap: you press it at month 20, keep playing to
+month 50, close the tab, and lose thirty months of decisions without being told.
+
+---
+
+## What the interface has to do
+
+The engine adjudicates. The interface has to *teach*, and that is a different job.
+
+**Every turn produces a receipt.** Roughly half the squares resolve with no decision to
+make — payday pays you, a baby arrives, the market ignores you. Those turns used to end
+with your money changed and nothing on screen to say why, which is bad teaching and
+indistinguishable from a bug. Now the turn is replayed back to you: what moved, in which
+direction, and what it did to your passive income. When a forced sale cascades, you see
+the whole cascade rather than a number that quietly got smaller.
+
+**The number that wins is the number that's biggest.** Passive income against total
+expenses, side by side, in the statement and in the middle of the board. Monthly cash
+flow used to have both of those slots — and a player optimising the biggest thing on
+screen would have been optimising the wrong one, because cash flow goes *up* when you
+sell the assets that were going to free you.
+
+**Quantities are offered, not typed.** A stock card gives you `Max 314 / 157 / 100 / 50
+/ 10` for buying and `All 240 / 120 / 10 / 1` for selling, each labelled with what it
+costs. A single shared number box used to serve Buy, Sell and Sell-all, defaulting to
+10 — so its answer to a $5 share you could buy 314 of was "buy $50 worth."
+
+**Refusing is never the quiet option.** On any card where saying no is the lesson — a
+luxury doodad, a trap deal, a market buyer — "No thanks" is the primary button and the
+card says outright that refusing costs nothing. Declines are logged and totalled, so
+discipline leaves a visible trace.
+
+**Controls appear when they are relevant.** The bank is a two-line status until you ask
+for it, then a stepper that shows what the loan does to your cash flow *before* you
+commit. It used to be a number field pre-filled with `1000` sitting on screen every turn
+of the game, next to a Repay button whose only possible outcome was an error.
+
+**The board explains itself.** Tap any square to find out what it does. A phone has no
+hover, so the tooltip the board relied on reached nobody, and the only documentation
+link in the player-facing UI used to point at the developer test suite.
+
+**Errors appear where they happened.** Inside the card that produced them, not in a
+banner at the top of the document that erases itself after five seconds while you are
+three screens further down.
 
 ---
 
@@ -178,8 +222,10 @@ The game is built to be played on a phone, not merely to survive on one.
   reading their financial statement.
 - **Nothing scrolls sideways** at any width down to 320px, and layout respects notch
   safe-area insets.
+- **Tap any board square** for an explanation — the only documentation a touch device
+  can actually reach, since there is no hover.
 - Export/Import are hidden on phones, where a file picker is more trouble than it is
-  worth; Save/Load cover the same ground.
+  worth; the game autosaves anyway.
 
 ---
 
