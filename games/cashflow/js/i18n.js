@@ -73,6 +73,19 @@
     return (neg ? '-$' : '$') + abs.toLocaleString('en-US');
   }
 
+  /* The decimal separator differs by locale; the placement of the % sign is
+   * left to the strings themselves, which is why this returns a bare
+   * number.
+   *
+   * `digits` is a maximum, not a width: a rate of exactly 6% reads "6%", not
+   * "6.0%". A trailing zero is precision this game does not have and does not
+   * need, and it makes a plain number look like a measurement. */
+  function pct(n, digits) {
+    var d = digits === undefined ? 1 : digits;
+    return Number(n).toLocaleString(current === 'fr' ? 'fr-FR' : 'en-US',
+      { minimumFractionDigits: 0, maximumFractionDigits: d });
+  }
+
   function fill(template, params) {
     if (!params) return template;
     return template.replace(/\{(\$?)([a-zA-Z0-9_]+)\}/g, function (whole, isMoney, name) {
@@ -124,6 +137,7 @@
     t: t,
     maybe: maybe,
     money: money,
+    pct: pct,
     fill: fill,
     lang: lang,
     setLang: setLang,

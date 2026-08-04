@@ -14,7 +14,8 @@
   var D = window.CF.data;
   var T = window.CF.i18n;
   var t = T.t;
-  var money = T.money;   // locale-aware: $1,000 or 1 000 $
+  var money = T.money;
+  var pct = T.pct;   // locale-aware: $1,000 or 1 000 $
 
   var SAVE_KEY = 'cashflow-solo-save-v1';
 
@@ -168,7 +169,7 @@
 
   function rateText(payment, balance) {
     var r = annualRate(payment, balance);
-    return r === null ? '' : t('{pct}%/yr', { pct: r.toFixed(r < 10 ? 1 : 0) });
+    return r === null ? '' : t('{pct}%/yr', { pct: pct(r, r < 10 ? 1 : 0) });
   }
 
   /* Every expense line explains what it is and how, or whether, it ends.
@@ -192,7 +193,7 @@
     } else if (slot) {
       var rate = annualRate(slot.payment, slot.liability);
       body.push(t('The monthly payment on this debt. The balance is {$balance}, so the payment is costing you about {pct}% a year.',
-        { balance: slot.liability, pct: rate === null ? 0 : rate.toFixed(rate < 10 ? 1 : 0) }));
+        { balance: slot.liability, pct: rate === null ? 0 : pct(rate, rate < 10 ? 1 : 0) }));
       body.push(t('Pay the {$balance} off in full from the Liabilities list below and this line disappears for the rest of the game. Debts cannot be part-paid.',
         { balance: slot.liability }));
     }
@@ -1336,7 +1337,7 @@
       card.appendChild(terms([
         [t('Cost'), money(c.cost)],
         [t('Monthly income'), money(c.cashflow)],
-        [t('Annual return'), ((c.cashflow * 12 / c.cost) * 100).toFixed(1) + '%']
+        [t('Annual return'), t('{pct}%', { pct: pct((c.cashflow * 12 / c.cost) * 100) })]
       ]));
       var cdBuy = el('button', {
         class: 'primary',
@@ -1387,13 +1388,13 @@
           explain(t('Cash-on-cash return'), [
             t('What the money you actually put in earns you in a year, ignoring the part the mortgage pays for.'),
             t('Monthly cash flow x 12 / down payment: {$cf} x 12 / {$down} = {pct}% a year.',
-              { cf: c.cashflow, down: c.down, pct: roi.toFixed(1) }),
+              { cf: c.cashflow, down: c.down, pct: pct(roi) }),
             t('It says nothing about whether the price is fair, or what the property might later sell for.')
           ]);
         },
         title: t('What does this mean?')
       }, [t('Cash-on-cash return')])]),
-      el('span', { text: roi.toFixed(1) + '% ' + t('a year') })
+      el('span', { text: t('{pct}% a year', { pct: pct(roi) }) })
     ]));
     card.appendChild(termsBox);
     var short = Math.max(0, c.down - state.cash);
@@ -1592,7 +1593,7 @@
       terms([
         [t('Cost (cash)'), money(p.cost)],
         [t('Monthly cash flow'), money(p.cashflow)],
-        [t('Annual return'), ((p.cashflow * 12 / p.cost) * 100).toFixed(1) + '%'],
+        [t('Annual return'), t('{pct}%', { pct: pct((p.cashflow * 12 / p.cost) * 100) })],
         [t('Your cash'), money(state.cash)]
       ]),
       errorSlot(),
