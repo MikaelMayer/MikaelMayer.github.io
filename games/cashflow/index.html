@@ -59,7 +59,7 @@
     </div>
 
     <div class="panel">
-      <h2>Bank</h2>
+      <h2>Loans</h2>
       <div id="bank"></div>
     </div>
 
@@ -87,9 +87,10 @@
         it, and you may always refuse a luxury.
       </p>
       <p>
-        The bank will lend you money in $1,000 blocks at $100 a month each — 120% a year.
-        That interest is an expense like any other, so borrowing raises the bar you are
-        trying to clear.
+        You can take a loan in $1,000 blocks at $100 a month each — 120% a year, interest only.
+        That interest is an expense like any other, so every loan raises the bar you are
+        trying to clear. Nothing is ever borrowed on your behalf: taking a loan is always
+        your own deliberate choice, and you repay it from the Liabilities list.
       </p>
       <p class="muted-note">
         Keyboard: <kbd>r</kbd> rolls, <kbd>u</kbd> undoes.
@@ -105,6 +106,10 @@
   Runs entirely offline; nothing leaves your browser.
   <a href="tests.html">Run the engine tests</a>.
 </footer>
+
+<dialog id="money-dialog">
+  <div class="dlg-body" id="money-dialog-body"></div>
+</dialog>
 
 <dialog id="setup">
   <form class="dlg-body" method="dialog">

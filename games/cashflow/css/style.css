@@ -1,35 +1,66 @@
 /* CASHFLOW Solo -- styles.
    One stylesheet, no build step, no external fonts or CDNs. Works offline. */
 
+/* Palette.
+   A board game should look like one. The square colours are the loudest thing
+   on screen on purpose -- they are how you read the board at a glance -- while
+   the panels stay quiet so the numbers remain legible. Both themes carry the
+   same hues at different weights, so the board reads the same either way. */
+
 :root {
-  --bg: #0e1116;
-  --panel: #161b22;
-  --panel-2: #1c2129;
-  --line: #2a313c;
-  --text: #e6edf3;
-  --muted: #8b97a8;
-  --accent: #4c9f70;
-  --accent-dim: #2f6b4a;
-  --gold: #d9a441;
-  --danger: #d05a5a;
-  --info: #5a8fd0;
-  --radius: 8px;
+  --bg: #e9eff6;
+  --panel: #ffffff;
+  --panel-2: #f1f6fb;
+  --line: #ccdae8;
+  --text: #10202f;
+  --muted: #5a7085;
+  --accent: #00a05c;
+  --accent-dim: #7fd7b0;
+  --gold: #e8930c;
+  --danger: #e0403a;
+  --info: #1f7fd4;
+  --purple: #7b4de0;
+  --pink: #dd3f8c;
+  --shadow: 0 1px 2px rgba(16, 32, 47, .06), 0 4px 14px rgba(16, 32, 47, .07);
+
+  --sq-deal-bg: #c3efd6;      --sq-deal-line: #21b573;
+  --sq-pay-bg: #ffe6a8;       --sq-pay-line: #e8930c;
+  --sq-market-bg: #cbe2fb;    --sq-market-line: #1f7fd4;
+  --sq-doodad-bg: #ffd5cf;    --sq-doodad-line: #e0403a;
+  --sq-charity-bg: #e3d8ff;   --sq-charity-line: #7b4de0;
+  --sq-baby-bg: #ffd4ea;      --sq-baby-line: #dd3f8c;
+  --sq-fired-bg: #ffb3ab;     --sq-fired-line: #c62f28;
+  --sq-on-color: #10202f;
+
+  --radius: 10px;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 }
 
-@media (prefers-color-scheme: light) {
+@media (prefers-color-scheme: dark) {
   :root {
-    --bg: #f4f6f8;
-    --panel: #ffffff;
-    --panel-2: #eef1f5;
-    --line: #d5dbe3;
-    --text: #1a1f26;
-    --muted: #5d6875;
-    --accent: #2f7d54;
-    --accent-dim: #b9dcc8;
-    --gold: #a97613;
-    --danger: #b23c3c;
-    --info: #2c6bb0;
+    --bg: #101826;
+    --panel: #1a2334;
+    --panel-2: #222d42;
+    --line: #33425c;
+    --text: #e9f1fb;
+    --muted: #93a7c0;
+    --accent: #24d489;
+    --accent-dim: #1d7a55;
+    --gold: #ffc043;
+    --danger: #ff6f62;
+    --info: #56aaff;
+    --purple: #a78bfa;
+    --pink: #f472b6;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 6px 18px rgba(0, 0, 0, .28);
+
+    --sq-deal-bg: #13492f;      --sq-deal-line: #24d489;
+    --sq-pay-bg: #4d3810;       --sq-pay-line: #ffc043;
+    --sq-market-bg: #133453;    --sq-market-line: #56aaff;
+    --sq-doodad-bg: #4d201c;    --sq-doodad-line: #ff6f62;
+    --sq-charity-bg: #2f2455;   --sq-charity-line: #a78bfa;
+    --sq-baby-bg: #48213c;      --sq-baby-line: #f472b6;
+    --sq-fired-bg: #631f19;     --sq-fired-line: #ff8578;
+    --sq-on-color: #e9f1fb;
   }
 }
 
@@ -187,6 +218,7 @@ main {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 14px;
+  box-shadow: var(--shadow);
 }
 .panel + .panel { margin-top: 16px; }
 .panel h2 {
@@ -261,18 +293,38 @@ button.sq:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px;
   .board.rat .sq .lbl-short { display: inline; }
 }
 
-.sq.OPPORTUNITY { background: rgba(76, 159, 112, .16); border-color: var(--accent-dim); }
-.sq.PAYDAY, .sq.CASHFLOW_DAY { background: rgba(217, 164, 65, .2); border-color: var(--gold); font-weight: 700; }
-.sq.MARKET { background: rgba(90, 143, 208, .16); }
-.sq.DOODAD, .sq.SETBACK { background: rgba(208, 90, 90, .16); }
-.sq.CHARITY { background: rgba(160, 120, 208, .16); }
-.sq.BABY { background: rgba(208, 150, 190, .16); }
-.sq.DOWNSIZED { background: rgba(208, 90, 90, .3); }
-.sq.INVESTMENT { background: rgba(76, 159, 112, .16); }
-.sq.DREAM { background: rgba(160, 120, 208, .16); }
-.sq.DREAM.mine { background: rgba(217, 164, 65, .3); border-color: var(--gold); }
+.sq { color: var(--sq-on-color); font-weight: 600; }
+.sq.OPPORTUNITY, .sq.INVESTMENT { background: var(--sq-deal-bg); border-color: var(--sq-deal-line); }
+.sq.PAYDAY, .sq.CASHFLOW_DAY {
+  background: var(--sq-pay-bg);
+  border-color: var(--sq-pay-line);
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+.sq.MARKET { background: var(--sq-market-bg); border-color: var(--sq-market-line); }
+.sq.DOODAD, .sq.SETBACK { background: var(--sq-doodad-bg); border-color: var(--sq-doodad-line); }
+.sq.CHARITY { background: var(--sq-charity-bg); border-color: var(--sq-charity-line); }
+.sq.BABY { background: var(--sq-baby-bg); border-color: var(--sq-baby-line); }
+.sq.DOWNSIZED { background: var(--sq-fired-bg); border-color: var(--sq-fired-line); }
+.sq.DREAM { background: var(--sq-charity-bg); border-color: var(--sq-charity-line); }
 
-.sq.here { outline: 2px solid var(--text); outline-offset: -2px; }
+/* Your own dream is the thing you are playing for, so it gets to shout. */
+.sq.DREAM.mine {
+  background: var(--sq-pay-bg);
+  border-color: var(--sq-pay-line);
+  border-width: 2px;
+  font-weight: 800;
+}
+
+/* The square you are standing on, lifted off the board. */
+.sq.here {
+  outline: 3px solid var(--text);
+  outline-offset: -3px;
+  transform: scale(1.06);
+  z-index: 2;
+  box-shadow: var(--shadow);
+}
+
 .sq .pawn {
   position: absolute;
   inset: auto 3px 3px auto;
@@ -293,9 +345,9 @@ button.sq:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px;
   padding: 12px;
 }
 .board-center .big {
-  font-size: clamp(20px, 3.4vw, 34px);
-  font-weight: 700;
-  letter-spacing: .02em;
+  font-size: clamp(22px, 3.6vw, 38px);
+  font-weight: 800;
+  letter-spacing: -.01em;
 }
 .board-center .sub { color: var(--muted); font-size: 13px; }
 .dice {
@@ -303,14 +355,16 @@ button.sq:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px;
   gap: 8px;
 }
 .die {
-  width: 34px; height: 34px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel-2);
+  width: 40px; height: 40px;
+  border: 2px solid var(--sq-pay-line);
+  border-radius: 9px;
+  background: var(--sq-pay-bg);
+  color: var(--sq-on-color);
   display: grid;
   place-items: center;
-  font-weight: 700;
-  font-size: 18px;
+  font-weight: 800;
+  font-size: 21px;
+  box-shadow: var(--shadow);
 }
 
 /* ---------------- financial statement ---------------- */
@@ -378,7 +432,7 @@ button.sq:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px;
 .chip.bad { border-color: var(--danger); color: var(--danger); }
 
 .progress {
-  height: 8px;
+  height: 10px;
   background: var(--panel-2);
   border: 1px solid var(--line);
   border-radius: 99px;
@@ -388,7 +442,8 @@ button.sq:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px;
 .progress > i {
   display: block;
   height: 100%;
-  background: var(--accent);
+  background: linear-gradient(90deg, var(--accent), var(--sq-pay-line));
+  transition: width .35s ease;
 }
 
 /* ---------------- action card ---------------- */
@@ -738,3 +793,35 @@ footer a { color: var(--muted); }
 @media (max-height: 520px) and (orientation: landscape) {
   .board, .board.fast { max-width: min(520px, 88vh); }
 }
+
+/* ---------------- liability rows ---------------- */
+
+.stmt .row.liab {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0 3px 12px;
+}
+.stmt .row.liab .liabname { color: var(--muted); }
+.stmt .row.liab .liabnum { font-variant-numeric: tabular-nums; }
+.stmt .row.liab .liabnote { font-size: 10px; color: var(--muted); font-style: italic; }
+button.tiny {
+  font-size: 11px;
+  padding: 3px 9px;
+  min-height: 0;
+  border-radius: 99px;
+}
+@media (pointer: coarse) {
+  button.tiny { min-height: 32px; padding: 5px 12px; }
+}
+
+/* ---------------- money dialog ---------------- */
+
+#money-dialog { max-width: 460px; }
+#money-dialog h2 { margin: 0 0 8px; font-size: 18px; }
+#money-dialog .dlg-note { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+#money-dialog .terms { margin-bottom: 14px; }
+
+.quickrow { margin-bottom: 12px; }
+#money-dialog .stepper { margin-bottom: 10px; }

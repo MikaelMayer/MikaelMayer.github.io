@@ -24,10 +24,6 @@
   var undoStack = [];
   var MAX_UNDO = 60;
 
-  // Bank panel: null when idle, 'borrow' or 'repay' while a loan is being set up.
-  var bankMode = null;
-  var bankAmount = 1000;
-
   /* ------------------------------------------------------------------ *
    * Tiny DOM helpers
    * ------------------------------------------------------------------ */
@@ -91,7 +87,7 @@
     OPPORTUNITY: 'Choose a Small Deal or a Big Deal, then look at the card. Small Deals need a few thousand down; Big Deals need much more and pay much more. Looking is always free and you can always say no.',
     PAYDAY: 'You collect your monthly cash flow — salary plus passive income, less every expense. You collect it whenever you PASS a payday square as well as when you land on one, so there are three per lap.',
     MARKET: 'Something happens to the things you own. Usually a buyer appears for one type of asset and you may sell; sometimes a cost lands on every property or business you hold. If you own nothing that matches, nothing happens.',
-    DOODAD: 'An expense. Bills — a car repair, a dentist — are paid and shown to you. Anything expensive is a luxury you are offered and may refuse, and refusing costs nothing. This is where most paycheques quietly go.',
+    DOODAD: 'An unplanned expense. Some are bills you simply have to pay — a car repair, a dentist. The expensive ones are luxuries, and you can always turn those down at no cost. This is where most of a paycheque quietly goes.',
     CHARITY: 'You may donate 10% of your total income. If you do, then for the next three turns you may roll one die or two — more control over where you land, and more chances at an Opportunity.',
     BABY: 'A child joins your household, up to three. Each one adds your profession\'s per-child cost to your expenses every month, for good, which raises the bar you have to clear to get out.',
     DOWNSIZED: 'You lose your job. Pay one full month of total expenses and lose your next two turns. The lower your cash flow, the harder this lands.'
@@ -542,19 +538,60 @@
       row('Retail', money(p.retail), true),
       row('Other', money(p.other), true),
       row('Children (' + state.children + ')', money(p.children), true),
-      row('Bank loan', money(p.bankLoan), true),
+      row('Loans', money(p.bankLoan), true),
       row('Total expenses', money(s.totalExpenses), false, true)
     ]));
 
-    st.appendChild(group('Liabilities', [
-      row('Home mortgage', money(state.profession.home.liability), true),
-      state.profession.school.liability ? row('School loan', money(state.profession.school.liability), true) : null,
-      row('Car loan', money(state.profession.car.liability), true),
-      row('Credit cards', money(state.profession.creditCard.liability), true),
-      row('Retail debt', money(state.profession.retail.liability), true),
-      row('Bank loan', money(state.bankLoan), true),
-      row('Property mortgages', money(propertyDebt()), true)
-    ]));
+    /* Every debt you can clear gets its own button, right beside the number.
+     *
+     * Retiring a debt removes its monthly payment for good, which lowers the
+     * bar you are trying to clear -- so it belongs on the balance sheet next
+     * to the debt itself, not buried in a panel elsewhere. */
+    var liabilities = el('div', { class: 'group' }, [
+      el('div', { class: 'row' }, [el('span', { class: 'label', text: 'Liabilities' })])
+    ]);
+
+    Object.keys(E.LIABILITY_NAMES).forEach(function (which) {
+      var slot = state.profession[which];
+      if (!slot.liability && !slot.payment) return;
+      liabilities.appendChild(liabilityRow(
+        capitalise(E.LIABILITY_NAMES[which]), slot.liability, slot.payment,
+        slot.liability > 0 ? function () { openPayoffDialog(which); } : null,
+        slot.liability > state.cash
+      ));
+    });
+
+    liabilities.appendChild(liabilityRow(
+      'Loans', state.bankLoan, p.bankLoan,
+      state.bankLoan > 0 ? openRepayLoanDialog : null,
+      state.cash < 1000
+    ));
+
+    if (propertyDebt() > 0) {
+      liabilities.appendChild(liabilityRow('Property mortgages', propertyDebt(), 0, null, false,
+        'Cleared when you sell the property'));
+    }
+    st.appendChild(liabilities);
+  }
+
+  function capitalise(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  function liabilityRow(label, balance, payment, onPay, disabled, note) {
+    var r = el('div', { class: 'row sub liab' }, [
+      el('span', { class: 'liabname', text: label }),
+      el('span', { class: 'liabnum', text: money(balance) })
+    ]);
+    if (onPay) {
+      var b = el('button', { class: 'tiny', onclick: onPay, text: 'Repay' });
+      if (disabled) {
+        b.disabled = true;
+        b.title = 'Not enough cash';
+      }
+      r.appendChild(b);
+    } else {
+      r.appendChild(el('span', { class: 'liabnote', text: note || '' }));
+    }
+    return r;
   }
 
   function propertyDebt() {
@@ -631,7 +668,7 @@
       case 'deal': return host.appendChild(dealCard(p));
       case 'charity': return host.appendChild(simpleCard(p, 'Donate ' + money(p.amount), 'charityDonate', 'Decline'));
       case 'doodadOptional': return host.appendChild(optionalDoodadCard(p));
-      case 'notice': return host.appendChild(noticeCard(p));
+      case 'bill': return host.appendChild(billCard(p));
       case 'sellAsset': return host.appendChild(sellAssetCard(p));
       case 'sellGold': return host.appendChild(sellGoldCard(p));
       case 'ftInvestment': return host.appendChild(ftInvestmentCard(p));
@@ -882,7 +919,9 @@
        * on the optional-doodad card. These two cards teach the same lesson and
        * used to give opposite visual instructions. */
       buttons.appendChild(el('button', { class: 'primary', onclick: function () { doAction('pass'); }, text: 'Walk away' }));
-      buttons.appendChild(el('button', { class: 'ghost', onclick: function () { doAction('buyDeal'); }, text: 'Do it anyway' }));
+      var trapBtn = el('button', { class: 'ghost', onclick: function () { doAction('buyDeal'); }, text: 'Do it anyway' });
+      if (c.cost > state.cash) { trapBtn.disabled = true; trapBtn.title = 'Not enough cash'; }
+      buttons.appendChild(trapBtn);
       card.appendChild(errorSlot());
       card.appendChild(buttons);
       card.appendChild(el('div', { class: 'hint', text: 'Money out, nothing coming back. An asset puts money in your pocket; this does the opposite.' }));
@@ -902,23 +941,32 @@
     var short = Math.max(0, c.down - state.cash);
     var credit = E.availableCredit(state);
     var outOfReach = short > credit;
+    /* Buy is green only when you can actually pay for it. A deal you cannot
+     * afford must not look like the obvious next tap. */
     var buyBtn = el('button', {
-      class: 'primary',
+      class: short > 0 ? '' : 'primary',
       onclick: function () { doAction('buyDeal'); },
-      text: outOfReach ? 'Out of reach' : 'Buy'
+      text: 'Buy for ' + money(c.down)
     });
-    if (outOfReach) buyBtn.disabled = true;
+    if (short > 0) buyBtn.disabled = true;
     buttons.appendChild(buyBtn);
+
+    if (short > 0 && short <= credit) {
+      buttons.appendChild(el('button', { onclick: openLoanDialog, text: 'Take a loan…' }));
+    }
+
     card.appendChild(errorSlot());
     card.appendChild(cardFooter(card, buttons, 'Pass'));
+
     if (short > 0) {
       card.appendChild(el('div', {
         class: 'hint',
         text: short > credit
-          ? 'You are short ' + money(short) + ' and the bank will only lend another ' +
+          ? 'You are ' + money(short) + ' short, and you could only borrow another ' +
             money(credit) + '. This one is out of reach today.'
-          : 'You are short ' + money(short) + '. Buying anyway means a bank loan at $100 a month ' +
-            'per $1,000 - that interest comes straight off your cash flow.'
+          : 'You are ' + money(short) + ' short. You could take a loan to cover it — but a loan ' +
+            'costs ' + money(100) + ' a month for every ' + money(1000) + ', every month until you ' +
+            'repay it, and that comes straight off the cash flow this deal is meant to add.'
       }));
     }
     return card;
@@ -933,19 +981,46 @@
     return buttons;
   }
 
-  /* A bill that has already been paid. One button, and it says plainly why
-   * there was nothing to decide -- so that the doodads you CAN refuse read as
-   * a genuine choice rather than an inconsistency. */
-  function noticeCard(p) {
-    return el('div', { class: 'card ' + (p.cls || 'info') }, [
-      el('span', { class: 'tagline', text: 'Bill — already paid' }),
-      el('h3', { text: p.title }),
-      el('p', { text: p.text }),
-      p.amount ? terms([['Paid', money(p.amount)], ['Cash left', money(state.cash)]]) : null,
-      el('div', { class: 'buttons' }, [
-        el('button', { class: 'primary', onclick: function () { doAction('acknowledge'); }, text: 'Continue' })
-      ])
+  /* An expense you have to pay -- but paying is still something you do, not
+   * something done to you while you watch. You see the amount, what you have,
+   * and what you will have, and then you hand it over. */
+  function billCard(p) {
+    var after = state.cash - p.amount;
+    var short = Math.max(0, p.amount - state.cash);
+    var credit = E.availableCredit(state);
+
+    var card = el('div', { class: 'card danger' }, [
+      el('span', { class: 'tagline', text: 'An expense you have to pay' }),
+      el('h3', { text: p.title })
     ]);
+    if (p.text) card.appendChild(el('p', { text: p.text }));
+
+    card.appendChild(terms([
+      ['Amount', money(p.amount)],
+      ['Cash before', money(state.cash)],
+      ['Cash after', short ? money(0) : money(after)]
+    ]));
+    card.appendChild(errorSlot());
+    card.appendChild(el('div', { class: 'buttons' }, [
+      el('button', {
+        class: 'primary',
+        onclick: function () { doAction('payBill'); },
+        text: 'Pay ' + money(p.amount)
+      })
+    ]));
+
+    if (short > 0) {
+      var borrow = Math.ceil(short / 1000) * 1000;
+      card.appendChild(el('div', {
+        class: 'hint',
+        text: short <= credit
+          ? 'You are ' + money(short) + ' short, so paying takes an automatic loan of ' + money(borrow) +
+            ', adding ' + money(borrow / 1000 * 100) + ' a month to your expenses. You have to pay this one.'
+          : 'You are ' + money(short) + ' short and can only borrow ' + money(credit) +
+            ', so paying will sell whatever it has to.'
+      }));
+    }
+    return card;
   }
 
   /* A doodad you may refuse. The refusal is the lesson, so it gets equal
@@ -1142,6 +1217,181 @@
       'These only pay off if someone later pays you more than you did.');
   }
 
+  /* ------------------------------------------------------------------ *
+   * Loans
+   *
+   * Taking on debt is always a deliberate, separate act with its own dialog.
+   * Buying something can never quietly create a loan -- a player who ends up
+   * paying 120% a year has to have chosen to.
+   * ------------------------------------------------------------------ */
+
+  var loanAmount = 1000;
+
+  /* One amount-picker dialog, shared by taking a loan and repaying one.
+   *
+   * It builds its DOM once and mutates the value and the summary in place.
+   * Rebuilding the whole dialog on every step of the stepper would destroy the
+   * very button the player is tapping, losing focus each time and dropping
+   * fast repeat taps. */
+  function amountDialog(opts) {
+    var dlg = $('#money-dialog');
+    var body = $('#money-dialog-body');
+    var value = Math.max(opts.min, Math.min(opts.initial, opts.max));
+
+    clear(body);
+    body.appendChild(el('h2', { text: opts.title }));
+    body.appendChild(el('p', { class: 'dlg-note', text: opts.note }));
+
+    function close() { dlg.close(); }
+
+    if (opts.max < opts.min) {
+      body.appendChild(el('p', { class: 'dlg-note', text: opts.blocked }));
+      body.appendChild(el('div', { class: 'dlg-actions' }, [
+        el('button', { class: 'primary', onclick: close, text: 'Close' })
+      ]));
+      if (!dlg.open) dlg.showModal();
+      return;
+    }
+
+    var valueNode = el('span', { class: 'stepval', 'aria-live': 'polite', text: money(value) });
+    var summary = el('div', { class: 'terms' });
+    var confirm = el('button', { class: 'primary', text: '' });
+
+    function refresh() {
+      valueNode.textContent = money(value);
+      clear(summary);
+      opts.summary(value).forEach(function (pair) {
+        if (!pair) return;
+        summary.appendChild(el('div', {}, [
+          el('span', { text: pair[0] }),
+          el('span', { text: pair[1] })
+        ]));
+      });
+      confirm.textContent = opts.confirmLabel(value);
+      loanAmount = value;
+    }
+
+    function bump(delta) {
+      value = Math.max(opts.min, Math.min(opts.max, value + delta));
+      refresh();
+    }
+
+    body.appendChild(el('div', { class: 'stepper' }, [
+      el('button', { onclick: function () { bump(-opts.step); }, 'aria-label': 'Less', text: '−' }),
+      valueNode,
+      el('button', { onclick: function () { bump(opts.step); }, 'aria-label': 'More', text: '+' })
+    ]));
+    body.appendChild(el('div', { class: 'buttons quickrow' }, [
+      el('button', { class: 'tiny', onclick: function () { value = opts.min; refresh(); }, text: 'Min' }),
+      el('button', { class: 'tiny', onclick: function () { value = opts.max; refresh(); }, text: 'Max ' + money(opts.max) })
+    ]));
+    body.appendChild(summary);
+    confirm.addEventListener('click', function () {
+      if (opts.onConfirm(value)) close();
+    });
+    body.appendChild(el('div', { class: 'dlg-actions' }, [
+      el('button', { class: 'ghost', onclick: close, text: 'Cancel' }),
+      confirm
+    ]));
+
+    refresh();
+    if (!dlg.open) dlg.showModal();
+  }
+
+  function openLoanDialog() {
+    var available = E.availableCredit(state);
+    var s = E.stats(state);
+    amountDialog({
+      title: 'Take a loan',
+      note: 'Loans are interest only. You pay ' + money(100) + ' a month for every ' +
+        money(1000) + ' you borrow — 120% a year — and you keep paying it every single ' +
+        'month until you repay the principal. Nothing else in this game costs that much.',
+      blocked: 'You have no borrowing capacity left.',
+      min: 1000, max: Math.floor(available / 1000) * 1000, step: 1000,
+      initial: loanAmount,
+      summary: function (v) {
+        var extra = (v / 1000) * 100;
+        return [
+          ['Cash afterwards', money(state.cash) + '  →  ' + money(state.cash + v)],
+          ['Monthly expenses', money(s.totalExpenses) + '  →  ' + money(s.totalExpenses + extra)],
+          ['Monthly cash flow', money(s.cashflow) + '  →  ' + money(s.cashflow - extra)]
+        ];
+      },
+      confirmLabel: function (v) { return 'Take ' + money(v); },
+      onConfirm: function (v) { return doAction('borrow', { amount: v }); }
+    });
+  }
+
+  function openRepayLoanDialog() {
+    var s = E.stats(state);
+    var max = Math.min(state.bankLoan, Math.floor(state.cash / 1000) * 1000);
+    amountDialog({
+      title: 'Repay loans',
+      note: 'You owe ' + money(state.bankLoan) + ', which costs you ' +
+        money(state.bankLoan / 1000 * 100) + ' every month. Every ' + money(1000) +
+        ' you clear gives you ' + money(100) + ' a month back, for good.',
+      blocked: 'You need at least ' + money(1000) + ' in cash to repay a block.',
+      min: 1000, max: max, step: 1000,
+      initial: loanAmount,
+      summary: function (v) {
+        var freed = (v / 1000) * 100;
+        return [
+          ['Cash afterwards', money(state.cash) + '  →  ' + money(state.cash - v)],
+          ['Loans left', money(state.bankLoan) + '  →  ' + money(state.bankLoan - v)],
+          ['Monthly cash flow', money(s.cashflow) + '  →  ' + money(s.cashflow + freed)]
+        ];
+      },
+      confirmLabel: function (v) { return 'Repay ' + money(v); },
+      onConfirm: function (v) { return doAction('repay', { amount: v }); }
+    });
+  }
+
+  /* Consumer debts are all-or-nothing, so this one is a confirmation rather
+   * than a picker: you clear the balance and the payment goes with it. */
+  function openPayoffDialog(which) {
+    var dlg = $('#money-dialog');
+    var body = $('#money-dialog-body');
+    var slot = state.profession[which];
+    var s = E.stats(state);
+    var name = E.LIABILITY_NAMES[which];
+    var afford = slot.liability <= state.cash;
+
+    clear(body);
+    body.appendChild(el('h2', { text: 'Pay off your ' + name }));
+    body.appendChild(el('p', {
+      class: 'dlg-note',
+      text: 'Clearing a debt is all or nothing, and it removes the monthly payment for ' +
+        'the rest of the game — a guaranteed ' + money(slot.payment) + ' a month back, for good.'
+    }));
+    body.appendChild(terms([
+      ['Balance to clear', money(slot.liability)],
+      ['Your cash', money(state.cash)],
+      ['Cash afterwards', afford ? money(state.cash - slot.liability) : '—'],
+      ['Monthly expenses', money(s.totalExpenses) + '  →  ' + money(s.totalExpenses - slot.payment)],
+      ['Monthly cash flow', money(s.cashflow) + '  →  ' + money(s.cashflow + slot.payment)]
+    ]));
+    if (!afford) {
+      body.appendChild(el('p', {
+        class: 'dlg-note',
+        text: 'You are ' + money(slot.liability - state.cash) + ' short of clearing it.'
+      }));
+    }
+    body.appendChild(el('div', { class: 'dlg-actions' }, [
+      el('button', { class: 'ghost', onclick: function () { dlg.close(); }, text: 'Cancel' }),
+      afford ? el('button', {
+        class: 'primary',
+        onclick: function () {
+          if (doAction('repayLiability', { which: which })) dlg.close();
+        },
+        text: 'Pay off ' + money(slot.liability)
+      }) : null
+    ]));
+    if (!dlg.open) dlg.showModal();
+  }
+
+
+  /* A summary and one way in. Taking a loan happens in its own dialog, and
+   * repaying happens from the Liabilities list beside the debt itself. */
   function renderBank() {
     var host = $('#bank');
     clear(host);
@@ -1150,8 +1400,8 @@
       host.appendChild(el('div', {
         class: 'empty',
         text: state.phase === 'bankrupt'
-          ? 'The bank is closed to you.'
-          : 'There is no borrowing on the Fast Track. Investments are bought with cash.'
+          ? 'No one will lend to you now.'
+          : 'There are no loans on the Fast Track. Investments are bought with cash.'
       }));
       return;
     }
@@ -1159,95 +1409,34 @@
     var available = E.availableCredit(state);
     var owed = state.bankLoan;
 
-    /* Idle state: a status line, not a form.
-     *
-     * This panel used to render a number input pre-filled with 1000 next to
-     * Borrow and Repay on every single turn of the game, whether or not the
-     * player had any debt or any reason to take some on. A control with no
-     * context and no call to action does not earn permanent space. */
-    if (!bankMode) {
-      var status = el('div', { class: 'bankstatus' });
-      status.appendChild(el('div', { class: 'bankline' }, [
-        el('span', { text: 'Debt' }),
-        el('span', { class: owed > 0 ? 'neg' : '', text: money(owed) + (owed > 0 ? '  (' + money(owed / 1000 * 100) + '/mo)' : '') })
-      ]));
-      status.appendChild(el('div', { class: 'bankline' }, [
-        el('span', { text: 'Can still borrow' }),
-        el('span', { text: money(available) })
-      ]));
-      host.appendChild(status);
-
-      var actions = el('div', { class: 'buttons' });
-      var borrowBtn = el('button', {
-        onclick: function () { bankMode = 'borrow'; bankAmount = 1000; render(); },
-        text: 'Borrow…'
-      });
-      if (available < 1000) {
-        borrowBtn.disabled = true;
-        borrowBtn.title = 'You are at your credit limit of ' + money(E.creditLimit(state)) + '.';
-      }
-      actions.appendChild(borrowBtn);
-      if (owed > 0) {
-        actions.appendChild(el('button', {
-          onclick: function () { bankMode = 'repay'; bankAmount = Math.min(owed, Math.floor(state.cash / 1000) * 1000) || 1000; render(); },
-          text: 'Repay…'
-        }));
-      }
-      host.appendChild(actions);
-      host.appendChild(el('div', {
-        class: 'hint',
-        text: owed > 0
-          ? 'Bank money costs $100 a month per $1,000 — 120% a year. Clearing it is usually the best return available to you.'
-          : 'The bank lends at $100 a month per $1,000 — 120% a year, the most expensive money in the game.'
-      }));
-      return;
-    }
-
-    /* Active state: a stepper, and the consequence stated before you commit. */
-    var repaying = bankMode === 'repay';
-    var ceiling = repaying ? Math.min(owed, Math.floor(state.cash / 1000) * 1000) : available;
-    bankAmount = Math.max(1000, Math.min(bankAmount, ceiling));
-
-    var stepper = el('div', { class: 'stepper' }, [
-      el('button', {
-        onclick: function () { bankAmount = Math.max(1000, bankAmount - 1000); render(); },
-        'aria-label': 'Less', text: '−'
-      }),
-      el('span', { class: 'stepval', 'aria-live': 'polite', text: money(bankAmount) }),
-      el('button', {
-        onclick: function () { bankAmount = Math.min(ceiling, bankAmount + 1000); render(); },
-        'aria-label': 'More', text: '+'
+    var status = el('div', { class: 'bankstatus' });
+    status.appendChild(el('div', { class: 'bankline' }, [
+      el('span', { text: 'You owe' }),
+      el('span', {
+        class: owed > 0 ? 'neg' : '',
+        text: money(owed) + (owed > 0 ? '  (' + money(owed / 1000 * 100) + '/mo)' : '')
       })
-    ]);
-    host.appendChild(el('div', { class: 'banktitle', text: repaying ? 'Repay the bank' : 'Borrow from the bank' }));
-    host.appendChild(stepper);
+    ]));
+    status.appendChild(el('div', { class: 'bankline' }, [
+      el('span', { text: 'You could borrow' }),
+      el('span', { text: money(available) })
+    ]));
+    host.appendChild(status);
 
-    var s = E.stats(state);
-    var deltaExpense = (repaying ? -1 : 1) * (bankAmount / 1000) * 100;
-    host.appendChild(terms([
-      ['Cash afterwards', money(state.cash + (repaying ? -bankAmount : bankAmount))],
-      ['Monthly expenses', money(s.totalExpenses) + '  →  ' + money(s.totalExpenses + deltaExpense)],
-      ['Monthly cash flow', money(s.cashflow) + '  →  ' + money(s.cashflow - deltaExpense)]
-    ]));
-    host.appendChild(errorSlot());
-    host.appendChild(el('div', { class: 'buttons' }, [
-      el('button', {
-        class: 'primary',
-        onclick: function () {
-          var amount = bankAmount;
-          if (doAction(repaying ? 'repay' : 'borrow', { amount: amount })) bankMode = null;
-          render();
-        },
-        text: (repaying ? 'Repay ' : 'Borrow ') + money(bankAmount)
-      }),
-      el('button', { class: 'ghost', onclick: function () { bankMode = null; cardError = null; render(); }, text: 'Cancel' })
-    ]));
-    if (ceiling < 1000) {
-      host.appendChild(el('div', {
-        class: 'hint',
-        text: repaying ? 'You need at least $1,000 in cash to repay a block.' : 'No credit available.'
-      }));
+    var take = el('button', { onclick: openLoanDialog, text: 'Take a loan…' });
+    if (available < 1000) {
+      take.disabled = true;
+      take.title = 'You have reached your borrowing limit of ' + money(E.creditLimit(state)) + '.';
     }
+    host.appendChild(el('div', { class: 'buttons' }, [take]));
+    host.appendChild(el('div', {
+      class: 'hint',
+      text: owed > 0
+        ? 'Repay loans from the Liabilities list in your financial statement. Every ' +
+          money(1000) + ' you clear gives you back ' + money(100) + ' a month.'
+        : 'Interest only: ' + money(100) + ' a month for every ' + money(1000) +
+          ' borrowed, every month until you repay it.'
+    }));
   }
 
   function renderLog() {

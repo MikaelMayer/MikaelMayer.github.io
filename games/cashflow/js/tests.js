@@ -234,6 +234,11 @@
       var cash = s.cash;
       E.roll(s, 1, [1]);                      // forced die: land exactly on 19
       eq(s.position, 19, 'should have landed on downsized');
+      eq(s.pending.kind, 'bill', 'losing your job presents a bill, it does not just take the money');
+      eq(s.pending.amount, exp, 'the bill is one month of total expenses');
+      eq(s.cash, cash, 'nothing is taken until the player pays');
+      assert(!E.act(s, 'acknowledge').ok, 'a bill must not be dismissable');
+      assert(E.act(s, 'payBill').ok, 'paying failed');
       eq(s.cash, cash - exp, 'should have paid one month of expenses');
       eq(s.skipTurns, 2, 'should lose two turns');
 
@@ -296,24 +301,28 @@
       eq(E.checkInvariants(s).length, 0, 'invariants after buying');
     });
 
-    test('an unaffordable down payment borrows in whole $1,000 blocks and never goes negative', function () {
+    test('a purchase never takes out a loan on your behalf', function () {
       var s = E.createGame({ seed: 11, professionId: 'doctor' });
       s.cash = 500;
-      s.pending = {
-        kind: 'deal', deck: 'big',
-        card: {
-          id: 'x', kind: 'realestate', propType: 'plex', title: 'Test plex',
-          cost: 240000, down: 40000, mortgage: 200000, cashflow: 1700, units: 8
-        }
+      var card = {
+        id: 'x', kind: 'realestate', propType: 'plex', title: 'Test plex',
+        cost: 240000, down: 40000, mortgage: 200000, cashflow: 1700, units: 8
       };
-      var expBefore = E.stats(s).totalExpenses;
+      s.pending = { kind: 'deal', deck: 'big', card: card };
+
       var r = E.act(s, 'buyDeal');
-      assert(r.ok, r.error);
-      assert(s.cash >= 0, 'cash went negative');
-      eq(s.bankLoan % 1000, 0, 'loan not a whole number of blocks');
-      eq(s.bankLoan, 40000, 'should borrow 40,000 to cover a 39,500 shortfall rounded up');
-      eq(s.cash, 500, 'change from the rounded-up loan stays in cash');
-      eq(E.stats(s).totalExpenses, expBefore + 4000, 'loan interest added to expenses');
+      assert(!r.ok, 'a deal was bought with money the player did not have');
+      assert(/Take a loan first/.test(r.error), 'the refusal should point at loans, got: ' + r.error);
+      eq(s.cash, 500, 'cash untouched');
+      eq(s.bankLoan, 0, 'and above all, no debt was created by a Buy button');
+      eq(s.assets.length, 0, 'nothing was bought');
+
+      // Borrowing is a separate, deliberate act -- and then the deal goes through.
+      assert(E.act(s, 'borrow', { amount: 40000 }).ok, 'borrowing failed');
+      eq(s.bankLoan, 40000, 'the loan is the player\'s own choice');
+      assert(E.act(s, 'buyDeal').ok, 'buying after borrowing failed');
+      eq(s.cash, 500, 'the down payment came out of the borrowed cash');
+      eq(s.assets.length, 1, 'asset recorded');
       eq(E.checkInvariants(s).length, 0, 'invariants after a financed purchase');
     });
 
@@ -327,10 +336,9 @@
       assert(!E.act(s, 'borrow', { amount: 1000 }).ok, 'lent with no credit left');
     });
 
-    test('a purchase beyond your credit is refused, and refusing changes nothing', function () {
+    test('a purchase beyond your means is refused, and refusing changes nothing', function () {
       var s = E.createGame({ seed: 112, professionId: 'janitor' });
       s.cash = 500;
-      var before = E.serialize(s);
       s.pending = {
         kind: 'deal', deck: 'big',
         card: {
@@ -338,12 +346,12 @@
           cost: 900000, down: 150000, mortgage: 750000, cashflow: 4500, units: 30
         }
       };
-      var pendingSnapshot = E.serialize(s);
+      var snapshot = E.serialize(s);
       var r = E.act(s, 'buyDeal');
-      assert(!r.ok, 'a janitor was allowed to borrow $150,000');
-      assert(/lend at most/.test(r.error), 'the refusal should explain the credit limit, got: ' + r.error);
-      eq(E.serialize(s), pendingSnapshot, 'a refused purchase must not mutate anything');
-      assert(before !== pendingSnapshot, 'sanity: the snapshots differ by the pending card');
+      assert(!r.ok, 'a janitor bought a $150,000 down payment');
+      eq(E.serialize(s), snapshot, 'a refused purchase must not mutate anything');
+      // And the loan that would be needed is itself beyond the limit.
+      assert(!E.act(s, 'borrow', { amount: 150000 }).ok, 'lent past the borrowing limit');
     });
 
     test('a player who cannot pay a bill goes bankrupt instead of spiralling', function () {
@@ -369,11 +377,14 @@
       s.position = 0;
       E.roll(s, 1, [1]);
       eq(D.RAT_RACE_BOARD[1], 'DOODAD', 'test assumes square 1 is a doodad');
-      assert(s.pending && s.pending.kind === 'notice', 'the player should see the bill');
-      eq(s.pending.amount, 600, 'the notice states what was paid');
-      eq(s.cash, 19400, 'and it really was paid');
-      assert(E.act(s, 'acknowledge').ok, 'the notice must be dismissable');
-      eq(s.pending, null, 'and dismissing it frees the board');
+      assert(s.pending && s.pending.kind === 'bill', 'the player should be shown a bill');
+      eq(s.pending.amount, 600, 'the bill states the amount');
+      eq(s.cash, 20000, 'nothing is taken before the player pays');
+      assert(!E.act(s, 'acknowledge').ok, 'a compulsory bill must not be dismissable');
+      eq(s.cash, 20000, 'a refused dismissal changes nothing');
+      assert(E.act(s, 'payBill').ok, 'paying failed');
+      eq(s.cash, 19400, 'paid');
+      eq(s.pending, null, 'and the board is free again');
     });
 
     test('refusing an optional doodad costs nothing at all', function () {
@@ -411,6 +422,7 @@
       forceCardOnTop(s, 'doodad', 'dd06');                    // $600 car repair, mandatory
       s.position = 0;
       E.roll(s, 1, [1]);
+      assert(E.act(s, 'payBill').ok, 'paying the bill failed');
       eq(D.RAT_RACE_BOARD[1], 'DOODAD', 'test assumes square 1 is a doodad');
       eq(s.phase, 'ratrace', 'the player should have survived by selling');
       eq(s.stocks.GRW, undefined, 'the shares should have been sold');
@@ -432,6 +444,7 @@
       forceCardOnTop(s, 'doodad', 'dd06');
       s.position = 0;
       E.roll(s, 1, [1]);
+      E.act(s, 'payBill');
       // 80% of $50,000 is $40,000; clearing the $20,000 mortgage leaves $20,000.
       eq(s.cash, 20000 - 600, 'distressed sale proceeds less the bill');
       eq(s.assets.length, 0, 'the property is gone');
@@ -450,8 +463,31 @@
       forceCardOnTop(s, 'doodad', 'dd06');
       s.position = 0;
       E.roll(s, 1, [1]);
+      E.act(s, 'payBill');
       eq(s.phase, 'bankrupt', '80% of cost does not clear the mortgage, so nothing can be sold');
       eq(s.assets.length, 1, 'the property was not given away below its debt');
+    });
+
+    test('paying off a debt removes its monthly payment for good', function () {
+      var s = E.createGame({ seed: 119, professionId: 'teacher' });
+      var before = E.stats(s);
+      var carPayment = s.profession.car.payment;
+      var carBalance = s.profession.car.liability;
+      assert(carPayment > 0 && carBalance > 0, 'the teacher should start with a car loan');
+
+      s.cash = carBalance - 1;
+      assert(!E.act(s, 'repayLiability', { which: 'car' }).ok, 'paid off a debt without the money');
+      eq(s.profession.car.liability, carBalance, 'nothing changed on a refused payoff');
+
+      s.cash = carBalance + 250;
+      assert(E.act(s, 'repayLiability', { which: 'car' }).ok, 'payoff failed');
+      eq(s.cash, 250, 'the balance came out of cash');
+      eq(s.profession.car.liability, 0, 'debt cleared');
+      eq(s.profession.car.payment, 0, 'and its monthly payment with it');
+      eq(E.stats(s).totalExpenses, before.totalExpenses - carPayment, 'expenses fell by the payment');
+      eq(E.stats(s).cashflow, before.cashflow + carPayment, 'cash flow rose by the same');
+      assert(!E.act(s, 'repayLiability', { which: 'car' }).ok, 'paid off the same debt twice');
+      eq(E.checkInvariants(s).length, 0, 'invariants after a payoff');
     });
 
     test('stocks must be paid for in cash', function () {
@@ -842,6 +878,8 @@
   function sensibleStep(E, s) {
     var p = s.pending;
 
+    if (p.kind === 'bill') return E.act(s, 'payBill');
+
     if (p.kind === 'chooseDeck') {
       return E.act(s, 'chooseDeck', { deck: s.cash >= 25000 ? 'big' : 'small' });
     }
@@ -905,6 +943,14 @@
     }
 
     switch (p.kind) {
+      case 'bill':
+        // Sometimes take a loan first, so the deliberate-borrow path is exercised.
+        if (rng.next() < 0.15) {
+          var room = E.availableCredit(s);
+          if (room >= 1000) E.act(s, 'borrow', { amount: 1000 });
+        }
+        return run('payBill');
+
       case 'chooseDeck':
         return run('chooseDeck', { deck: rng.next() < 0.5 ? 'small' : 'big' });
 
@@ -929,10 +975,9 @@
           if (s.cash < c.cost) return run('pass');
           return run('buyDeal');
         }
-        // Real estate, businesses and traps may be financed, but only up to
-        // what the bank will actually lend.
+        // Purchases are cash only; nothing here quietly takes out a loan.
         var due = c.kind === 'trap' ? c.cost : c.down;
-        if (s.cash + E.availableCredit(s) < due) return run('pass');
+        if (s.cash < due) return run('pass');
         return run('buyDeal');
       }
 

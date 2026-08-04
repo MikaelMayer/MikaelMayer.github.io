@@ -42,6 +42,16 @@
   // Defensive ceiling. Nothing in a correct game comes near it.
   var SANE_MAX = 1e12;
 
+  /* The consumer debts a player starts with. Each can be cleared outright,
+   * which removes its monthly payment for the rest of the game. */
+  var LIABILITY_NAMES = {
+    home: 'home mortgage',
+    school: 'school loan',
+    car: 'car loan',
+    creditCard: 'credit cards',
+    retail: 'retail debt'
+  };
+
   /* ------------------------------------------------------------------ *
    * Small helpers
    * ------------------------------------------------------------------ */
@@ -290,7 +300,7 @@
     state.pending = null;
     state.result = { how: 'bankrupt', months: state.months, reason: reason };
     log(state, 'BANKRUPT. You could not pay for ' + reason +
-      ', you had ' + money(state.cash) + ' in cash, and the bank will lend no more against ' +
+      ', you had ' + money(state.cash) + ' in cash, and you can borrow no more against ' +
       money(stats(state).totalIncome) + ' a month of income.', 'loss');
     log(state, 'This is what a negative cash flow does if you keep borrowing to feed it.', 'system');
     var err = new Error('BANKRUPT');
@@ -315,7 +325,7 @@
       if (needed > available) {
         if (voluntary) {
           throw new Error('That needs ' + money(amount) + ', you have ' + money(state.cash) +
-            ' in cash, and the bank will lend at most another ' + money(available) +
+            ' in cash, and you can borrow at most another ' + money(available) +
             ' against your income.');
         }
         // A bill you must pay. Sell what you have to before giving up.
@@ -332,7 +342,7 @@
       borrowed = needed;
       state.bankLoan += borrowed;
       state.cash += borrowed;
-      log(state, 'Bank loan of ' + money(borrowed) + ' taken to cover ' + reason +
+      log(state, 'Forced loan of ' + money(borrowed) + ' to cover ' + reason +
         ' (adds ' + money(borrowed / LOAN_UNIT * LOAN_RATE_PER_UNIT) + '/mo to expenses).', 'loan');
     }
     state.cash -= amount;
@@ -525,10 +535,14 @@
         }
         break;
       case 'DOWNSIZED':
-        var st = stats(state);
-        debit(state, st.totalExpenses, 'Downsized - one month of total expenses');
-        state.skipTurns = 2;
-        log(state, 'You lose your next 2 turns.', 'system');
+        state.pending = {
+          kind: 'bill', title: 'You lost your job',
+          text: 'You still owe a full month of everything: taxes, the mortgage, the loans, the lot. ' +
+            'You will also lose your next two turns.',
+          amount: stats(state).totalExpenses,
+          reason: 'Lost your job - one month of expenses',
+          then: 'downsize'
+        };
         break;
       default:
         throw new Error('Unknown square type: ' + type);
@@ -558,15 +572,13 @@
       return;
     }
 
-    /* A compulsory doodad is a bill, not a decision -- but the player still
-     * has to see it. Silently subtracting money and moving on is how a game
-     * teaches nothing and feels broken at the same time. */
-    debit(state, amount, 'Doodad: ' + card.title);
+    /* A compulsory expense is still an action. The player has to press Pay --
+     * they see the amount, their cash before, and their cash after, and then
+     * they hand the money over. Deducting it for them and reporting it as
+     * "already paid" is both confusing and a wasted teaching moment. */
     state.pending = {
-      kind: 'notice', cls: 'danger', title: card.title, amount: amount,
-      text: (card.text ? card.text + ' ' : '') +
-        'This one is a bill rather than a choice, so it is already paid. ' +
-        'The doodads you can refuse are always marked as such.'
+      kind: 'bill', title: card.title, text: card.text || '',
+      amount: amount, reason: 'Expense: ' + card.title
     };
   }
 
@@ -587,11 +599,10 @@
         log(state, 'Market: ' + card.title + ' - it does not touch you. Nothing to pay.', 'system');
         return;
       }
-      var owed = card.amount * count;
-      debit(state, owed, 'Market: ' + card.title);
       state.pending = {
-        kind: 'notice', cls: 'danger', title: card.title, amount: owed,
-        text: card.text + ' Owning assets means owning their problems too.'
+        kind: 'bill', title: card.title, amount: card.amount * count,
+        text: card.text + ' Owning things means owning their problems too.',
+        reason: 'Market: ' + card.title
       };
       return;
     }
@@ -728,7 +739,7 @@
       var cost = qty * card.price;
       if (cost > state.cash) {
         throw new Error('That costs ' + money(cost) + ' and you have ' + money(state.cash) +
-          '. The bank will not finance shares. Buy fewer.');
+          '. Shares are bought with cash. Buy fewer.');
       }
       state.cash -= cost;
       var h = state.stocks[card.symbol] || (state.stocks[card.symbol] = { shares: 0, invested: 0 });
@@ -785,6 +796,9 @@
 
       if (card.kind === 'trap') {
         // Traps are cash out for nothing (or worse, a recurring expense).
+        if (card.cost > state.cash) {
+          throw new Error('You need ' + money(card.cost) + ' in cash and you have ' + money(state.cash) + '.');
+        }
         debit(state, card.cost, card.title, true);
         if (card.addExpense) {
           state.extraExpenses += card.addExpense;
@@ -811,9 +825,18 @@
         return;
       }
 
-      // Real estate and businesses. The down payment must come from cash;
-      // if you are short, the bank covers it -- with the interest to match.
-      var borrowed = debit(state, card.down, 'Down payment on ' + card.title, true);
+      /* Real estate and businesses are paid for in cash.
+        *
+        * Buying used to quietly borrow the shortfall, which meant a single tap
+        * on Buy could create thousands of dollars of debt at 120% a year
+        * without the player ever choosing to take a loan. Taking on debt has
+        * to be its own deliberate act. */
+      if (card.down > state.cash) {
+        throw new Error('You need ' + money(card.down) + ' in cash and you have ' +
+          money(state.cash) + '. Take a loan first if you want this deal.');
+      }
+      state.cash -= card.down;
+      log(state, '-' + money(card.down) + '  Down payment on ' + card.title, 'loss');
       var category = card.kind === 'business' ? 'business' : 'realestate';
       state.assets.push({
         id: state.nextAssetId++,
@@ -830,7 +853,6 @@
       log(state, 'Bought ' + card.title + ' (' + money(card.cost) + ', ' +
         money(card.mortgage) + ' financed). Adds ' + money(card.cashflow) + '/mo passive income.',
         card.cashflow >= 0 ? 'gain' : 'loss');
-      if (borrowed) log(state, 'You used borrowed money for the down payment.', 'loan');
       state.pending = null;
       afterAction(state);
     },
@@ -841,6 +863,19 @@
       state.charityTurns = 3;
       log(state, 'For the next 3 turns you may roll one die or two.', 'gain');
       state.pending = null;
+      afterAction(state);
+    },
+
+    /* A bill you cannot refuse -- but you still hand the money over yourself.
+     * The engine never quietly takes it. */
+    payBill: function (state) {
+      var p = requirePending(state, 'bill');
+      debit(state, p.amount, p.reason || p.title);
+      state.pending = null;
+      if (p.then === 'downsize') {
+        state.skipTurns = 2;
+        log(state, 'You lose your next 2 turns.', 'system');
+      }
       afterAction(state);
     },
 
@@ -931,17 +966,17 @@
     borrow: function (state, payload) {
       var amount = intOrThrow(payload.amount, 'amount');
       if (amount <= 0 || amount % LOAN_UNIT !== 0) {
-        throw new Error('The bank lends in ' + money(LOAN_UNIT) + ' blocks.');
+        throw new Error('Loans come in ' + money(LOAN_UNIT) + ' blocks.');
       }
       var available = availableCredit(state);
       if (amount > available) {
-        throw new Error('The bank will lend you at most another ' + money(available) +
-          '. Your credit limit is ' + CREDIT_MULTIPLE + ' months of total income (' +
+        throw new Error('You can borrow at most another ' + money(available) +
+          '. Your borrowing limit is ' + CREDIT_MULTIPLE + ' months of total income (' +
           money(creditLimit(state)) + ') and you already owe ' + money(state.bankLoan) + '.');
       }
       state.bankLoan += amount;
       state.cash += amount;
-      log(state, 'Borrowed ' + money(amount) + '. Expenses rise by ' +
+      log(state, 'Took a loan of ' + money(amount) + '. Expenses rise by ' +
         money(amount / LOAN_UNIT * LOAN_RATE_PER_UNIT) + '/mo.', 'loan');
       afterAction(state);
     },
@@ -955,8 +990,35 @@
       if (amount > state.cash) throw new Error('You only have ' + money(state.cash) + ' in cash.');
       state.cash -= amount;
       state.bankLoan -= amount;
-      log(state, 'Repaid ' + money(amount) + ' of bank loan. Expenses fall by ' +
+      log(state, 'Repaid ' + money(amount) + ' of loans. Expenses fall by ' +
         money(amount / LOAN_UNIT * LOAN_RATE_PER_UNIT) + '/mo.', 'gain');
+      afterAction(state);
+    },
+
+    /* Clear a consumer debt outright.
+     *
+     * Paying off the car loan removes the car payment, which is the whole
+     * point: every debt you retire lowers the bar you have to clear to leave
+     * the Rat Race. These are all-or-nothing -- you cannot part-pay a car
+     * loan and get a smaller payment -- whereas `repay` handles loans, which
+     * come in $1,000 blocks. */
+    repayLiability: function (state, payload) {
+      var which = payload.which;
+      var slot = state.profession[which];
+      if (!slot || typeof slot.liability !== 'number') {
+        throw new Error('There is no such debt.');
+      }
+      if (slot.liability <= 0) throw new Error('That is already paid off.');
+      if (slot.liability > state.cash) {
+        throw new Error('Clearing that costs ' + money(slot.liability) + ' and you have ' +
+          money(state.cash) + '.');
+      }
+      var freed = slot.payment;
+      state.cash -= slot.liability;
+      log(state, '-' + money(slot.liability) + '  Paid off ' + LIABILITY_NAMES[which] +
+        ' in full. Expenses fall by ' + money(freed) + '/mo, for good.', 'gain');
+      slot.liability = 0;
+      slot.payment = 0;
       afterAction(state);
     },
 
@@ -1002,6 +1064,13 @@
        * exists to teach, and it used to leave no trace anywhere. Record it, so
        * the player can see what their discipline was worth. */
       var p = state.pending;
+      /* A bill is the one pending state that cannot be dismissed. Without this
+       * guard the generic "continue" action would clear it and the player
+       * would simply never pay, which is both a rules hole and a silent
+       * difficulty cliff. */
+      if (p && p.kind === 'bill') {
+        throw new Error('This one has to be paid.');
+      }
       if (p && p.kind === 'doodadOptional') {
         state.refused = (state.refused || 0) + p.amount;
         log(state, 'Declined ' + p.title + '. ' + money(p.amount) +
@@ -1237,6 +1306,7 @@
     money: money,
     findById: findById,
     totalGold: totalGold,
+    LIABILITY_NAMES: LIABILITY_NAMES,
     constants: {
       MAX_CHILDREN: MAX_CHILDREN,
       LOAN_UNIT: LOAN_UNIT,
