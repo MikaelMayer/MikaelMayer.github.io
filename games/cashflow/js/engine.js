@@ -95,9 +95,9 @@
 
   /* For log params only: keep the card, not its name. name() is still right
    * for anything rendered once, now, in the current language. */
-  function ref(obj) {
-    if (!obj || !obj.id) return name(obj);
-    var f = obj.title !== undefined ? 'title' : 'name';
+  function ref(obj, field) {
+    if (!obj || !obj.id) return field ? (obj && obj[field]) || '' : name(obj);
+    var f = field || (obj.title !== undefined ? 'title' : 'name');
     return { id: obj.id, f: f, en: obj[f] };
   }
 
@@ -513,6 +513,13 @@
 
     if (state.phase === 'ratrace') moveRatRace(state, total);
     else moveFastTrack(state, total);
+
+    /* Escape is checked after player actions, and today only an action can
+     * raise passive income -- splits exist, but none of them touch a
+     * dividend-paying symbol. That is a property of the current card set, not
+     * a rule, so check here too rather than leaving a trap for whoever adds
+     * the first dividend split. */
+    afterAction(state);
   }
 
   function moveRatRace(state, steps) {
@@ -666,7 +673,8 @@
     if (card.kind === 'goldbuyer') {
       var coins = totalGold(state);
       if (coins === 0) {
-        log(state, '{title} - but you own no gold coins to sell.', { title: ref(card) }, 'system');
+        log(state, '{title} - {text} You own no gold coins to sell.',
+          { title: ref(card), text: ref(card, 'text') }, 'system');
         return;
       }
       state.pending = {
@@ -679,7 +687,8 @@
     // kind === 'buyer'
     var offers = buildOffers(state, card);
     if (offers.length === 0) {
-      log(state, '{title} - but you own nothing this buyer wants.', { title: ref(card) }, 'system');
+      log(state, '{title} - {text} You own nothing this buyer wants.',
+        { title: ref(card), text: ref(card, 'text') }, 'system');
       return;
     }
     state.pending = {
@@ -1111,7 +1120,13 @@
       }
       if (p && p.kind === 'doodadOptional') {
         state.refused = (state.refused || 0) + p.amount;
-        log(state, 'Declined {title} ({$amount}). Total declined this game: {$total}.', { title: p.title, amount: p.amount, total: state.refused }, 'system');
+        if (state.refused === p.amount) {
+          log(state, 'Declined {title} ({$amount}).',
+            { title: p.title, amount: p.amount }, 'system');
+        } else {
+          log(state, 'Declined {title} ({$amount}). Total declined this game: {$total}.',
+            { title: p.title, amount: p.amount, total: state.refused }, 'system');
+        }
       }
       state.pending = null;
       afterAction(state);

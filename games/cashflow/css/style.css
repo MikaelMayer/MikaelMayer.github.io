@@ -1118,3 +1118,14 @@ button.term:focus-visible { outline: 2px solid var(--accent); outline-offset: 2p
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------------- going further ---------------- */
+
+.rules ul.links {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.rules ul.links li { margin-bottom: 6px; }
+.rules ul.links a { color: var(--accent); }

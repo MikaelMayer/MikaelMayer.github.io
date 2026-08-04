@@ -377,6 +377,18 @@
     });
   }
 
+  /* Which finished game has already been announced, so a redraw does not
+   * reopen the dialog every time the statement is touched. */
+  var announced = null;
+
+  function maybeAnnounceEnd() {
+    if (!E.isOver(state)) { announced = null; return; }
+    var key = state.seed + ':' + state.months + ':' + state.phase;
+    if (announced === key) return;
+    announced = key;
+    openEndDialog();
+  }
+
   function undo() {
     if (!undoStack.length) return;
     state = JSON.parse(undoStack.pop());
@@ -406,6 +418,7 @@
       renderLog();
       renderInvariants();
       renderExplain();
+      maybeAnnounceEnd();
       maybeScrollToAction();
       focusNewDecision();
       autosave();
@@ -832,7 +845,7 @@
       ]));
       head.appendChild(passiveBox);
       head.appendChild(box(t('Cash'), money(state.cash)));
-      head.appendChild(box(t('Monthly cash flow'), signed(s.cashflow), null, t('what payday pays')));
+      head.appendChild(box(t('Monthly cash flow'), signed(s.cashflow), null, t('Income minus expenses, monthly')));
     }
 
     var st = $('#statement');
@@ -878,8 +891,8 @@
         el('span', { class: 'winval', text: money(state.dream.cost) })
       ]));
       win.appendChild(row(t('\u00a0\u00a0cash needed'),
-        state.cash >= state.dream.cost ? 'you can afford it'
-          : money(state.dream.cost - state.cash) + ' more', true));
+        state.cash >= state.dream.cost ? t('you can afford it')
+          : t('{$amount} more', { amount: state.dream.cost - state.cash }), true));
       win.appendChild(el('div', { class: 'winline' }, [
         el('span', { class: 'winname', text: t('or new investment income') }),
         el('span', { class: 'winval', text: money(goal) })
@@ -1190,8 +1203,13 @@
     // Collected on the way past, before the square was ever reached.
     if (onTheWay.length) lines.appendChild(entryBlock('payday', null, onTheWay));
     if (fromSquare.length) {
-      var sqType = (receipt.square && receipt.square.type) ? ' ' + receipt.square.type : '';
-      lines.appendChild(entryBlock('square' + sqType, squareText(receipt.square), fromSquare));
+      var costly = receipt.entries.some(function (e) { return e.type === 'loss'; });
+      var type = (receipt.square && receipt.square.type) || '';
+      /* Expense squares are red because they usually cost you something.
+       * When one did not, the neutral block tells the truth. */
+      if (type === 'DOODAD' && !costly) type = '';
+      lines.appendChild(entryBlock('square' + (type ? ' ' + type : ''),
+        squareText(receipt.square), fromSquare));
     }
     card.appendChild(lines);
 
@@ -1456,6 +1474,8 @@
       card.appendChild(terms([
         [t('Price per share'), money(c.price)],
         [t('Dividend'), c.dividend ? t('{$amount} / share / month', { amount: c.dividend }) : t('none')],
+        c.dividend ? [t('Dividend yield at this price'),
+          t('{pct}%/yr', { pct: pct((c.dividend * 12 / c.price) * 100) })] : null,
         [t('Trading range'), money(c.range[0]) + ' - ' + money(c.range[1])]
       ]));
 
@@ -2112,8 +2132,7 @@
     body.appendChild(el('h2', { text: t('Out of the Rat Race in {months} months', { months: state.months }) }));
     body.appendChild(el('p', {
       class: 'dlg-note',
-      text: 'Your passive income overtook your expenses, so the Rat Race is finished. ' +
-        'From here the game is a different one.'
+      text: t('Your passive income overtook your expenses, so the Rat Race is finished. From here the game is a different one.')
     }));
 
     body.appendChild(el('div', { class: 'ftrules' }, [
@@ -2124,8 +2143,7 @@
       ]),
       el('p', {
         class: 'dlg-note',
-        text: 'Everything you built in the Rat Race — the properties, the businesses, the ' +
-          'shares — became that monthly income. Your old salary, expenses and debts are gone.'
+        text: t('Everything you built in the Rat Race - the properties, the businesses, the shares - became that monthly income. Your old salary, expenses and debts are gone.')
       }),
 
       el('h3', { text: t('What changes') }),
@@ -2138,23 +2156,56 @@
       el('h3', { text: t('Two ways to win') }),
       el('ul', {}, [
         el('li', {}, [
-          'Land on ',
-          el('strong', { text: '★ ' + T.field(state.dream, 'name') }),
-          ' and pay ' + money(state.dream.cost) + '.'
+          el('span', { text: t('Land on your dream, {name}, and pay {$cost}.',
+            { name: T.field(state.dream, 'name'), cost: state.dream.cost }) })
         ]),
         el('li', { text: t('Or add {$goal} a month of new investment income.', { goal: goal }) })
       ]),
       el('p', {
         class: 'dlg-note',
-        text: 'Your dream is the gold square on the board. Only that one wins the game for ' +
-          'you; the others belong to nobody.'
+        text: t('Your dream is the gold square on the board. Only that one wins the game for you; the others belong to nobody.')
       })
     ]));
 
     body.appendChild(el('div', { class: 'dlg-actions' }, [
       el('button', { class: 'primary', onclick: function () { dlg.close(); }, text: t('Start the Fast Track') })
     ]));
-    if (!dlg.open) dlg.showModal();
+    if (!dlg.open) {
+      window.scrollTo(0, 0);
+      dlg.showModal();
+    }
+  }
+
+  /* The game is over: say so where it cannot be missed, rather than only in
+   * a card in a column and a line in the middle of the board. */
+  function openEndDialog() {
+    var dlg = $('#money-dialog');
+    var body = $('#money-dialog-body');
+    var won = state.phase === 'won';
+
+    clear(body);
+    body.appendChild(el('h2', {
+      text: won ? t('You win') : t('Bankrupt')
+    }));
+    body.appendChild(el('p', {
+      class: 'dlg-note',
+      text: won
+        ? (state.result.how === 'dream'
+            ? t('You bought your dream in {months} months.', { months: state.result.months })
+            : t('You added {$income} a month of investment income in {months} months.',
+                { income: E.ftStats(state).addedIncome, months: state.result.months }))
+        : t('You could not pay for {reason}, and there was nothing left to sell or borrow against.',
+            { reason: state.result.reason })
+    }));
+    body.appendChild(ladderNote());
+    body.appendChild(el('div', { class: 'dlg-actions' }, [
+      el('button', { class: 'primary', onclick: function () { dlg.close(); openSetup(); }, text: t('New game') }),
+      el('button', { onclick: function () { dlg.close(); }, text: t('Close') })
+    ]));
+    if (!dlg.open) {
+      window.scrollTo(0, 0);
+      dlg.showModal();
+    }
   }
 
   function renderBank() {
@@ -2165,8 +2216,8 @@
       host.appendChild(el('div', {
         class: 'empty',
         text: state.phase === 'bankrupt'
-          ? 'No one will lend to you now.'
-          : 'There are no loans on the Fast Track. Investments are bought with cash.'
+          ? t('No one will lend to you now.')
+          : t('There are no loans on the Fast Track. Investments are bought with cash.')
       }));
       return;
     }
