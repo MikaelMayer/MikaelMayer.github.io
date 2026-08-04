@@ -36,6 +36,8 @@
   <div class="col">
     <div class="panel" id="board-wrap">
       <div class="board rat" id="board"></div>
+      <!-- Lives outside the grid so a board redraw cannot destroy it mid-move. -->
+      <div id="token" aria-hidden="true"></div>
     </div>
   </div>
 

@@ -68,7 +68,7 @@
     OPPORTUNITY: 'Opportunity',
     PAYDAY: 'PAYDAY',
     MARKET: 'Market',
-    DOODAD: 'Doodad',
+    DOODAD: 'Expense',
     CHARITY: 'Charity',
     BABY: 'Baby',
     DOWNSIZED: 'Downsized'
@@ -87,7 +87,7 @@
     OPPORTUNITY: 'Choose a Small Deal or a Big Deal, then look at the card. Small Deals need a few thousand down; Big Deals need much more and pay much more. Looking is always free and you can always say no.',
     PAYDAY: 'You collect your monthly cash flow — salary plus passive income, less every expense. You collect it whenever you PASS a payday square as well as when you land on one, so there are three per lap.',
     MARKET: 'Something happens to the things you own. Usually a buyer appears for one type of asset and you may sell; sometimes a cost lands on every property or business you hold. If you own nothing that matches, nothing happens.',
-    DOODAD: 'An unplanned expense. Some are bills you simply have to pay — a car repair, a dentist. The expensive ones are luxuries, and you can always turn those down at no cost. This is where most of a paycheque quietly goes.',
+    DOODAD: 'An unplanned expense. Some are bills you simply have to pay — a car repair, a dentist. The expensive ones are things you merely want, and you can always turn those down at no cost. This is where most of a paycheque quietly goes.',
     CHARITY: 'You may donate 10% of your total income. If you do, then for the next three turns you may roll one die or two — more control over where you land, and more chances at an Opportunity.',
     BABY: 'A child joins your household, up to three. Each one adds your profession\'s per-child cost to your expenses every month, for good, which raises the bar you have to clear to get out.',
     DOWNSIZED: 'You lose your job. Pay one full month of total expenses and lose your next two turns. The lower your cash flow, the harder this lands.'
@@ -186,9 +186,11 @@
   }
 
   function doRoll(dice) {
+    if (moving) return;                 // ignore taps while the token is walking
     squareInfo = null;
     snapshot();
     beginTurn();
+    var from = (state.phase === 'fasttrack' || state.phase === 'won') ? state.ftPosition : state.position;
     var mark = state.log.length;
     try {
       E.roll(state, dice);
@@ -201,7 +203,16 @@
     cardError = null;
     recordSince(mark);
     receipt.square = currentSquareLabel();
-    render();
+
+    var to = (state.phase === 'fasttrack' || state.phase === 'won') ? state.ftPosition : state.position;
+    if (to !== from && !E.isOver(state)) {
+      // Draw the board first so the squares exist, then walk the token across
+      // them and redraw once it arrives so the landing square lights up.
+      render();
+      walkToken(from, to, render);
+    } else {
+      render();
+    }
   }
 
   function undo() {
@@ -350,9 +361,10 @@
       // screen. Doing it in CSS means no resize listener and no reflow bugs.
       var explains = isRat && SQUARE_HELP[type];
       var node = el(explains ? 'button' : 'div', {
-        class: 'sq ' + type + (i === pos ? ' here' : '') + (mine ? ' mine' : ''),
+        class: 'sq ' + type + (i === pos && !moving ? ' here' : '') + (mine ? ' mine' : ''),
         style: 'grid-row:' + cell[0] + ';grid-column:' + cell[1],
         title: explains ? label + ' — tap to see what this square does' : label,
+        'data-index': String(i),
         'aria-label': label + (i === pos ? ', you are here' : '')
       }, [
         el('span', { class: 'lbl-full', text: label }),
@@ -363,11 +375,115 @@
         node.type = 'button';
         (function (t) { node.addEventListener('click', function () { squareInfo = t; render(); }); })(type);
       }
-      if (i === pos) node.appendChild(el('span', { class: 'pawn' }));
       wrap.appendChild(node);
     }
 
     wrap.appendChild(renderBoardCentre(n));
+    placeToken(moving ? tokenAt : pos, false);
+  }
+
+  /* ---- the token -------------------------------------------------
+   *
+   * The token lives outside the board grid, absolutely positioned over it, so
+   * a board redraw does not destroy it mid-move and so it can slide between
+   * squares instead of teleporting. It walks one square at a time, which is
+   * the part that makes a roll of five feel like five. */
+  var moving = false;
+  var tokenAt = 0;
+
+  function boardLength() {
+    return (state.phase === 'fasttrack' || state.phase === 'won')
+      ? D.FAST_TRACK_BOARD.length : D.RAT_RACE_BOARD.length;
+  }
+
+  /* The very first paint happens before the page has settled -- a scrollbar
+   * may still appear and shift the centred board sideways -- so place the
+   * token again once layout has stopped moving. */
+  function settleToken() {
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        if (state && !moving) placeToken(tokenAt, false);
+      });
+    });
+  }
+
+  function placeToken(index, animate) {
+    var token = $('#token');
+    var board = $('#board');
+    if (!token || !board) return;
+    var sq = board.querySelector('.sq[data-index="' + index + '"]');
+    if (!sq) { token.style.opacity = '0'; return; }
+
+    token.style.opacity = '1';
+    token.classList.toggle('gliding', !!animate);
+
+    /* Measure against the wrapper rather than adding up offsets. A square's
+     * offsetParent is already the positioned wrapper, so adding the board's
+     * own offset on top double-counts it and lands the token a square wide of
+     * where the player actually is. */
+    var wrapRect = $('#board-wrap').getBoundingClientRect();
+    var sqRect = sq.getBoundingClientRect();
+    var x = sqRect.left - wrapRect.left + sqRect.width / 2;
+    var y = sqRect.top - wrapRect.top + sqRect.height / 2;
+
+    token.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px) translate(-50%,-50%)';
+    tokenAt = index;
+  }
+
+  function walkToken(from, to, done) {
+    var len = boardLength();
+    var steps = (to - from + len) % len;
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (steps === 0 || reduce) {
+      placeToken(to, false);
+      done();
+      return;
+    }
+
+    moving = true;
+    var cur = from;
+    var taken = 0;
+    placeToken(cur, false);
+
+    (function hop() {
+      cur = (cur + 1) % len;
+      taken++;
+      placeToken(cur, true);
+      if (taken < steps) {
+        setTimeout(hop, 170);
+      } else {
+        setTimeout(function () { moving = false; done(); }, 220);
+      }
+    })();
+  }
+
+  /* A real die face, not a printed number.
+   *
+   * Nine cells of a 3x3 grid; each face lights the cells a physical die would.
+   * Cheaper and crisper than an image, and it scales with the board. */
+  var DIE_PIPS = {
+    1: [4],
+    2: [0, 8],
+    3: [0, 4, 8],
+    4: [0, 2, 6, 8],
+    5: [0, 2, 4, 6, 8],
+    6: [0, 2, 3, 5, 6, 8]
+  };
+
+  function dieFace(value) {
+    var die = el('div', {
+      class: 'die',
+      role: 'img',
+      'aria-label': 'die showing ' + value
+    });
+    var lit = DIE_PIPS[value] || [];
+    for (var i = 0; i < 9; i++) {
+      die.appendChild(el('span', {
+        class: 'pip' + (lit.indexOf(i) === -1 ? ' off' : '')
+      }));
+    }
+    return die;
   }
 
   function renderBoardCentre(n) {
@@ -444,7 +560,7 @@
 
     if (state.lastRoll) {
       var dice = el('div', { class: 'dice' });
-      state.lastRoll.forEach(function (d) { dice.appendChild(el('div', { class: 'die', text: String(d) })); });
+      state.lastRoll.forEach(function (d) { dice.appendChild(dieFace(d)); });
       centre.appendChild(dice);
     }
     return centre;
@@ -528,17 +644,25 @@
       row('Total income', money(s.totalIncome), false, true)
     ]));
 
+    /* Only expenses you actually have.
+     *
+     * A debt you have cleared should leave the sheet, not sit there at $0 --
+     * seeing the line vanish is the reward for paying it off, and a statement
+     * full of zeroes buries the numbers that still matter. */
     var p = s.expenseParts;
+    function expense(label, amount) {
+      return amount > 0 ? row(label, money(amount), true) : null;
+    }
     st.appendChild(group('Expenses', [
-      row('Taxes', money(p.taxes), true),
-      row('Home mortgage', money(p.home), true),
-      p.school ? row('School loan', money(p.school), true) : null,
-      row('Car loan', money(p.car), true),
-      row('Credit cards', money(p.creditCard), true),
-      row('Retail', money(p.retail), true),
-      row('Other', money(p.other), true),
-      row('Children (' + state.children + ')', money(p.children), true),
-      row('Loans', money(p.bankLoan), true),
+      expense('Taxes', p.taxes),
+      expense('Home mortgage', p.home),
+      expense('School loan', p.school),
+      expense('Car loan', p.car),
+      expense('Credit cards', p.creditCard),
+      expense('Retail', p.retail),
+      expense('Other', p.other),
+      state.children > 0 ? row('Children (' + state.children + ')', money(p.children), true) : null,
+      expense('Loans', p.bankLoan),
       row('Total expenses', money(s.totalExpenses), false, true)
     ]));
 
@@ -561,11 +685,11 @@
       ));
     });
 
-    liabilities.appendChild(liabilityRow(
-      'Loans', state.bankLoan, p.bankLoan,
-      state.bankLoan > 0 ? openRepayLoanDialog : null,
-      state.cash < 1000
-    ));
+    if (state.bankLoan > 0) {
+      liabilities.appendChild(liabilityRow(
+        'Loans', state.bankLoan, p.bankLoan, openRepayLoanDialog, state.cash < 1000
+      ));
+    }
 
     if (propertyDebt() > 0) {
       liabilities.appendChild(liabilityRow('Property mortgages', propertyDebt(), 0, null, false,
@@ -1516,6 +1640,7 @@
     $('#setup').close();
     renderBank();
     render();
+    settleToken();
   }
 
   /* ------------------------------------------------------------------ *
@@ -1567,6 +1692,26 @@
       $('#seed-input').value = String(window.CF.randomSeed());
     });
 
+    /* Keep the token glued to its square whenever the board moves under it.
+     *
+     * A window-resize listener is not enough: the board is centred, so it also
+     * shifts sideways when a scrollbar appears because the page grew — which
+     * happens constantly as cards come and go. ResizeObserver catches every
+     * cause, including font loading and panel reflow. */
+    if (window.ResizeObserver) {
+      var reposition = function () { if (state && !moving) placeToken(tokenAt, false); };
+      var ro = new ResizeObserver(reposition);
+      /* Watch the WRAPPER, not just the board. The board is capped at a fixed
+       * max-width and centred, so when a scrollbar appears the board's size
+       * does not change at all -- only its left offset does, and a
+       * size-only observer never fires. The wrapper does change width. */
+      ro.observe($('#board-wrap'));
+      ro.observe($('#board'));
+    }
+    window.addEventListener('resize', function () {
+      if (state && !moving) placeToken(tokenAt, false);
+    });
+
     document.addEventListener('keydown', function (e) {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
       if (e.key === 'r' && state && E.canRoll(state)) {
@@ -1584,6 +1729,7 @@
         state = E.deserialize(existing);
         renderBank();
         render();
+        settleToken();
         return;
       } catch (e) { /* fall through to setup */ }
     }

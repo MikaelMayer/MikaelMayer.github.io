@@ -560,7 +560,7 @@
     if (card.perChild) {
       amount = card.amount * state.children;
       if (amount === 0) {
-        log(state, 'Doodad: ' + card.title + ' - you have no children, so nothing to pay.', 'system');
+        log(state, card.title + ' - you have no children, so there is nothing to pay.', 'system');
         return;
       }
     }
@@ -582,11 +582,20 @@
     };
   }
 
+  /* Who a market cost actually lands on. Naming the group is what turns
+   * "this does not touch you" into an explanation the player can act on:
+   * it tells them what they would need to own for it to matter. */
+  var WHO_IT_HITS = {
+    perProperty: 'people who own property',
+    perBusiness: 'people who own a business',
+    ifAnyRental: 'landlords with tenants'
+  };
+
   function drawMarket(state) {
     var card = drawCard(state, 'market', D.MARKET);
 
     if (card.kind === 'none') {
-      log(state, 'Market: ' + card.title + '. ' + card.text, 'system');
+      log(state, card.title + '. ' + card.text, 'system');
       return;
     }
 
@@ -596,13 +605,14 @@
       else if (card.scope === 'perBusiness') count = countAssets(state, 'business');
       else if (card.scope === 'ifAnyRental') count = countAssets(state, 'realestate') > 0 ? 1 : 0;
       if (count === 0) {
-        log(state, 'Market: ' + card.title + ' - it does not touch you. Nothing to pay.', 'system');
+        log(state, card.title + ' — a cost for ' + WHO_IT_HITS[card.scope] +
+          '. You have none, so you pay nothing.', 'system');
         return;
       }
       state.pending = {
         kind: 'bill', title: card.title, amount: card.amount * count,
         text: card.text + ' Owning things means owning their problems too.',
-        reason: 'Market: ' + card.title
+        reason: card.title
       };
       return;
     }
@@ -610,7 +620,7 @@
     if (card.kind === 'goldbuyer') {
       var coins = totalGold(state);
       if (coins === 0) {
-        log(state, 'Market: ' + card.title + ' - you own no gold.', 'system');
+        log(state, card.title + ' — but you own no gold coins to sell.', 'system');
         return;
       }
       state.pending = {
@@ -623,7 +633,7 @@
     // kind === 'buyer'
     var offers = buildOffers(state, card);
     if (offers.length === 0) {
-      log(state, 'Market: ' + card.title + ' - you own nothing that matches.', 'system');
+      log(state, card.title + ' — but you own nothing this buyer wants.', 'system');
       return;
     }
     state.pending = {

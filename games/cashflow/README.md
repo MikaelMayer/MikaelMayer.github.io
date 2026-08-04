@@ -85,7 +85,7 @@ costs. A single shared number box used to serve Buy, Sell and Sell-all, defaulti
 10 — so its answer to a $5 share you could buy 314 of was "buy $50 worth."
 
 **Refusing is never the quiet option.** On any card where saying no is the lesson — a
-luxury doodad, a trap deal, a market buyer — "No thanks" is the primary button and the
+luxury expense, a trap deal, a market buyer — "No thanks" is the primary button and the
 card says outright that refusing costs nothing. Declines are logged and totalled, so
 discipline leaves a visible trace.
 
@@ -133,7 +133,7 @@ three screens further down.
 | --- | --- |
 | **Opportunity** | Choose a Small Deal or a Big Deal. Looking is always free; you may decline anything. |
 | **PAYDAY** | Collect your monthly cash flow. Collected on passing as well as on landing — three per lap. |
-| **Doodad** | An expense. Bills are paid and shown to you; every luxury is a choice you can refuse. |
+| **Expense** | An unplanned cost. Bills are shown to you and you press Pay; anything expensive is a want you can refuse for free. |
 | **Market** | A buyer appears for a type of asset, or a cost lands on the assets you own. |
 | **Charity** | Donate 10% of total income and for the next 3 turns you may roll one die or two. |
 | **Baby** | A child, up to three. Each adds your profession's per-child cost every month. |
@@ -192,9 +192,12 @@ Steps 1–2 are standard. Step 3 is the table rule ("if you cannot pay, sell ass
 automated, because a solo player facing a bill they cannot cover has no real choice to
 make — so the game makes it, and says exactly what it sold and why.
 
-### Doodads: which ones you can refuse
+### Expenses: which ones you can refuse
 
-Every doodad falls into one of two groups, and the card says which on its face.
+Every card in this deck falls into one of two groups, and the card says which on its face.
+
+(The source calls this deck `DOODADS`, after the Rich Dad term. The word never reaches
+the player: the square is called Expense and the cards talk about what the thing is.)
 
 **Bills** — car repair, dentist, vet, plumbing, tyres, an insurance excess, braces.
 These are paid, and the card that appears is a receipt: *"Bill — already paid."* You
@@ -209,14 +212,15 @@ refusing costs nothing.
 This split is the point of the square. If everything were compulsory, the lesson would
 be "bad luck happens" — which is true but not useful. If everything were refusable, a
 rational player would decline all of it and the square would be decoration. Splitting
-them means the money you lose to doodads is money **you chose to spend**, which is the
+them means the money you lose to expenses is money **you chose to spend**, which is the
 thing worth learning. It also matters mechanically: before the split, a single large
 compulsory hit early could put a low-income profession into a debt spiral it could
 never escape, through no decision of its own. Bankruptcy among competent players fell
-from 9% to under 2% when the expensive doodads became choices.
+from 9% to under 2% when the expensive expenses became choices.
 
-Every doodad is also now *shown*. Before, a compulsory one silently subtracted the
-money and moved on, which is both bad teaching and indistinguishable from a bug.
+Every one of them is also *shown*, and you press Pay yourself. Before, a compulsory one
+silently subtracted the money and moved on, which is both bad teaching and
+indistinguishable from a bug.
 
 ### The Fast Track (40 squares, two dice)
 
@@ -265,7 +269,7 @@ Each one is a single value or block in the code.
 | Credit capped at 10× income | `CREDIT_MULTIPLE`, `engine.js` | Prevents an unrecoverable, arithmetic-breaking debt spiral. |
 | Forced sales are automatic | `liquidateFor()`, `engine.js` | Removes a decision that isn't really a decision; keeps the turn flow unbreakable. |
 | Distressed property sells at 80% | `DISTRESS_FACTOR`, `engine.js` | Teaches that liquidity has a price. |
-| Every doodad over $700 is refusable | `optional: true`, `data.js` | See "Doodads" below. A test enforces this rule so the deck cannot drift back. |
+| Every expense over $700 is refusable | `optional: true`, `data.js` | See "Expenses" above. A test enforces the ceiling so the deck cannot drift back. |
 | Rat Race cash carries over | `enterFastTrack()`, `engine.js` | Deleting a player's hard-won savings reads as a bug even when it is a rule. |
 | Bankruptcy is possible | `bankrupt()`, `engine.js` | Risk that cannot bite is not a lesson. Undo is always available. |
 
