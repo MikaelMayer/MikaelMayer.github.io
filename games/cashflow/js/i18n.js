@@ -91,7 +91,15 @@
     return template.replace(/\{(\$?)([a-zA-Z0-9_]+)\}/g, function (whole, isMoney, name) {
       if (!(name in params)) return whole;
       var v = params[name];
-      return isMoney ? money(v) : String(v);
+      if (isMoney) return money(v);
+      /* A content reference -- {id, f, en} -- resolves in the language being
+       * read rather than the one it was written in. */
+      if (v && typeof v === 'object' && v.id) {
+        var tr = content(v.id);
+        var f = v.f || 'title';
+        return (tr && tr[f]) || v.en || v.id;
+      }
+      return String(v);
     });
   }
 

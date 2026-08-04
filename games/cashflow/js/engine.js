@@ -93,6 +93,14 @@
   // Names that live in data.js and have a translation keyed by card id.
   function name(obj) { return T.field(obj, 'title') || T.field(obj, 'name'); }
 
+  /* For log params only: keep the card, not its name. name() is still right
+   * for anything rendered once, now, in the current language. */
+  function ref(obj) {
+    if (!obj || !obj.id) return name(obj);
+    var f = obj.title !== undefined ? 'title' : 'name';
+    return { id: obj.id, f: f, en: obj[f] };
+  }
+
   function log(state, key, params, type) {
     if (typeof params === 'string') { type = params; params = null; }
     state.log.push({
@@ -305,7 +313,7 @@
         var a = state.assets[i];
         state.assets.splice(i, 1);
         state.cash += candidate.value;
-        log(state, 'Forced sale: sold {name} for {$value} (80% of what you paid) to cover {reason}. Passive income falls by {$lost}/mo.', { name: name(a), value: candidate.value, reason: reason, lost: a.cashflow }, 'loss');
+        log(state, 'Forced sale: sold {name} for {$value} (80% of what you paid) to cover {reason}. Passive income falls by {$lost}/mo.', { name: ref(a), value: candidate.value, reason: reason, lost: a.cashflow }, 'loss');
         return;
       }
     }
@@ -521,10 +529,21 @@
   function payday(state) {
     var s = stats(state);
     if (s.cashflow >= 0) {
-      credit(state, s.cashflow, 'PAYDAY');
-    } else {
-      debit(state, -s.cashflow, 'PAYDAY (your expenses exceed your income)');
+      state.cash += s.cashflow;
+      log(state, 'You passed PAYDAY and collected {$amount}.', { amount: s.cashflow }, 'payday');
+      return;
     }
+    /* Expenses outran income. When there is cash to cover it this is just a
+     * payment; when there is not, debit() handles borrowing, forced sales and
+     * bankruptcy exactly as before, and says so in its own line. */
+    var owed = -s.cashflow;
+    if (state.cash >= owed) {
+      state.cash -= owed;
+      log(state, 'You passed PAYDAY. Your expenses came to {$amount} more than your income.',
+        { amount: owed }, 'payday');
+      return;
+    }
+    debit(state, owed, 'PAYDAY (your expenses exceed your income)');
   }
 
   function resolveRatRaceSquare(state, type) {
@@ -588,7 +607,7 @@
     if (card.perChild) {
       amount = card.amount * state.children;
       if (amount === 0) {
-        log(state, '{title} - you have no children, so there is nothing to pay.', { title: name(card) }, 'system');
+        log(state, '{title} - you have no children, so there is nothing to pay.', { title: ref(card) }, 'system');
         return;
       }
     }
@@ -623,7 +642,7 @@
     var card = drawCard(state, 'market', D.MARKET);
 
     if (card.kind === 'none') {
-      log(state, '{title}. {text}', { title: name(card), text: T.field(card, 'text') }, 'system');
+      log(state, '{title}. {text}', { title: ref(card), text: T.field(card, 'text') }, 'system');
       return;
     }
 
@@ -633,7 +652,7 @@
       else if (card.scope === 'perBusiness') count = countAssets(state, 'business');
       else if (card.scope === 'ifAnyRental') count = countAssets(state, 'realestate') > 0 ? 1 : 0;
       if (count === 0) {
-        log(state, '{title} - a cost for {who}. You have none, so you pay nothing.', { title: name(card), who: t(WHO_IT_HITS[card.scope]) }, 'system');
+        log(state, '{title} - a cost for {who}. You have none, so you pay nothing.', { title: ref(card), who: t(WHO_IT_HITS[card.scope]) }, 'system');
         return;
       }
       state.pending = {
@@ -647,7 +666,7 @@
     if (card.kind === 'goldbuyer') {
       var coins = totalGold(state);
       if (coins === 0) {
-        log(state, '{title} - but you own no gold coins to sell.', { title: name(card) }, 'system');
+        log(state, '{title} - but you own no gold coins to sell.', { title: ref(card) }, 'system');
         return;
       }
       state.pending = {
@@ -660,7 +679,7 @@
     // kind === 'buyer'
     var offers = buildOffers(state, card);
     if (offers.length === 0) {
-      log(state, '{title} - but you own nothing this buyer wants.', { title: name(card) }, 'system');
+      log(state, '{title} - but you own nothing this buyer wants.', { title: ref(card) }, 'system');
       return;
     }
     state.pending = {
@@ -726,7 +745,7 @@
   function presentDeal(state, deckName) {
     var catalogue = deckName === 'small' ? D.SMALL_DEALS : D.BIG_DEALS;
     var card = drawCard(state, deckName, catalogue);
-    log(state, deckName === 'small' ? 'Small Deal: {title}' : 'Big Deal: {title}', { title: name(card) }, 'card');
+    log(state, deckName === 'small' ? 'Small Deal: {title}' : 'Big Deal: {title}', { title: ref(card) }, 'card');
 
     if (card.kind === 'split') {
       applySplit(state, card);
@@ -739,7 +758,7 @@
   function applySplit(state, card) {
     var holding = state.stocks[card.symbol];
     if (!holding || holding.shares === 0) {
-      log(state, '{title} - you own none.', { title: name(card) }, 'system');
+      log(state, '{title} - you own none.', { title: ref(card) }, 'system');
       return;
     }
     var before = holding.shares;
@@ -762,7 +781,7 @@
 
     pass: function (state) {
       var p = state.pending;
-      if (p && p.kind === 'deal') log(state, 'Passed on {title}.', { title: name(p.card) }, 'system');
+      if (p && p.kind === 'deal') log(state, 'Passed on {title}.', { title: ref(p.card) }, 'system');
       state.pending = null;
       afterAction(state);
     },
@@ -852,7 +871,7 @@
           id: state.nextAssetId++, category: 'paper', name: card.title,
           cost: card.cost, mortgage: 0, cashflow: card.cashflow, propType: 'paper', units: 1
         });
-        log(state, 'Bought {title} for {$cost}. Adds {$cf}/mo.', { title: name(card), cost: card.cost, cf: card.cashflow }, 'gain');
+        log(state, 'Bought {title} for {$cost}. Adds {$cf}/mo.', { title: ref(card), cost: card.cost, cf: card.cashflow }, 'gain');
         state.pending = null;
         afterAction(state);
         return;
@@ -868,7 +887,7 @@
         fail('You need {$need} in cash and you have {$cash}. Take a loan first if you want this deal.', { need: card.down, cash: state.cash });
       }
       state.cash -= card.down;
-      log(state, '-{$amount}  Down payment on {title}', { amount: card.down, title: name(card) }, 'loss');
+      log(state, '-{$amount}  Down payment on {title}', { amount: card.down, title: ref(card) }, 'loss');
       var category = card.kind === 'business' ? 'business' : 'realestate';
       state.assets.push({
         id: state.nextAssetId++,
@@ -882,7 +901,7 @@
         units: card.units || 1,
         acres: card.acres || 0
       });
-      log(state, 'Bought {title} ({$cost}, {$financed} financed). Adds {$cf}/mo passive income.', { title: name(card), cost: card.cost, financed: card.mortgage, cf: card.cashflow }, card.cashflow >= 0 ? 'gain' : 'loss');
+      log(state, 'Bought {title} ({$cost}, {$financed} financed). Adds {$cf}/mo passive income.', { title: ref(card), cost: card.cost, financed: card.mortgage, cf: card.cashflow }, card.cashflow >= 0 ? 'gain' : 'loss');
       state.pending = null;
       afterAction(state);
     },

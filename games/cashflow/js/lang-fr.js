@@ -21,7 +21,7 @@
       "Monthly expenses": "Dépenses mensuelles",
       "Total income minus total expenses. This is what each PAYDAY pays you.": "Revenus totaux moins dépenses totales. C’est ce que verse chaque JOUR DE PAIE.",
       "your {$total} of monthly expenses": "vos {$total} de dépenses mensuelles",
-      "{pct}%/yr": "{pct} %/an",
+      "{pct}%/yr": "{pct}%/an",
       "a year": "par an",
       "What the money you actually put in earns you in a year, ignoring the part the mortgage pays for.": "Ce que rapporte en un an l’argent que vous avez réellement engagé, sans compter la part financée par l’emprunt.",
       "Monthly cash flow x 12 / down payment: {$cf} x 12 / {$down} = {pct}% a year.": "Flux mensuel x 12 / apport : {$cf} x 12 / {$down} = {pct} % par an.",
@@ -259,6 +259,8 @@
       "Anyone who opens this link starts from the same seed, profession and dream, and can make different choices from there.": "Quiconque ouvre ce lien démarre avec la même graine, la même profession et le même rêve, et peut ensuite faire d’autres choix.",
       "Link copied. Anyone who opens it starts this same game.": "Lien copié. Quiconque l’ouvre démarre cette même partie.",
       "{$amount}/mo": "{$amount}/mois",
+      "You passed PAYDAY and collected {$amount}.": "Vous êtes passé par le JOUR DE PAIE et avez encaissé {$amount}.",
+      "You passed PAYDAY. Your expenses came to {$amount} more than your income.": "Vous êtes passé par le JOUR DE PAIE. Vos dépenses ont dépassé vos revenus de {$amount}.",
       'Monthly income from these': 'Revenu mensuel de ces titres',
       'Change amount': 'Modifier la quantité',
       'Buy {qty} share': 'Acheter {qty} action',
@@ -620,63 +622,63 @@
           },
           "sd01": {
                 "title": "HLTH - HealthCo",
-                "text": "Les actions se négocient à 5 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Un essai de phase avancée a manqué son objectif et le titre a fortement chuté."
+                "text": "Les actions se négocient à 5 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Un essai de phase 3 s’est effondré en plein scandale et le régulateur enquête."
           },
           "sd02": {
                 "title": "HLTH - HealthCo",
-                "text": "Les actions se négocient à 10 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Un concurrent a commercialisé un traitement similaire avant elle."
+                "text": "Les actions se négocient à 10 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Deux de ses médicaments ont été retoqués le même trimestre."
           },
           "sd03": {
                 "title": "HLTH - HealthCo",
-                "text": "Les actions se négocient à 20 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Rien de notable cette année ; le titre reste au milieu de sa fourchette."
+                "text": "Les actions se négocient à 20 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Une année calme. Rien n’a été annoncé, dans un sens ni dans l’autre."
           },
           "sd04": {
                 "title": "HLTH - HealthCo",
-                "text": "Les actions se négocient à 30 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Un nouveau traitement a été homologué et la presse est enthousiaste."
+                "text": "Les actions se négocient à 30 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Un nouveau médicament s’est révélé très efficace et il est désormais commercialisé."
           },
           "sd05": {
                 "title": "GRW - GrowTech",
-                "text": "Les actions se négocient à 5 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Une startup bien financée casse ses prix sur son marché principal."
+                "text": "Les actions se négocient à 5 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Son fondateur a démissionné du jour au lendemain et les comptes sont en cours de correction."
           },
           "sd06": {
                 "title": "GRW - GrowTech",
-                "text": "Les actions se négocient à 15 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. La croissance ralentit et deux ingénieurs clés sont partis."
+                "text": "Les actions se négocient à 15 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. La croissance s’est arrêtée et un tiers de l’équipe technique est parti."
           },
           "sd07": {
                 "title": "GRW - GrowTech",
-                "text": "Les actions se négocient à 30 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Elle a signé son plus gros client entreprise à ce jour."
+                "text": "Les actions se négocient à 30 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Elle a signé son plus gros client à ce jour."
           },
           "sd08": {
                 "title": "GRW - GrowTech",
-                "text": "Les actions se négocient à 40 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Élue entreprise de l’année par la presse économique. Les volumes échangés sont inhabituellement élevés."
+                "text": "Les actions se négocient à 40 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Son nouveau produit est sur toutes les lèvres. La presse la sacre entreprise de l’année."
           },
           "sd09": {
                 "title": "BIGX - BigBox Retail",
-                "text": "Les actions se négocient à 10 €. Fourchette 10 € - 50 €. Ne verse pas de dividende. Un concurrent en ligne a ouvert un entrepôt juste à côté de son plus grand magasin."
+                "text": "Les actions se négocient à 10 €. Fourchette 10 € - 50 €. Ne verse pas de dividende. Une crise de trésorerie l’a forcée à fermer un tiers de ses magasins."
           },
           "sd10": {
                 "title": "BIGX - BigBox Retail",
-                "text": "Les actions se négocient à 20 €. Fourchette 10 € - 50 €. Ne verse pas de dividende. Les ventes stagnent et elle a fermé quatre magasins."
+                "text": "Les actions se négocient à 20 €. Fourchette 10 € - 50 €. Ne verse pas de dividende. Les ventes stagnent et un concurrent en ligne lui prend des parts de marché."
           },
           "sd11": {
                 "title": "BIGX - BigBox Retail",
-                "text": "Les actions se négocient à 40 €. Fourchette 10 € - 50 €. Ne verse pas de dividende. Un trimestre de fêtes solide a dépassé toutes les prévisions."
+                "text": "Les actions se négocient à 40 €. Fourchette 10 € - 50 €. Ne verse pas de dividende. Des ventes de fin d’année record ont dépassé toutes les prévisions."
           },
           "sd12": {
                 "title": "MYTV - MediaTV",
-                "text": "Les actions se négocient à 1 €. Fourchette 1 € - 30 €. Ne verse pas de dividende. Elle a perdu les droits de diffusion sur lesquels reposait son activité. Titre à très faible prix, risque très élevé."
+                "text": "Les actions se négocient à 1 €. Fourchette 1 € - 30 €. Ne verse pas de dividende. Elle a perdu les droits de diffusion sur lesquels reposait toute son activité."
           },
           "sd13": {
                 "title": "MYTV - MediaTV",
-                "text": "Les actions se négocient à 5 €. Fourchette 1 € - 30 €. Ne verse pas de dividende. Les recettes publicitaires baissent depuis six trimestres consécutifs."
+                "text": "Les actions se négocient à 5 €. Fourchette 1 € - 30 €. Ne verse pas de dividende. Les recettes publicitaires baissent depuis six trimestres d’affilée."
           },
           "sd14": {
                 "title": "MYTV - MediaTV",
-                "text": "Les actions se négocient à 15 €. Fourchette 1 € - 30 €. Ne verse pas de dividende. Un nouvel accord de diffusion en ligne a ramené des abonnés."
+                "text": "Les actions se négocient à 15 €. Fourchette 1 € - 30 €. Ne verse pas de dividende. Sa nouvelle série cartonne et les abonnés reviennent en masse."
           },
           "sd15": {
                 "title": "NRGY - NuEnergy",
-                "text": "Les actions se négocient à 5 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Un projet a été annulé et le régulateur a ouvert une enquête."
+                "text": "Les actions se négocient à 5 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Une avarie a provoqué une fuite et les amendes ne sont pas encore chiffrées."
           },
           "sd16": {
                 "title": "NRGY - NuEnergy",
@@ -684,7 +686,7 @@
           },
           "sd17": {
                 "title": "NRGY - NuEnergy",
-                "text": "Les actions se négocient à 35 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Elle a remporté un contrat national et la presse salue sa direction."
+                "text": "Les actions se négocient à 35 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Elle a remporté un contrat national courant sur dix ans."
           },
           "sd18": {
                 "title": "SAFE - SafePower Utility",
@@ -700,7 +702,7 @@
           },
           "sd21": {
                 "title": "REIT - Income REIT Fund",
-                "text": "Les actions se négocient à 20 €. Fourchette 20 € - 40 €. Verse 1 € par action et par mois. Plusieurs locataires sont partis et deux immeubles sont à moitié vides."
+                "text": "Les actions se négocient à 20 €. Fourchette 20 € - 40 €. Verse 1 € par action et par mois. Son principal locataire a fait faillite et deux immeubles sont vides."
           },
           "sd22": {
                 "title": "REIT - Income REIT Fund",
@@ -708,7 +710,7 @@
           },
           "sd23": {
                 "title": "REIT - Income REIT Fund",
-                "text": "Les actions se négocient à 35 €. Fourchette 20 € - 40 €. Verse 1 € par action et par mois. Les loyers ont augmenté dans tous ses immeubles et l’occupation est presque totale."
+                "text": "Les actions se négocient à 35 €. Fourchette 20 € - 40 €. Verse 1 € par action et par mois. Les loyers ont augmenté dans tous ses immeubles et elle est presque pleine."
           },
           "sd24": {
                 "title": "HLTH annonce une division d’action 2 pour 1",

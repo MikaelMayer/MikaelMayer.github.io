@@ -295,14 +295,28 @@
     }
   }
 
-  function currentSquareLabel() {
+  /* Returns something renderable later rather than a finished string: a
+   * translation key for a board square, or a content id for a Fast Track
+   * square. Resolving at capture time froze the receipt in whichever language
+   * the turn happened in, so switching language left "Marche" sitting above
+   * English text. */
+  function currentSquare() {
     if (state.phase === 'fasttrack' || state.phase === 'won') {
       var sq = D.FAST_TRACK_BOARD[state.ftPosition];
-      if (sq.type === 'INVESTMENT') return E.findById(D.FT_INVESTMENTS, sq.investment).name;
-      if (sq.type === 'DREAM') return E.findById(D.DREAMS, sq.dream).name;
-      return sq.label || sq.type;
+      if (sq.type === 'INVESTMENT') return { investment: sq.investment };
+      if (sq.type === 'DREAM') return { dream: sq.dream };
+      return { label: sq.label || sq.type };
     }
-    return SQUARE_LABEL[D.RAT_RACE_BOARD[state.position]] || '';
+    var key = SQUARE_LABEL[D.RAT_RACE_BOARD[state.position]];
+    return key ? { key: key } : null;
+  }
+
+  function squareText(sq) {
+    if (!sq) return '';
+    if (sq.key) return t(sq.key);
+    if (sq.investment) return T.field(E.findById(D.FT_INVESTMENTS, sq.investment), 'name');
+    if (sq.dream) return T.field(E.findById(D.DREAMS, sq.dream), 'name');
+    return sq.label ? T.maybe(sq.label) : '';
   }
 
   function doAction(type, payload) {
@@ -342,7 +356,7 @@
     }
     cardError = null;
     recordSince(mark);
-    receipt.square = currentSquareLabel();
+    receipt.square = currentSquare();
 
     var to = (state.phase === 'fasttrack' || state.phase === 'won') ? state.ftPosition : state.position;
     var entered = phaseBefore === 'ratrace' && state.phase === 'fasttrack';
@@ -810,9 +824,8 @@
         el('span', { text: t('your {$total} of monthly expenses', { total: s.totalExpenses }) })
       ]));
       head.appendChild(passiveBox);
-      var cashBox = box(t('Cash'), money(state.cash));
-      cashBox.className += ' wide';   // nothing sits beside it now
-      head.appendChild(cashBox);
+      head.appendChild(box(t('Cash'), money(state.cash)));
+      head.appendChild(box(t('Monthly cash flow'), signed(s.cashflow), null, t('what payday pays')));
     }
 
     var st = $('#statement');
@@ -1103,21 +1116,30 @@
     var passiveDelta = E.stats(state).passiveIncome - receipt.passiveStart;
     var tone = cashDelta > 0 ? 'gold' : (cashDelta < 0 ? 'danger' : 'info');
 
-    var card = el('div', { class: 'card receipt ' + tone }, [
-      el('span', { class: 'tagline', text: t('Last turn — {square}', { square: receipt.square || t('result') }) })
-    ]);
+    var card = el('div', { class: 'card receipt ' + tone });
 
-    if (cashDelta !== 0) {
-      card.appendChild(el('div', { class: 'receipt-headline' }, [
-        el('span', { class: cashDelta > 0 ? 'pos' : 'neg', text: (cashDelta > 0 ? '+' : '') + money(cashDelta) }),
-        el('span', { class: 'receipt-sub', text: t('cash, now {$cash}', { cash: state.cash }) })
-      ]));
-    }
-
+    /* Passing a payday happens on the way to the square, so its lines come
+     * first and stand on their own. What the square did comes second, under
+     * the name of the square -- which is where naming it is useful, next to
+     * the thing it produced, rather than as a heading over the whole turn. */
     var lines = el('div', { class: 'receipt-lines' });
+    var fromSquare = [];
     receipt.entries.forEach(function (entry) {
-      lines.appendChild(el('div', { class: 'receipt-line ' + entry.type, text: logText(entry) }));
+      if (entry.type === 'payday') {
+        lines.appendChild(el('div', { class: 'receipt-line ' + entry.type, text: logText(entry) }));
+      } else {
+        fromSquare.push(entry);
+      }
     });
+
+    if (fromSquare.length) {
+      if (receipt.square) {
+        lines.appendChild(el('div', { class: 'receipt-square', text: squareText(receipt.square) }));
+      }
+      fromSquare.forEach(function (entry) {
+        lines.appendChild(el('div', { class: 'receipt-line ' + entry.type, text: logText(entry) }));
+      });
+    }
     card.appendChild(lines);
 
     if (passiveDelta !== 0) {
@@ -1343,12 +1365,29 @@
     return box;
   }
 
+  /* A save stores a copy of the card it is waiting on, so its English title
+   * and text are frozen at the moment it was drawn. French is looked up live
+   * by id, so editing a card leaves an in-progress game showing the new French
+   * against the old English -- which is exactly how it looks when a
+   * translation is wrong. Re-read the wording from the catalogue; only the
+   * wording, since the saved numbers are what the decision was offered on. */
+  function liveCard(c) {
+    if (!c || !c.id) return c;
+    var decks = [D.SMALL_DEALS, D.BIG_DEALS, D.DOODADS, D.MARKET];
+    for (var i = 0; i < decks.length; i++) {
+      var found = E.findById(decks[i], c.id);
+      if (found) return found;
+    }
+    return c;
+  }
+
   function dealCard(p) {
     var c = p.card;
+    var wording = liveCard(c);
     var card = el('div', { class: 'card' }, [
-      el('h3', { text: T.field(c, 'title') })
+      el('h3', { text: T.field(wording, 'title') })
     ]);
-    var cardText = T.field(c, 'text');
+    var cardText = T.field(wording, 'text');
     if (cardText) card.appendChild(el('p', { text: cardText }));
 
     var buttons = el('div', { class: 'buttons' });
