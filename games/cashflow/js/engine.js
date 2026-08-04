@@ -578,7 +578,7 @@
     if (card.optional) {
       state.pending = {
         kind: 'doodadOptional', title: card.title, text: card.text,
-        amount: amount, addExpense: card.addExpense || 0
+        amount: amount, addExpense: card.addExpense || 0, action: card.action || null
       };
       return;
     }

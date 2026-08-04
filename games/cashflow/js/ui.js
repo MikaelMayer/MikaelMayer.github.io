@@ -1077,6 +1077,14 @@
     return el('div', { class: 'carderror', role: 'alert', text: cardError });
   }
 
+  /* The button on a card should say what the card actually does. A card
+    * where a friend asks you for money is not a purchase, and labelling it
+    * "Buy" describes neither the act nor its consequences. */
+  function actionLabel(spec, amount, fallback) {
+    if (!spec) return fallback + ' ' + money(amount);
+    return spec.replace('%s', money(amount));
+  }
+
   function terms(pairs) {
     var box = el('div', { class: 'terms' });
     pairs.forEach(function (pr) {
@@ -1211,7 +1219,10 @@
         ['Cash now', money(state.cash)],
         ['Cash if you buy', money(state.cash - c.cost)]
       ]));
-      var trapBtn = el('button', { onclick: function () { doAction('buyDeal'); }, text: 'Buy for ' + money(c.cost) });
+      var trapBtn = el('button', {
+        onclick: function () { doAction('buyDeal'); },
+        text: actionLabel(c.action, c.cost, 'Buy for')
+      });
       if (c.cost > state.cash) { trapBtn.disabled = true; trapBtn.title = 'Not enough cash'; }
       buttons.appendChild(trapBtn);
       buttons.appendChild(el('button', { onclick: function () { doAction('pass'); }, text: 'Pass' }));
@@ -1333,7 +1344,10 @@
       ]),
       errorSlot(),
       el('div', { class: 'buttons' }, [
-        el('button', { onclick: function () { doAction('doodadAccept'); }, text: 'Buy for ' + money(p.amount) }),
+        el('button', {
+          onclick: function () { doAction('doodadAccept'); },
+          text: actionLabel(p.action, p.amount, 'Buy for')
+        }),
         el('button', { onclick: function () { doAction('acknowledge'); }, text: 'Decline' })
       ])
     ]);

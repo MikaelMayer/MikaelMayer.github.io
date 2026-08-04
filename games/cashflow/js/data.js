@@ -283,17 +283,17 @@
     // --- Traps: the lesson is that "no" is a legal move ---
     {
       id: 'sd46', deck: 'small', kind: 'trap', title: 'A friend asks for a $1,000 loan',
-      cost: 1000,
+      cost: 1000, action: 'Lend %s to your friend',
       text: 'No interest, no repayment date and nothing in writing.'
     },
     {
       id: 'sd47', deck: 'small', kind: 'trap', title: 'Hot tip: pre-IPO shares, $2,500 minimum',
-      cost: 2500,
+      cost: 2500, action: 'Put in %s',
       text: 'Unlisted shares sold privately. There is no public price and no way to sell them in this game.'
     },
     {
       id: 'sd48', deck: 'small', kind: 'trap', title: 'Timeshare in a ski resort',
-      cost: 4000, addExpense: 50,
+      cost: 4000, addExpense: 50, action: 'Sign up for %s',
       text: 'Two weeks a year at a fixed resort, plus $50 a month in maintenance fees.'
     }
   ];
@@ -339,12 +339,12 @@
 
     {
       id: 'bd23', deck: 'big', kind: 'trap', title: 'Restaurant with your name on it',
-      cost: 60000, addExpense: 400,
+      cost: 60000, addExpense: 400, action: 'Take it on for %s',
       text: 'A 60-seat restaurant. It currently runs $400 a month below break-even.'
     },
     {
       id: 'bd24', deck: 'big', kind: 'trap', title: 'Exotic car "investment"',
-      cost: 45000, addExpense: 300,
+      cost: 45000, addExpense: 300, action: 'Buy the car for %s',
       text: 'Insurance and storage come to $300 a month. It earns no rental income.'
     },
     property('bd25', 'big', 'plex', '10-plex - seller financing offered', 280000, 20000, 1100,
@@ -395,7 +395,7 @@
       text: 'A six-speaker system for the living room.'
     },
     {
-      id: 'dd05', title: 'Holiday package', amount: 1200, optional: true,
+      id: 'dd05', title: 'Holiday package', amount: 1200, optional: true, action: 'Book it for %s',
       text: 'Seven nights, flights and hotel included.'
     },
     {
@@ -420,10 +420,12 @@
     },
     {
       id: 'dd24', title: 'New car on finance', amount: 5000, addExpense: 300, optional: true,
+      action: 'Take it, %s down',
       text: 'A $5,000 deposit, then $300 a month for as long as you keep it.'
     },
     {
       id: 'dd25', title: 'Boat on finance', amount: 3000, addExpense: 200, optional: true,
+      action: 'Take it, %s down',
       text: 'A $3,000 deposit, then $200 a month for mooring and upkeep.'
     }
   ];
