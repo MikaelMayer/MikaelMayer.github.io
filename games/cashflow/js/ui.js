@@ -95,6 +95,57 @@
     DOWNSIZED: 'You lose your job. Pay one full month of total expenses and lose your next two turns. The lower your cash flow, the harder this lands.'
   };
 
+  /* Tap a term, get the term explained. Same gesture as tapping a board
+   * square, and the explanation lands in the same place, so there is one idea
+   * to learn rather than two.
+   *
+   * These describe the SYSTEM, never the move. "Passive income comes from
+   * rent, dividends, interest and business profit" is a rule; "buy this
+   * 8-plex" would be advice, and the player is here to work that out. */
+  var TERM_HELP = {
+    'Passive income': 'Money that arrives whether or not you go to work: rent from property, dividends from shares, interest, and profit from businesses you own. Your salary is not passive income. When this figure passes your total expenses, you are out of the Rat Race.',
+    'Total expenses': 'Everything you must pay every month: taxes, the payment on each debt, living costs, the cost of any children, and interest on loans you have taken. Clearing a debt in full removes its payment from this figure permanently.',
+    'Cash': 'Money on hand. You buy with it and bills come out of it. It is not income: a large cash balance does not by itself bring you any closer to leaving the Rat Race.',
+    'Monthly cash flow': 'Total income minus total expenses. This is the amount you collect each time you pass a PAYDAY square. It includes your salary, which is why it is not the figure that ends the Rat Race.',
+    'Total income': 'Your salary plus your passive income.',
+    'Salary': 'What your profession pays each month. It stops if you stop working, so it does not count towards leaving the Rat Race.',
+    'Interest / dividends': 'Monthly income from shares that pay a dividend, and from certificates of deposit.',
+    'Real estate': 'The combined monthly cash flow of the properties you own, after their mortgage payments are deducted.',
+    'Business': 'The combined monthly income of the businesses you own.',
+    'Assets': 'What you own. Some of it pays you every month; some of it pays nothing until you sell it for more than you paid.',
+    'Liabilities': 'What you owe. Each one has a matching monthly payment in the Expenses list. Paying a debt off in full removes that payment for the rest of the game.',
+    'Loans': 'Money you have borrowed. Every $1,000 costs $100 a month, every month, until you repay the principal.',
+    'Taxes': 'Deducted from your salary every month. It does not change as you play.',
+    'Cash Flow Day income': 'What you collect each time you pass or land on a Cash Flow Day square: the income you carried out of the Rat Race, plus anything the investments you have bought here produce.'
+  };
+
+  var termInfo = null;
+
+  function termHelpCard(term) {
+    return el('div', { class: 'card info' }, [
+      el('span', { class: 'tagline', text: t('Financial term') }),
+      el('h3', { text: t(term) }),
+      el('p', { text: t(TERM_HELP[term]) }),
+      el('div', { class: 'buttons' }, [
+        el('button', { onclick: function () { termInfo = null; render(); }, text: t('Close') })
+      ])
+    ]);
+  }
+
+  /* Wraps a label in a button when we have something to say about it, and
+   * leaves it as plain text when we do not -- so nothing looks tappable
+   * unless it is. */
+  function term(label) {
+    if (!TERM_HELP[label]) return t(label);
+    var b = el('button', {
+      class: 'term',
+      onclick: function () { termInfo = label; render(); },
+      title: t('What does this mean?')
+    }, [t(label)]);
+    b.type = 'button';
+    return b;
+  }
+
   var squareInfo = null;
 
   function squareHelpCard(type) {
@@ -193,6 +244,7 @@
   function doRoll(dice) {
     if (moving) return;                 // ignore taps while the token is walking
     squareInfo = null;
+    termInfo = null;
     snapshot();
     beginTurn();
     var phaseBefore = state.phase;
@@ -525,56 +577,16 @@
       return centre;
     }
 
-    var s = E.stats(state);
-    if (state.phase === 'ratrace') {
-      /* Passive income is the number that ends the game, so it is the number
-       * that gets the 34px treatment. Monthly cash flow used to be here, and
-       * a player optimising the biggest number on screen would have been
-       * optimising the wrong one -- cash flow goes UP when you sell the
-       * assets that were going to free you. */
-      centre.appendChild(el('div', { class: 'sub', text: t('Passive income') }));
-      centre.appendChild(el('div', { class: 'big', text: money(s.passiveIncome) }));
-
-      var gap = s.totalExpenses - s.passiveIncome;
-      centre.appendChild(el('div', {
-        class: 'sub',
-        text: gap > 0
-          ? t('{$gap} a month short of your {$total} of expenses', { gap: gap, total: s.totalExpenses })
-          : t('Clear of your {$total} of expenses', { total: s.totalExpenses })
-      }));
-
-      var pct = s.totalExpenses > 0 ? Math.min(100, (s.passiveIncome / s.totalExpenses) * 100) : 0;
-      var bar = el('div', {
-        class: 'progress', role: 'progressbar',
-        'aria-valuemin': '0', 'aria-valuemax': '100',
-        'aria-valuenow': String(Math.round(pct)),
-        'aria-valuetext': money(s.passiveIncome) + ' of ' + money(s.totalExpenses) + ' needed to leave the Rat Race'
-      });
-      bar.appendChild(el('i', { style: 'width:' + pct.toFixed(1) + '%' }));
-      centre.appendChild(bar);
-      centre.appendChild(el('div', { class: 'sub', text: t('{pct}% of the way out', { pct: Math.round(pct) }) }));
+    /* The centre of the board is not a second financial statement.
+     *
+     * It used to repeat passive income, the gap and a bare percentage, all of
+     * which live in the statement where the numbers belong. What is left here
+     * is what only the board can say: which month it is, what you just rolled,
+     * and any temporary state you are under. */
+    if (state.phase === 'ratrace' || state.phase === 'fasttrack') {
+      centre.appendChild(el('div', { class: 'sub', text: t('Month') }));
+      centre.appendChild(el('div', { class: 'big', text: String(state.months) }));
       centre.appendChild(statusChips());
-    } else {
-      var f = E.ftStats(state);
-      centre.appendChild(el('div', { class: 'sub', text: t('Cash Flow Day income') }));
-      centre.appendChild(el('div', { class: 'big', text: money(f.totalIncome) }));
-      centre.appendChild(el('div', {
-        class: 'sub',
-        text: t('New investment income {$have} of {$goal}', { have: f.addedIncome, goal: E.fastTrackGoal(state) })
-      }));
-      centre.appendChild(el('div', {
-        class: 'sub',
-        text: t('or land on ★ {name} and pay {$cost}', { name: T.field(state.dream, 'short') || T.field(state.dream, 'name'), cost: state.dream.cost })
-      }));
-      var pct2 = Math.min(100, (f.addedIncome / E.fastTrackGoal(state)) * 100);
-      var bar2 = el('div', {
-        class: 'progress', role: 'progressbar',
-        'aria-valuemin': '0', 'aria-valuemax': '100',
-        'aria-valuenow': String(Math.round(pct2)),
-        'aria-valuetext': money(f.addedIncome) + ' of ' + money(E.fastTrackGoal(state)) + ' of new income'
-      });
-      bar2.appendChild(el('i', { style: 'width:' + pct2.toFixed(1) + '%' }));
-      centre.appendChild(bar2);
     }
 
     if (state.lastRoll) {
@@ -603,12 +615,9 @@
         ? t('Out of work: {n} turns lost', { n: state.skipTurns })
         : t('Out of work: {n} turn lost', { n: state.skipTurns }) }));
     }
-    if (state.children > 0) {
-      wrap.appendChild(el('span', { class: 'chip', text: state.children + ' child' + (state.children > 1 ? 'ren' : '') }));
-    }
-    if (state.bankLoan > 0) {
-      wrap.appendChild(el('span', { class: 'chip bad', text: t('Loans {$amount}', { amount: state.bankLoan }) }));
-    }
+    /* Children and loans are not chips: both have their own line in the
+     * statement, and repeating them here was part of what made the middle of
+     * the board feel like a duplicate sheet. Only temporary states appear. */
     return wrap;
   }
 
@@ -618,7 +627,9 @@
     clear(head);
 
     function box(k, v, cls, sub) {
-      var b = el('div', { class: 'box' + (cls === 'hero' ? ' hero' : '') }, [el('div', { class: 'k', text: k })]);
+      var b = el('div', { class: 'box' + (cls === 'hero' ? ' hero' : '') }, [
+        el('div', { class: 'k' }, [termFor(k)])
+      ]);
       var val = el('div', { class: 'v' + (cls && cls !== 'hero' ? ' ' + cls : '') });
       val.appendChild(typeof v === 'string' ? document.createTextNode(v) : v);
       b.appendChild(val);
@@ -641,9 +652,12 @@
        * because "passive income vs total expenses" IS the game, and it used to
        * be a 13px grey subline while cash flow got two large displays. */
       var gap = s.totalExpenses - s.passiveIncome;
+      /* Distance to the goal, named by its destination rather than by what is
+       * missing. "$950 short" and "$950 until financial freedom" are the same
+       * arithmetic; only one of them reads as a failure. */
       var passiveBox = box(t('Passive income'), money(s.passiveIncome), 'hero',
-        gap > 0 ? t('{$gap} short of {$total}', { gap: gap, total: s.totalExpenses })
-                : t('clear of {$total}', { total: s.totalExpenses }));
+        gap > 0 ? t('{$gap} until financial freedom', { gap: gap })
+                : t('You are financially free'));
 
       /* A bar whose full width is your total expenses. Passive income only
        * means something measured against what it has to cover, so the two
@@ -658,6 +672,14 @@
       });
       passiveBar.appendChild(el('i', { style: 'width:' + pctOut.toFixed(1) + '%' }));
       passiveBox.appendChild(passiveBar);
+
+      /* The ends of the bar say what the ends mean. A bare percentage did not
+       * say what it was a percentage of, which is exactly what made it
+       * unreadable. */
+      passiveBox.appendChild(el('div', { class: 'barends' }, [
+        el('span', { text: money(0) }),
+        el('span', { text: t('financial freedom') })
+      ]));
       head.appendChild(passiveBox);
       head.appendChild(box(t('Total expenses'), money(s.totalExpenses), 'hero', t('the bar to clear')));
       head.appendChild(box(t('Cash'), money(state.cash)));
@@ -753,7 +775,7 @@
      * in the order a financial statement puts them. */
     var assetsHost = el('div', { class: 'group assets' });
     assetsHost.appendChild(el('div', { class: 'row' }, [
-      el('span', { class: 'label', text: t('Assets') })
+      el('span', { class: 'label' }, [term('Assets')])
     ]));
     var assetsBody = el('div', {});
     renderAssets(assetsBody);
@@ -766,7 +788,7 @@
      * bar you are trying to clear -- so it belongs on the balance sheet next
      * to the debt itself, not buried in a panel elsewhere. */
     var liabilities = el('div', { class: 'group' }, [
-      el('div', { class: 'row' }, [el('span', { class: 'label', text: t('Liabilities') })])
+      el('div', { class: 'row' }, [el('span', { class: 'label' }, [term('Liabilities')])])
     ]);
 
     Object.keys(E.LIABILITY_NAMES).forEach(function (which) {
@@ -817,7 +839,7 @@
 
   function group(title, rows) {
     var g = el('div', { class: 'group' }, [el('div', { class: 'row' }, [
-      el('span', { class: 'label', text: title })
+      el('span', { class: 'label' }, [termFor(title)])
     ])]);
     rows.forEach(function (r) { if (r) g.appendChild(r); });
     return g;
@@ -825,9 +847,18 @@
 
   function row(label, value, sub, total) {
     return el('div', { class: 'row' + (sub ? ' sub' : '') + (total ? ' total' : '') }, [
-      el('span', { text: label }),
+      el('span', {}, [termFor(label)]),
       el('span', { text: value })
     ]);
+  }
+
+  /* row() is called with an already-translated label, so look the term up by
+   * matching against the English keys we know. */
+  function termFor(translatedLabel) {
+    for (var key in TERM_HELP) {
+      if (t(key) === translatedLabel) return term(key);
+    }
+    return translatedLabel;
   }
 
   /* ------------------------------------------------------------------ *
@@ -868,6 +899,7 @@
       return;
     }
 
+    if (termInfo) host.appendChild(termHelpCard(termInfo));
     if (squareInfo) host.appendChild(squareHelpCard(squareInfo));
 
     var p = state.pending;
