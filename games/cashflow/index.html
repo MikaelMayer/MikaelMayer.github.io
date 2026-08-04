@@ -20,12 +20,13 @@
          restore a stale one. Undo is the recovery path; Export is for sending
          a game to someone else. New game is deliberately NOT the primary
          button: it is the destructive one. -->
-    <button id="undo-btn" title="Undo the last action (u)">Undo</button>
-    <button id="export-btn" class="hide-sm" title="Download this game as a file">Export</button>
+    <button id="undo-btn" data-t title="Undo the last action (u)">Undo</button>
+    <button id="export-btn" class="hide-sm" data-t title="Download this game as a file">Export</button>
     <label class="filebtn hide-sm">
-      Import<input type="file" id="import-input" accept="application/json" hidden>
+      <span data-t>Import</span><input type="file" id="import-input" accept="application/json" hidden>
     </label>
-    <button id="new-btn">New game</button>
+    <select id="lang-select" aria-label="Language"></select>
+    <button id="new-btn" data-t>New game</button>
   </div>
 </header>
 
@@ -43,7 +44,7 @@
 
   <div class="col">
     <div class="panel">
-      <h2>This turn</h2>
+      <h2 data-t>This turn</h2>
       <div id="action" aria-live="polite"></div>
     </div>
   </div>
@@ -52,54 +53,29 @@
     <!-- Assets and liabilities are the two halves of one balance sheet, so
          they live in the statement together rather than in separate panels. -->
     <div class="panel">
-      <h2>Financial statement</h2>
+      <h2 data-t>Financial statement</h2>
       <div class="headline" id="headline"></div>
       <div class="stmt" id="statement"></div>
     </div>
 
     <div class="panel">
-      <h2>Loans</h2>
+      <h2 data-t>Loans</h2>
       <div id="bank"></div>
     </div>
 
     <div class="panel">
-      <h2>History</h2>
+      <h2 data-t>History</h2>
       <div id="log"></div>
     </div>
 
     <details class="panel rules">
-      <summary>How to play</summary>
-      <p>
-        You are trying to build <strong>passive income</strong> — money that arrives whether
-        or not you go to work — until it is greater than your <strong>total monthly
-        expenses</strong>. The moment it is, you are out of the Rat Race. Do it in as few
-        months as you can.
-      </p>
-      <p>
-        A salary is not passive income. Neither is a lump sum from selling something.
-        Only rent, dividends, interest and business profit count, which is why selling a
-        property for a good price can still move you backwards.
-      </p>
-      <p>
-        Roll, move, and resolve the square you land on. <strong>Tap any square on the
-        board to see what it does.</strong> You may always look at a deal and then decline
-        it, and you may always refuse a luxury.
-      </p>
-      <p>
-        Once your passive income passes your expenses you leave the Rat Race for the Fast
-        Track, where you win by landing on your own dream and buying it, or by doubling the
-        monthly income you arrived with.
-      </p>
-      <p>
-        You can take a loan in $1,000 blocks at $100 a month each — 120% a year, interest only.
-        That interest is an expense like any other, so every loan raises the bar you are
-        trying to clear. Nothing is ever borrowed on your behalf: taking a loan is always
-        your own deliberate choice, and you repay it from the Liabilities list.
-      </p>
-      <p class="muted-note">
-        Keyboard: <kbd>r</kbd> rolls, <kbd>u</kbd> undoes.
-        Your game saves itself in this browser as you play.
-      </p>
+      <summary data-t>How to play</summary>
+      <p data-t>You are trying to build passive income — money that arrives whether or not you go to work — until it is greater than your total monthly expenses. The moment it is, you are out of the Rat Race. Do it in as few months as you can.</p>
+      <p data-t>A salary is not passive income. Neither is a lump sum from selling something. Only rent, dividends, interest and business profit count, which is why selling a property for a good price can still move you backwards.</p>
+      <p data-t>Roll, move, and resolve the square you land on. Tap any square on the board to see what it does. You may always look at a deal and then decline it, and you may always refuse a purchase.</p>
+      <p data-t>Once your passive income passes your expenses you leave the Rat Race for the Fast Track, where you win by landing on your own dream and buying it, or by doubling the monthly income you arrived with.</p>
+      <p data-t>You can take a loan in $1,000 blocks at $100 a month each — 120% a year, interest only. That interest is an expense like any other, so every loan raises the bar you are trying to clear. Nothing is ever borrowed on your behalf: taking a loan is always your own deliberate choice, and you repay it from the Liabilities list.</p>
+      <p class="muted-note" data-t>Keyboard: r rolls, u undoes. Your game saves itself in this browser as you play.</p>
     </details>
   </div>
 </main>
@@ -117,14 +93,13 @@
 
 <dialog id="setup">
   <form class="dlg-body" method="dialog">
-    <h2>Start a game</h2>
+    <h2 data-t>Start a game</h2>
     <p style="color:var(--muted);margin-top:0">
-      One goal: build passive income greater than your monthly expenses. Do it in as
-      few months as you can.
+      <span data-t>One goal: build passive income greater than your monthly expenses. Do it in as few months as you can.</span>
     </p>
 
     <div class="field">
-      <label for="prof-select">Profession</label>
+      <label for="prof-select" data-t>Profession</label>
       <select id="prof-select"></select>
     </div>
 
@@ -133,28 +108,29 @@
     </div>
 
     <div class="field">
-      <label for="dream-select">Your dream (the Fast Track goal)</label>
+      <label for="dream-select" data-t>Your dream (the Fast Track goal)</label>
       <select id="dream-select"></select>
     </div>
 
     <div class="field">
-      <label for="seed-input">Seed — leave blank for random</label>
+      <label for="seed-input" data-t>Seed — leave blank for random</label>
       <div style="display:flex;gap:8px">
         <input type="text" id="seed-input" placeholder="e.g. 8814" inputmode="numeric">
-        <button id="random-seed-btn" class="ghost" type="button">Random</button>
+        <button id="random-seed-btn" class="ghost" type="button" data-t>Random</button>
       </div>
       <div class="hint">
-        The same seed with the same choices always plays out identically — useful for
-        teaching a specific scenario, or for reporting a bug that someone else can reproduce.
+        <span data-t>The same seed with the same choices always plays out identically — useful for teaching a specific scenario, or for reporting a bug that someone else can reproduce.</span>
       </div>
     </div>
 
     <div class="dlg-actions">
-      <button id="start-btn" class="primary" type="submit">Start</button>
+      <button id="start-btn" class="primary" type="submit" data-t>Start</button>
     </div>
   </form>
 </dialog>
 
+<script src="js/i18n.js"></script>
+<script src="js/lang-fr.js"></script>
 <script src="js/rng.js"></script>
 <script src="js/data.js"></script>
 <script src="js/engine.js"></script>

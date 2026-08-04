@@ -23,6 +23,13 @@
   var D = global.CF.data;
   var makeRng = global.CF.makeRng;
 
+  /* Every player-visible string in this file is a translation key with named
+   * placeholders. Log entries keep the key and its params alongside the
+   * rendered English, so switching language re-renders past turns rather than
+   * leaving them stranded in the language they happened in. */
+  var T = global.CF.i18n;
+  var t = T.t;
+
   var MAX_CHILDREN = 3;
   var LOAN_UNIT = 1000;          // Bank lends in $1,000 blocks
   var LOAN_RATE_PER_UNIT = 100;  // ...at $100/month interest per block (10%)
@@ -80,15 +87,31 @@
     };
   }
 
-  function money(n) {
-    var neg = n < 0;
-    var s = Math.abs(Math.round(n)).toLocaleString('en-US');
-    return (neg ? '-$' : '$') + s;
+  // Locale-aware: $1,000 in English, 1 000 $ in French.
+  var money = T.money;
+
+  // Names that live in data.js and have a translation keyed by card id.
+  function name(obj) { return T.field(obj, 'title') || T.field(obj, 'name'); }
+
+  function log(state, key, params, type) {
+    if (typeof params === 'string') { type = params; params = null; }
+    state.log.push({
+      turn: state.months,
+      k: key,
+      p: params || null,
+      text: t(key, params),          // rendered now, for old readers and exports
+      type: type || 'info'
+    });
+    if (state.log.length > 500) state.log.shift();
   }
 
-  function log(state, text, type) {
-    state.log.push({ turn: state.months, text: text, type: type || 'info' });
-    if (state.log.length > 500) state.log.shift();
+  /* Throw a player-facing error carrying its key, so the interface can render
+   * it in the current language rather than the one it was written in. */
+  function fail(key, params) {
+    var e = new Error(t(key, params));
+    e.k = key;
+    e.p = params || null;
+    throw e;
   }
 
   /* ------------------------------------------------------------------ *
@@ -210,7 +233,7 @@
   function credit(state, amount, reason) {
     if (amount <= 0) return;
     state.cash += amount;
-    log(state, '+' + money(amount) + '  ' + reason, 'gain');
+    log(state, '+{$amount}  {reason}', { amount: amount, reason: reason }, 'gain');
   }
 
   /* How much the bank is willing to lend you in total, based on what you earn.
@@ -274,8 +297,7 @@
     if (candidate.type === 'stock') {
       delete state.stocks[candidate.key];
       state.cash += candidate.value;
-      log(state, 'Forced sale: sold ' + candidate.name + ' for ' + money(candidate.value) +
-        ' to cover ' + reason + '.', 'loss');
+      log(state, 'Forced sale: sold {name} for {$value} to cover {reason}.', { name: candidate.name, value: candidate.value, reason: reason }, 'loss');
       return;
     }
     for (var i = 0; i < state.assets.length; i++) {
@@ -283,9 +305,7 @@
         var a = state.assets[i];
         state.assets.splice(i, 1);
         state.cash += candidate.value;
-        log(state, 'Forced sale: sold ' + a.name + ' for ' + money(candidate.value) +
-          ' (80% of what you paid) to cover ' + reason +
-          '. Passive income falls by ' + money(a.cashflow) + '/mo.', 'loss');
+        log(state, 'Forced sale: sold {name} for {$value} (80% of what you paid) to cover {reason}. Passive income falls by {$lost}/mo.', { name: name(a), value: candidate.value, reason: reason, lost: a.cashflow }, 'loss');
         return;
       }
     }
@@ -311,9 +331,7 @@
     state.phase = 'bankrupt';
     state.pending = null;
     state.result = { how: 'bankrupt', months: state.months, reason: reason };
-    log(state, 'BANKRUPT. You could not pay for ' + reason +
-      ', you had ' + money(state.cash) + ' in cash, and you can borrow no more against ' +
-      money(stats(state).totalIncome) + ' a month of income.', 'loss');
+    log(state, 'BANKRUPT. You could not pay for {reason}, you had {$cash} in cash, and you can borrow no more against {$income} a month of income.', { reason: reason, cash: state.cash, income: stats(state).totalIncome }, 'loss');
     var err = new Error('BANKRUPT');
     err.bankrupt = true;
     throw err;
@@ -335,15 +353,13 @@
       var available = availableCredit(state);
       if (needed > available) {
         if (voluntary) {
-          throw new Error('That needs ' + money(amount) + ', you have ' + money(state.cash) +
-            ' in cash, and you can borrow at most another ' + money(available) +
-            ' against your income.');
+          fail('That needs {$amount}, you have {$cash} in cash, and you can borrow at most another {$available} against your income.', { amount: amount, cash: state.cash, available: available });
         }
         // A bill you must pay. Sell what you have to before giving up.
         liquidateFor(state, amount, reason);
         if (state.cash >= amount) {
           state.cash -= amount;
-          log(state, '-' + money(amount) + '  ' + reason, 'loss');
+          log(state, '-{$amount}  {reason}', { amount: amount, reason: reason }, 'loss');
           return 0;
         }
         needed = Math.ceil((amount - state.cash) / LOAN_UNIT) * LOAN_UNIT;
@@ -353,11 +369,10 @@
       borrowed = needed;
       state.bankLoan += borrowed;
       state.cash += borrowed;
-      log(state, 'Forced loan of ' + money(borrowed) + ' to cover ' + reason +
-        ' (adds ' + money(borrowed / LOAN_UNIT * LOAN_RATE_PER_UNIT) + '/mo to expenses).', 'loan');
+      log(state, 'Forced loan of {$borrowed} to cover {reason} (adds {$monthly}/mo to expenses).', { borrowed: borrowed, reason: reason, monthly: borrowed / LOAN_UNIT * LOAN_RATE_PER_UNIT }, 'loan');
     }
     state.cash -= amount;
-    log(state, '-' + money(amount) + '  ' + reason, 'loss');
+    log(state, '-{$amount}  {reason}', { amount: amount, reason: reason }, 'loss');
     return borrowed;
   }
 
@@ -409,12 +424,10 @@
     };
     state.rngState = rng.getState();
 
-    log(state, 'Game ' + seed + ' begins. ' + profession.name +
-      ', take-home ' + money(profession.salary) + '/mo, savings ' + money(profession.savings) + '.', 'system');
-    log(state, 'Dream: ' + dream.name + ' (' + money(dream.cost) + ').', 'system');
+    log(state, 'Game {seed} begins. {job}, take-home {$salary}/mo, savings {$savings}.', { seed: seed, job: T.field(profession, 'name'), salary: profession.salary, savings: profession.savings }, 'system');
+    log(state, 'Dream: {name} ({$cost}).', { name: T.field(dream, 'name'), cost: dream.cost }, 'system');
     var s = stats(state);
-    log(state, 'Starting monthly cash flow: ' + money(s.cashflow) +
-      '. Passive income: ' + money(s.passiveIncome) + ' against ' + money(s.totalExpenses) + ' of expenses.', 'system');
+    log(state, 'Starting monthly cash flow: {$cf}. Passive income: {$passive} against {$expenses} of expenses.', { cf: s.cashflow, passive: s.passiveIncome, expenses: s.totalExpenses }, 'system');
     return state;
   }
 
@@ -447,7 +460,7 @@
   }
 
   function rollInner(state, diceCount, forcedDice) {
-    if (!canRoll(state)) throw new Error('Cannot roll right now.');
+    if (!canRoll(state)) fail('You cannot roll right now.');
     var allowed = diceOptions(state);
     if (forcedDice) diceCount = forcedDice.length;
     if (allowed.indexOf(diceCount) === -1) diceCount = allowed[0];
@@ -458,7 +471,7 @@
     if (state.skipTurns > 0) {
       state.skipTurns -= 1;
       state.lastRoll = null;
-      log(state, 'Turn lost (downsized). ' + state.skipTurns + ' to go.', 'system');
+      log(state, 'Turn lost. {n} to go.', { n: state.skipTurns }, 'system');
       return;
     }
 
@@ -481,7 +494,7 @@
       r.commit();
     }
     state.lastRoll = dice;
-    log(state, 'Rolled ' + dice.join(' + ') + ' = ' + total + '.', 'roll');
+    log(state, 'Rolled {dice} = {total}.', { dice: dice.join(' + '), total: total }, 'roll');
 
     if (state.phase === 'ratrace') moveRatRace(state, total);
     else moveFastTrack(state, total);
@@ -516,7 +529,7 @@
         state.pending = {
           kind: 'chooseDeck',
           title: 'Opportunity',
-          text: 'Take a Small Deal or a Big Deal? Big Deals need more money down and pay far more.'
+          text: t('Take a Small Deal or a Big Deal? Big Deals need more money down and pay far more.')
         };
         break;
       case 'DOODAD':
@@ -531,18 +544,15 @@
           kind: 'charity',
           title: 'Charity',
           amount: Math.round(s.totalIncome * 0.1),
-          text: 'Donate 10% of your total income (' + money(Math.round(s.totalIncome * 0.1)) +
-            ') and for the next 3 turns you may roll one die or two. More choices, more opportunities.'
+          text: t('Donate 10% of your total income ({$amount}) and for the next 3 turns you may roll one die or two. More choices, more opportunities.', { amount: Math.round(s.totalIncome * 0.1) })
         };
         break;
       case 'BABY':
         if (state.children >= MAX_CHILDREN) {
-          log(state, 'A new baby - but your statement already carries ' + MAX_CHILDREN +
-            ' children, the maximum. No change.', 'system');
+          log(state, 'A new baby - but you already have {max} children, the maximum. No change.', { max: MAX_CHILDREN }, 'system');
         } else {
           state.children += 1;
-          log(state, 'A baby arrives. Child expenses rise by ' +
-            money(state.profession.childCost) + '/mo (now ' + state.children + ' children).', 'system');
+          log(state, 'A baby arrives. Child expenses rise by {$cost}/mo (now {n} children).', { cost: state.profession.childCost, n: state.children }, 'system');
         }
         break;
       case 'DOWNSIZED':
@@ -551,7 +561,7 @@
           text: 'You still owe a full month of everything: taxes, the mortgage, the loans, the lot. ' +
             'You will also lose your next two turns.',
           amount: stats(state).totalExpenses,
-          reason: 'Lost your job - one month of expenses',
+          reason: t('Lost your job - one month of expenses'),
           then: 'downsize'
         };
         break;
@@ -571,13 +581,13 @@
     if (card.perChild) {
       amount = card.amount * state.children;
       if (amount === 0) {
-        log(state, card.title + ' - you have no children, so there is nothing to pay.', 'system');
+        log(state, '{title} - you have no children, so there is nothing to pay.', { title: name(card) }, 'system');
         return;
       }
     }
     if (card.optional) {
       state.pending = {
-        kind: 'doodadOptional', title: card.title, text: card.text,
+        kind: 'doodadOptional', title: name(card), text: T.field(card, 'text'),
         amount: amount, addExpense: card.addExpense || 0, action: card.action || null
       };
       return;
@@ -588,7 +598,7 @@
      * they hand the money over. Deducting it for them and reporting it as
      * "already paid" is both confusing and a wasted teaching moment. */
     state.pending = {
-      kind: 'bill', title: card.title, text: card.text || '',
+      kind: 'bill', title: name(card), text: T.field(card, 'text') || '',
       amount: amount, reason: 'Expense: ' + card.title
     };
   }
@@ -606,7 +616,7 @@
     var card = drawCard(state, 'market', D.MARKET);
 
     if (card.kind === 'none') {
-      log(state, card.title + '. ' + card.text, 'system');
+      log(state, '{title}. {text}', { title: name(card), text: T.field(card, 'text') }, 'system');
       return;
     }
 
@@ -616,14 +626,13 @@
       else if (card.scope === 'perBusiness') count = countAssets(state, 'business');
       else if (card.scope === 'ifAnyRental') count = countAssets(state, 'realestate') > 0 ? 1 : 0;
       if (count === 0) {
-        log(state, card.title + ' — a cost for ' + WHO_IT_HITS[card.scope] +
-          '. You have none, so you pay nothing.', 'system');
+        log(state, '{title} - a cost for {who}. You have none, so you pay nothing.', { title: name(card), who: t(WHO_IT_HITS[card.scope]) }, 'system');
         return;
       }
       state.pending = {
-        kind: 'bill', title: card.title, amount: card.amount * count,
-        text: card.text,
-        reason: card.title
+        kind: 'bill', title: name(card), amount: card.amount * count,
+        text: T.field(card, 'text'),
+        reason: name(card)
       };
       return;
     }
@@ -631,11 +640,11 @@
     if (card.kind === 'goldbuyer') {
       var coins = totalGold(state);
       if (coins === 0) {
-        log(state, card.title + ' — but you own no gold coins to sell.', 'system');
+        log(state, '{title} - but you own no gold coins to sell.', { title: name(card) }, 'system');
         return;
       }
       state.pending = {
-        kind: 'sellGold', title: card.title, text: card.text,
+        kind: 'sellGold', title: name(card), text: T.field(card, 'text'),
         unitPrice: card.unitPrice, maxQty: coins
       };
       return;
@@ -644,11 +653,11 @@
     // kind === 'buyer'
     var offers = buildOffers(state, card);
     if (offers.length === 0) {
-      log(state, card.title + ' — but you own nothing this buyer wants.', 'system');
+      log(state, '{title} - but you own nothing this buyer wants.', { title: name(card) }, 'system');
       return;
     }
     state.pending = {
-      kind: 'sellAsset', title: card.title, text: card.text, offers: offers
+      kind: 'sellAsset', title: name(card), text: T.field(card, 'text'), offers: offers
     };
   }
 
@@ -710,7 +719,7 @@
   function presentDeal(state, deckName) {
     var catalogue = deckName === 'small' ? D.SMALL_DEALS : D.BIG_DEALS;
     var card = drawCard(state, deckName, catalogue);
-    log(state, (deckName === 'small' ? 'Small Deal' : 'Big Deal') + ': ' + card.title, 'card');
+    log(state, deckName === 'small' ? 'Small Deal: {title}' : 'Big Deal: {title}', { title: name(card) }, 'card');
 
     if (card.kind === 'split') {
       applySplit(state, card);
@@ -723,13 +732,12 @@
   function applySplit(state, card) {
     var holding = state.stocks[card.symbol];
     if (!holding || holding.shares === 0) {
-      log(state, card.title + ' - you own none.', 'system');
+      log(state, '{title} - you own none.', { title: name(card) }, 'system');
       return;
     }
     var before = holding.shares;
     holding.shares = Math.floor(holding.shares * card.ratio);
-    log(state, card.symbol + ': ' + before + ' shares become ' + holding.shares +
-      '. Your total value is unchanged.', 'system');
+    log(state, '{symbol}: {before} shares become {after}. Your total value is unchanged.', { symbol: card.symbol, before: before, after: holding.shares }, 'system');
     if (holding.shares === 0) delete state.stocks[card.symbol];
   }
 
@@ -747,7 +755,7 @@
 
     pass: function (state) {
       var p = state.pending;
-      if (p && p.kind === 'deal') log(state, 'Passed on ' + p.card.title + '.', 'system');
+      if (p && p.kind === 'deal') log(state, 'Passed on {title}.', { title: name(p.card) }, 'system');
       state.pending = null;
       afterAction(state);
     },
@@ -756,18 +764,16 @@
       var card = requirePending(state, 'deal').card;
       if (card.kind !== 'stock') throw new Error('Not a stock card.');
       var qty = intOrThrow(payload.qty, 'quantity');
-      if (qty <= 0) throw new Error('Quantity must be at least 1.');
+      if (qty <= 0) fail('Choose at least one.');
       var cost = qty * card.price;
       if (cost > state.cash) {
-        throw new Error('That costs ' + money(cost) + ' and you have ' + money(state.cash) +
-          '. Shares are bought with cash. Buy fewer.');
+        fail('That costs {$cost} and you have {$cash}. Shares are bought with cash. Buy fewer.', { cost: cost, cash: state.cash });
       }
       state.cash -= cost;
       var h = state.stocks[card.symbol] || (state.stocks[card.symbol] = { shares: 0, invested: 0 });
       h.shares += qty;
       h.invested += cost;
-      log(state, 'Bought ' + qty + ' ' + card.symbol + ' at ' + money(card.price) +
-        ' = ' + money(cost) + '.', 'loss');
+      log(state, 'Bought {qty} {symbol} at {$price} = {$cost}.', { qty: qty, symbol: card.symbol, price: card.price, cost: cost }, 'loss');
       state.pending = null;
       afterAction(state);
     },
@@ -776,9 +782,9 @@
       var card = requirePending(state, 'deal').card;
       if (card.kind !== 'stock') throw new Error('Not a stock card.');
       var h = state.stocks[card.symbol];
-      if (!h || h.shares === 0) throw new Error('You own no ' + card.symbol + '.');
+      if (!h || h.shares === 0) fail('You own no {symbol}.', { symbol: card.symbol });
       var qty = intOrThrow(payload.qty, 'quantity');
-      if (qty <= 0 || qty > h.shares) throw new Error('You own ' + h.shares + ' shares.');
+      if (qty <= 0 || qty > h.shares) fail('You own {n} shares.', { n: h.shares });
       var proceeds = qty * card.price;
       var costBasis = Math.round(h.invested * (qty / h.shares));
       h.invested -= costBasis;
@@ -795,15 +801,15 @@
       var card = requirePending(state, 'deal').card;
       if (card.kind !== 'gold') throw new Error('Not a gold card.');
       var qty = intOrThrow(payload.qty, 'quantity');
-      if (qty <= 0 || qty > card.maxQty) throw new Error('You may buy 1 to ' + card.maxQty + ' coins.');
+      if (qty <= 0 || qty > card.maxQty) fail('You may buy 1 to {n} coins.', { n: card.maxQty });
       var cost = qty * card.unitPrice;
-      if (cost > state.cash) throw new Error('That costs ' + money(cost) + ' and you have ' + money(state.cash) + '.');
+      if (cost > state.cash) fail('That costs {$cost} and you have {$cash}.', { cost: cost, cash: state.cash });
       state.cash -= cost;
       state.assets.push({
         id: state.nextAssetId++, category: 'gold', name: 'Gold coins',
         qty: qty, cost: cost, unitPrice: card.unitPrice, cashflow: 0, mortgage: 0
       });
-      log(state, 'Bought ' + qty + ' gold coins for ' + money(cost) + '. They pay nothing until you sell them.', 'loss');
+      log(state, 'Bought {qty} gold coins for {$cost}. They pay nothing until you sell them.', { qty: qty, cost: cost }, 'loss');
       state.pending = null;
       afterAction(state);
     },
@@ -818,12 +824,12 @@
       if (card.kind === 'trap') {
         // Traps are cash out for nothing (or worse, a recurring expense).
         if (card.cost > state.cash) {
-          throw new Error('You need ' + money(card.cost) + ' in cash and you have ' + money(state.cash) + '.');
+          fail('You need {$need} in cash and you have {$cash}.', { need: card.cost, cash: state.cash });
         }
         debit(state, card.cost, card.title, true);
         if (card.addExpense) {
           state.extraExpenses += card.addExpense;
-          log(state, 'Monthly expenses rise by ' + money(card.addExpense) + ' - permanently.', 'loss');
+          log(state, 'Monthly expenses rise by {$amount} - permanently.', { amount: card.addExpense }, 'loss');
         }
         state.pending = null;
         afterAction(state);
@@ -832,15 +838,14 @@
 
       if (card.kind === 'cd') {
         if (card.cost > state.cash) {
-          throw new Error('That needs ' + money(card.cost) + ' cash and you have ' + money(state.cash) + '.');
+          fail('That needs {$need} in cash and you have {$cash}.', { need: card.cost, cash: state.cash });
         }
         state.cash -= card.cost;
         state.assets.push({
           id: state.nextAssetId++, category: 'paper', name: card.title,
           cost: card.cost, mortgage: 0, cashflow: card.cashflow, propType: 'paper', units: 1
         });
-        log(state, 'Bought ' + card.title + ' for ' + money(card.cost) +
-          '. Adds ' + money(card.cashflow) + '/mo.', 'gain');
+        log(state, 'Bought {title} for {$cost}. Adds {$cf}/mo.', { title: name(card), cost: card.cost, cf: card.cashflow }, 'gain');
         state.pending = null;
         afterAction(state);
         return;
@@ -853,11 +858,10 @@
         * without the player ever choosing to take a loan. Taking on debt has
         * to be its own deliberate act. */
       if (card.down > state.cash) {
-        throw new Error('You need ' + money(card.down) + ' in cash and you have ' +
-          money(state.cash) + '. Take a loan first if you want this deal.');
+        fail('You need {$need} in cash and you have {$cash}. Take a loan first if you want this deal.', { need: card.down, cash: state.cash });
       }
       state.cash -= card.down;
-      log(state, '-' + money(card.down) + '  Down payment on ' + card.title, 'loss');
+      log(state, '-{$amount}  Down payment on {title}', { amount: card.down, title: name(card) }, 'loss');
       var category = card.kind === 'business' ? 'business' : 'realestate';
       state.assets.push({
         id: state.nextAssetId++,
@@ -871,18 +875,16 @@
         units: card.units || 1,
         acres: card.acres || 0
       });
-      log(state, 'Bought ' + card.title + ' (' + money(card.cost) + ', ' +
-        money(card.mortgage) + ' financed). Adds ' + money(card.cashflow) + '/mo passive income.',
-        card.cashflow >= 0 ? 'gain' : 'loss');
+      log(state, 'Bought {title} ({$cost}, {$financed} financed). Adds {$cf}/mo passive income.', { title: name(card), cost: card.cost, financed: card.mortgage, cf: card.cashflow }, card.cashflow >= 0 ? 'gain' : 'loss');
       state.pending = null;
       afterAction(state);
     },
 
     charityDonate: function (state) {
       var p = requirePending(state, 'charity');
-      debit(state, p.amount, 'Charitable donation', true);
+      debit(state, p.amount, t('Charitable donation'), true);
       state.charityTurns = 3;
-      log(state, 'For the next 3 turns you may roll one die or two.', 'gain');
+      log(state, 'For the next 3 turns you may roll one die or two.', null, 'gain');
       state.pending = null;
       afterAction(state);
     },
@@ -895,7 +897,7 @@
       state.pending = null;
       if (p.then === 'downsize') {
         state.skipTurns = 2;
-        log(state, 'You lose your next 2 turns.', 'system');
+        log(state, 'You lose your next 2 turns.', null, 'system');
       }
       afterAction(state);
     },
@@ -905,7 +907,7 @@
       debit(state, p.amount, p.title, true);
       if (p.addExpense) {
         state.extraExpenses += p.addExpense;
-        log(state, 'Monthly expenses rise by ' + money(p.addExpense) + ' - permanently.', 'loss');
+        log(state, 'Monthly expenses rise by {$amount} - permanently.', { amount: p.addExpense }, 'loss');
       }
       state.pending = null;
       afterAction(state);
@@ -923,15 +925,14 @@
       for (var j = 0; j < state.assets.length; j++) {
         if (state.assets[j].id === offer.assetId) idx = j;
       }
-      if (idx === -1) throw new Error('You no longer own that asset.');
+      if (idx === -1) fail('You no longer own that.');
 
       var asset = state.assets[idx];
       var net = offer.price - asset.mortgage;
       // Check affordability before touching anything, so a sale that cannot be
       // closed leaves the portfolio exactly as it was.
       if (net < 0 && state.cash + availableCredit(state) < -net) {
-        throw new Error('Closing that sale would cost you ' + money(-net) +
-          ' to clear the mortgage, and you cannot raise it.');
+        fail('Closing that sale would cost you {$amount} to clear the mortgage, and you cannot raise it.', { amount: -net });
       }
       if (net >= 0) {
         credit(state, net, 'Sold ' + asset.name + ' for ' + money(offer.price) +
@@ -940,9 +941,7 @@
         debit(state, -net, 'Sold ' + asset.name + ' at a loss - the sale price did not clear the mortgage', true);
       }
       var gain = offer.price - asset.cost;
-      log(state, (gain >= 0 ? 'Capital gain ' : 'Capital loss ') + money(Math.abs(gain)) +
-        ' against a purchase price of ' + money(asset.cost) + '. Passive income falls by ' +
-        money(asset.cashflow) + '/mo.', gain >= 0 ? 'gain' : 'loss');
+      log(state, gain >= 0 ? 'Capital gain {$gain} against a purchase price of {$cost}. Passive income falls by {$lost}/mo.' : 'Capital loss {$gain} against a purchase price of {$cost}. Passive income falls by {$lost}/mo.', { gain: Math.abs(gain), cost: asset.cost, lost: asset.cashflow }, gain >= 0 ? 'gain' : 'loss');
       state.assets.splice(idx, 1);
 
       // A single named buyer buys one property; a general market buys as many
@@ -960,7 +959,7 @@
     sellGold: function (state, payload) {
       var p = requirePending(state, 'sellGold');
       var qty = intOrThrow(payload.qty, 'quantity');
-      if (qty <= 0 || qty > p.maxQty) throw new Error('You own ' + p.maxQty + ' coins.');
+      if (qty <= 0 || qty > p.maxQty) fail('You own {n} coins.', { n: p.maxQty });
 
       var remaining = qty;
       var basis = 0;
@@ -987,32 +986,28 @@
     borrow: function (state, payload) {
       var amount = intOrThrow(payload.amount, 'amount');
       if (amount <= 0 || amount % LOAN_UNIT !== 0) {
-        throw new Error('Loans come in ' + money(LOAN_UNIT) + ' blocks.');
+        fail('Loans come in {$unit} blocks.', { unit: LOAN_UNIT });
       }
       var available = availableCredit(state);
       if (amount > available) {
-        throw new Error('You can borrow at most another ' + money(available) +
-          '. Your borrowing limit is ' + CREDIT_MULTIPLE + ' months of total income (' +
-          money(creditLimit(state)) + ') and you already owe ' + money(state.bankLoan) + '.');
+        fail('You can borrow at most another {$available}. Your borrowing limit is {months} months of total income ({$limit}) and you already owe {$owed}.', { available: available, months: CREDIT_MULTIPLE, limit: creditLimit(state), owed: state.bankLoan });
       }
       state.bankLoan += amount;
       state.cash += amount;
-      log(state, 'Took a loan of ' + money(amount) + '. Expenses rise by ' +
-        money(amount / LOAN_UNIT * LOAN_RATE_PER_UNIT) + '/mo.', 'loan');
+      log(state, 'Took a loan of {$amount}. Expenses rise by {$monthly}/mo until the principal is repaid.', { amount: amount, monthly: amount / LOAN_UNIT * LOAN_RATE_PER_UNIT }, 'loan');
       afterAction(state);
     },
 
     repay: function (state, payload) {
       var amount = intOrThrow(payload.amount, 'amount');
       if (amount <= 0 || amount % LOAN_UNIT !== 0) {
-        throw new Error('Repay in ' + money(LOAN_UNIT) + ' blocks.');
+        fail('Repay in {$unit} blocks.', { unit: LOAN_UNIT });
       }
-      if (amount > state.bankLoan) throw new Error('You only owe ' + money(state.bankLoan) + '.');
-      if (amount > state.cash) throw new Error('You only have ' + money(state.cash) + ' in cash.');
+      if (amount > state.bankLoan) fail('You only owe {$owed}.', { owed: state.bankLoan });
+      if (amount > state.cash) fail('You only have {$cash} in cash.', { cash: state.cash });
       state.cash -= amount;
       state.bankLoan -= amount;
-      log(state, 'Repaid ' + money(amount) + ' of loans. Expenses fall by ' +
-        money(amount / LOAN_UNIT * LOAN_RATE_PER_UNIT) + '/mo.', 'gain');
+      log(state, 'Repaid {$amount} of loans. Expenses fall by {$monthly}/mo.', { amount: amount, monthly: amount / LOAN_UNIT * LOAN_RATE_PER_UNIT }, 'gain');
       afterAction(state);
     },
 
@@ -1027,17 +1022,15 @@
       var which = payload.which;
       var slot = state.profession[which];
       if (!slot || typeof slot.liability !== 'number') {
-        throw new Error('There is no such debt.');
+        fail('There is no such debt.');
       }
-      if (slot.liability <= 0) throw new Error('That is already paid off.');
+      if (slot.liability <= 0) fail('That is already paid off.');
       if (slot.liability > state.cash) {
-        throw new Error('Clearing that costs ' + money(slot.liability) + ' and you have ' +
-          money(state.cash) + '.');
+        fail('Clearing that costs {$cost} and you have {$cash}.', { cost: slot.liability, cash: state.cash });
       }
       var freed = slot.payment;
       state.cash -= slot.liability;
-      log(state, '-' + money(slot.liability) + '  Paid off ' + LIABILITY_NAMES[which] +
-        ' in full. Expenses fall by ' + money(freed) + '/mo.', 'gain');
+      log(state, '-{$amount}  Paid off {debt} in full. Expenses fall by {$freed}/mo.', { amount: slot.liability, debt: t(LIABILITY_NAMES[which]), freed: freed }, 'gain');
       slot.liability = 0;
       slot.payment = 0;
       afterAction(state);
@@ -1049,13 +1042,11 @@
       var p = requirePending(state, 'ftInvestment');
       var inv = findById(D.FT_INVESTMENTS, p.investmentId);
       if (state.cash < inv.cost) {
-        throw new Error('That costs ' + money(inv.cost) + ' and you have ' + money(state.cash) +
-          '. On the Fast Track you buy with cash.');
+        fail('That costs {$cost} and you have {$cash}. On the Fast Track you buy with cash.', { cost: inv.cost, cash: state.cash });
       }
       state.cash -= inv.cost;
       state.ftInvestments.push({ id: inv.id, name: inv.name, cost: inv.cost, cashflow: inv.cashflow });
-      log(state, 'Bought ' + inv.name + ' for ' + money(inv.cost) + '. Adds ' +
-        money(inv.cashflow) + '/mo.', 'gain');
+      log(state, 'Bought {title} for {$cost}. Adds {$cf}/mo.', { title: T.field(inv, 'name'), cost: inv.cost, cf: inv.cashflow }, 'gain');
       state.pending = null;
       afterAction(state);
     },
@@ -1064,18 +1055,18 @@
       var p = requirePending(state, 'ftDream');
       var dream = findById(D.DREAMS, p.dreamId);
       if (state.cash < dream.cost) {
-        throw new Error('Your dream costs ' + money(dream.cost) + ' and you have ' + money(state.cash) + '.');
+        fail('Your dream costs {$cost} and you have {$cash}.', { cost: dream.cost, cash: state.cash });
       }
       state.cash -= dream.cost;
-      log(state, 'You bought your dream: ' + dream.name + '.', 'gain');
+      log(state, 'You bought your dream: {name}.', { name: T.field(dream, 'name') }, 'gain');
       state.pending = null;
       win(state, 'dream');
     },
 
     ftCharityDonate: function (state) {
       var p = requirePending(state, 'ftCharity');
-      if (state.cash < p.amount) throw new Error('You do not have ' + money(p.amount) + ' in cash for that donation.');
-      debit(state, p.amount, 'Charitable donation', true);
+      if (state.cash < p.amount) fail('You do not have {$amount} in cash for that donation.', { amount: p.amount });
+      debit(state, p.amount, t('Charitable donation'), true);
       state.pending = null;
       afterAction(state);
     },
@@ -1090,12 +1081,11 @@
        * would simply never pay, which is both a rules hole and a silent
        * difficulty cliff. */
       if (p && p.kind === 'bill') {
-        throw new Error('This one has to be paid.');
+        fail('This one has to be paid.');
       }
       if (p && p.kind === 'doodadOptional') {
         state.refused = (state.refused || 0) + p.amount;
-        log(state, 'Declined ' + p.title + ' (' + money(p.amount) + '). Total declined this game: ' +
-          money(state.refused) + '.', 'system');
+        log(state, 'Declined {title} ({$amount}). Total declined this game: {$total}.', { title: p.title, amount: p.amount, total: state.refused }, 'system');
       }
       state.pending = null;
       afterAction(state);
@@ -1104,7 +1094,7 @@
 
   function requirePending(state, kind) {
     if (!state.pending || state.pending.kind !== kind) {
-      throw new Error('That action is not available right now.');
+      fail('That action is not available right now.');
     }
     return state.pending;
   }
@@ -1127,7 +1117,7 @@
       // Bankruptcy is an outcome, not a rejected click: the state it left
       // behind is the correct one and the UI should render it.
       if (e.bankrupt) return { ok: true, bankrupt: true };
-      return { ok: false, error: e.message };
+      return { ok: false, error: e.message, k: e.k || null, p: e.p || null };
     }
   }
 
@@ -1155,16 +1145,12 @@
     state.pending = null;
     state.skipTurns = 0;
     state.charityTurns = 0;
-    log(state, 'OUT OF THE RAT RACE in ' + state.months + ' months. Passive income ' +
-      money(s.passiveIncome) + ' beats expenses of ' + money(s.totalExpenses) + '.', 'win');
+    log(state, 'OUT OF THE RAT RACE in {months} months. Passive income {$passive} beats expenses of {$expenses}.', { months: state.months, passive: s.passiveIncome, expenses: s.totalExpenses }, 'win');
     /* Typed 'rules' rather than 'system': this is an explanation of how the
      * game now works, not something that happened this turn. The interface
      * keeps it out of the turn receipt and puts it in a dialog of its own. */
-    log(state, 'Fast Track: your Cash Flow Day income is ' + money(state.ftBaseIncome) +
-      ' and you start with the same amount in cash.', 'rules');
-    log(state, 'Win by buying your dream (' + state.dream.name + ', ' + money(state.dream.cost) +
-      ') or by doubling your Cash Flow Day income - adding another ' +
-      money(fastTrackGoal(state)) + '/mo of investment income.', 'rules');
+    log(state, 'Fast Track: your Cash Flow Day income is {$income} and you start with the same amount in cash.', { income: state.ftBaseIncome }, 'rules');
+    log(state, 'Win by buying your dream ({name}, {$cost}) or by doubling your Cash Flow Day income - adding another {$goal}/mo of investment income.', { name: T.field(state.dream, 'name'), cost: state.dream.cost, goal: fastTrackGoal(state) }, 'rules');
   }
 
   function moveFastTrack(state, steps) {
@@ -1187,7 +1173,7 @@
         state.pending = {
           kind: 'ftInvestment', investmentId: inv.id, title: inv.name,
           cost: inv.cost, cashflow: inv.cashflow,
-          text: money(inv.cost) + ' cash buys ' + money(inv.cashflow) + ' a month.'
+          text: t('{$cost} in cash buys {$cf} a month.', { cost: inv.cost, cf: inv.cashflow })
         };
         break;
       case 'DREAM':
@@ -1196,10 +1182,10 @@
           state.pending = {
             kind: 'ftDream', dreamId: dream.id, title: 'Your dream: ' + dream.name,
             cost: dream.cost,
-            text: 'This is the dream you chose. Buy it for ' + money(dream.cost) + ' and you win.'
+            text: t('This is the dream you chose. Buy it for {$cost} and you win.', { cost: dream.cost })
           };
         } else {
-          log(state, 'Someone else\'s dream: ' + dream.name + '. Not yours - keep moving.', 'system');
+          log(state, "Someone else's dream: {name}. Not yours - keep moving.", { name: T.field(dream, 'name') }, 'system');
         }
         break;
       case 'SETBACK':
@@ -1215,14 +1201,14 @@
     if (sq.setback === 'divorce') {
       var all = state.cash;
       state.cash = 0;
-      log(state, sq.label + ': ' + sq.text + ' Lost ' + money(all) + '.', 'loss');
+      log(state, '{label}: {text} Lost {$amount}.', { label: t(sq.label), text: t(sq.text), amount: all }, 'loss');
     } else if (sq.setback === 'charity') {
       var amount = Math.round(ftStats(state).totalIncome * 0.1);
       state.pending = { kind: 'ftCharity', title: 'Charity', amount: amount, text: sq.text };
     } else {
       var half = Math.floor(state.cash / 2);
       state.cash -= half;
-      log(state, sq.label + ': ' + sq.text + ' Lost ' + money(half) + '.', 'loss');
+      log(state, '{label}: {text} Lost {$amount}.', { label: t(sq.label), text: t(sq.text), amount: half }, 'loss');
     }
   }
 
@@ -1236,10 +1222,9 @@
     state.pending = null;
     state.result = { how: how, months: state.months };
     if (how === 'dream') {
-      log(state, 'YOU WIN. You bought your dream in ' + state.months + ' months.', 'win');
+      log(state, 'YOU WIN. You bought your dream in {months} months.', { months: state.months }, 'win');
     } else {
-      log(state, 'YOU WIN. You added ' + money(ftStats(state).addedIncome) +
-        ' a month of investment income in ' + state.months + ' months.', 'win');
+      log(state, 'YOU WIN. You added {$income} a month of investment income in {months} months.', { income: ftStats(state).addedIncome, months: state.months }, 'win');
     }
   }
 
@@ -1307,9 +1292,9 @@
 
   function deserialize(text) {
     var state = JSON.parse(text);
-    if (!state || state.version !== 1) throw new Error('Unrecognised or outdated save file.');
+    if (!state || state.version !== 1) fail('Unrecognised or outdated save file.');
     var problems = checkInvariants(state);
-    if (problems.length) throw new Error('Save file is inconsistent: ' + problems[0]);
+    if (problems.length) fail('Save file is inconsistent: {problem}', { problem: problems[0] });
     return state;
   }
 

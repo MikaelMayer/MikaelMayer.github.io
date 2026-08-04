@@ -259,6 +259,32 @@ it; none of them touch your investments.
 
 ---
 
+## Languages
+
+English and French, chosen from the browser's language and overridable with the
+selector in the header. The choice is remembered.
+
+**The English string is the key.** `t('Roll {n} dice', {n: 2})` looks the English up in
+the active dictionary and falls back to the English itself when there is no entry.
+Adding a language is therefore purely additive — nothing breaks while it is half done,
+and the source stays readable because you can see what a line says without a lookup.
+The cost is that changing an English phrase orphans its translation, which is why
+`CF.i18n.missingTranslations()` exists: call it in the browser console and it lists
+every phrase the active language has not covered, including card text by id. That
+report is how the French was finished, and it currently returns empty.
+
+**Engine log lines keep their key and their raw numbers**, not a finished sentence. A
+game saved in French therefore reads in English if you switch, and past turns
+re-render rather than being stranded in the language they happened in.
+
+**Money follows the locale**: `$1,000` in English, `1 000 $` in French — symbol after
+the number, space as the group separator. It is the first thing a French speaker
+notices and the easiest thing to get wrong.
+
+To add a language, copy `js/lang-fr.js`, translate the `ui` map (interface and engine
+lines) and the `content` map (166 cards, professions, dreams and investments, by id),
+and add the code to `SUPPORTED` in `js/i18n.js`. No other file needs to change.
+
 ## On a phone
 
 The game is built to be played on a phone, not merely to survive on one.

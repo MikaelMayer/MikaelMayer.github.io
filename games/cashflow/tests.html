@@ -34,6 +34,7 @@
   <div id="results"></div>
 </div>
 
+<script src="js/i18n.js"></script>
 <script src="js/rng.js"></script>
 <script src="js/data.js"></script>
 <script src="js/engine.js"></script>
@@ -42,6 +43,7 @@
 (function () {
   // Let the browser paint "Running…" before the long simulations start.
   setTimeout(function () {
+    window.CF.i18n.setLang('en');   // the suite asserts against English
     var t0 = performance.now();
     var results = window.CF.runTests();
     var ms = Math.round(performance.now() - t0);

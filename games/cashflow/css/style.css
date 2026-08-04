@@ -908,3 +908,11 @@ button.tiny {
 }
 .winline .winname { min-width: 0; }
 .winline .winval { white-space: nowrap; font-weight: 700; }
+
+/* Language picker sits with the tools in the header. */
+#lang-select {
+  font-size: 13px;
+  padding: 6px 8px;
+  min-height: 0;
+}
+@media (pointer: coarse) { #lang-select { min-height: 44px; } }

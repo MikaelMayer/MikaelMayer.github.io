@@ -1,5 +1,8 @@
 /* Node test runner:  node run-tests.js
  * The same suite the browser runs at tests.html. */
+require('./js/i18n.js');
+// Tests assert against English text; pin it regardless of the machine locale.
+globalThis.CF.i18n.setLang('en');
 require('./js/rng.js');
 require('./js/data.js');
 require('./js/engine.js');

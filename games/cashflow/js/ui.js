@@ -12,7 +12,9 @@
 
   var E = window.CF.engine;
   var D = window.CF.data;
-  var money = E.money;
+  var T = window.CF.i18n;
+  var t = T.t;
+  var money = T.money;   // locale-aware: $1,000 or 1 000 $
 
   var SAVE_KEY = 'cashflow-solo-save-v1';
 
@@ -97,11 +99,11 @@
 
   function squareHelpCard(type) {
     return el('div', { class: 'card info' }, [
-      el('span', { class: 'tagline', text: 'Board square' }),
-      el('h3', { text: SQUARE_LABEL[type] }),
-      el('p', { text: SQUARE_HELP[type] }),
+      el('span', { class: 'tagline', text: t('Board square') }),
+      el('h3', { text: t(SQUARE_LABEL[type]) }),
+      el('p', { text: t(SQUARE_HELP[type]) }),
       el('div', { class: 'buttons' }, [
-        el('button', { onclick: function () { squareInfo = null; render(); }, text: 'Close' })
+        el('button', { onclick: function () { squareInfo = null; render(); }, text: t('Close') })
       ])
     ]);
   }
@@ -177,7 +179,7 @@
     var res = E.act(state, type, payload);
     if (!res.ok) {
       undoStack.pop();          // nothing changed, so nothing to undo
-      cardError = res.error;
+      cardError = res.k ? t(res.k, res.p) : res.error;
       render();
       return false;
     }
@@ -346,17 +348,17 @@
       var label, short, mine = false;
 
       if (isRat) {
-        label = SQUARE_LABEL[type];
-        short = SQUARE_SHORT[type] || label;
+        label = t(SQUARE_LABEL[type]);
+        short = SQUARE_SHORT[type] ? t(SQUARE_SHORT[type]) : label;
       } else if (type === 'INVESTMENT') {
         var inv = E.findById(D.FT_INVESTMENTS, sq.investment);
-        label = inv.name;
-        short = inv.short || inv.name;
+        label = T.field(inv, 'name');
+        short = T.field(inv, 'short') || T.field(inv, 'name');
       } else if (type === 'DREAM') {
         var dr = E.findById(D.DREAMS, sq.dream);
         mine = dr.id === state.dream.id;
-        label = (mine ? '\u2605 ' : '') + dr.name;
-        short = (mine ? '\u2605 ' : '') + (dr.short || dr.name);
+        label = (mine ? '★ ' : '') + T.field(dr, 'name');
+        short = (mine ? '★ ' : '') + (T.field(dr, 'short') || T.field(dr, 'name'));
       } else {
         label = sq.label;
         short = sq.label;
@@ -506,20 +508,20 @@
     centre.style.gridColumn = '2 / ' + n;
 
     if (state.phase === 'won') {
-      centre.appendChild(el('div', { class: 'big', text: 'You win' }));
+      centre.appendChild(el('div', { class: 'big', text: t('You win') }));
       centre.appendChild(el('div', {
         class: 'sub',
         text: (state.result.how === 'dream' ? 'Dream bought' : 'Fast Track cash flow goal reached') +
           ' in ' + state.result.months + ' months.'
       }));
-      centre.appendChild(el('button', { class: 'primary', onclick: openSetup, text: 'Play again' }));
+      centre.appendChild(el('button', { class: 'primary', onclick: openSetup, text: t('Play again') }));
       return centre;
     }
 
     if (state.phase === 'bankrupt') {
-      centre.appendChild(el('div', { class: 'big neg', text: 'Bankrupt' }));
-      centre.appendChild(el('div', { class: 'sub', text: 'Month ' + state.result.months + '.' }));
-      centre.appendChild(el('button', { class: 'primary', onclick: openSetup, text: 'New game' }));
+      centre.appendChild(el('div', { class: 'big neg', text: t('Bankrupt') }));
+      centre.appendChild(el('div', { class: 'sub', text: t('Month {n}.', { n: state.result.months }) }));
+      centre.appendChild(el('button', { class: 'primary', onclick: openSetup, text: t('New game') }));
       return centre;
     }
 
@@ -530,15 +532,15 @@
        * a player optimising the biggest number on screen would have been
        * optimising the wrong one -- cash flow goes UP when you sell the
        * assets that were going to free you. */
-      centre.appendChild(el('div', { class: 'sub', text: 'Passive income' }));
+      centre.appendChild(el('div', { class: 'sub', text: t('Passive income') }));
       centre.appendChild(el('div', { class: 'big', text: money(s.passiveIncome) }));
 
       var gap = s.totalExpenses - s.passiveIncome;
       centre.appendChild(el('div', {
         class: 'sub',
         text: gap > 0
-          ? money(gap) + ' a month short of your ' + money(s.totalExpenses) + ' of expenses'
-          : 'Clear of your ' + money(s.totalExpenses) + ' of expenses'
+          ? t('{$gap} a month short of your {$total} of expenses', { gap: gap, total: s.totalExpenses })
+          : t('Clear of your {$total} of expenses', { total: s.totalExpenses })
       }));
 
       var pct = s.totalExpenses > 0 ? Math.min(100, (s.passiveIncome / s.totalExpenses) * 100) : 0;
@@ -550,21 +552,19 @@
       });
       bar.appendChild(el('i', { style: 'width:' + pct.toFixed(1) + '%' }));
       centre.appendChild(bar);
-      centre.appendChild(el('div', { class: 'sub', text: Math.round(pct) + '% of the way out' }));
+      centre.appendChild(el('div', { class: 'sub', text: t('{pct}% of the way out', { pct: Math.round(pct) }) }));
       centre.appendChild(statusChips());
     } else {
       var f = E.ftStats(state);
-      centre.appendChild(el('div', { class: 'sub', text: 'Cash Flow Day income' }));
+      centre.appendChild(el('div', { class: 'sub', text: t('Cash Flow Day income') }));
       centre.appendChild(el('div', { class: 'big', text: money(f.totalIncome) }));
       centre.appendChild(el('div', {
         class: 'sub',
-        text: 'New investment income ' + money(f.addedIncome) + ' of ' +
-          money(E.fastTrackGoal(state))
+        text: t('New investment income {$have} of {$goal}', { have: f.addedIncome, goal: E.fastTrackGoal(state) })
       }));
       centre.appendChild(el('div', {
         class: 'sub',
-        text: 'or land on \u2605 ' + (state.dream.short || state.dream.name) +
-          ' and pay ' + money(state.dream.cost)
+        text: t('or land on ★ {name} and pay {$cost}', { name: T.field(state.dream, 'short') || T.field(state.dream, 'name'), cost: state.dream.cost })
       }));
       var pct2 = Math.min(100, (f.addedIncome / E.fastTrackGoal(state)) * 100);
       var bar2 = el('div', {
@@ -593,17 +593,21 @@
     if (state.charityTurns > 0) {
       wrap.appendChild(el('span', {
         class: 'chip good',
-        text: 'Dice choice: this turn' + (state.charityTurns > 1 ? ' and ' + (state.charityTurns - 1) + ' more' : '')
+        text: state.charityTurns > 1
+          ? t('Dice choice: this turn and {n} more', { n: state.charityTurns - 1 })
+          : t('Dice choice: this turn')
       }));
     }
     if (state.skipTurns > 0) {
-      wrap.appendChild(el('span', { class: 'chip bad', text: 'Downsized: ' + state.skipTurns + ' turn' + (state.skipTurns > 1 ? 's' : '') + ' lost' }));
+      wrap.appendChild(el('span', { class: 'chip bad', text: state.skipTurns > 1
+        ? t('Out of work: {n} turns lost', { n: state.skipTurns })
+        : t('Out of work: {n} turn lost', { n: state.skipTurns }) }));
     }
     if (state.children > 0) {
       wrap.appendChild(el('span', { class: 'chip', text: state.children + ' child' + (state.children > 1 ? 'ren' : '') }));
     }
     if (state.bankLoan > 0) {
-      wrap.appendChild(el('span', { class: 'chip bad', text: 'Bank debt ' + money(state.bankLoan) }));
+      wrap.appendChild(el('span', { class: 'chip bad', text: t('Loans {$amount}', { amount: state.bankLoan }) }));
     }
     return wrap;
   }
@@ -625,20 +629,21 @@
     if (state.phase === 'fasttrack' || state.phase === 'won') {
       var f = E.ftStats(state);
       var ftGoal = E.fastTrackGoal(state);
-      head.appendChild(box('Cash', money(state.cash),
+      head.appendChild(box(t('Cash'), money(state.cash),
         state.cash >= state.dream.cost ? 'hero' : null,
         state.cash >= state.dream.cost
           ? 'enough for your dream'
           : money(state.dream.cost - state.cash) + ' short of your dream'));
-      head.appendChild(box('Cash Flow Day', money(f.totalIncome), null,
+      head.appendChild(box(t('Cash Flow Day'), money(f.totalIncome), null,
         money(f.addedIncome) + ' of ' + money(ftGoal) + ' new income'));
     } else {
       /* The win condition, side by side, as the first thing in the panel --
        * because "passive income vs total expenses" IS the game, and it used to
        * be a 13px grey subline while cash flow got two large displays. */
       var gap = s.totalExpenses - s.passiveIncome;
-      var passiveBox = box('Passive income', money(s.passiveIncome), 'hero',
-        gap > 0 ? money(gap) + ' short of ' + money(s.totalExpenses) : 'clear of ' + money(s.totalExpenses));
+      var passiveBox = box(t('Passive income'), money(s.passiveIncome), 'hero',
+        gap > 0 ? t('{$gap} short of {$total}', { gap: gap, total: s.totalExpenses })
+                : t('clear of {$total}', { total: s.totalExpenses }));
 
       /* A bar whose full width is your total expenses. Passive income only
        * means something measured against what it has to cover, so the two
@@ -654,9 +659,9 @@
       passiveBar.appendChild(el('i', { style: 'width:' + pctOut.toFixed(1) + '%' }));
       passiveBox.appendChild(passiveBar);
       head.appendChild(passiveBox);
-      head.appendChild(box('Total expenses', money(s.totalExpenses), 'hero', 'the bar to clear'));
-      head.appendChild(box('Cash', money(state.cash)));
-      head.appendChild(box('Monthly cash flow', signed(s.cashflow), null, 'what payday pays'));
+      head.appendChild(box(t('Total expenses'), money(s.totalExpenses), 'hero', t('the bar to clear')));
+      head.appendChild(box(t('Cash'), money(state.cash)));
+      head.appendChild(box(t('Monthly cash flow'), signed(s.cashflow), null, t('what payday pays')));
     }
 
     var st = $('#statement');
@@ -666,24 +671,24 @@
       var ft = E.ftStats(state);
       var goal = E.fastTrackGoal(state);
 
-      st.appendChild(group('Cash Flow Day income', [
-        row('Carried from the Rat Race', money(ft.baseIncome), true),
-        row('From investments bought here', money(ft.investmentIncome), true),
-        row('Total per Cash Flow Day', money(ft.totalIncome), false, true)
+      st.appendChild(group(t('Cash Flow Day income'), [
+        row(t('Carried from the Rat Race'), money(ft.baseIncome), true),
+        row(t('From investments bought here'), money(ft.investmentIncome), true),
+        row(t('Total per Cash Flow Day'), money(ft.totalIncome), false, true)
       ]));
 
       /* The Rat Race portfolio is not shown here: it no longer produces
        * anything on its own, it was converted into the income above, and
        * listing it again reads as though it were still working for you. */
       var inv = el('div', { class: 'group assets' }, [
-        el('div', { class: 'row' }, [el('span', { class: 'label', text: 'Investments' })])
+        el('div', { class: 'row' }, [el('span', { class: 'label', text: t('Investments') })])
       ]);
       if (!state.ftInvestments.length) {
-        inv.appendChild(el('div', { class: 'empty', text: 'None yet. Land on an investment square to buy one.' }));
+        inv.appendChild(el('div', { class: 'empty', text: t('None yet. Land on an investment square to buy one.') }));
       } else {
         state.ftInvestments.forEach(function (i) {
           inv.appendChild(el('div', { class: 'item' }, [
-            el('span', { class: 'n', text: i.name }),
+            el('span', { class: 'n', text: T.field(i, 'name') }),
             el('span', { class: 'm', text: money(i.cost) }),
             el('span', { class: 'm pos', text: money(i.cashflow) + '/mo' })
           ]));
@@ -695,31 +700,31 @@
        * it wrap. A plain terms row pins its value to one line and squeezes the
        * label into a column one character wide. */
       var win = el('div', { class: 'group' }, [
-        el('div', { class: 'row' }, [el('span', { class: 'label', text: 'Two ways to win' })])
+        el('div', { class: 'row' }, [el('span', { class: 'label', text: t('Two ways to win') })])
       ]);
       win.appendChild(el('div', { class: 'winline' }, [
-        el('span', { class: 'winname', text: '\u2605 ' + state.dream.name }),
+        el('span', { class: 'winname', text: '★ ' + T.field(state.dream, 'name') }),
         el('span', { class: 'winval', text: money(state.dream.cost) })
       ]));
-      win.appendChild(row('\u00a0\u00a0cash needed',
+      win.appendChild(row(t('\u00a0\u00a0cash needed'),
         state.cash >= state.dream.cost ? 'you can afford it'
           : money(state.dream.cost - state.cash) + ' more', true));
       win.appendChild(el('div', { class: 'winline' }, [
-        el('span', { class: 'winname', text: 'or new investment income' }),
+        el('span', { class: 'winname', text: t('or new investment income') }),
         el('span', { class: 'winval', text: money(goal) })
       ]));
-      win.appendChild(row('\u00a0\u00a0so far', money(ft.addedIncome), true));
+      win.appendChild(row(t('\u00a0\u00a0so far'), money(ft.addedIncome), true));
       st.appendChild(win);
       return;
     }
 
-    st.appendChild(group('Income', [
-      row('Salary', money(s.salary), true),
-      row('Interest / dividends', money(s.interestDividends), true),
-      row('Real estate', money(s.realEstateIncome), true),
-      row('Business', money(s.businessIncome), true),
-      row('Passive income', money(s.passiveIncome), false, true),
-      row('Total income', money(s.totalIncome), false, true)
+    st.appendChild(group(t('Income'), [
+      row(t('Salary'), money(s.salary), true),
+      row(t('Interest / dividends'), money(s.interestDividends), true),
+      row(t('Real estate'), money(s.realEstateIncome), true),
+      row(t('Business'), money(s.businessIncome), true),
+      row(t('Passive income'), money(s.passiveIncome), false, true),
+      row(t('Total income'), money(s.totalIncome), false, true)
     ]));
 
     /* Only expenses you actually have.
@@ -731,24 +736,24 @@
     function expense(label, amount) {
       return amount > 0 ? row(label, money(amount), true) : null;
     }
-    st.appendChild(group('Expenses', [
-      expense('Taxes', p.taxes),
-      expense('Home mortgage', p.home),
-      expense('School loan', p.school),
-      expense('Car loan', p.car),
-      expense('Credit cards', p.creditCard),
-      expense('Retail', p.retail),
-      expense('Other', p.other),
-      state.children > 0 ? row('Children (' + state.children + ')', money(p.children), true) : null,
-      expense('Loans', p.bankLoan),
-      row('Total expenses', money(s.totalExpenses), false, true)
+    st.appendChild(group(t('Expenses'), [
+      expense(t('Taxes'), p.taxes),
+      expense(t('Home mortgage'), p.home),
+      expense(t('School loan'), p.school),
+      expense(t('Car loan'), p.car),
+      expense(t('Credit cards'), p.creditCard),
+      expense(t('Retail'), p.retail),
+      expense(t('Other'), p.other),
+      state.children > 0 ? row(t('Children (') + state.children + ')', money(p.children), true) : null,
+      expense(t('Loans'), p.bankLoan),
+      row(t('Total expenses'), money(s.totalExpenses), false, true)
     ]));
 
     /* Assets first, then liabilities: the two sides of the balance sheet,
      * in the order a financial statement puts them. */
     var assetsHost = el('div', { class: 'group assets' });
     assetsHost.appendChild(el('div', { class: 'row' }, [
-      el('span', { class: 'label', text: 'Assets' })
+      el('span', { class: 'label', text: t('Assets') })
     ]));
     var assetsBody = el('div', {});
     renderAssets(assetsBody);
@@ -761,27 +766,26 @@
      * bar you are trying to clear -- so it belongs on the balance sheet next
      * to the debt itself, not buried in a panel elsewhere. */
     var liabilities = el('div', { class: 'group' }, [
-      el('div', { class: 'row' }, [el('span', { class: 'label', text: 'Liabilities' })])
+      el('div', { class: 'row' }, [el('span', { class: 'label', text: t('Liabilities') })])
     ]);
 
     Object.keys(E.LIABILITY_NAMES).forEach(function (which) {
       var slot = state.profession[which];
       if (!slot.liability && !slot.payment) return;
       liabilities.appendChild(liabilityRow(
-        capitalise(E.LIABILITY_NAMES[which]), slot.liability, slot.payment,
+        capitalise(t(E.LIABILITY_NAMES[which])), slot.liability, slot.payment,
         slot.liability > 0 ? function () { openPayoffDialog(which); } : null,
         slot.liability > state.cash
       ));
     });
 
     if (state.bankLoan > 0) {
-      liabilities.appendChild(liabilityRow(
-        'Loans', state.bankLoan, p.bankLoan, openRepayLoanDialog, state.cash < 1000
+      liabilities.appendChild(liabilityRow(t('Loans'), state.bankLoan, p.bankLoan, openRepayLoanDialog, state.cash < 1000
       ));
     }
 
     if (propertyDebt() > 0) {
-      liabilities.appendChild(liabilityRow('Property mortgages', propertyDebt(), 0, null, false,
+      liabilities.appendChild(liabilityRow(t('Property mortgages'), propertyDebt(), 0, null, false,
         'Cleared when you sell the property'));
     }
     st.appendChild(liabilities);
@@ -795,7 +799,7 @@
       el('span', { class: 'liabnum', text: money(balance) })
     ]);
     if (onPay) {
-      var b = el('button', { class: 'tiny', onclick: onPay, text: 'Repay' });
+      var b = el('button', { class: 'tiny', onclick: onPay, text: t('Repay') });
       if (disabled) {
         b.disabled = true;
         b.title = 'Not enough cash';
@@ -836,15 +840,13 @@
 
     if (state.phase === 'bankrupt') {
       host.appendChild(el('div', { class: 'card danger' }, [
-        el('h3', { text: 'Bankrupt in ' + state.result.months + ' months' }),
+        el('h3', { text: t('Bankrupt in {months} months', { months: state.result.months }) }),
         el('p', {
-          text: 'You could not pay for ' + state.result.reason + ', and there was nothing ' +
-            'left to sell or borrow against. Expenses that grow faster than income only ' +
-            'end one way. Use Undo to go back and take a different turn, or start again.'
+          text: t('You could not pay for {reason}, and there was nothing left to sell or borrow against. Use Undo to go back and take a different turn, or start again.', { reason: state.result.reason })
         }),
         el('div', { class: 'buttons' }, [
-          el('button', { class: 'primary', onclick: openSetup, text: 'New game' }),
-          el('button', { onclick: undo, text: 'Undo the last move' })
+          el('button', { class: 'primary', onclick: openSetup, text: t('New game') }),
+          el('button', { onclick: undo, text: t('Undo the last move') })
         ])
       ]));
       return;
@@ -852,7 +854,7 @@
 
     if (state.phase === 'won') {
       host.appendChild(el('div', { class: 'card gold' }, [
-        el('h3', { text: 'Game over - you win' }),
+        el('h3', { text: t('Game over - you win') }),
         el('p', {
           text: state.result.how === 'dream'
             ? 'You bought your dream in ' + state.result.months + ' months.'
@@ -860,7 +862,7 @@
               ' a month of investment income in ' + state.result.months + ' months.'
         }),
         el('div', { class: 'buttons' }, [
-          el('button', { class: 'primary', onclick: openSetup, text: 'New game' })
+          el('button', { class: 'primary', onclick: openSetup, text: t('New game') })
         ])
       ]));
       return;
@@ -879,20 +881,20 @@
     switch (p.kind) {
       case 'chooseDeck': return host.appendChild(chooseDeckCard(p));
       case 'deal': return host.appendChild(dealCard(p));
-      case 'charity': return host.appendChild(simpleCard(p, 'Donate ' + money(p.amount), 'charityDonate', 'Decline'));
+      case 'charity': return host.appendChild(simpleCard(p, t('Donate {$amount}', { amount: p.amount }), 'charityDonate', t('Decline')));
       case 'doodadOptional': return host.appendChild(optionalDoodadCard(p));
       case 'bill': return host.appendChild(billCard(p));
       case 'sellAsset': return host.appendChild(sellAssetCard(p));
       case 'sellGold': return host.appendChild(sellGoldCard(p));
       case 'ftInvestment': return host.appendChild(ftInvestmentCard(p));
       case 'ftDream': return host.appendChild(ftDreamCard(p));
-      case 'ftCharity': return host.appendChild(simpleCard(p, 'Donate ' + money(p.amount), 'ftCharityDonate', 'Decline'));
+      case 'ftCharity': return host.appendChild(simpleCard(p, t('Donate {$amount}', { amount: p.amount }), 'ftCharityDonate', t('Decline')));
       default:
         return host.appendChild(el('div', { class: 'card danger' }, [
-          el('h3', { text: 'Unexpected state' }),
+          el('h3', { text: t('Unexpected state') }),
           el('p', { text: 'The engine is waiting on "' + p.kind + '", which this interface does not know how to show. Please report this with the seed above.' }),
           el('div', { class: 'buttons' }, [
-            el('button', { onclick: function () { doAction('acknowledge'); }, text: 'Continue' })
+            el('button', { onclick: function () { doAction('acknowledge'); }, text: t('Continue') })
           ])
         ]));
     }
@@ -906,27 +908,29 @@
     var tone = cashDelta > 0 ? 'gold' : (cashDelta < 0 ? 'danger' : 'info');
 
     var card = el('div', { class: 'card receipt ' + tone }, [
-      el('span', { class: 'tagline', text: 'Last turn — ' + (receipt.square || 'result') })
+      el('span', { class: 'tagline', text: t('Last turn — {square}', { square: receipt.square || t('result') }) })
     ]);
 
     if (cashDelta !== 0) {
       card.appendChild(el('div', { class: 'receipt-headline' }, [
         el('span', { class: cashDelta > 0 ? 'pos' : 'neg', text: (cashDelta > 0 ? '+' : '') + money(cashDelta) }),
-        el('span', { class: 'receipt-sub', text: 'cash, now ' + money(state.cash) })
+        el('span', { class: 'receipt-sub', text: t('cash, now {$cash}', { cash: state.cash }) })
       ]));
     }
 
     var lines = el('div', { class: 'receipt-lines' });
     receipt.entries.forEach(function (entry) {
-      lines.appendChild(el('div', { class: 'receipt-line ' + entry.type, text: entry.text }));
+      lines.appendChild(el('div', { class: 'receipt-line ' + entry.type, text: logText(entry) }));
     });
     card.appendChild(lines);
 
     if (passiveDelta !== 0) {
       card.appendChild(el('div', {
         class: 'hint',
-        text: 'Passive income ' + (passiveDelta > 0 ? 'rose ' : 'fell ') + money(Math.abs(passiveDelta)) +
-          ' a month, to ' + money(E.stats(state).passiveIncome) + '.'
+        text: t(passiveDelta > 0
+          ? 'Passive income rose {$amount} a month, to {$total}.'
+          : 'Passive income fell {$amount} a month, to {$total}.',
+          { amount: Math.abs(passiveDelta), total: E.stats(state).passiveIncome })
       }));
     }
     return card;
@@ -939,19 +943,26 @@
     ]);
 
     if (state.skipTurns > 0) {
-      card.appendChild(el('p', { text: 'You lose ' + state.skipTurns + ' more turn' + (state.skipTurns > 1 ? 's' : '') + '.' }));
+      card.appendChild(el('p', {
+        text: t(state.skipTurns > 1 ? 'You lose {n} more turns.' : 'You lose {n} more turn.', { n: state.skipTurns })
+      }));
       card.appendChild(el('div', { class: 'buttons' }, [
-        el('button', { class: 'primary', onclick: function () { doRoll(1); }, text: 'Sit out a month' })
+        el('button', { class: 'primary', onclick: function () { doRoll(1); }, text: t('Sit out a month') })
       ]));
       return card;
     }
 
     if (state.phase === 'fasttrack') {
-      card.appendChild(el('p', { text: 'Roll two dice.' }));
+      card.appendChild(el('p', { text: t('Roll two dice.') }));
     } else if (opts.length > 1) {
-      card.appendChild(el('p', { text: 'Your donation earns you a choice: one die or two, for ' + state.charityTurns + ' more turn' + (state.charityTurns > 1 ? 's' : '') + '.' }));
+      card.appendChild(el('p', {
+        text: t(state.charityTurns > 1
+          ? 'Your donation earns you a choice: one die or two, for {n} more turns.'
+          : 'Your donation earns you a choice: one die or two, for {n} more turn.',
+          { n: state.charityTurns })
+      }));
     } else {
-      card.appendChild(el('p', { text: 'Roll the die and move.' }));
+      card.appendChild(el('p', { text: t('Roll the die and move.') }));
     }
 
     var buttons = el('div', { class: 'buttons' });
@@ -968,13 +979,13 @@
 
   function chooseDeckCard(p) {
     return el('div', { class: 'card' }, [
-      el('h3', { text: p.title }),
-      el('p', { text: p.text }),
+      el('h3', { text: T.maybe(p.title) }),
+      el('p', { text: T.maybe(p.text) }),
       el('div', { class: 'buttons' }, [
-        el('button', { onclick: function () { doAction('chooseDeck', { deck: 'small' }); }, text: 'Small Deal' }),
-        el('button', { onclick: function () { doAction('chooseDeck', { deck: 'big' }); }, text: 'Big Deal' })
+        el('button', { onclick: function () { doAction('chooseDeck', { deck: 'small' }); }, text: t('Small Deal') }),
+        el('button', { onclick: function () { doAction('chooseDeck', { deck: 'big' }); }, text: t('Big Deal') })
       ]),
-      el('div', { class: 'hint', text: 'Looking at a deal does not commit you to it.' })
+      el('div', { class: 'hint', text: t('Looking at a deal does not commit you to it.') })
     ]);
   }
 
@@ -1028,7 +1039,7 @@
         },
         title: n + ' for ' + money(n * unitPrice)
       }, [
-        el('span', { class: 'qty', text: (i === 0 ? (mode === 'sell' ? 'All ' : 'Max ') : '') + n }),
+        el('span', { class: 'qty', text: (i === 0 ? (mode === 'sell' ? t('All') + ' ' : t('Max') + ' ') : '') + n }),
         el('span', { class: 'qtycost', text: money(n * unitPrice) })
       ]));
     });
@@ -1042,11 +1053,11 @@
     var total = qty * opts.unitPrice;
     var buying = trade.mode === 'buy';
     var rows = [
-      [buying ? 'Buying' : 'Selling', qty + ' ' + (qty === 1 ? opts.unit : opts.units) +
-        ' at ' + money(opts.unitPrice)],
-      ['Total', money(total)],
-      ['Cash now', money(state.cash)],
-      ['Cash after', money(buying ? state.cash - total : state.cash + total)]
+      [buying ? t('Buying') : t('Selling'),
+        t('{n} {unit} at {$price}', { n: qty, unit: qty === 1 ? opts.unit : opts.units, price: opts.unitPrice })],
+      [t('Total'), money(total)],
+      [t('Cash now'), money(state.cash)],
+      [t('Cash after'), money(buying ? state.cash - total : state.cash + total)]
     ];
     if (opts.extraRows) rows = rows.concat(opts.extraRows(qty, buying));
 
@@ -1056,12 +1067,13 @@
       el('div', { class: 'buttons' }, [
         el('button', {
           onclick: function () { opts.onConfirm(qty, buying); },
-          text: (buying ? 'Buy ' : 'Sell ') + qty + ' ' + (qty === 1 ? opts.unit : opts.units)
+          text: t(buying ? 'Buy {n} {unit}' : 'Sell {n} {unit}',
+            { n: qty, unit: qty === 1 ? opts.unit : opts.units })
         }),
         el('button', {
           class: 'ghost',
           onclick: function () { resetTrade(); render(); },
-          text: 'Change amount'
+          text: t('Change amount')
         })
       ])
     ]);
@@ -1097,9 +1109,10 @@
   function dealCard(p) {
     var c = p.card;
     var card = el('div', { class: 'card' }, [
-      el('h3', { text: c.title })
+      el('h3', { text: T.field(c, 'title') })
     ]);
-    if (c.text) card.appendChild(el('p', { text: c.text }));
+    var cardText = T.field(c, 'text');
+    if (cardText) card.appendChild(el('p', { text: cardText }));
 
     var buttons = el('div', { class: 'buttons' });
 
@@ -1108,11 +1121,11 @@
       var shares = held ? held.shares : 0;
       var maxBuy = Math.floor(state.cash / c.price);
       card.appendChild(terms([
-        ['Price per share', money(c.price)],
-        ['Dividend', c.dividend ? money(c.dividend) + ' / share / month' : 'none'],
-        ['Trading range', money(c.range[0]) + ' - ' + money(c.range[1])],
-        ['You own', shares + ' shares' + (held ? ' (paid ' + money(held.invested) + ')' : '')],
-        ['You can afford', maxBuy + ' shares']
+        [t('Price per share'), money(c.price)],
+        [t('Dividend'), c.dividend ? t('{$amount} / share / month', { amount: c.dividend }) : t('none')],
+        [t('Trading range'), money(c.range[0]) + ' - ' + money(c.range[1])],
+        [t('You own'), held ? t('{n} shares (paid {$paid})', { n: shares, paid: held.invested }) : t('{n} shares', { n: shares })],
+        [t('You can afford'), t('{n} shares', { n: maxBuy })]
       ]));
       /* Preset amounts rather than one shared number field.
        *
@@ -1122,23 +1135,22 @@
        * absurd on a $5 share you could buy 300 of. Each button now carries
        * its own quantity, so nothing can be typed into the wrong operation. */
       if (maxBuy >= 1) {
-        card.appendChild(quantityRow('Buy', buyAmounts(maxBuy), c.price, 'buy'));
+        card.appendChild(quantityRow(t('Buy'), buyAmounts(maxBuy), c.price, 'buy'));
       } else {
-        card.appendChild(el('div', { class: 'hint', text: 'One share costs ' + money(c.price) + ' and you have ' + money(state.cash) + '.' }));
+        card.appendChild(el('div', { class: 'hint', text: t('One share costs {$price} and you have {$cash}.', { price: c.price, cash: state.cash }) }));
       }
       if (shares > 0) {
-        card.appendChild(quantityRow('Sell', sellAmounts(shares), c.price, 'sell'));
+        card.appendChild(quantityRow(t('Sell'), sellAmounts(shares), c.price, 'sell'));
       }
 
       if (trade.qty > 0) {
         card.appendChild(confirmTrade({
-          unitPrice: c.price, unit: 'share', units: 'shares',
+          unitPrice: c.price, unit: t('share'), units: t('shares'),
           extraRows: function (qty, buying) {
             var after = buying ? shares + qty : shares - qty;
-            var out = [['Shares after', String(after)]];
+            var out = [[t('Shares after'), String(after)]];
             if (c.dividend) {
-              out.push(['Monthly income from these',
-                money(shares * c.dividend) + '  →  ' + money(after * c.dividend)]);
+              out.push([t('Monthly income from these'), money(shares * c.dividend) + '  →  ' + money(after * c.dividend)]);
             }
             return out;
           },
@@ -1151,37 +1163,37 @@
       }
 
       card.appendChild(el('div', { class: 'buttons' }, [
-        el('button', { class: 'ghost', onclick: function () { doAction('pass'); }, text: 'Pass' })
+        el('button', { class: 'ghost', onclick: function () { doAction('pass'); }, text: t('Pass') })
       ]));
       var span = c.range[1] - c.range[0];
       var pctOfRange = span > 0 ? Math.round(((c.price - c.range[0]) / span) * 100) : 0;
       card.appendChild(el('div', {
         class: 'hint',
-        text: 'At ' + money(c.price) + ', this is ' + pctOfRange + '% of the way up its ' +
-          money(c.range[0]) + ' to ' + money(c.range[1]) + ' range.'
+        text: t('At {$price}, this is {pct}% of the way up its {$low} to {$high} range.',
+          { price: c.price, pct: pctOfRange, low: c.range[0], high: c.range[1] })
       }));
       return card;
     }
 
     if (c.kind === 'gold') {
       card.appendChild(terms([
-        ['Price per coin', money(c.unitPrice)],
-        ['Maximum', c.maxQty + ' coins'],
-        ['Monthly income', 'none']
+        [t('Price per coin'), money(c.unitPrice)],
+        [t('Maximum'), t('{n} coins', { n: c.maxQty })],
+        [t('Monthly income'), 'none']
       ]));
       var maxCoins = Math.min(c.maxQty, Math.floor(state.cash / c.unitPrice));
       if (maxCoins >= 1) {
         var coinAmounts = [];
         for (var n = maxCoins; n >= 1 && coinAmounts.length < 5; n--) coinAmounts.push(n);
-        card.appendChild(quantityRow('Buy', coinAmounts, c.unitPrice, 'buy'));
+        card.appendChild(quantityRow(t('Buy'), coinAmounts, c.unitPrice, 'buy'));
       } else {
-        card.appendChild(el('div', { class: 'hint', text: 'One coin costs ' + money(c.unitPrice) + ' and you have ' + money(state.cash) + '.' }));
+        card.appendChild(el('div', { class: 'hint', text: t('One coin costs {$price} and you have {$cash}.', { price: c.unitPrice, cash: state.cash }) }));
       }
 
       if (trade.qty > 0) {
         card.appendChild(confirmTrade({
-          unitPrice: c.unitPrice, unit: 'coin', units: 'coins',
-          extraRows: function () { return [['Monthly income from these', money(0)]]; },
+          unitPrice: c.unitPrice, unit: t('coin'), units: t('coins'),
+          extraRows: function () { return [[t('Monthly income from these'), money(0)]]; },
           onConfirm: function (qty) { doAction('buyGold', { qty: qty }); }
         }));
       } else {
@@ -1189,16 +1201,16 @@
       }
 
       card.appendChild(el('div', { class: 'buttons' }, [
-        el('button', { class: 'ghost', onclick: function () { doAction('pass'); }, text: 'Pass' })
+        el('button', { class: 'ghost', onclick: function () { doAction('pass'); }, text: t('Pass') })
       ]));
       return card;
     }
 
     if (c.kind === 'cd') {
       card.appendChild(terms([
-        ['Cost', money(c.cost)],
-        ['Monthly income', money(c.cashflow)],
-        ['Annual return', ((c.cashflow * 12 / c.cost) * 100).toFixed(1) + '%']
+        [t('Cost'), money(c.cost)],
+        [t('Monthly income'), money(c.cashflow)],
+        [t('Annual return'), ((c.cashflow * 12 / c.cost) * 100).toFixed(1) + '%']
       ]));
       var cdBuy = el('button', {
         class: 'primary',
@@ -1213,11 +1225,11 @@
 
     if (c.kind === 'trap') {
       card.appendChild(terms([
-        ['Cost', money(c.cost)],
-        ['Monthly income', money(0)],
-        c.addExpense ? ['Added monthly expense', money(c.addExpense)] : null,
-        ['Cash now', money(state.cash)],
-        ['Cash if you buy', money(state.cash - c.cost)]
+        [t('Cost'), money(c.cost)],
+        [t('Monthly income'), money(0)],
+        c.addExpense ? [t('Added monthly expense'), money(c.addExpense)] : null,
+        [t('Cash now'), money(state.cash)],
+        [t('Cash if you buy'), money(state.cash - c.cost)]
       ]));
       var trapBtn = el('button', {
         onclick: function () { doAction('buyDeal'); },
@@ -1225,7 +1237,7 @@
       });
       if (c.cost > state.cash) { trapBtn.disabled = true; trapBtn.title = 'Not enough cash'; }
       buttons.appendChild(trapBtn);
-      buttons.appendChild(el('button', { onclick: function () { doAction('pass'); }, text: 'Pass' }));
+      buttons.appendChild(el('button', { onclick: function () { doAction('pass'); }, text: t('Pass') }));
       card.appendChild(errorSlot());
       card.appendChild(buttons);
       return card;
@@ -1234,12 +1246,12 @@
     // Real estate and businesses
     var roi = c.down > 0 ? (c.cashflow * 12 / c.down) * 100 : 0;
     card.appendChild(terms([
-      ['Price', money(c.cost)],
-      ['Down payment', money(c.down)],
-      ['Mortgage / financed', money(c.mortgage)],
-      ['Monthly cash flow', money(c.cashflow)],
+      [t('Price'), money(c.cost)],
+      [t('Down payment'), money(c.down)],
+      [t('Mortgage / financed'), money(c.mortgage)],
+      [t('Monthly cash flow'), money(c.cashflow)],
       ['Cash-on-cash return', roi.toFixed(1) + '% a year'],
-      ['Your cash', money(state.cash)]
+      [t('Your cash'), money(state.cash)]
     ]));
     var short = Math.max(0, c.down - state.cash);
     var credit = E.availableCredit(state);
@@ -1249,13 +1261,13 @@
     var buyBtn = el('button', {
       class: '',
       onclick: function () { doAction('buyDeal'); },
-      text: 'Buy for ' + money(c.down)
+      text: t('Buy for {$amount}', { amount: c.down })
     });
     if (short > 0) buyBtn.disabled = true;
     buttons.appendChild(buyBtn);
 
     if (short > 0 && short <= credit) {
-      buttons.appendChild(el('button', { onclick: openLoanDialog, text: 'Take a loan…' }));
+      buttons.appendChild(el('button', { onclick: openLoanDialog, text: t('Take a loan…') }));
     }
 
     card.appendChild(errorSlot());
@@ -1291,14 +1303,14 @@
     var credit = E.availableCredit(state);
 
     var card = el('div', { class: 'card danger' }, [
-      el('span', { class: 'tagline', text: 'An expense you have to pay' }),
-      el('h3', { text: p.title })
+      el('span', { class: 'tagline', text: t('An expense you have to pay') }),
+      el('h3', { text: T.maybe(p.title) })
     ]);
-    if (p.text) card.appendChild(el('p', { text: p.text }));
+    if (p.text) card.appendChild(el('p', { text: T.maybe(p.text) }));
 
     card.appendChild(terms([
-      ['Amount', money(p.amount)],
-      ['Cash before', money(state.cash)],
+      [t('Amount'), money(p.amount)],
+      [t('Cash before'), money(state.cash)],
       ['Cash after', short ? money(0) : money(after)]
     ]));
     card.appendChild(errorSlot());
@@ -1306,7 +1318,7 @@
       el('button', {
         class: 'primary',
         onclick: function () { doAction('payBill'); },
-        text: 'Pay ' + money(p.amount)
+        text: t('Pay {$amount}', { amount: p.amount })
       })
     ]));
 
@@ -1329,18 +1341,16 @@
   function optionalDoodadCard(p) {
     var s = E.stats(state);
     return el('div', { class: 'card' }, [
-      el('span', { class: 'tagline', text: 'Accept or decline' }),
-      el('h3', { text: p.title }),
-      p.text ? el('p', { text: p.text }) : null,
+      el('span', { class: 'tagline', text: t('Accept or decline') }),
+      el('h3', { text: T.maybe(p.title) }),
+      p.text ? el('p', { text: T.maybe(p.text) }) : null,
       terms([
-        ['Cost', money(p.amount)],
-        ['Cash now', money(state.cash)],
-        ['Cash if you buy', money(state.cash - p.amount)],
-        p.addExpense ? ['Monthly expenses if you buy',
-          money(s.totalExpenses) + '  →  ' + money(s.totalExpenses + p.addExpense)] : null,
-        p.addExpense ? ['Monthly cash flow if you buy',
-          money(s.cashflow) + '  →  ' + money(s.cashflow - p.addExpense)] : null,
-        ['If you decline', 'no change']
+        [t('Cost'), money(p.amount)],
+        [t('Cash now'), money(state.cash)],
+        [t('Cash if you buy'), money(state.cash - p.amount)],
+        p.addExpense ? [t('Monthly expenses if you buy'), money(s.totalExpenses) + '  →  ' + money(s.totalExpenses + p.addExpense)] : null,
+        p.addExpense ? [t('Monthly cash flow if you buy'), money(s.cashflow) + '  →  ' + money(s.cashflow - p.addExpense)] : null,
+        [t('If you decline'), 'no change']
       ]),
       errorSlot(),
       el('div', { class: 'buttons' }, [
@@ -1348,16 +1358,16 @@
           onclick: function () { doAction('doodadAccept'); },
           text: actionLabel(p.action, p.amount, 'Buy for')
         }),
-        el('button', { onclick: function () { doAction('acknowledge'); }, text: 'Decline' })
+        el('button', { onclick: function () { doAction('acknowledge'); }, text: t('Decline') })
       ])
     ]);
   }
 
   function simpleCard(p, yesLabel, yesAction, noLabel, cls) {
     return el('div', { class: 'card' + (cls ? ' ' + cls : ' info') }, [
-      el('h3', { text: p.title }),
-      el('p', { text: p.text }),
-      p.amount !== undefined ? terms([['Cost', money(p.amount)], p.addExpense ? ['Added monthly expense', money(p.addExpense)] : null]) : null,
+      el('h3', { text: T.maybe(p.title) }),
+      el('p', { text: T.maybe(p.text) }),
+      p.amount !== undefined ? terms([[t('Cost'), money(p.amount)], p.addExpense ? [t('Added monthly expense'), money(p.addExpense)] : null]) : null,
       errorSlot(),
       el('div', { class: 'buttons' }, [
         el('button', { onclick: function () { doAction(yesAction); }, text: yesLabel }),
@@ -1371,8 +1381,8 @@
    * recommended. */
   function sellAssetCard(p) {
     var card = el('div', { class: 'card info' }, [
-      el('h3', { text: p.title }),
-      el('p', { text: p.text })
+      el('h3', { text: T.maybe(p.title) }),
+      el('p', { text: T.maybe(p.text) })
     ]);
 
     var offers = p.offers.slice().sort(function (a, b) { return b.netCash - a.netCash; });
@@ -1383,13 +1393,13 @@
       var row = el('div', { class: 'offer' + (loss ? ' loss' : '') }, [
         el('div', { class: 'offername', text: o.name }),
         el('div', { class: 'offerfacts' }, [
-          el('span', { class: loss ? 'neg' : 'pos', text: (o.netCash >= 0 ? '+' : '') + money(o.netCash) + ' cash' }),
-          el('span', { class: 'neg', text: '−' + money(o.cashflowLost) + '/mo income' }),
-          el('span', { class: 'muted', text: (gain >= 0 ? 'gain ' : 'loss ') + money(Math.abs(gain)) + ' vs the ' + money(o.cost) + ' you paid' })
+          el('span', { class: loss ? 'neg' : 'pos', text: (o.netCash >= 0 ? '+' : '') + money(o.netCash) + ' ' + t('cash') }),
+          el('span', { class: 'neg', text: t('−{$amount}/mo income', { amount: o.cashflowLost }) }),
+          el('span', { class: 'muted', text: t(gain >= 0 ? 'gain {$gain} vs the {$paid} you paid' : 'loss {$gain} vs the {$paid} you paid', { gain: Math.abs(gain), paid: o.cost })})
         ]),
         el('button', {
           onclick: function () { doAction('sellAsset', { assetId: o.assetId }); },
-          text: 'Sell'
+          text: t('Sell')
         })
       ]);
       card.appendChild(row);
@@ -1397,29 +1407,29 @@
 
     card.appendChild(errorSlot());
     card.appendChild(el('div', { class: 'buttons' }, [
-      el('button', { onclick: function () { doAction('acknowledge'); }, text: 'Sell nothing' })
+      el('button', { onclick: function () { doAction('acknowledge'); }, text: t('Sell nothing') })
     ]));
     card.appendChild(el('div', {
       class: 'hint',
-      text: 'A sale raises cash once and removes that property\'s monthly income from then on.'
+      text: t('A sale raises cash once and removes that property\'s monthly income from then on.')
     }));
     return card;
   }
 
   function sellGoldCard(p) {
     var card = el('div', { class: 'card gold' }, [
-      el('h3', { text: p.title }),
-      el('p', { text: p.text }),
-      terms([['Price per coin', money(p.unitPrice)], ['Coins you own', String(p.maxQty)]])
+      el('h3', { text: T.maybe(p.title) }),
+      el('p', { text: T.maybe(p.text) }),
+      terms([[t('Price per coin'), money(p.unitPrice)], [t('Coins you own'), String(p.maxQty)]])
     ]);
     var amounts = [];
     for (var n = p.maxQty; n >= 1 && amounts.length < 5; n--) amounts.push(n);
-    card.appendChild(quantityRow('Sell', amounts, p.unitPrice, 'sell'));
+    card.appendChild(quantityRow(t('Sell'), amounts, p.unitPrice, 'sell'));
 
     if (trade.qty > 0) {
       card.appendChild(confirmTrade({
-        unitPrice: p.unitPrice, unit: 'coin', units: 'coins',
-        extraRows: function (qty) { return [['Coins left', String(p.maxQty - qty)]]; },
+        unitPrice: p.unitPrice, unit: t('coin'), units: t('coins'),
+        extraRows: function (qty) { return [[t('Coins left'), String(p.maxQty - qty)]]; },
         onConfirm: function (qty) { doAction('sellGold', { qty: qty }); }
       }));
     } else {
@@ -1427,38 +1437,38 @@
     }
 
     card.appendChild(el('div', { class: 'buttons' }, [
-      el('button', { onclick: function () { doAction('acknowledge'); }, text: 'Sell none' })
+      el('button', { onclick: function () { doAction('acknowledge'); }, text: t('Sell none') })
     ]));
     return card;
   }
 
   function ftInvestmentCard(p) {
     return el('div', { class: 'card' }, [
-      el('h3', { text: p.title }),
-      el('p', { text: p.text }),
+      el('h3', { text: T.maybe(p.title) }),
+      el('p', { text: T.maybe(p.text) }),
       terms([
-        ['Cost (cash)', money(p.cost)],
-        ['Monthly cash flow', money(p.cashflow)],
-        ['Annual return', ((p.cashflow * 12 / p.cost) * 100).toFixed(1) + '%'],
-        ['Your cash', money(state.cash)]
+        [t('Cost (cash)'), money(p.cost)],
+        [t('Monthly cash flow'), money(p.cashflow)],
+        [t('Annual return'), ((p.cashflow * 12 / p.cost) * 100).toFixed(1) + '%'],
+        [t('Your cash'), money(state.cash)]
       ]),
       errorSlot(),
       el('div', { class: 'buttons' }, [
-        el('button', { onclick: function () { doAction('buyInvestment'); }, text: 'Buy for ' + money(p.cost) }),
-        el('button', { onclick: function () { doAction('acknowledge'); }, text: 'Pass' })
+        el('button', { onclick: function () { doAction('buyInvestment'); }, text: t('Buy for {$amount}', { amount: p.cost }) }),
+        el('button', { onclick: function () { doAction('acknowledge'); }, text: t('Pass') })
       ])
     ]);
   }
 
   function ftDreamCard(p) {
     return el('div', { class: 'card gold' }, [
-      el('h3', { text: p.title }),
-      el('p', { text: p.text }),
-      terms([['Cost', money(p.cost)], ['Your cash', money(state.cash)]]),
+      el('h3', { text: T.maybe(p.title) }),
+      el('p', { text: T.maybe(p.text) }),
+      terms([[t('Cost'), money(p.cost)], [t('Your cash'), money(state.cash)]]),
       errorSlot(),
       el('div', { class: 'buttons' }, [
-        el('button', { onclick: function () { doAction('buyDream'); }, text: 'Buy for ' + money(p.cost) }),
-        el('button', { onclick: function () { doAction('acknowledge'); }, text: 'Not yet' })
+        el('button', { onclick: function () { doAction('buyDream'); }, text: t('Buy for {$amount}', { amount: p.cost }) }),
+        el('button', { onclick: function () { doAction('acknowledge'); }, text: t('Not yet') })
       ])
     ]);
   }
@@ -1481,7 +1491,7 @@
       var h = state.stocks[sym];
       var meta = D.STOCK_SYMBOLS[sym];
       var monthly = h.shares * meta.dividend;
-      var row = [sym + ' — ' + meta.name, h.shares + ' shares, paid ' + money(h.invested), monthly];
+      var row = [sym + ' — ' + meta.name, t('{n} shares, paid {$paid}', { n: h.shares, paid: h.invested }), monthly];
       (monthly > 0 ? earning : speculative).push(row);
     }
 
@@ -1493,15 +1503,17 @@
 
     state.assets.forEach(function (a) {
       if (a.category === 'gold') {
-        speculative.push([a.name, a.qty + ' coins, paid ' + money(a.cost), 0]);
+        speculative.push([T.maybe(a.name), t('{n} coins, paid {$paid}', { n: a.qty, paid: a.cost }), 0]);
       } else {
-        var detail = money(a.cost) + (a.mortgage ? ', ' + money(a.mortgage) + ' owed' : ', owned outright');
+        var detail = a.mortgage
+          ? t('{$cost}, {$owed} owed', { cost: a.cost, owed: a.mortgage })
+          : t('{$cost}, owned outright', { cost: a.cost });
         (a.cashflow > 0 ? earning : speculative).push([a.name, detail, a.cashflow]);
       }
     });
 
     if (!earning.length && !speculative.length) {
-      host.appendChild(el('div', { class: 'empty', text: 'Nothing yet. Every Opportunity square is a chance to start.' }));
+      host.appendChild(el('div', { class: 'empty', text: t('Nothing yet. Every Opportunity square is a chance to start.') }));
       return;
     }
 
@@ -1522,8 +1534,8 @@
       if (note) host.appendChild(el('div', { class: 'hint', text: note }));
     }
 
-    section('Producing monthly income', earning);
-    section('Producing no monthly income', speculative);
+    section(t('Producing monthly income'), earning);
+    section(t('Producing no monthly income'), speculative);
   }
 
   /* ------------------------------------------------------------------ *
@@ -1562,7 +1574,7 @@
     if (opts.max < opts.min) {
       body.appendChild(el('p', { class: 'dlg-note', text: opts.blocked }));
       body.appendChild(el('div', { class: 'dlg-actions' }, [
-        el('button', { class: 'primary', onclick: close, text: 'Close' })
+        el('button', { class: 'primary', onclick: close, text: t('Close') })
       ]));
       if (!dlg.open) dlg.showModal();
       return;
@@ -1570,7 +1582,7 @@
 
     var valueNode = el('span', { class: 'stepval', 'aria-live': 'polite', text: money(value) });
     var summary = el('div', { class: 'terms' });
-    var confirm = el('button', { class: 'primary', text: '' });
+    var confirm = el('button', { class: 'primary', text: t('') });
 
     function refresh() {
       valueNode.textContent = money(value);
@@ -1591,20 +1603,20 @@
     }
 
     body.appendChild(el('div', { class: 'stepper' }, [
-      el('button', { onclick: function () { bump(-opts.step); }, 'aria-label': 'Less', text: '−' }),
+      el('button', { onclick: function () { bump(-opts.step); }, 'aria-label': 'Less', text: t('−') }),
       valueNode,
-      el('button', { onclick: function () { bump(opts.step); }, 'aria-label': 'More', text: '+' })
+      el('button', { onclick: function () { bump(opts.step); }, 'aria-label': 'More', text: t('+') })
     ]));
     body.appendChild(el('div', { class: 'buttons quickrow' }, [
-      el('button', { class: 'tiny', onclick: function () { value = opts.min; refresh(); }, text: 'Min' }),
-      el('button', { class: 'tiny', onclick: function () { value = opts.max; refresh(); }, text: 'Max ' + money(opts.max) })
+      el('button', { class: 'tiny', onclick: function () { value = opts.min; refresh(); }, text: t('Min') }),
+      el('button', { class: 'tiny', onclick: function () { value = opts.max; refresh(); }, text: t('Max {$amount}', { amount: opts.max }) })
     ]));
     body.appendChild(summary);
     confirm.addEventListener('click', function () {
       if (opts.onConfirm(value)) close();
     });
     body.appendChild(el('div', { class: 'dlg-actions' }, [
-      el('button', { class: 'ghost', onclick: close, text: 'Cancel' }),
+      el('button', { class: 'ghost', onclick: close, text: t('Cancel') }),
       confirm
     ]));
 
@@ -1616,7 +1628,7 @@
     var available = E.availableCredit(state);
     var s = E.stats(state);
     amountDialog({
-      title: 'Take a loan',
+      title: t('Take a loan'),
       note: 'Interest only: ' + money(100) + ' a month for every ' + money(1000) +
         ' borrowed, which is 120% a year. The payment continues every month until you ' +
         'repay the principal.',
@@ -1626,9 +1638,9 @@
       summary: function (v) {
         var extra = (v / 1000) * 100;
         return [
-          ['Cash afterwards', money(state.cash) + '  →  ' + money(state.cash + v)],
-          ['Monthly expenses', money(s.totalExpenses) + '  →  ' + money(s.totalExpenses + extra)],
-          ['Monthly cash flow', money(s.cashflow) + '  →  ' + money(s.cashflow - extra)]
+          [t('Cash afterwards'), money(state.cash) + '  →  ' + money(state.cash + v)],
+          [t('Monthly expenses'), money(s.totalExpenses) + '  →  ' + money(s.totalExpenses + extra)],
+          [t('Monthly cash flow'), money(s.cashflow) + '  →  ' + money(s.cashflow - extra)]
         ];
       },
       confirmLabel: function (v) { return 'Take ' + money(v); },
@@ -1640,7 +1652,7 @@
     var s = E.stats(state);
     var max = Math.min(state.bankLoan, Math.floor(state.cash / 1000) * 1000);
     amountDialog({
-      title: 'Repay loans',
+      title: t('Repay loans'),
       note: 'You owe ' + money(state.bankLoan) + ', which costs ' +
         money(state.bankLoan / 1000 * 100) + ' a month. Each ' + money(1000) +
         ' repaid removes ' + money(100) + ' a month from your expenses.',
@@ -1650,9 +1662,9 @@
       summary: function (v) {
         var freed = (v / 1000) * 100;
         return [
-          ['Cash afterwards', money(state.cash) + '  →  ' + money(state.cash - v)],
-          ['Loans left', money(state.bankLoan) + '  →  ' + money(state.bankLoan - v)],
-          ['Monthly cash flow', money(s.cashflow) + '  →  ' + money(s.cashflow + freed)]
+          [t('Cash afterwards'), money(state.cash) + '  →  ' + money(state.cash - v)],
+          [t('Loans left'), money(state.bankLoan) + '  →  ' + money(state.bankLoan - v)],
+          [t('Monthly cash flow'), money(s.cashflow) + '  →  ' + money(s.cashflow + freed)]
         ];
       },
       confirmLabel: function (v) { return 'Repay ' + money(v); },
@@ -1671,33 +1683,32 @@
     var afford = slot.liability <= state.cash;
 
     clear(body);
-    body.appendChild(el('h2', { text: 'Pay off your ' + name }));
+    body.appendChild(el('h2', { text: t('Pay off your {debt}', { debt: name }) }));
     body.appendChild(el('p', {
       class: 'dlg-note',
-      text: 'This debt can only be cleared in full. Doing so removes its ' +
-        money(slot.payment) + ' monthly payment for the rest of the game.'
+      text: t('This debt can only be cleared in full. Doing so removes its {$payment} monthly payment for the rest of the game.', { payment: slot.payment })
     }));
     body.appendChild(terms([
-      ['Balance to clear', money(slot.liability)],
-      ['Your cash', money(state.cash)],
+      [t('Balance to clear'), money(slot.liability)],
+      [t('Your cash'), money(state.cash)],
       ['Cash afterwards', afford ? money(state.cash - slot.liability) : '—'],
-      ['Monthly expenses', money(s.totalExpenses) + '  →  ' + money(s.totalExpenses - slot.payment)],
-      ['Monthly cash flow', money(s.cashflow) + '  →  ' + money(s.cashflow + slot.payment)]
+      [t('Monthly expenses'), money(s.totalExpenses) + '  →  ' + money(s.totalExpenses - slot.payment)],
+      [t('Monthly cash flow'), money(s.cashflow) + '  →  ' + money(s.cashflow + slot.payment)]
     ]));
     if (!afford) {
       body.appendChild(el('p', {
         class: 'dlg-note',
-        text: 'You are ' + money(slot.liability - state.cash) + ' short of clearing it.'
+        text: t('You are {$amount} short of clearing it.', { amount: slot.liability - state.cash })
       }));
     }
     body.appendChild(el('div', { class: 'dlg-actions' }, [
-      el('button', { class: 'ghost', onclick: function () { dlg.close(); }, text: 'Cancel' }),
+      el('button', { class: 'ghost', onclick: function () { dlg.close(); }, text: t('Cancel') }),
       afford ? el('button', {
         class: 'primary',
         onclick: function () {
           if (doAction('repayLiability', { which: which })) dlg.close();
         },
-        text: 'Pay off ' + money(slot.liability)
+        text: t('Pay off {$amount}', { amount: slot.liability })
       }) : null
     ]));
     if (!dlg.open) dlg.showModal();
@@ -1716,7 +1727,7 @@
     var goal = E.fastTrackGoal(state);
 
     clear(body);
-    body.appendChild(el('h2', { text: 'Out of the Rat Race in ' + state.months + ' months' }));
+    body.appendChild(el('h2', { text: t('Out of the Rat Race in {months} months', { months: state.months }) }));
     body.appendChild(el('p', {
       class: 'dlg-note',
       text: 'Your passive income overtook your expenses, so the Rat Race is finished. ' +
@@ -1724,10 +1735,10 @@
     }));
 
     body.appendChild(el('div', { class: 'ftrules' }, [
-      el('h3', { text: 'What carries over' }),
+      el('h3', { text: t('What carries over') }),
       terms([
-        ['Cash Flow Day income', money(f.baseIncome)],
-        ['Cash to start', money(state.cash)]
+        [t('Cash Flow Day income'), money(f.baseIncome)],
+        [t('Cash to start'), money(state.cash)]
       ]),
       el('p', {
         class: 'dlg-note',
@@ -1735,21 +1746,21 @@
           'shares — became that monthly income. Your old salary, expenses and debts are gone.'
       }),
 
-      el('h3', { text: 'What changes' }),
+      el('h3', { text: t('What changes') }),
       el('ul', {}, [
-        el('li', { text: 'You roll two dice instead of one.' }),
-        el('li', { text: 'Investments are bought with cash. There are no loans here.' }),
-        el('li', { text: 'You collect your Cash Flow Day income each time you pass or land on a Cash Flow Day square.' })
+        el('li', { text: t('You roll two dice instead of one.') }),
+        el('li', { text: t('Investments are bought with cash. There are no loans here.') }),
+        el('li', { text: t('You collect your Cash Flow Day income each time you pass or land on a Cash Flow Day square.') })
       ]),
 
-      el('h3', { text: 'Two ways to win' }),
+      el('h3', { text: t('Two ways to win') }),
       el('ul', {}, [
         el('li', {}, [
           'Land on ',
-          el('strong', { text: '★ ' + state.dream.name }),
+          el('strong', { text: '★ ' + T.field(state.dream, 'name') }),
           ' and pay ' + money(state.dream.cost) + '.'
         ]),
-        el('li', { text: 'Or add ' + money(goal) + ' a month of new investment income.' })
+        el('li', { text: t('Or add {$goal} a month of new investment income.', { goal: goal }) })
       ]),
       el('p', {
         class: 'dlg-note',
@@ -1759,7 +1770,7 @@
     ]));
 
     body.appendChild(el('div', { class: 'dlg-actions' }, [
-      el('button', { class: 'primary', onclick: function () { dlg.close(); }, text: 'Start the Fast Track' })
+      el('button', { class: 'primary', onclick: function () { dlg.close(); }, text: t('Start the Fast Track') })
     ]));
     if (!dlg.open) dlg.showModal();
   }
@@ -1783,19 +1794,19 @@
 
     var status = el('div', { class: 'bankstatus' });
     status.appendChild(el('div', { class: 'bankline' }, [
-      el('span', { text: 'You owe' }),
+      el('span', { text: t('You owe') }),
       el('span', {
         class: owed > 0 ? 'neg' : '',
         text: money(owed) + (owed > 0 ? '  (' + money(owed / 1000 * 100) + '/mo)' : '')
       })
     ]));
     status.appendChild(el('div', { class: 'bankline' }, [
-      el('span', { text: 'You could borrow' }),
+      el('span', { text: t('You could borrow') }),
       el('span', { text: money(available) })
     ]));
     host.appendChild(status);
 
-    var take = el('button', { onclick: openLoanDialog, text: 'Take a loan…' });
+    var take = el('button', { onclick: openLoanDialog, text: t('Take a loan…') });
     if (available < 1000) {
       take.disabled = true;
       take.title = 'You have reached your borrowing limit of ' + money(E.creditLimit(state)) + '.';
@@ -1811,6 +1822,13 @@
     }));
   }
 
+  /* Log entries carry their key and params, so history and receipts render in
+   * the language that is active now rather than the one they happened in.
+   * Entries from older saves only have .text; fall back to that. */
+  function logText(entry) {
+    return entry.k ? t(entry.k, entry.p) : (entry.text || '');
+  }
+
   function renderLog() {
     var host = $('#log');
     clear(host);
@@ -1818,7 +1836,7 @@
       var entry = state.log[i];
       host.appendChild(el('div', { class: entry.type }, [
         el('span', { class: 't', text: 'm' + entry.turn }),
-        entry.text
+        logText(entry)
       ]));
     }
   }
@@ -1838,21 +1856,42 @@
    * Setup dialog
    * ------------------------------------------------------------------ */
 
-  function openSetup() {
-    var dlg = $('#setup');
+  /* Rebuilt rather than built once, so the profession and dream lists follow a
+   * language change instead of staying in whichever language the page loaded
+   * in. `force` keeps the current selections while relabelling them. */
+  function buildSetupOptions(force) {
     var sel = $('#prof-select');
-    if (!sel.options.length) {
-      D.PROFESSIONS.forEach(function (p) {
-        sel.appendChild(el('option', { value: p.id, text: p.name }));
-      });
-      D.DREAMS.forEach(function (d) {
-        $('#dream-select').appendChild(el('option', { value: d.id, text: d.name + ' - ' + money(d.cost) }));
-      });
+    var dream = $('#dream-select');
+    if (!sel) return;
+    if (sel.options.length && !force) return;
+
+    var keepProf = sel.value || 'teacher';
+    var keepDream = dream.value;
+
+    clear(sel);
+    clear(dream);
+    D.PROFESSIONS.forEach(function (p) {
+      sel.appendChild(el('option', { value: p.id, text: T.field(p, 'name') }));
+    });
+    D.DREAMS.forEach(function (d) {
+      dream.appendChild(el('option', {
+        value: d.id,
+        text: T.field(d, 'name') + ' - ' + money(d.cost)
+      }));
+    });
+    sel.value = keepProf;
+    if (keepDream) dream.value = keepDream;
+    if (!sel._wired) {
       sel.addEventListener('change', renderProfPreview);
-      sel.value = 'teacher';
+      sel._wired = true;
     }
     renderProfPreview();
-    dlg.showModal();
+  }
+
+  function openSetup() {
+    buildSetupOptions(false);
+    renderProfPreview();
+    $('#setup').showModal();
   }
 
   function renderProfPreview() {
@@ -1862,11 +1901,11 @@
     var host = $('#prof-preview');
     clear(host);
     [
-      ['Salary', money(p.salary)],
-      ['Total expenses', money(expenses)],
-      ['Monthly cash flow', money(p.salary - expenses)],
-      ['Savings to start', money(p.savings)],
-      ['Cost per child', money(p.childCost) + ' / month']
+      [t('Salary'), money(p.salary)],
+      [t('Total expenses'), money(expenses)],
+      [t('Monthly cash flow'), money(p.salary - expenses)],
+      [t('Savings to start'), money(p.savings)],
+      [t('Cost per child'), money(p.childCost) + ' / month']
     ].forEach(function (r) {
       host.appendChild(el('div', {}, [el('span', { text: r[0] }), el('span', { text: r[1] })]));
     });
@@ -1926,7 +1965,45 @@
    * Wiring
    * ------------------------------------------------------------------ */
 
+  /* Static text in index.html carries data-t with its English inside; this
+   * swaps in the active language and runs again whenever the player changes
+   * it. Keeping the English in the markup means the page is readable and
+   * usable even if the translation files never load. */
+  function applyStaticText() {
+    var nodes = document.querySelectorAll('[data-t]');
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (!n.getAttribute('data-t-src')) n.setAttribute('data-t-src', n.textContent.trim());
+      n.textContent = t(n.getAttribute('data-t-src'));
+    }
+    document.title = t('CASHFLOW Solo');
+  }
+
+  function buildLanguagePicker() {
+    var sel = $('#lang-select');
+    if (!sel) return;
+    clear(sel);
+    T.supported.forEach(function (code) {
+      var o = el('option', { value: code, text: CF_langName(code) });
+      if (code === T.lang()) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener('change', function () {
+      T.setLang(sel.value);
+      applyStaticText();
+      buildLanguagePicker();
+      if (state) { renderBank(); render(); }
+      buildSetupOptions(true);
+    });
+  }
+
+  function CF_langName(code) {
+    return (window.CF.langNames && window.CF.langNames[code]) || code;
+  }
+
   function init() {
+    applyStaticText();
+    buildLanguagePicker();
     $('#new-btn').addEventListener('click', openSetup);
     $('#undo-btn').addEventListener('click', undo);
     $('#export-btn').addEventListener('click', exportGame);
