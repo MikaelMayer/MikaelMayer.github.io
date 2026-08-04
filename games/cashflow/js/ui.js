@@ -1534,7 +1534,13 @@
    * paying 120% a year has to have chosen to.
    * ------------------------------------------------------------------ */
 
-  var loanAmount = 1000;
+  /* The amount dialogs always open at the smallest step.
+   *
+   * They used to remember the last amount, so after borrowing $3,000 and
+   * finding it short, reopening the dialog was already armed at $3,000 --
+   * one tap from borrowing that much again by accident. Starting at the
+   * minimum makes every increase a deliberate act. */
+  var LOAN_STEP = 1000;
 
   /* One amount-picker dialog, shared by taking a loan and repaying one.
    *
@@ -1577,7 +1583,6 @@
         ]));
       });
       confirm.textContent = opts.confirmLabel(value);
-      loanAmount = value;
     }
 
     function bump(delta) {
@@ -1617,7 +1622,7 @@
         'repay the principal.',
       blocked: 'You have no borrowing capacity left.',
       min: 1000, max: Math.floor(available / 1000) * 1000, step: 1000,
-      initial: loanAmount,
+      initial: LOAN_STEP,
       summary: function (v) {
         var extra = (v / 1000) * 100;
         return [
@@ -1641,7 +1646,7 @@
         ' repaid removes ' + money(100) + ' a month from your expenses.',
       blocked: 'You need at least ' + money(1000) + ' in cash to repay a block.',
       min: 1000, max: max, step: 1000,
-      initial: loanAmount,
+      initial: LOAN_STEP,
       summary: function (v) {
         var freed = (v / 1000) * 100;
         return [
