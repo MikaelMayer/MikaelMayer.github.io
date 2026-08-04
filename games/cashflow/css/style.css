@@ -574,8 +574,45 @@ button.sq:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px;
 .receipt-lines {
   font-family: var(--mono);
   font-size: 12px;
-  border-top: 1px solid var(--line);
-  padding-top: 6px;
+  display: grid;
+  gap: 8px;
+}
+/* Two boxes, because two separate things happened. What you collected on the
+   way past a payday is not part of what the square you landed on did. */
+.receipt-block {
+  border-radius: 8px;
+  padding: 7px 10px;
+}
+.receipt-block.payday {
+  background: var(--sq-pay-bg);
+  border-left: 3px solid var(--sq-pay-line);
+  color: var(--sq-on-color);
+}
+.receipt-block.payday .receipt-line { color: var(--sq-on-color); font-weight: 600; }
+.receipt-block.square {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+/* The block wears the colour of the square it came from, so the market result
+   is recognisably the market square you just landed on. */
+.receipt-block.square.MARKET      { background: var(--sq-market-bg);  border-color: var(--sq-market-line); }
+.receipt-block.square.OPPORTUNITY { background: var(--sq-deal-bg);    border-color: var(--sq-deal-line); }
+.receipt-block.square.DOODAD      { background: var(--sq-doodad-bg);  border-color: var(--sq-doodad-line); }
+.receipt-block.square.CHARITY     { background: var(--sq-charity-bg); border-color: var(--sq-charity-line); }
+.receipt-block.square.BABY        { background: var(--sq-baby-bg);    border-color: var(--sq-baby-line); }
+.receipt-block.square.DOWNSIZED   { background: var(--sq-fired-bg);   border-color: var(--sq-fired-line); }
+.receipt-block.square.MARKET .receipt-line,
+.receipt-block.square.OPPORTUNITY .receipt-line,
+.receipt-block.square.DOODAD .receipt-line,
+.receipt-block.square.CHARITY .receipt-line,
+.receipt-block.square.BABY .receipt-line,
+.receipt-block.square.DOWNSIZED .receipt-line { color: var(--sq-on-color); }
+.receipt-square {
+  font-size: 10px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 3px;
 }
 .receipt-line { padding: 2px 0; color: var(--muted); }
 .receipt-line.gain { color: var(--accent); }

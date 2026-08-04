@@ -116,7 +116,7 @@
       'Export': 'Exporter',
       'Import': 'Importer',
       'New game': 'Nouvelle partie',
-      'This turn': 'C’est ton tour !',
+      'This turn': 'C’est votre tour !',
       'Financial statement': 'Bilan financier',
       'Loans': 'Emprunts',
       'History': 'Historique',

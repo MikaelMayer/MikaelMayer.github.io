@@ -307,8 +307,9 @@
       if (sq.type === 'DREAM') return { dream: sq.dream };
       return { label: sq.label || sq.type };
     }
-    var key = SQUARE_LABEL[D.RAT_RACE_BOARD[state.position]];
-    return key ? { key: key } : null;
+    var type = D.RAT_RACE_BOARD[state.position];
+    var key = SQUARE_LABEL[type];
+    return key ? { key: key, type: type } : null;
   }
 
   function squareText(sq) {
@@ -1123,22 +1124,26 @@
      * the name of the square -- which is where naming it is useful, next to
      * the thing it produced, rather than as a heading over the whole turn. */
     var lines = el('div', { class: 'receipt-lines' });
+    var onTheWay = [];
     var fromSquare = [];
     receipt.entries.forEach(function (entry) {
-      if (entry.type === 'payday') {
-        lines.appendChild(el('div', { class: 'receipt-line ' + entry.type, text: logText(entry) }));
-      } else {
-        fromSquare.push(entry);
-      }
+      (entry.type === 'payday' ? onTheWay : fromSquare).push(entry);
     });
 
-    if (fromSquare.length) {
-      if (receipt.square) {
-        lines.appendChild(el('div', { class: 'receipt-square', text: squareText(receipt.square) }));
-      }
-      fromSquare.forEach(function (entry) {
-        lines.appendChild(el('div', { class: 'receipt-line ' + entry.type, text: logText(entry) }));
+    function block(cls, caption, entries) {
+      var box = el('div', { class: 'receipt-block ' + cls });
+      if (caption) box.appendChild(el('div', { class: 'receipt-square', text: caption }));
+      entries.forEach(function (entry) {
+        box.appendChild(el('div', { class: 'receipt-line ' + entry.type, text: logText(entry) }));
       });
+      return box;
+    }
+
+    // Collected on the way past, before the square was ever reached.
+    if (onTheWay.length) lines.appendChild(block('payday', null, onTheWay));
+    if (fromSquare.length) {
+      var sqType = (receipt.square && receipt.square.type) ? ' ' + receipt.square.type : '';
+      lines.appendChild(block('square' + sqType, squareText(receipt.square), fromSquare));
     }
     card.appendChild(lines);
 
