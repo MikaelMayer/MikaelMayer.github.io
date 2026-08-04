@@ -396,6 +396,8 @@
      * blank screen is the worst possible failure mode; say what happened and
      * keep the game recoverable through Undo. */
     try {
+      // Before anything draws: the end-of-game card reports this total.
+      if (state.phase === 'fasttrack' || state.phase === 'won') awardStar(state.profession.id);
       renderHeader();
       renderBoard();
       renderStatement();
@@ -666,6 +668,11 @@
    *
    * Nine cells of a 3x3 grid; each face lights the cells a physical die would.
    * Cheaper and crisper than an image, and it scales with the board. */
+  /* Money going round, not money going up: a ring with two gaps and two
+   * arrowheads, with the coin it moves in the middle. Inline so it works
+   * offline from a file:// URL, and vector so it is sharp at every size. */
+  var LOGO_SVG = "<svg class=\"mark\" viewBox=\"0 0 100 100\" aria-hidden=\"true\" focusable=\"false\"><g fill=\"none\" stroke=\"currentColor\" stroke-width=\"9\" stroke-linecap=\"butt\"><path d=\"M 82.8 41.2 A 34 34 0 0 0 22.1 30.5\"/><path d=\"M 17.2 58.8 A 34 34 0 0 0 77.9 69.5\"/></g><g fill=\"currentColor\"><path d=\"M 18.5 37.3 L 19.1 20.1 L 32.0 32.6 Z\"/><path d=\"M 81.5 62.7 L 80.9 79.9 L 68.0 67.4 Z\"/></g><circle cx=\"50\" cy=\"50\" r=\"15\" fill=\"currentColor\" opacity=\".16\"/><circle cx=\"50\" cy=\"50\" r=\"15\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\"/><circle cx=\"50\" cy=\"50\" r=\"6.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\"/></svg>";
+
   var DIE_PIPS = {
     1: [4],
     2: [0, 8],
@@ -719,14 +726,13 @@
      * is what only the board can say: which month it is, what you just rolled,
      * and any temporary state you are under. */
     if (state.phase === 'ratrace' || state.phase === 'fasttrack') {
-      centre.appendChild(el('div', { class: 'logo' }, [
+      var logo = el('div', { class: 'logo' });
+      logo.innerHTML = LOGO_SVG;
+      logo.appendChild(el('div', { class: 'wordmark' }, [
         el('span', { class: 'logo-cash', text: 'CASH' }),
         el('span', { class: 'logo-flow', text: 'FLOW' })
       ]));
-      /* Everything on this screen explains itself when tapped, and nothing
-       * about it looks like it would. One line, once, in the one place a
-       * player's eye returns to between turns. */
-      centre.appendChild(el('div', { class: 'tagline', text: t('Tap anything to learn more') }));
+      centre.appendChild(logo);
       centre.appendChild(statusChips());
     }
 
@@ -784,10 +790,10 @@
       head.appendChild(box(t('Cash'), money(state.cash),
         state.cash >= state.dream.cost ? 'hero' : null,
         state.cash >= state.dream.cost
-          ? 'enough for your dream'
-          : money(state.dream.cost - state.cash) + ' short of your dream'));
+          ? t('enough for your dream')
+          : t('{$gap} short of your dream', { gap: state.dream.cost - state.cash })));
       head.appendChild(box(t('Cash Flow Day'), money(f.totalIncome), null,
-        money(f.addedIncome) + ' of ' + money(ftGoal) + ' new income'));
+        t('{$added} of {$goal} new income', { added: f.addedIncome, goal: ftGoal })));
     } else {
       /* The win condition, side by side, as the first thing in the panel --
        * because "passive income vs total expenses" IS the game, and it used to
@@ -1046,9 +1052,33 @@
    * The action area: either "roll" or whatever decision is pending.
    * ------------------------------------------------------------------ */
 
+  function ladderNote() {
+    var done = earnedStars().length;
+    var total = D.PROFESSIONS.length;
+    var next = nextProfession();
+    var note = el('div', { class: 'hint ladder' });
+    note.appendChild(el('div', {
+      text: t('Professions beaten: {done} of {total}.', { done: done, total: total })
+    }));
+    if (next) {
+      note.appendChild(el('div', {
+        text: t('Not yet beaten: {name}, number {n} of {total} by difficulty.',
+          { name: T.field(next, 'name'), n: next.difficulty || total, total: total })
+      }));
+    } else {
+      note.appendChild(el('div', { text: t('Every profession has been beaten.') }));
+    }
+    return note;
+  }
+
   function renderPending() {
     var host = $('#action');
     clear(host);
+
+    /* Mid-roll: the dice are still turning or the token is still walking.
+     * There is nothing to decide until it lands, and showing the card early
+     * gave away the square before the token got there. */
+    if (moving) return;
 
     if (state.phase === 'bankrupt') {
       host.appendChild(el('div', { class: 'card danger' }, [
@@ -1056,6 +1086,7 @@
         el('p', {
           text: t('You could not pay for {reason}, and there was nothing left to sell or borrow against. Use Undo to go back and take a different turn, or start again.', { reason: state.result.reason })
         }),
+        ladderNote(),
         el('div', { class: 'buttons' }, [
           el('button', { class: 'primary', onclick: openSetup, text: t('New game') }),
           el('button', { onclick: undo, text: t('Undo the last move') })
@@ -1069,10 +1100,11 @@
         el('h3', { text: t('Game over - you win') }),
         el('p', {
           text: state.result.how === 'dream'
-            ? 'You bought your dream in ' + state.result.months + ' months.'
-            : 'You added ' + money(E.ftStats(state).addedIncome) +
-              ' a month of investment income in ' + state.result.months + ' months.'
+            ? t('You bought your dream in {months} months.', { months: state.result.months })
+            : t('You added {$income} a month of investment income in {months} months.',
+                { income: E.ftStats(state).addedIncome, months: state.result.months })
         }),
+        ladderNote(),
         el('div', { class: 'buttons' }, [
           el('button', { class: 'primary', onclick: openSetup, text: t('New game') })
         ])
@@ -1087,6 +1119,11 @@
       host.appendChild(rollCard());
       return;
     }
+
+    /* Money collected passing a payday happened before this card was drawn
+     * and is not part of it, but it did just happen to you. */
+    var passed = paydayBlock();
+    if (passed) host.appendChild(passed);
 
     switch (p.kind) {
       case 'chooseDeck': return host.appendChild(chooseDeckCard(p));
@@ -1112,6 +1149,26 @@
 
   /* The turn just played, replayed back. This is the only place a player can
    * see WHY their numbers changed without reading the history log. */
+  function entryBlock(cls, caption, entries) {
+    var box = el('div', { class: 'receipt-block ' + cls });
+    if (caption) box.appendChild(el('div', { class: 'receipt-square', text: caption }));
+    entries.forEach(function (entry) {
+      box.appendChild(el('div', { class: 'receipt-line ' + entry.type, text: logText(entry) }));
+    });
+    return box;
+  }
+
+  /* The payday part of this turn on its own, for when a card is waiting and
+   * the full receipt would be premature. */
+  function paydayBlock() {
+    if (!receipt || !receipt.entries.length) return null;
+    var paid = receipt.entries.filter(function (e) { return e.type === 'payday'; });
+    if (!paid.length) return null;
+    var wrap = el('div', { class: 'receipt-lines standalone' });
+    wrap.appendChild(entryBlock('payday', null, paid));
+    return wrap;
+  }
+
   function receiptCard() {
     var cashDelta = state.cash - receipt.cashStart;
     var passiveDelta = E.stats(state).passiveIncome - receipt.passiveStart;
@@ -1130,20 +1187,11 @@
       (entry.type === 'payday' ? onTheWay : fromSquare).push(entry);
     });
 
-    function block(cls, caption, entries) {
-      var box = el('div', { class: 'receipt-block ' + cls });
-      if (caption) box.appendChild(el('div', { class: 'receipt-square', text: caption }));
-      entries.forEach(function (entry) {
-        box.appendChild(el('div', { class: 'receipt-line ' + entry.type, text: logText(entry) }));
-      });
-      return box;
-    }
-
     // Collected on the way past, before the square was ever reached.
-    if (onTheWay.length) lines.appendChild(block('payday', null, onTheWay));
+    if (onTheWay.length) lines.appendChild(entryBlock('payday', null, onTheWay));
     if (fromSquare.length) {
       var sqType = (receipt.square && receipt.square.type) ? ' ' + receipt.square.type : '';
-      lines.appendChild(block('square' + sqType, squareText(receipt.square), fromSquare));
+      lines.appendChild(entryBlock('square' + sqType, squareText(receipt.square), fromSquare));
     }
     card.appendChild(lines);
 
@@ -1689,7 +1737,13 @@
     return el('div', { class: 'card' + (cls ? ' ' + cls : ' info') }, [
       el('h3', { text: T.maybe(p.title) }),
       el('p', { text: T.maybe(p.text) }),
-      p.amount !== undefined ? terms([[t('Cost'), money(p.amount)], p.addExpense ? [t('Added monthly expense'), money(p.addExpense)] : null]) : null,
+      /* You cannot judge a donation without knowing what it leaves you. */
+      p.amount !== undefined ? terms([
+        [t('Cost'), money(p.amount)],
+        p.addExpense ? [t('Added monthly expense'), money(p.addExpense)] : null,
+        [t('Your cash'), money(state.cash)],
+        [t('Cash if you accept'), money(state.cash - p.amount)]
+      ]) : null,
       errorSlot(),
       el('div', { class: 'buttons' }, [
         el('button', { onclick: function () { doAction(yesAction); }, text: yesLabel }),
@@ -2187,19 +2241,63 @@
   /* Rebuilt rather than built once, so the profession and dream lists follow a
    * language change instead of staying in whichever language the page loaded
    * in. `force` keeps the current selections while relabelling them. */
+  /* Professions double as levels, so the game remembers which ones you have
+   * got out of the Rat Race with. Kept separately from the save, because it
+   * outlives any one game. */
+  var STARS_KEY = 'cashflow-solo-stars';
+
+  function earnedStars() {
+    try {
+      var raw = localStorage.getItem(STARS_KEY);
+      var list = raw ? JSON.parse(raw) : [];
+      return Object.prototype.toString.call(list) === '[object Array]' ? list : [];
+    } catch (e) { return []; }
+  }
+
+  function awardStar(id) {
+    if (!id) return false;
+    var list = earnedStars();
+    if (list.indexOf(id) !== -1) return false;
+    list.push(id);
+    try { localStorage.setItem(STARS_KEY, JSON.stringify(list)); } catch (e) { /* private mode */ }
+    return true;
+  }
+
+  function professionsByDifficulty() {
+    return D.PROFESSIONS.slice().sort(function (a, b) {
+      return (a.difficulty || 99) - (b.difficulty || 99);
+    });
+  }
+
+  /* The easiest profession you have not beaten yet. */
+  function nextProfession() {
+    var done = earnedStars();
+    var list = professionsByDifficulty();
+    for (var i = 0; i < list.length; i++) {
+      if (done.indexOf(list[i].id) === -1) return list[i];
+    }
+    return null;
+  }
+
   function buildSetupOptions(force) {
     var sel = $('#prof-select');
     var dream = $('#dream-select');
     if (!sel) return;
     if (sel.options.length && !force) return;
 
-    var keepProf = sel.value || 'teacher';
+    var suggested = nextProfession();
+    var keepProf = sel.value || (suggested ? suggested.id : 'police-officer');
     var keepDream = dream.value;
 
     clear(sel);
     clear(dream);
-    D.PROFESSIONS.forEach(function (p) {
-      sel.appendChild(el('option', { value: p.id, text: T.field(p, 'name') }));
+    var done = earnedStars();
+    professionsByDifficulty().forEach(function (p, i) {
+      var star = done.indexOf(p.id) !== -1 ? ' \u2605' : '';
+      sel.appendChild(el('option', {
+        value: p.id,
+        text: (i + 1) + ' \u00b7 ' + T.field(p, 'name') + star
+      }));
     });
     D.DREAMS.forEach(function (d) {
       dream.appendChild(el('option', {
@@ -2233,7 +2331,7 @@
       [t('Total expenses'), money(expenses)],
       [t('Monthly cash flow'), money(p.salary - expenses)],
       [t('Savings to start'), money(p.savings)],
-      [t('Cost per child'), money(p.childCost) + ' / month']
+      [t('Cost per child'), t('{$amount} / month', { amount: p.childCost })]
     ].forEach(function (r) {
       host.appendChild(el('div', {}, [el('span', { text: r[0] }), el('span', { text: r[1] })]));
     });

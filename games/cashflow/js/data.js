@@ -35,7 +35,7 @@
 
   var PROFESSIONS = [
     {
-      id: 'janitor', name: 'Janitor', salary: 1600, taxes: 280,
+      id: 'janitor', difficulty: 8, name: 'Janitor', salary: 1600, taxes: 280,
       home: { payment: 200, liability: 20000 },
       school: { payment: 0, liability: 0 },
       car: { payment: 60, liability: 4000 },
@@ -44,7 +44,7 @@
       other: 300, childCost: 140, savings: 560
     },
     {
-      id: 'mechanic', name: 'Mechanic', salary: 2000, taxes: 360,
+      id: 'mechanic', difficulty: 4, name: 'Mechanic', salary: 2000, taxes: 360,
       home: { payment: 300, liability: 28000 },
       school: { payment: 0, liability: 0 },
       car: { payment: 80, liability: 6000 },
@@ -53,7 +53,7 @@
       other: 250, childCost: 160, savings: 720
     },
     {
-      id: 'truck-driver', name: 'Truck Driver', salary: 2500, taxes: 460,
+      id: 'truck-driver', difficulty: 2, name: 'Truck Driver', salary: 2500, taxes: 460,
       home: { payment: 400, liability: 38000 },
       school: { payment: 60, liability: 12000 },
       car: { payment: 100, liability: 8000 },
@@ -62,7 +62,7 @@
       other: 300, childCost: 180, savings: 610
     },
     {
-      id: 'secretary', name: 'Secretary', salary: 2500, taxes: 460,
+      id: 'secretary', difficulty: 3, name: 'Secretary', salary: 2500, taxes: 460,
       home: { payment: 400, liability: 38000 },
       school: { payment: 60, liability: 12000 },
       car: { payment: 120, liability: 9000 },
@@ -71,7 +71,7 @@
       other: 300, childCost: 170, savings: 710
     },
     {
-      id: 'police-officer', name: 'Police Officer', salary: 3000, taxes: 580,
+      id: 'police-officer', difficulty: 1, name: 'Police Officer', salary: 3000, taxes: 580,
       home: { payment: 500, liability: 46000 },
       school: { payment: 60, liability: 12000 },
       car: { payment: 100, liability: 8000 },
@@ -80,7 +80,7 @@
       other: 330, childCost: 200, savings: 700
     },
     {
-      id: 'nurse', name: 'Nurse', salary: 3100, taxes: 600,
+      id: 'nurse', difficulty: 12, name: 'Nurse', salary: 3100, taxes: 600,
       home: { payment: 700, liability: 75000 },
       school: { payment: 150, liability: 30000 },
       car: { payment: 120, liability: 9000 },
@@ -89,7 +89,7 @@
       other: 380, childCost: 240, savings: 760
     },
     {
-      id: 'teacher', name: 'Teacher (K-12)', salary: 3300, taxes: 630,
+      id: 'teacher', difficulty: 7, name: 'Teacher (K-12)', salary: 3300, taxes: 630,
       home: { payment: 700, liability: 75000 },
       school: { payment: 120, liability: 24000 },
       car: { payment: 140, liability: 11000 },
@@ -98,7 +98,7 @@
       other: 400, childCost: 240, savings: 400
     },
     {
-      id: 'business-manager', name: 'Business Manager', salary: 4600, taxes: 910,
+      id: 'business-manager', difficulty: 11, name: 'Business Manager', salary: 4600, taxes: 910,
       home: { payment: 700, liability: 75000 },
       school: { payment: 300, liability: 60000 },
       car: { payment: 300, liability: 19000 },
@@ -107,7 +107,7 @@
       other: 700, childCost: 300, savings: 400
     },
     {
-      id: 'engineer', name: 'Engineer', salary: 4900, taxes: 1050,
+      id: 'engineer', difficulty: 9, name: 'Engineer', salary: 4900, taxes: 1050,
       home: { payment: 1090, liability: 75000 },
       school: { payment: 60, liability: 12000 },
       car: { payment: 220, liability: 17000 },
@@ -116,7 +116,7 @@
       other: 700, childCost: 320, savings: 400
     },
     {
-      id: 'lawyer', name: 'Lawyer', salary: 7500, taxes: 1830,
+      id: 'lawyer', difficulty: 5, name: 'Lawyer', salary: 7500, taxes: 1830,
       home: { payment: 1100, liability: 115000 },
       school: { payment: 300, liability: 60000 },
       car: { payment: 300, liability: 19000 },
@@ -125,7 +125,7 @@
       other: 1100, childCost: 380, savings: 400
     },
     {
-      id: 'airline-pilot', name: 'Airline Pilot', salary: 9500, taxes: 2350,
+      id: 'airline-pilot', difficulty: 6, name: 'Airline Pilot', salary: 9500, taxes: 2350,
       home: { payment: 1330, liability: 150000 },
       school: { payment: 750, liability: 150000 },
       car: { payment: 380, liability: 33000 },
@@ -134,7 +134,7 @@
       other: 1400, childCost: 480, savings: 400
     },
     {
-      id: 'doctor', name: 'Doctor (MD)', salary: 13200, taxes: 3420,
+      id: 'doctor', difficulty: 10, name: 'Doctor (MD)', salary: 13200, taxes: 3420,
       home: { payment: 1900, liability: 202000 },
       school: { payment: 750, liability: 150000 },
       car: { payment: 380, liability: 33000 },

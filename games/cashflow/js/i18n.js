@@ -94,6 +94,8 @@
       if (isMoney) return money(v);
       /* A content reference -- {id, f, en} -- resolves in the language being
        * read rather than the one it was written in. */
+      /* A phrase reference -- {k: 'English key'} -- translates when read. */
+      if (v && typeof v === 'object' && v.k) return t(v.k);
       if (v && typeof v === 'object' && v.id) {
         var tr = content(v.id);
         var f = v.f || 'title';

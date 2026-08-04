@@ -1076,4 +1076,8 @@
 
   global.CF = global.CF || {};
   global.CF.runTests = runAll;
+  /* The competent player is useful outside the suite too -- it is how the
+   * professions were ordered by difficulty. Exposed rather than copied, so
+   * the ordering always reflects the strategy the tests actually assert on. */
+  global.CF.simulate = { playSensibly: playSensibly };
 })(typeof window !== 'undefined' ? window : globalThis);

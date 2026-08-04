@@ -652,7 +652,7 @@
       else if (card.scope === 'perBusiness') count = countAssets(state, 'business');
       else if (card.scope === 'ifAnyRental') count = countAssets(state, 'realestate') > 0 ? 1 : 0;
       if (count === 0) {
-        log(state, '{title} - a cost for {who}. You have none, so you pay nothing.', { title: ref(card), who: t(WHO_IT_HITS[card.scope]) }, 'system');
+        log(state, '{title} - a cost for {who}. You have none, so you pay nothing.', { title: ref(card), who: { k: WHO_IT_HITS[card.scope] } }, 'system');
         return;
       }
       state.pending = {
