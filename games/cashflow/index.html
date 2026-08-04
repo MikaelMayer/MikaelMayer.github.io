@@ -14,6 +14,9 @@
   <div class="brand">
     <h1>CASHFLOW <span>Solo</span></h1>
     <span class="seedtag" id="seedtag">seed —</span>
+    <!-- The seed alone is not enough to replay a game: the profession and the
+         dream are chosen, not derived from it. This shares all three. -->
+    <button id="share-btn" class="linkbtn" data-t title="Copy a link that starts this same game">Share this setup</button>
   </div>
   <div class="tools">
     <!-- The game autosaves, so there is no Save button and no Load button to
@@ -85,10 +88,18 @@
   Independent implementation — not affiliated with or endorsed by Rich Dad Company.
   Runs entirely offline; nothing leaves your browser.
   <a href="tests.html">Run the engine tests</a>.
+  <a href="https://www.richdad.com/cashflow-classic" rel="noopener" target="_blank">Play the original CASHFLOW Classic</a>.
 </footer>
 
 <dialog id="money-dialog">
   <div class="dlg-body" id="money-dialog-body"></div>
+</dialog>
+
+<!-- Explanations open over the game rather than in the column below it. An
+     inline explainer appears wherever that column happens to have scrolled to,
+     which for a tap on the statement is usually off-screen. -->
+<dialog id="explain" aria-labelledby="explain-title">
+  <div class="dlg-body" id="explain-body"></div>
 </dialog>
 
 <dialog id="setup">

@@ -52,7 +52,7 @@
       "The combined monthly income of the businesses you own.": "Le revenu mensuel cumulé des entreprises que vous possédez.",
       "What you own. Some of it pays you every month; some of it pays nothing until you sell it for more than you paid.": "Ce que vous possédez. Une partie vous rapporte chaque mois ; une autre ne rapporte rien tant que vous ne l’avez pas revendue plus cher.",
       "What you owe. Each one has a matching monthly payment in the Expenses list. Paying a debt off in full removes that payment for the rest of the game.": "Ce que vous devez. Chaque ligne a une mensualité correspondante dans les dépenses. Solder une dette en totalité supprime cette mensualité pour le reste de la partie.",
-      "Money you have borrowed. Every $1,000 costs $100 a month, every month, until you repay the principal.": "L’argent que vous avez emprunté. Chaque 1 000 $ coûte 100 $ par mois, tous les mois, jusqu’au remboursement du capital.",
+      "Money you have borrowed. Every $1,000 costs $100 a month, every month, until you repay the principal.": "L’argent que vous avez emprunté. Chaque 1 000 € coûte 100 € par mois, tous les mois, jusqu’au remboursement du capital.",
       "Deducted from your salary every month. It does not change as you play.": "Prélevés sur votre salaire chaque mois. Ils ne varient pas au cours de la partie.",
       "What you collect each time you pass or land on a Cash Flow Day square: the income you carried out of the Rat Race, plus anything the investments you have bought here produce.": "Ce que vous encaissez à chaque passage ou arrêt sur une case Jour de paie : le revenu emporté en sortant de la course des rats, plus ce que rapportent les investissements achetés ici.",
       "{$amount} / share / month": "{$amount} / action / mois",
@@ -107,7 +107,7 @@
       "A salary is not passive income. Neither is a lump sum from selling something. Only rent, dividends, interest and business profit count, which is why selling a property for a good price can still move you backwards.": "Un salaire n’est pas un revenu passif. Une somme touchée en vendant quelque chose non plus. Seuls comptent les loyers, les dividendes, les intérêts et les bénéfices d’entreprise — c’est pourquoi vendre un bien à bon prix peut malgré tout vous faire reculer.",
       "Roll, move, and resolve the square you land on. Tap any square on the board to see what it does. You may always look at a deal and then decline it, and you may always refuse a purchase.": "Lancez, avancez, puis résolvez la case où vous vous arrêtez. Touchez n’importe quelle case du plateau pour savoir ce qu’elle fait. Vous pouvez toujours regarder une affaire puis la refuser, et toujours refuser un achat.",
       "Once your passive income passes your expenses you leave the Rat Race for the Fast Track, where you win by landing on your own dream and buying it, or by doubling the monthly income you arrived with.": "Dès que vos revenus passifs dépassent vos dépenses, vous quittez la course des rats pour la voie rapide, où l’on gagne en s’arrêtant sur son propre rêve et en l’achetant, ou en doublant le revenu mensuel avec lequel on est arrivé.",
-      "You can take a loan in $1,000 blocks at $100 a month each — 120% a year, interest only. That interest is an expense like any other, so every loan raises the bar you are trying to clear. Nothing is ever borrowed on your behalf: taking a loan is always your own deliberate choice, and you repay it from the Liabilities list.": "Vous pouvez emprunter par blocs de 1 000 $ à 100 $ par mois chacun — 120 % par an, intérêts seuls. Ces intérêts sont une dépense comme une autre : chaque emprunt relève donc le seuil à franchir. Rien n’est jamais emprunté à votre place : emprunter est toujours votre choix délibéré, et vous remboursez depuis la liste des passifs.",
+      "You can take a loan in $1,000 blocks at $100 a month each — 120% a year, interest only. That interest is an expense like any other, so every loan raises the bar you are trying to clear. Nothing is ever borrowed on your behalf: taking a loan is always your own deliberate choice, and you repay it from the Liabilities list.": "Vous pouvez emprunter par blocs de 1 000 € à 100 € par mois chacun — 120 % par an, intérêts seuls. Ces intérêts sont une dépense comme une autre : chaque emprunt relève donc le seuil à franchir. Rien n’est jamais emprunté à votre place : emprunter est toujours votre choix délibéré, et vous remboursez depuis la liste des passifs.",
       "Keyboard: r rolls, u undoes. Your game saves itself in this browser as you play.": "Clavier : r lance les dés, u annule. Votre partie s’enregistre toute seule dans ce navigateur.",
       "Undo the last action (u)": "Annuler la dernière action (u)",
       "Download this game as a file": "Télécharger cette partie sous forme de fichier",
@@ -194,7 +194,7 @@
       'Big Deal': 'Grosse affaire',
       'Looking at a deal does not commit you to it.':
         'Regarder une affaire ne vous engage à rien.',
-      'Pass': 'Passer',
+      'Pass': 'J’ai fini',
       'Buy': 'Acheter',
       'Buy for {$amount}': 'Acheter pour {$amount}',
       'Sell': 'Vendre',
@@ -221,7 +221,7 @@
       'Cash-on-cash return': 'Rendement sur apport',
       'Your cash': 'Votre argent liquide',
       'Price per share': 'Prix par action',
-      'Dividend': 'Dividende',
+      'Dividend': 'Dividende mensuel',
       'none': 'aucun',
       'Trading range': 'Fourchette de cotation',
       'You own': 'Vous possédez',
@@ -240,6 +240,25 @@
       'Coins left': 'Pièces restantes',
       '{pct}%': '{pct}\u00a0%',
       '{pct}% a year': '{pct}\u00a0% par an',
+      "Tap anything to learn more": "Touchez n’importe quoi pour en savoir plus",
+      "Your position": "Votre position",
+      "Average price you paid": "Prix moyen payé",
+      "Total invested": "Total investi",
+      "Price now": "Prix actuel",
+      "{n} shares at {$avg} each, {$paid} in total": "{n} actions à {$avg} l’unité, {$paid} au total",
+      "or type an amount": "ou saisissez un nombre",
+      "Use": "Valider",
+      "Number of shares to buy": "Nombre d’actions à acheter",
+      "Number of shares to sell": "Nombre d’actions à vendre",
+      "Enter how many shares.": "Indiquez un nombre d’actions.",
+      "You can afford {n} shares at this price.": "À ce prix, vous pouvez en acheter {n}.",
+      "You only own {n} shares.": "Vous n’en possédez que {n}.",
+      "Share": "Partager",
+      "Share this setup": "Partager cette partie",
+      "Share this game": "Partager cette partie",
+      "Anyone who opens this link starts from the same seed, profession and dream, and can make different choices from there.": "Quiconque ouvre ce lien démarre avec la même graine, la même profession et le même rêve, et peut ensuite faire d’autres choix.",
+      "Link copied. Anyone who opens it starts this same game.": "Lien copié. Quiconque l’ouvre démarre cette même partie.",
+      "{$amount}/mo": "{$amount}/mois",
       'Monthly income from these': 'Revenu mensuel de ces titres',
       'Change amount': 'Modifier la quantité',
       'Buy {qty} share': 'Acheter {qty} action',
@@ -601,95 +620,95 @@
           },
           "sd01": {
                 "title": "HLTH - HealthCo",
-                "text": "Les actions se négocient à 5 $. Fourchette 5 $ - 40 $. Ne verse pas de dividende. Des rumeurs évoquent l’homologation d’un nouveau médicament."
+                "text": "Les actions se négocient à 5 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Un essai de phase avancée a manqué son objectif et le titre a fortement chuté."
           },
           "sd02": {
                 "title": "HLTH - HealthCo",
-                "text": "Les actions se négocient à 10 $. Fourchette 5 $ - 40 $. Ne verse pas de dividende."
+                "text": "Les actions se négocient à 10 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Un concurrent a commercialisé un traitement similaire avant elle."
           },
           "sd03": {
                 "title": "HLTH - HealthCo",
-                "text": "Les actions se négocient à 20 $. Fourchette 5 $ - 40 $. Ne verse pas de dividende."
+                "text": "Les actions se négocient à 20 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Rien de notable cette année ; le titre reste au milieu de sa fourchette."
           },
           "sd04": {
                 "title": "HLTH - HealthCo",
-                "text": "Les actions se négocient à 30 $. Fourchette 5 $ - 40 $. Ne verse pas de dividende. Les analystes estiment le titre pleinement valorisé."
+                "text": "Les actions se négocient à 30 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Un nouveau traitement a été homologué et la presse est enthousiaste."
           },
           "sd05": {
                 "title": "GRW - GrowTech",
-                "text": "Les actions se négocient à 5 $. Fourchette 5 $ - 40 $. Ne verse pas de dividende."
+                "text": "Les actions se négocient à 5 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Une startup bien financée casse ses prix sur son marché principal."
           },
           "sd06": {
                 "title": "GRW - GrowTech",
-                "text": "Les actions se négocient à 15 $. Fourchette 5 $ - 40 $. Ne verse pas de dividende."
+                "text": "Les actions se négocient à 15 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. La croissance ralentit et deux ingénieurs clés sont partis."
           },
           "sd07": {
                 "title": "GRW - GrowTech",
-                "text": "Les actions se négocient à 30 $. Fourchette 5 $ - 40 $. Ne verse pas de dividende."
+                "text": "Les actions se négocient à 30 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Elle a signé son plus gros client entreprise à ce jour."
           },
           "sd08": {
                 "title": "GRW - GrowTech",
-                "text": "Les actions se négocient à 40 $. Fourchette 5 $ - 40 $. Ne verse pas de dividende. Les volumes sont inhabituellement élevés ce mois-ci."
+                "text": "Les actions se négocient à 40 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Élue entreprise de l’année par la presse économique. Les volumes échangés sont inhabituellement élevés."
           },
           "sd09": {
                 "title": "BIGX - BigBox Retail",
-                "text": "Les actions se négocient à 10 $. Fourchette 10 $ - 50 $. Ne verse pas de dividende."
+                "text": "Les actions se négocient à 10 €. Fourchette 10 € - 50 €. Ne verse pas de dividende. Un concurrent en ligne a ouvert un entrepôt juste à côté de son plus grand magasin."
           },
           "sd10": {
                 "title": "BIGX - BigBox Retail",
-                "text": "Les actions se négocient à 20 $. Fourchette 10 $ - 50 $. Ne verse pas de dividende."
+                "text": "Les actions se négocient à 20 €. Fourchette 10 € - 50 €. Ne verse pas de dividende. Les ventes stagnent et elle a fermé quatre magasins."
           },
           "sd11": {
                 "title": "BIGX - BigBox Retail",
-                "text": "Les actions se négocient à 40 $. Fourchette 10 $ - 50 $. Ne verse pas de dividende."
+                "text": "Les actions se négocient à 40 €. Fourchette 10 € - 50 €. Ne verse pas de dividende. Un trimestre de fêtes solide a dépassé toutes les prévisions."
           },
           "sd12": {
                 "title": "MYTV - MediaTV",
-                "text": "Les actions se négocient à 1 $. Fourchette 1 $ - 30 $. Ne verse pas de dividende. Titre à très faible capitalisation, très risqué."
+                "text": "Les actions se négocient à 1 €. Fourchette 1 € - 30 €. Ne verse pas de dividende. Elle a perdu les droits de diffusion sur lesquels reposait son activité. Titre à très faible prix, risque très élevé."
           },
           "sd13": {
                 "title": "MYTV - MediaTV",
-                "text": "Les actions se négocient à 5 $. Fourchette 1 $ - 30 $. Ne verse pas de dividende."
+                "text": "Les actions se négocient à 5 €. Fourchette 1 € - 30 €. Ne verse pas de dividende. Les recettes publicitaires baissent depuis six trimestres consécutifs."
           },
           "sd14": {
                 "title": "MYTV - MediaTV",
-                "text": "Les actions se négocient à 15 $. Fourchette 1 $ - 30 $. Ne verse pas de dividende."
+                "text": "Les actions se négocient à 15 €. Fourchette 1 € - 30 €. Ne verse pas de dividende. Un nouvel accord de diffusion en ligne a ramené des abonnés."
           },
           "sd15": {
                 "title": "NRGY - NuEnergy",
-                "text": "Les actions se négocient à 5 $. Fourchette 5 $ - 40 $. Ne verse pas de dividende."
+                "text": "Les actions se négocient à 5 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Un projet a été annulé et le régulateur a ouvert une enquête."
           },
           "sd16": {
                 "title": "NRGY - NuEnergy",
-                "text": "Les actions se négocient à 20 $. Fourchette 5 $ - 40 $. Ne verse pas de dividende."
+                "text": "Les actions se négocient à 20 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Les prix de l’énergie sont stables depuis le début de l’année."
           },
           "sd17": {
                 "title": "NRGY - NuEnergy",
-                "text": "Les actions se négocient à 35 $. Fourchette 5 $ - 40 $. Ne verse pas de dividende."
+                "text": "Les actions se négocient à 35 €. Fourchette 5 € - 40 €. Ne verse pas de dividende. Elle a remporté un contrat national et la presse salue sa direction."
           },
           "sd18": {
                 "title": "SAFE - SafePower Utility",
-                "text": "Les actions se négocient à 20 $. Fourchette 20 $ - 40 $. Verse 1 $ par action et par mois. Un service public régulé au long historique de dividendes."
+                "text": "Les actions se négocient à 20 €. Fourchette 20 € - 40 €. Verse 1 € par action et par mois. Le régulateur a plafonné ce qu’elle peut facturer aux ménages."
           },
           "sd19": {
                 "title": "SAFE - SafePower Utility",
-                "text": "Les actions se négocient à 30 $. Fourchette 20 $ - 40 $. Verse 1 $ par action et par mois."
+                "text": "Les actions se négocient à 30 €. Fourchette 20 € - 40 €. Verse 1 € par action et par mois. Un service public régulé au long historique de dividendes. Rien n’a changé cette année."
           },
           "sd20": {
                 "title": "SAFE - SafePower Utility",
-                "text": "Les actions se négocient à 40 $. Fourchette 20 $ - 40 $. Verse 1 $ par action et par mois."
+                "text": "Les actions se négocient à 40 €. Fourchette 20 € - 40 €. Verse 1 € par action et par mois. Elle a augmenté son dividende pour la douzième année consécutive."
           },
           "sd21": {
                 "title": "REIT - Income REIT Fund",
-                "text": "Les parts se négocient à 20 $. Fourchette 20 $ - 40 $. Verse 1 $ par part et par mois. Un fonds propriétaire d’immeubles résidentiels."
+                "text": "Les actions se négocient à 20 €. Fourchette 20 € - 40 €. Verse 1 € par action et par mois. Plusieurs locataires sont partis et deux immeubles sont à moitié vides."
           },
           "sd22": {
                 "title": "REIT - Income REIT Fund",
-                "text": "Les parts se négocient à 25 $. Fourchette 20 $ - 40 $. Verse 1 $ par part et par mois."
+                "text": "Les actions se négocient à 25 €. Fourchette 20 € - 40 €. Verse 1 € par action et par mois. Un fonds propriétaire d’immeubles d’habitation. Le taux d’occupation est stable."
           },
           "sd23": {
                 "title": "REIT - Income REIT Fund",
-                "text": "Les parts se négocient à 35 $. Fourchette 20 $ - 40 $. Verse 1 $ par part et par mois."
+                "text": "Les actions se négocient à 35 €. Fourchette 20 € - 40 €. Verse 1 € par action et par mois. Les loyers ont augmenté dans tous ses immeubles et l’occupation est presque totale."
           },
           "sd24": {
                 "title": "HLTH annonce une division d’action 2 pour 1",
@@ -765,24 +784,24 @@
                 "text": "Un dépôt de six mois à taux fixe. Les fonds sont bloqués pendant la durée."
           },
           "sd44": {
-                "title": "Pièces d’or de collection — 500 $ pièce",
+                "title": "Pièces d’or de collection — 500 € pièce",
                 "text": "L’or ne verse aucun revenu mensuel. Sa valeur sera ce qu’un acheteur en proposera plus tard."
           },
           "sd45": {
-                "title": "Pièces d’or de collection — 600 $ pièce",
+                "title": "Pièces d’or de collection — 600 € pièce",
                 "text": "Les prix des collectionneurs ont monté cette année."
           },
           "sd46": {
-                "title": "Un ami vous demande un prêt de 1 000 $",
+                "title": "Un ami vous demande un prêt de 1 000 €",
                 "text": "Sans intérêt, sans échéance et sans rien d’écrit."
           },
           "sd47": {
-                "title": "Tuyau : actions pré-introduction, 2 500 $ minimum",
+                "title": "Tuyau : actions pré-introduction, 2 500 € minimum",
                 "text": "Actions non cotées vendues de gré à gré. Il n’y a pas de cours public et aucun moyen de les revendre dans ce jeu."
           },
           "sd48": {
                 "title": "Multipropriété dans une station de ski",
-                "text": "Deux semaines par an dans une station donnée, plus 50 $ par mois de charges."
+                "text": "Deux semaines par an dans une station donnée, plus 50 € par mois de charges."
           },
           "bd01": {
                 "title": "Immeuble de 4 logements — locataires stables"
@@ -862,11 +881,11 @@
           },
           "bd23": {
                 "title": "Un restaurant à votre nom",
-                "text": "Un restaurant de 60 couverts. Il tourne actuellement 400 $ par mois sous son seuil de rentabilité."
+                "text": "Un restaurant de 60 couverts. Il tourne actuellement 400 € par mois sous son seuil de rentabilité."
           },
           "bd24": {
                 "title": "Voiture de collection « placement »",
-                "text": "L’assurance et le gardiennage reviennent à 300 $ par mois. Elle ne génère aucun loyer."
+                "text": "L’assurance et le gardiennage reviennent à 300 € par mois. Elle ne génère aucun loyer."
           },
           "bd25": {
                 "title": "Immeuble de 10 logements — crédit vendeur",
@@ -967,55 +986,55 @@
           },
           "dd24": {
                 "title": "Voiture neuve à crédit",
-                "text": "Un apport de 5 000 $, puis 300 $ par mois tant que vous la gardez."
+                "text": "Un apport de 5 000 €, puis 300 € par mois tant que vous la gardez."
           },
           "dd25": {
                 "title": "Bateau à crédit",
-                "text": "Un apport de 3 000 $, puis 200 $ par mois d’amarrage et d’entretien."
+                "text": "Un apport de 3 000 €, puis 200 € par mois d’amarrage et d’entretien."
           },
           "mk01": {
                 "title": "Acheteur pour maisons 3 ch./2 sdb",
-                "text": "Une famille en mutation paiera 75 000 $ pour chaque maison 3 ch./2 sdb que vous possédez."
+                "text": "Une famille en mutation paiera 75 000 € pour chaque maison 3 ch./2 sdb que vous possédez."
           },
           "mk02": {
                 "title": "Acheteur pour maisons 3 ch./2 sdb",
-                "text": "Un investisseur propose 65 000 $ par maison 3 ch./2 sdb."
+                "text": "Un investisseur propose 65 000 € par maison 3 ch./2 sdb."
           },
           "mk03": {
                 "title": "Marché tendu sur les maisons 3 ch./2 sdb",
-                "text": "Une surenchère. 90 000 $ par maison 3 ch./2 sdb."
+                "text": "Une surenchère. 90 000 € par maison 3 ch./2 sdb."
           },
           "mk04": {
                 "title": "Acheteur d’appartements",
-                "text": "50 000 $ pour chaque appartement que vous possédez."
+                "text": "50 000 € pour chaque appartement que vous possédez."
           },
           "mk05": {
                 "title": "Acheteur d’appartements",
-                "text": "42 000 $ pour chaque appartement que vous possédez."
+                "text": "42 000 € pour chaque appartement que vous possédez."
           },
           "mk06": {
                 "title": "Acheteur de maisons à deux logements",
-                "text": "32 000 $ par logement pour toute maison de deux logements que vous possédez."
+                "text": "32 000 € par logement pour toute maison de deux logements que vous possédez."
           },
           "mk07": {
                 "title": "Acheteur d’immeubles — petits logements",
-                "text": "40 000 $ par logement pour tout immeuble que vous possédez."
+                "text": "40 000 € par logement pour tout immeuble que vous possédez."
           },
           "mk08": {
                 "title": "Acheteur institutionnel",
-                "text": "Un fonds de pension achète. 55 000 $ par logement."
+                "text": "Un fonds de pension achète. 55 000 € par logement."
           },
           "mk09": {
                 "title": "Offre au rabais sur les immeubles",
-                "text": "28 000 $ par logement. Vous n’êtes nullement tenu d’accepter."
+                "text": "28 000 € par logement. Vous n’êtes nullement tenu d’accepter."
           },
           "mk10": {
                 "title": "Promoteur foncier",
-                "text": "3 000 $ l’hectare pour tout terrain que vous possédez."
+                "text": "3 000 € l’hectare pour tout terrain que vous possédez."
           },
           "mk11": {
                 "title": "Terrain reclassé en zone constructible",
-                "text": "La commune a reclassé le terrain. 7 400 $ l’hectare."
+                "text": "La commune a reclassé le terrain. 7 400 € l’hectare."
           },
           "mk12": {
                 "title": "Acheteur d’entreprise",
@@ -1035,27 +1054,27 @@
           },
           "mk16": {
                 "title": "L’or atteint un record",
-                "text": "Les collectionneurs paient 1 200 $ la pièce d’or."
+                "text": "Les collectionneurs paient 1 200 € la pièce d’or."
           },
           "mk17": {
                 "title": "L’or décroche",
-                "text": "Les négociants proposent 400 $ la pièce. La vente est facultative."
+                "text": "Les négociants proposent 400 € la pièce. La vente est facultative."
           },
           "mk18": {
                 "title": "Un locataire dégrade un logement",
-                "text": "Si vous possédez un bien locatif, payez 1 000 $ de réparations."
+                "text": "Si vous possédez un bien locatif, payez 1 000 € de réparations."
           },
           "mk19": {
                 "title": "Réévaluation de la taxe foncière",
-                "text": "Payez 200 $ pour chaque bien que vous possédez."
+                "text": "Payez 200 € pour chaque bien que vous possédez."
           },
           "mk20": {
                 "title": "Pertes dues au vol à l’étalage",
-                "text": "Payez 500 $ pour chaque entreprise que vous possédez."
+                "text": "Payez 500 € pour chaque entreprise que vous possédez."
           },
           "mk21": {
                 "title": "Toiture à refaire",
-                "text": "Payez 500 $ pour chaque bien que vous possédez."
+                "text": "Payez 500 € pour chaque bien que vous possédez."
           },
           "mk22": {
                 "title": "Les taux d’intérêt restent stables",

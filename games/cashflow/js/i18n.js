@@ -61,14 +61,14 @@
   }
 
   /* ---- money ------------------------------------------------------
-   * French writes 1 000 $ with the symbol after and a space as the group
+   * French writes 1 000 € with the symbol after and a space as the group
    * separator; English writes $1,000. Getting this wrong is the first thing a
    * French speaker notices. */
   function money(n) {
     var neg = n < 0;
     var abs = Math.abs(Math.round(n));
     if (current === 'fr') {
-      return (neg ? '-' : '') + abs.toLocaleString('fr-FR') + ' $';
+      return (neg ? '-' : '') + abs.toLocaleString('fr-FR') + '\u00a0\u20ac';
     }
     return (neg ? '-$' : '$') + abs.toLocaleString('en-US');
   }

@@ -371,6 +371,36 @@ button.sq:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px;
   letter-spacing: -.01em;
 }
 .board-center .sub { color: var(--muted); font-size: 13px; }
+
+/* The middle of the board says what game this is. Two weights of the same
+   word, which is how the printed logo reads, scaled to the board rather than
+   to the page so it never crowds the squares. */
+.board-center .logo {
+  font-size: clamp(20px, 4.4vw, 44px);
+  font-weight: 900;
+  letter-spacing: -.02em;
+  line-height: 1;
+  white-space: nowrap;
+}
+.board-center .logo-cash { color: var(--text); }
+.board-center .logo-flow { color: var(--accent, #16a34a); }
+.board-center .tagline {
+  color: var(--muted);
+  font-size: clamp(10px, 1.3vw, 13px);
+  letter-spacing: .02em;
+  max-width: 22ch;
+  line-height: 1.35;
+}
+
+/* Shaking while the faces change reads as a roll rather than as a flicker. */
+.dice.rolling { animation: dice-shake .28s ease-in-out infinite; }
+@keyframes dice-shake {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50%      { transform: translateY(-4px) rotate(3deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dice.rolling { animation: none; }
+}
 .dice {
   display: flex;
   gap: 8px;
@@ -851,6 +881,60 @@ button.tiny {
 /* ---------------- money dialog ---------------- */
 
 #money-dialog { max-width: 460px; }
+
+/* Explanations open over the game. Narrower than the setup form because they
+   are prose, and prose in a 640px column is hard to read. */
+#explain { max-width: 480px; }
+#explain h3 { margin: 4px 0 12px; }
+#explain p { margin: 0 0 12px; line-height: 1.5; }
+#explain p:last-of-type { margin-bottom: 16px; }
+/* A shared link has to be selectable and must not blow the dialog sideways. */
+#explain p { overflow-wrap: anywhere; }
+
+.linkbtn {
+  background: none;
+  border: 0;
+  padding: 0 0 0 10px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.linkbtn:hover { color: var(--text); }
+
+/* Holdings are a separate subject from the company, so they get their own
+   heading rather than more rows in the same box. */
+.poshead {
+  margin: 14px 0 6px;
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.qtycustom {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 6px 0 2px;
+}
+.qtycustom input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+}
+.qtycustom button { flex: 0 0 auto; }
+@media (pointer: coarse) {
+  /* 16px keeps iOS Safari from zooming the page when the field is focused. */
+  .qtycustom input { font-size: 16px; min-height: 44px; }
+  .qtycustom button { min-height: 44px; }
+}
 #money-dialog h2 { margin: 0 0 8px; font-size: 18px; }
 #money-dialog .dlg-note { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
 #money-dialog .terms { margin-bottom: 14px; }

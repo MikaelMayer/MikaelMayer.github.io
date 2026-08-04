@@ -125,23 +125,52 @@
    * cost to clear. */
   var termInfo = null;
 
-  function explain(title, body) {
-    termInfo = { title: title, body: body.filter(Boolean) };
+  function explain(title, body, tagline) {
+    squareInfo = null;
+    termInfo = { title: title, body: body.filter(Boolean), tagline: tagline || t('Financial term') };
     render();
   }
 
-  function termHelpCard(info) {
-    var card = el('div', { class: 'card info' }, [
-      el('span', { class: 'tagline', text: t('Financial term') }),
-      el('h3', { text: info.title })
-    ]);
+  function closeExplain() {
+    termInfo = null;
+    squareInfo = null;
+    var dlg = $('#explain');
+    if (dlg && dlg.open) dlg.close();
+  }
+
+  /* Fills the dialog and opens it, or closes it when there is nothing to
+   * explain. Called from render(), so it has to tolerate being called
+   * repeatedly while already open. */
+  function renderExplain() {
+    var dlg = $('#explain');
+    if (!dlg) return;
+    var info = termInfo || squareInfo;
+    if (!info) {
+      if (dlg.open) dlg.close();
+      return;
+    }
+
+    var host = $('#explain-body');
+    clear(host);
+    host.appendChild(el('span', { class: 'tagline', text: info.tagline }));
+    host.appendChild(el('h3', { id: 'explain-title', text: info.title }));
     info.body.forEach(function (para) {
-      card.appendChild(el('p', { text: para }));
+      host.appendChild(el('p', { text: para }));
     });
-    card.appendChild(el('div', { class: 'buttons' }, [
-      el('button', { onclick: function () { termInfo = null; render(); }, text: t('Close') })
+    host.appendChild(el('div', { class: 'dlg-actions' }, [
+      el('button', { class: 'primary', onclick: closeExplain, text: t('Close') })
     ]));
-    return card;
+
+    if (!dlg.open) {
+      if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+      if (!dlg._wired) {
+        // Esc and backdrop clicks close the dialog without going through the
+        // button, so the state they leave behind has to be cleared too.
+        dlg.addEventListener('close', function () { termInfo = null; squareInfo = null; });
+        dlg.addEventListener('click', function (e) { if (e.target === dlg) closeExplain(); });
+        dlg._wired = true;
+      }
+    }
   }
 
   /* Wraps a label in a button when we have something to say about it, and
@@ -202,15 +231,14 @@
 
   var squareInfo = null;
 
-  function squareHelpCard(type) {
-    return el('div', { class: 'card info' }, [
-      el('span', { class: 'tagline', text: t('Board square') }),
-      el('h3', { text: t(SQUARE_LABEL[type]) }),
-      el('p', { text: t(SQUARE_HELP[type]) }),
-      el('div', { class: 'buttons' }, [
-        el('button', { onclick: function () { squareInfo = null; render(); }, text: t('Close') })
-      ])
-    ]);
+  function explainSquare(type) {
+    termInfo = null;
+    squareInfo = {
+      title: t(SQUARE_LABEL[type]),
+      body: [t(SQUARE_HELP[type])],
+      tagline: t('Board square')
+    };
+    render();
   }
 
   /* ------------------------------------------------------------------ *
@@ -318,15 +346,20 @@
 
     var to = (state.phase === 'fasttrack' || state.phase === 'won') ? state.ftPosition : state.position;
     var entered = phaseBefore === 'ratrace' && state.phase === 'fasttrack';
-    if (to !== from && !E.isOver(state) && !entered) {
-      // Draw the board first so the squares exist, then walk the token across
-      // them and redraw once it arrives so the landing square lights up.
-      render();
-      walkToken(from, to, render);
-    } else {
-      render();
-      if (entered) openFastTrackDialog();
-    }
+    // Draw the board first so the squares and the dice exist.
+    moving = true;
+    render();
+    tumbleDice(state.lastRoll || [], function () {
+      moving = false;
+      if (to !== from && !E.isOver(state) && !entered) {
+        // Walk the token across the squares, then redraw so the landing
+        // square lights up.
+        walkToken(from, to, render);
+      } else {
+        render();
+        if (entered) openFastTrackDialog();
+      }
+    });
   }
 
   function undo() {
@@ -355,6 +388,7 @@
       renderBank();
       renderLog();
       renderInvariants();
+      renderExplain();
       maybeScrollToAction();
       focusNewDecision();
       autosave();
@@ -486,7 +520,7 @@
       if (i === pos) node.setAttribute('aria-current', 'true');
       if (explains) {
         node.type = 'button';
-        (function (t) { node.addEventListener('click', function () { squareInfo = t; render(); }); })(type);
+        (function (ty) { node.addEventListener('click', function () { explainSquare(ty); }); })(type);
       }
       wrap.appendChild(node);
     }
@@ -552,12 +586,45 @@
     tokenAt = index;
   }
 
+  /* A die that simply appears showing 4 has not been rolled; it has been
+   * assigned. Tumbling it for about a second, settling, and only then moving
+   * the token separates the two events -- what you rolled, and what it did to
+   * you -- which are otherwise a single instantaneous jump.
+   *
+   * This randomness is presentation only. It never touches state.rngState, so
+   * a seed still reproduces the game exactly. */
+  function tumbleDice(faces, done) {
+    var host = document.querySelector('#board .dice');
+    if (!host || prefersReducedMotion()) { done(); return; }
+
+    function paint(values) {
+      clear(host);
+      values.forEach(function (v) { host.appendChild(dieFace(v)); });
+    }
+
+    host.classList.add('rolling');
+    var duration = 600 + Math.floor(Math.random() * 400);   // 0.6s - 1.0s
+    var started = Date.now();
+    var timer = setInterval(function () {
+      if (Date.now() - started >= duration) {
+        clearInterval(timer);
+        host.classList.remove('rolling');
+        paint(faces);                       // the face that actually counts
+        setTimeout(done, 500);              // let it register before anything moves
+        return;
+      }
+      paint(faces.map(function () { return 1 + Math.floor(Math.random() * 6); }));
+    }, 70);
+  }
+
+  function prefersReducedMotion() {
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+
   function walkToken(from, to, done) {
     var len = boardLength();
     var steps = (to - from + len) % len;
-    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    if (steps === 0 || reduce) {
+    if (steps === 0 || prefersReducedMotion()) {
       placeToken(to, false);
       done();
       return;
@@ -637,8 +704,14 @@
      * is what only the board can say: which month it is, what you just rolled,
      * and any temporary state you are under. */
     if (state.phase === 'ratrace' || state.phase === 'fasttrack') {
-      centre.appendChild(el('div', { class: 'sub', text: t('Month') }));
-      centre.appendChild(el('div', { class: 'big', text: String(state.months) }));
+      centre.appendChild(el('div', { class: 'logo' }, [
+        el('span', { class: 'logo-cash', text: 'CASH' }),
+        el('span', { class: 'logo-flow', text: 'FLOW' })
+      ]));
+      /* Everything on this screen explains itself when tapped, and nothing
+       * about it looks like it would. One line, once, in the one place a
+       * player's eye returns to between turns. */
+      centre.appendChild(el('div', { class: 'tagline', text: t('Tap anything to learn more') }));
       centre.appendChild(statusChips());
     }
 
@@ -768,7 +841,7 @@
           inv.appendChild(el('div', { class: 'item' }, [
             el('span', { class: 'n', text: T.field(i, 'name') }),
             el('span', { class: 'm', text: money(i.cost) }),
-            el('span', { class: 'm pos', text: money(i.cashflow) + '/mo' })
+            el('span', { class: 'm pos', text: t('{$amount}/mo', { amount: i.cashflow }) })
           ]));
         });
       }
@@ -993,9 +1066,6 @@
       return;
     }
 
-    if (termInfo) host.appendChild(termHelpCard(termInfo));
-    if (squareInfo) host.appendChild(squareHelpCard(squareInfo));
-
     var p = state.pending;
     if (!p) {
       // What just happened, then what to do next.
@@ -1096,7 +1166,7 @@
       buttons.appendChild(el('button', {
         class: 'primary',
         onclick: function () { doRoll(n); },
-        text: n === 1 ? t('Roll 1 die') : t('Roll 2 dice')
+        text: '\uD83C\uDFB2 ' + (n === 1 ? t('Roll 1 die') : t('Roll 2 dice'))
       }));
     });
     card.appendChild(buttons);
@@ -1148,6 +1218,47 @@
   function tradeFor(mode) {
     if (trade.key !== pendingKey()) resetTrade();
     return trade.mode === mode ? trade.qty : 0;
+  }
+
+  function averagePaid(held) {
+    if (!held || !held.shares) return null;
+    return held.invested / held.shares;
+  }
+
+  /* A free-typed quantity, next to the offered ones.
+   *
+   * The presets cover the common cases and cannot be typed wrong; they cannot
+   * express "97 shares". This adds that without going back to a single shared
+   * number box, because it commits to one mode -- buy or sell -- the moment it
+   * is used. */
+  function customQty(mode, max, unitPrice) {
+    var row = el('div', { class: 'qtycustom' });
+    var input = el('input', {
+      type: 'number', min: '1', max: String(max), step: '1',
+      inputmode: 'numeric',
+      'aria-label': mode === 'buy' ? t('Number of shares to buy') : t('Number of shares to sell'),
+      placeholder: t('or type an amount')
+    });
+    function use() {
+      var n = parseInt(input.value, 10);
+      if (!n || n < 1) { cardError = t('Enter how many shares.'); render(); return; }
+      if (n > max) {
+        cardError = mode === 'buy'
+          ? t('You can afford {n} shares at this price.', { n: max })
+          : t('You only own {n} shares.', { n: max });
+        render();
+        return;
+      }
+      trade = { key: pendingKey(), mode: mode, qty: n };
+      cardError = null;
+      render();
+    }
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); use(); }
+    });
+    row.appendChild(input);
+    row.appendChild(el('button', { class: 'ghost', onclick: use, text: t('Use') }));
+    return row;
   }
 
   function quantityRow(label, amounts, unitPrice, mode) {
@@ -1246,13 +1357,27 @@
       var held = state.stocks[c.symbol];
       var shares = held ? held.shares : 0;
       var maxBuy = Math.floor(state.cash / c.price);
+      /* Two boxes, because these are two different subjects. The first is
+       * about the company and is the same for every player; the second is
+       * about this player and is the same for every company. Reading them as
+       * one list invited comparing a dividend with a share count. */
       card.appendChild(terms([
         [t('Price per share'), money(c.price)],
         [t('Dividend'), c.dividend ? t('{$amount} / share / month', { amount: c.dividend }) : t('none')],
-        [t('Trading range'), money(c.range[0]) + ' - ' + money(c.range[1])],
-        [t('You own'), held ? t('{n} shares (paid {$paid})', { n: shares, paid: held.invested }) : t('{n} shares', { n: shares })],
-        [t('You can afford'), t('{n} shares', { n: maxBuy })]
+        [t('Trading range'), money(c.range[0]) + ' - ' + money(c.range[1])]
       ]));
+
+      var avg = averagePaid(held);
+      var position = [
+        [t('You own'), t('{n} shares', { n: shares })],
+        avg === null ? null : [t('Average price you paid'), money(Math.round(avg))],
+        avg === null ? null : [t('Total invested'), money(held.invested)],
+        [t('You can afford'), t('{n} shares', { n: maxBuy })]
+      ];
+      var posBox = terms(position);
+      posBox.className += ' position';
+      card.appendChild(el('div', { class: 'poshead', text: t('Your position') }));
+      card.appendChild(posBox);
       /* Preset amounts rather than one shared number field.
        *
        * The old card had a single input used by Buy, Sell and Sell-all, which
@@ -1262,11 +1387,13 @@
        * its own quantity, so nothing can be typed into the wrong operation. */
       if (maxBuy >= 1) {
         card.appendChild(quantityRow(t('Buy'), buyAmounts(maxBuy), c.price, 'buy'));
+        card.appendChild(customQty('buy', maxBuy, c.price));
       } else {
         card.appendChild(el('div', { class: 'hint', text: t('One share costs {$price} and you have {$cash}.', { price: c.price, cash: state.cash }) }));
       }
       if (shares > 0) {
         card.appendChild(quantityRow(t('Sell'), sellAmounts(shares), c.price, 'sell'));
+        card.appendChild(customQty('sell', shares, c.price));
       }
 
       if (trade.qty > 0) {
@@ -1274,7 +1401,15 @@
           unitPrice: c.price, unit: t('share'), units: t('shares'),
           extraRows: function (qty, buying) {
             var after = buying ? shares + qty : shares - qty;
-            var out = [[t('Shares after'), String(after)]];
+            var out = [];
+            var paid = averagePaid(held);
+            if (paid !== null) {
+              out.push([t('Average price you paid'), money(Math.round(paid))]);
+              if (!buying) {
+                out.push([t('Price now'), money(c.price)]);
+              }
+            }
+            out.push([t('Shares after'), String(after)]);
             if (c.dividend) {
               out.push([t('Monthly income from these'), money(shares * c.dividend) + '  →  ' + money(after * c.dividend)]);
             }
@@ -1634,7 +1769,13 @@
       var h = state.stocks[sym];
       var meta = D.STOCK_SYMBOLS[sym];
       var monthly = h.shares * meta.dividend;
-      var row = [sym + ' — ' + meta.name, t('{n} shares, paid {$paid}', { n: h.shares, paid: h.invested }), monthly];
+      var avgHeld = averagePaid(h);
+      var row = [sym + ' — ' + meta.name,
+        avgHeld === null
+          ? t('{n} shares', { n: h.shares })
+          : t('{n} shares at {$avg} each, {$paid} in total',
+              { n: h.shares, avg: Math.round(avgHeld), paid: h.invested }),
+        monthly];
       (monthly > 0 ? earning : speculative).push(row);
     }
 
@@ -1665,13 +1806,13 @@
       var total = rows.reduce(function (sum, r) { return sum + r[2]; }, 0);
       host.appendChild(el('div', { class: 'assetgroup' }, [
         el('span', { text: title }),
-        el('span', { class: total > 0 ? 'pos' : '', text: total > 0 ? money(total) + '/mo' : '' })
+        el('span', { class: total > 0 ? 'pos' : '', text: total > 0 ? t('{$amount}/mo', { amount: total }) : '' })
       ]));
       rows.forEach(function (r) {
         host.appendChild(el('div', { class: 'item' }, [
           el('span', { class: 'n', text: r[0] }),
           el('span', { class: 'm', text: r[1] }),
-          el('span', { class: 'm ' + (r[2] > 0 ? 'pos' : 'muted'), text: r[2] > 0 ? money(r[2]) + '/mo' : '$0/mo' })
+          el('span', { class: 'm ' + (r[2] > 0 ? 'pos' : 'muted'), text: t('{$amount}/mo', { amount: r[2] > 0 ? r[2] : 0 }) })
         ]));
       });
       if (note) host.appendChild(el('div', { class: 'hint', text: note }));
@@ -2054,6 +2195,47 @@
     });
   }
 
+  function setupLink() {
+    var base = location.origin + location.pathname;
+    return base + '?seed=' + encodeURIComponent(state.seed) +
+      '&prof=' + encodeURIComponent(state.profession.id) +
+      '&dream=' + encodeURIComponent(state.dream.id);
+  }
+
+  /* Reads a shared link. Anything missing falls back to the normal defaults,
+   * so a truncated or hand-edited URL still starts a game rather than failing. */
+  function setupFromUrl() {
+    if (!location.search) return null;
+    var q = {};
+    location.search.replace(/^\?/, '').split('&').forEach(function (pair) {
+      var kv = pair.split('=');
+      if (kv[0]) q[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || '');
+    });
+    if (!q.seed) return null;
+    return { seed: q.seed, professionId: q.prof || '', dreamId: q.dream || '' };
+  }
+
+  /* Clipboard access can be refused; showing the link is the fallback that
+   * always works. */
+  function showLink(url) {
+    explain(t('Share this game'), [
+      t('Anyone who opens this link starts from the same seed, profession and dream, and can make different choices from there.'),
+      url
+    ], t('Share'));
+  }
+
+  function shareSetup() {
+    if (!state) return;
+    var url = setupLink();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function () {
+        showBanner(t('Link copied. Anyone who opens it starts this same game.'));
+      }, function () { showLink(url); });
+    } else {
+      showLink(url);
+    }
+  }
+
   function startGame() {
     if (state && !E.isOver(state) && state.months > 0 &&
         !window.confirm('Abandon the current game at month ' + state.months + '?')) {
@@ -2155,6 +2337,8 @@
       e.target.value = '';
     });
     $('#start-btn').addEventListener('click', function (e) { e.preventDefault(); startGame(); });
+    var shareBtn = $('#share-btn');
+    if (shareBtn) shareBtn.addEventListener('click', function (e) { e.preventDefault(); shareSetup(); });
     $('#random-seed-btn').addEventListener('click', function (e) {
       e.preventDefault();
       $('#seed-input').value = String(window.CF.randomSeed());
@@ -2189,9 +2373,26 @@
       }
     });
 
-    // Resume automatically if a save exists, otherwise open setup.
     var existing = null;
     try { existing = localStorage.getItem(SAVE_KEY); } catch (e) { /* private mode */ }
+
+    /* A shared link names a starting position. With no game in progress it
+     * simply starts it; with one in progress it fills the setup dialog and
+     * waits, because someone else's link is not a reason to throw away the
+     * game you are in the middle of. */
+    var shared = setupFromUrl();
+    if (shared) {
+      buildSetupOptions(true);
+      $('#seed-input').value = shared.seed;
+      if (shared.professionId) $('#prof-select').value = shared.professionId;
+      if (shared.dreamId) $('#dream-select').value = shared.dreamId;
+      renderProfPreview();
+      if (!existing) { startGame(); return; }
+      $('#setup').showModal();
+      return;
+    }
+
+    // Resume automatically if a save exists, otherwise open setup.
     if (existing) {
       try {
         state = E.deserialize(existing);
