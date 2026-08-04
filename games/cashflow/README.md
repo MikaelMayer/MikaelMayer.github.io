@@ -89,10 +89,11 @@ luxury doodad, a trap deal, a market buyer — "No thanks" is the primary button
 card says outright that refusing costs nothing. Declines are logged and totalled, so
 discipline leaves a visible trace.
 
-**Controls appear when they are relevant.** The bank is a two-line status until you ask
-for it, then a stepper that shows what the loan does to your cash flow *before* you
-commit. It used to be a number field pre-filled with `1000` sitting on screen every turn
-of the game, next to a Repay button whose only possible outcome was an error.
+**Controls appear when they are relevant.** The Loans panel is a two-line status until
+you ask for it, and taking a loan happens in its own dialog that shows what the loan
+does to your cash flow *before* you commit. It used to be a number field pre-filled with
+`1000` sitting on screen every turn of the game, next to a Repay button whose only
+possible outcome was an error.
 
 **The board explains itself.** Tap any square to find out what it does. A phone has no
 hover, so the tooltip the board relied on reached nobody, and the only documentation
@@ -109,7 +110,7 @@ three screens further down.
 - **In a browser:** open `tests.html`.
 - **From a terminal:** `node run-tests.js`
 
-47 tests, no framework, about nine seconds. The last two matter most:
+48 tests, no framework, about nine seconds. The last two matter most:
 
 - **2,000 random games.** A random agent plays complete games, and the invariant check
   must pass after *every single action*. This is what catches stuck boards, undefined
@@ -141,22 +142,46 @@ three screens further down.
 You leave the Rat Race the moment **passive income exceeds total expenses**. Equal is
 not enough; one dollar over is.
 
-### The bank
+### Debt
+
+**Nothing is ever borrowed on your behalf.** Buying is cash only: if you cannot cover
+the down payment, Buy is disabled and a *Take a loan…* button appears next to it. The
+loan dialog states what the loan will do to your monthly cash flow before you confirm
+it. An earlier version quietly financed any shortfall when you pressed Buy, which meant
+one tap could create tens of thousands of dollars of debt at 120% a year — in a game
+whose whole lesson is that borrowing to buy is how people get trapped. Removing that
+raised the proportion of *randomly played* games that escape the Rat Race from 29 in
+2,000 to 567 in 2,000, without changing a competent player's results at all.
 
 Loans come in $1,000 blocks at $100 a month each — 120% a year, deliberately the worst
-deal in the game. Total borrowing is capped at **10 months of total income**.
+deal in the game, and interest-only: the payment never ends until you repay the
+principal. Total borrowing is capped at **10 months of total income**.
 
-That cap is the single most important rule that a naive implementation gets wrong.
-Without it, a player whose expenses exceed their income borrows to make payday, which
-raises their expenses, which makes the next payday worse. The debt compounds until the
-numbers exceed what a computer can represent exactly and the financial statement
-quietly stops adding up. With the cap, that becomes a real outcome rather than silent
-corruption.
+That cap is the single most important rule a naive implementation gets wrong. Without
+it, a player whose expenses exceed their income borrows to make payday, which raises
+their expenses, which makes the next payday worse. The debt compounds until the numbers
+exceed what a computer can represent exactly and the financial statement quietly stops
+adding up. With the cap, that becomes a real outcome rather than silent corruption.
+
+**Repaying, and what can be part-paid.** Every debt has its own Repay button beside it
+in the Liabilities list, because retiring a debt removes its monthly payment for the
+rest of the game — the cheapest, most certain way to lower the bar you are trying to
+clear. The two kinds behave differently, and deliberately so:
+
+| Debt | How you repay it |
+| --- | --- |
+| Loans | **Part-payable**, in $1,000 blocks. Each block clears $100/month. |
+| Home mortgage, school loan, car loan, credit cards, retail | **All or nothing.** Clear the whole balance and the whole payment goes with it. |
+
+That split is not a simplification — it is how the original game works, and the engine
+enforces it structurally: `repayLiability` takes no amount parameter, so a consumer debt
+*cannot* be part-paid, while `repay` handles loans in blocks.
 
 ### When you cannot pay
 
 1. Cash first.
-2. Then the bank, up to your credit limit.
+2. Then an automatic loan, up to your borrowing limit — this is the one place the
+   game borrows for you, because a bill you cannot refuse has to be settled somehow.
 3. Then a **forced sale**: the game sells your least productive holdings until the bill
    is covered. Shares, gold and certificates come back at cost; property in a hurry
    goes for **80% of what you paid**, and cannot be sold at all for less than its own
@@ -236,6 +261,7 @@ Each one is a single value or block in the code.
 
 | Decision | Where | Why |
 | --- | --- | --- |
+| Purchases are cash only | `buyDeal`, `engine.js` | A Buy button must never create debt. See "Debt" above. |
 | Credit capped at 10× income | `CREDIT_MULTIPLE`, `engine.js` | Prevents an unrecoverable, arithmetic-breaking debt spiral. |
 | Forced sales are automatic | `liquidateFor()`, `engine.js` | Removes a decision that isn't really a decision; keeps the turn flow unbreakable. |
 | Distressed property sells at 80% | `DISTRESS_FACTOR`, `engine.js` | Teaches that liquidity has a price. |
@@ -256,7 +282,7 @@ js/rng.js         seeded random number generator
 js/data.js        professions, dreams, boards, all four card decks — content only
 js/engine.js      every rule; pure functions over one state object; no DOM
 js/ui.js          rendering and input; no rules
-js/tests.js       47 tests plus the random and competent simulated players
+js/tests.js       48 tests plus the random and competent simulated players
 ```
 
 To translate the game or swap in different cards, `js/data.js` is the only file you
