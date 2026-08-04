@@ -132,7 +132,7 @@ three screens further down.
 - **In a browser:** open `tests.html`.
 - **From a terminal:** `node run-tests.js`
 
-48 tests, no framework, about nine seconds. The last two matter most:
+50 tests, no framework, about nine seconds. The last two matter most:
 
 - **2,000 random games.** A random agent plays complete games, and the invariant check
   must pass after *every single action*. This is what catches stuck boards, undefined
@@ -339,7 +339,7 @@ js/rng.js         seeded random number generator
 js/data.js        professions, dreams, boards, all four card decks — content only
 js/engine.js      every rule; pure functions over one state object; no DOM
 js/ui.js          rendering and input; no rules
-js/tests.js       48 tests plus the random and competent simulated players
+js/tests.js       50 tests plus the random and competent simulated players
 ```
 
 To translate the game or swap in different cards, `js/data.js` is the only file you

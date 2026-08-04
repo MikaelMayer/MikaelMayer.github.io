@@ -142,6 +142,25 @@
       }
     });
 
+    /* A seed is only worth having if it reproduces the game. The bare-number
+     * form is the one people reach for first, and it used to be accepted
+     * silently and ignored -- the game came back randomly seeded, which looks
+     * deterministic until you compare two of them. */
+    test('a seed reproduces the game, however it is passed', function () {
+      var a = E.createGame({ seed: 4242, professionId: 'teacher' });
+      var b = E.createGame({ seed: '4242', professionId: 'teacher' });
+      var c = E.createGame(4242);
+      eq(a.seed, 4242, 'number in an options object');
+      eq(b.seed, 4242, 'numeric string in an options object');
+      eq(c.seed, 4242, 'bare number shorthand');
+      eq(JSON.stringify(a.decks), JSON.stringify(b.decks),
+        'same seed must shuffle the decks identically');
+
+      var d = E.createGame({ seed: 4243, professionId: 'teacher' });
+      assert(JSON.stringify(a.decks) !== JSON.stringify(d.decks),
+        'a different seed must produce a different game');
+    });
+
     /* ---------------- financial statement ---------------- */
 
     test('a new game matches its profession sheet', function () {

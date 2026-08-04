@@ -381,6 +381,13 @@
    * ------------------------------------------------------------------ */
 
   function createGame(opts) {
+    /* createGame(1234) is the obvious way to ask for a seeded game, and it
+     * used to be the one way to silently NOT get one: a number has no .seed,
+     * so the game came back randomly seeded and looked deterministic until
+     * you compared two of them. Reproducing a reported game from its seed is
+     * the point of having seeds, so the shorthand is accepted rather than
+     * quietly ignored. */
+    if (typeof opts === 'number' || typeof opts === 'string') opts = { seed: opts };
     opts = opts || {};
     var seed = (opts.seed === undefined || opts.seed === null || opts.seed === '')
       ? global.CF.randomSeed() : (parseInt(opts.seed, 10) || 0);
