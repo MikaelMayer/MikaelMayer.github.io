@@ -119,17 +119,29 @@
     'Cash Flow Day income': 'What you collect each time you pass or land on a Cash Flow Day square: the income you carried out of the Rat Race, plus anything the investments you have bought here produce.'
   };
 
+  /* An explainer is { title, body: [paragraph, ...] }, so the same card can
+   * show a fixed glossary entry or one generated from the player's own
+   * figures -- how a percentage was computed, what a particular debt would
+   * cost to clear. */
   var termInfo = null;
 
-  function termHelpCard(term) {
-    return el('div', { class: 'card info' }, [
+  function explain(title, body) {
+    termInfo = { title: title, body: body.filter(Boolean) };
+    render();
+  }
+
+  function termHelpCard(info) {
+    var card = el('div', { class: 'card info' }, [
       el('span', { class: 'tagline', text: t('Financial term') }),
-      el('h3', { text: t(term) }),
-      el('p', { text: t(TERM_HELP[term]) }),
-      el('div', { class: 'buttons' }, [
-        el('button', { onclick: function () { termInfo = null; render(); }, text: t('Close') })
-      ])
+      el('h3', { text: info.title })
     ]);
+    info.body.forEach(function (para) {
+      card.appendChild(el('p', { text: para }));
+    });
+    card.appendChild(el('div', { class: 'buttons' }, [
+      el('button', { onclick: function () { termInfo = null; render(); }, text: t('Close') })
+    ]));
+    return card;
   }
 
   /* Wraps a label in a button when we have something to say about it, and
@@ -139,11 +151,53 @@
     if (!TERM_HELP[label]) return t(label);
     var b = el('button', {
       class: 'term',
-      onclick: function () { termInfo = label; render(); },
+      onclick: function () { explain(t(label), [t(TERM_HELP[label])]); },
       title: t('What does this mean?')
     }, [t(label)]);
     b.type = 'button';
     return b;
+  }
+
+  /* An annual rate makes debts comparable. A mortgage at 11% and a retail
+   * account at 60% look identical as monthly payments; as percentages they
+   * do not. Computed, not stored: payment x 12 / balance. */
+  function annualRate(payment, balance) {
+    if (!payment || !balance) return null;
+    return (payment * 12 / balance) * 100;
+  }
+
+  function rateText(payment, balance) {
+    var r = annualRate(payment, balance);
+    return r === null ? '' : t('{pct}%/yr', { pct: r.toFixed(r < 10 ? 1 : 0) });
+  }
+
+  /* Every expense line explains what it is and how, or whether, it ends.
+   * Stating that a debt can be cleared is a rule of the game; which debt to
+   * clear first is the player's problem. */
+  function explainExpense(key, label, amount) {
+    var slot = state.profession[key];
+    var body = [];
+
+    if (key === 'taxes') {
+      body.push(t('Deducted from your salary every month. It does not change as you play and cannot be removed.'));
+    } else if (key === 'other') {
+      body.push(t('Day-to-day living costs, plus the monthly cost of anything you accepted that carried one. Living costs cannot be removed.'));
+    } else if (key === 'children') {
+      body.push(t('Each child costs {$each} a month for the rest of the game. This cannot be removed.',
+        { each: state.profession.childCost }));
+    } else if (key === 'loans') {
+      body.push(t('Interest on money you have borrowed: {$per} a month for every {$unit}.', { per: 100, unit: 1000 }));
+      body.push(t('Repay the principal from the Liabilities list below. Every {$unit} you repay removes {$per} a month.', { unit: 1000, per: 100 }));
+      body.push(t('You currently owe {$owed}.', { owed: state.bankLoan }));
+    } else if (slot) {
+      var rate = annualRate(slot.payment, slot.liability);
+      body.push(t('The monthly payment on this debt. The balance is {$balance}, so the payment is costing you about {pct}% a year.',
+        { balance: slot.liability, pct: rate === null ? 0 : rate.toFixed(rate < 10 ? 1 : 0) }));
+      body.push(t('Pay the {$balance} off in full from the Liabilities list below and this line disappears for the rest of the game. Debts cannot be part-paid.',
+        { balance: slot.liability }));
+    }
+    body.push(t('It is part of the {$total} you must cover every month.', { total: E.stats(state).totalExpenses }));
+    explain(label, body);
   }
 
   var squareInfo = null;
@@ -563,8 +617,7 @@
       centre.appendChild(el('div', { class: 'big', text: t('You win') }));
       centre.appendChild(el('div', {
         class: 'sub',
-        text: (state.result.how === 'dream' ? 'Dream bought' : 'Fast Track cash flow goal reached') +
-          ' in ' + state.result.months + ' months.'
+        text: t(state.result.how === 'dream' ? 'Dream bought in {months} months.' : 'Fast Track income goal reached in {months} months.', { months: state.result.months })
       }));
       centre.appendChild(el('button', { class: 'primary', onclick: openSetup, text: t('Play again') }));
       return centre;
@@ -658,6 +711,7 @@
       var passiveBox = box(t('Passive income'), money(s.passiveIncome), 'hero',
         gap > 0 ? t('{$gap} until financial freedom', { gap: gap })
                 : t('You are financially free'));
+      passiveBox.className += ' wide';
 
       /* A bar whose full width is your total expenses. Passive income only
        * means something measured against what it has to cover, so the two
@@ -676,14 +730,16 @@
       /* The ends of the bar say what the ends mean. A bare percentage did not
        * say what it was a percentage of, which is exactly what made it
        * unreadable. */
+      /* The right end of the bar names the target, which is what the removed
+       * "Total expenses" box used to say and the only thing it contributed. */
       passiveBox.appendChild(el('div', { class: 'barends' }, [
         el('span', { text: money(0) }),
-        el('span', { text: t('financial freedom') })
+        el('span', { text: t('your {$total} of monthly expenses', { total: s.totalExpenses }) })
       ]));
       head.appendChild(passiveBox);
-      head.appendChild(box(t('Total expenses'), money(s.totalExpenses), 'hero', t('the bar to clear')));
-      head.appendChild(box(t('Cash'), money(state.cash)));
-      head.appendChild(box(t('Monthly cash flow'), signed(s.cashflow), null, t('what payday pays')));
+      var cashBox = box(t('Cash'), money(state.cash));
+      cashBox.className += ' wide';   // nothing sits beside it now
+      head.appendChild(cashBox);
     }
 
     var st = $('#statement');
@@ -740,14 +796,20 @@
       return;
     }
 
-    st.appendChild(group(t('Income'), [
+    /* Passive income is a subtotal of the lines above it; total income is the
+     * sum of everything. The grand total is drawn heavier so the arithmetic
+     * of the section is legible at a glance. */
+    var incomeGroup = group(t('Monthly income'), [
       row(t('Salary'), money(s.salary), true),
       row(t('Interest / dividends'), money(s.interestDividends), true),
       row(t('Real estate'), money(s.realEstateIncome), true),
       row(t('Business'), money(s.businessIncome), true),
-      row(t('Passive income'), money(s.passiveIncome), false, true),
-      row(t('Total income'), money(s.totalIncome), false, true)
-    ]));
+      row(t('Passive income'), money(s.passiveIncome), false, true)
+    ]);
+    var totalIncomeRow = row(t('Total income'), money(s.totalIncome), false, true);
+    totalIncomeRow.className += ' grand';
+    incomeGroup.appendChild(totalIncomeRow);
+    st.appendChild(incomeGroup);
 
     /* Only expenses you actually have.
      *
@@ -755,21 +817,51 @@
      * seeing the line vanish is the reward for paying it off, and a statement
      * full of zeroes buries the numbers that still matter. */
     var p = s.expenseParts;
-    function expense(label, amount) {
-      return amount > 0 ? row(label, money(amount), true) : null;
+
+    /* Each expense explains itself, including whether it can be got rid of.
+     * "Clear the balance and this line disappears" is a rule of the game, not
+     * a suggestion about what to do next. */
+    function expense(key, label, amount) {
+      if (!amount) return null;
+      var r = el('div', { class: 'row sub' }, [
+        el('span', {}, [el('button', {
+          class: 'term',
+          onclick: function () { explainExpense(key, label, amount); },
+          title: t('What does this mean?')
+        }, [label])]),
+        el('span', { text: money(amount) })
+      ]);
+      return r;
     }
-    st.appendChild(group(t('Expenses'), [
-      expense(t('Taxes'), p.taxes),
-      expense(t('Home mortgage'), p.home),
-      expense(t('School loan'), p.school),
-      expense(t('Car loan'), p.car),
-      expense(t('Credit cards'), p.creditCard),
-      expense(t('Retail'), p.retail),
-      expense(t('Other'), p.other),
-      state.children > 0 ? row(t('Children (') + state.children + ')', money(p.children), true) : null,
-      expense(t('Loans'), p.bankLoan),
-      row(t('Total expenses'), money(s.totalExpenses), false, true)
-    ]));
+
+    var expenseGroup = group(t('Monthly expenses'), [
+      expense('taxes', t('Taxes'), p.taxes),
+      expense('home', t('Home mortgage'), p.home),
+      expense('school', t('School loan'), p.school),
+      expense('car', t('Car loan'), p.car),
+      expense('creditCard', t('Credit cards'), p.creditCard),
+      expense('retail', t('Retail'), p.retail),
+      expense('other', t('Other'), p.other),
+      state.children > 0 ? expense('children', t('Children ({n})', { n: state.children }), p.children) : null,
+      expense('loans', t('Loans'), p.bankLoan)
+    ]);
+    var totalExpRow = row(t('Total expenses'), money(s.totalExpenses), false, true);
+    totalExpRow.className += ' grand';
+    expenseGroup.appendChild(totalExpRow);
+
+    /* Cash flow is the difference between the two totals above, so it reads
+     * as the bottom line of the subtraction rather than as a separate
+     * headline figure elsewhere on the page. */
+    var cashflowRow = el('div', { class: 'row total cashflow' }, [
+      el('span', {}, [term('Monthly cash flow')]),
+      el('span', { class: s.cashflow >= 0 ? 'pos' : 'neg', text: money(s.cashflow) })
+    ]);
+    expenseGroup.appendChild(cashflowRow);
+    expenseGroup.appendChild(el('div', {
+      class: 'hint',
+      text: t('Total income minus total expenses. This is what each PAYDAY pays you.')
+    }));
+    st.appendChild(expenseGroup);
 
     /* Assets first, then liabilities: the two sides of the balance sheet,
      * in the order a financial statement puts them. */
@@ -816,8 +908,10 @@
   function capitalise(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
   function liabilityRow(label, balance, payment, onPay, disabled, note) {
+    var rate = rateText(payment, balance);
     var r = el('div', { class: 'row sub liab' }, [
       el('span', { class: 'liabname', text: label }),
+      el('span', { class: 'liabrate', text: rate }),
       el('span', { class: 'liabnum', text: money(balance) })
     ]);
     if (onPay) {
@@ -971,7 +1065,7 @@
   function rollCard() {
     var opts = E.diceOptions(state);
     var card = el('div', { class: 'card' }, [
-      el('h3', { text: state.skipTurns > 0 ? 'You are downsized' : 'Your move' })
+      el('h3', { text: state.skipTurns > 0 ? t('You are out of work') : t('Your move') })
     ]);
 
     if (state.skipTurns > 0) {
@@ -1002,7 +1096,7 @@
       buttons.appendChild(el('button', {
         class: 'primary',
         onclick: function () { doRoll(n); },
-        text: n === 1 ? 'Roll 1 die' : 'Roll 2 dice'
+        text: n === 1 ? t('Roll 1 die') : t('Roll 2 dice')
       }));
     });
     card.appendChild(buttons);
@@ -1247,7 +1341,7 @@
       var cdBuy = el('button', {
         class: 'primary',
         onclick: function () { doAction('buyDeal'); },
-        text: state.cash < c.cost ? 'Not enough cash' : 'Buy'
+        text: state.cash < c.cost ? t('Not enough cash') : t('Buy')
       });
       if (state.cash < c.cost) cdBuy.disabled = true;
       buttons.appendChild(cdBuy);
@@ -1277,14 +1371,31 @@
 
     // Real estate and businesses
     var roi = c.down > 0 ? (c.cashflow * 12 / c.down) * 100 : 0;
-    card.appendChild(terms([
+    var termsBox = terms([
       [t('Price'), money(c.cost)],
       [t('Down payment'), money(c.down)],
       [t('Mortgage / financed'), money(c.mortgage)],
       [t('Monthly cash flow'), money(c.cashflow)],
-      ['Cash-on-cash return', roi.toFixed(1) + '% a year'],
       [t('Your cash'), money(state.cash)]
+    ]);
+    /* The return is the one figure on this card that is derived rather than
+     * printed, so it is the one worth being able to open up. */
+    termsBox.appendChild(el('div', {}, [
+      el('span', {}, [el('button', {
+        class: 'term',
+        onclick: function () {
+          explain(t('Cash-on-cash return'), [
+            t('What the money you actually put in earns you in a year, ignoring the part the mortgage pays for.'),
+            t('Monthly cash flow x 12 / down payment: {$cf} x 12 / {$down} = {pct}% a year.',
+              { cf: c.cashflow, down: c.down, pct: roi.toFixed(1) }),
+            t('It says nothing about whether the price is fair, or what the property might later sell for.')
+          ]);
+        },
+        title: t('What does this mean?')
+      }, [t('Cash-on-cash return')])]),
+      el('span', { text: roi.toFixed(1) + '% ' + t('a year') })
     ]));
+    card.appendChild(termsBox);
     var short = Math.max(0, c.down - state.cash);
     var credit = E.availableCredit(state);
     var outOfReach = short > credit;
