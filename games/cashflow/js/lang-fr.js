@@ -187,7 +187,7 @@
         'Les revenus passifs ont baissé de {$amount} par mois, à {$total}.',
 
       /* ---- cards ---- */
-      'Opportunity': 'Opportunité',
+      'Deal': 'Opportunité',
       'Take a Small Deal or a Big Deal? Big Deals need more money down and pay far more.':
         'Petite affaire ou grosse affaire ? Les grosses affaires demandent une mise plus élevée et rapportent bien davantage.',
       'Small Deal': 'Petite affaire',

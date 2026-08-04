@@ -68,7 +68,7 @@
   }
 
   var SQUARE_LABEL = {
-    OPPORTUNITY: 'Opportunity',
+    OPPORTUNITY: 'Deal',
     PAYDAY: 'PAYDAY',
     MARKET: 'Market',
     DOODAD: 'Expense',
@@ -79,7 +79,6 @@
 
   // Only the squares whose names do not fit a small cell need an alias.
   var SQUARE_SHORT = {
-    OPPORTUNITY: 'Deal',
     DOWNSIZED: 'Job loss'
   };
 

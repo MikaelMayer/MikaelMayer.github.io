@@ -528,7 +528,7 @@
       case 'OPPORTUNITY':
         state.pending = {
           kind: 'chooseDeck',
-          title: 'Opportunity',
+          title: 'Deal',
           text: t('Take a Small Deal or a Big Deal? Big Deals need more money down and pay far more.')
         };
         break;
