@@ -200,7 +200,7 @@
     stock('sd05', 'GRW', 5),
     stock('sd06', 'GRW', 15),
     stock('sd07', 'GRW', 30),
-    stock('sd08', 'GRW', 40, 'Everyone at work is talking about it.'),
+    stock('sd08', 'GRW', 40, 'Volume has been unusually high this month.'),
     stock('sd09', 'BIGX', 10),
     stock('sd10', 'BIGX', 20),
     stock('sd11', 'BIGX', 40),
@@ -210,7 +210,7 @@
     stock('sd15', 'NRGY', 5),
     stock('sd16', 'NRGY', 20),
     stock('sd17', 'NRGY', 35),
-    stock('sd18', 'SAFE', 20, 'Boring, steady, and it pays you every month.'),
+    stock('sd18', 'SAFE', 20, 'A regulated utility with a long dividend record.'),
     stock('sd19', 'SAFE', 30),
     stock('sd20', 'SAFE', 40),
     stock('sd21', 'REIT', 20, 'A fund that owns apartment buildings.'),
@@ -243,13 +243,13 @@
     property('sd31', 'small', 'house3_2', '3Br/2Ba House - retiring landlord', 55000, 5500, 150),
     property('sd32', 'small', 'condo', '2Br/1Ba Condo - near the university', 40000, 4000, 80),
     property('sd33', 'small', 'condo', '2Br/1Ba Condo - HOA fees just rose', 30000, 3000, 40,
-      { text: 'The rent is fine. The homeowners association is not.' }),
+      { text: 'The rent is at market. The homeowners association fee has risen twice this year.' }),
     property('sd34', 'small', 'condo', '1Br/1Ba Condo - downtown', 35000, 3500, 70),
     property('sd35', 'small', 'duplex', 'Duplex - both units rented', 45000, 4500, 100, { units: 2 }),
     property('sd36', 'small', 'duplex', 'Duplex - one unit vacant', 40000, 4000, 60,
       { units: 2, text: 'Cash flow assumes you fill the empty unit.' }),
     property('sd37', 'small', 'land', '20 acres of raw land', 5000, 5000, 0,
-      { acres: 20, text: 'No income, no mortgage, no tenants. You are betting on the price.' }),
+      { acres: 20, text: 'No rent, no mortgage and no tenants. Its value is whatever a buyer later offers.' }),
     property('sd38', 'small', 'land', '5 acres beside a new highway exit', 6000, 6000, 0,
       { acres: 5, text: 'A developer might want this one day.' }),
 
@@ -267,34 +267,34 @@
     {
       id: 'sd43', deck: 'small', kind: 'cd', title: '6-month Certificate of Deposit',
       cost: 5000, cashflow: 25,
-      text: 'Safe, liquid, and barely ahead of inflation. Useful ballast, not a way out.'
+      text: 'A six-month deposit at a fixed rate. The money is locked in for the term.'
     },
     {
       id: 'sd44', deck: 'small', kind: 'gold', title: 'Rare gold coins - $500 each',
       unitPrice: 500, maxQty: 6,
-      text: 'Gold pays no income. It only pays if someone later pays you more for it.'
+      text: 'Gold pays no monthly income. Its value is whatever a buyer later offers.'
     },
     {
       id: 'sd45', deck: 'small', kind: 'gold', title: 'Rare gold coins - $600 each',
       unitPrice: 600, maxQty: 4,
-      text: 'Collectors are bidding prices up this year.'
+      text: 'Collector prices have risen this year.'
     },
 
     // --- Traps: the lesson is that "no" is a legal move ---
     {
       id: 'sd46', deck: 'small', kind: 'trap', title: 'A friend asks for a $1,000 loan',
       cost: 1000,
-      text: 'He is good for it. Probably. No interest, no repayment date, no paperwork.'
+      text: 'No interest, no repayment date and nothing in writing.'
     },
     {
       id: 'sd47', deck: 'small', kind: 'trap', title: 'Hot tip: pre-IPO shares, $2,500 minimum',
       cost: 2500,
-      text: 'Your brother-in-law says it is a sure thing and the window closes tonight.'
+      text: 'Unlisted shares sold privately. There is no public price and no way to sell them in this game.'
     },
     {
       id: 'sd48', deck: 'small', kind: 'trap', title: 'Timeshare in a ski resort',
       cost: 4000, addExpense: 50,
-      text: 'Two weeks a year, plus $50 a month in maintenance fees forever. This is a liability wearing a holiday brochure.'
+      text: 'Two weeks a year at a fixed resort, plus $50 a month in maintenance fees.'
     }
   ];
 
@@ -327,7 +327,7 @@
     business('bd15', 'big', 'Self-storage facility', 200000, 30000, 1300),
     business('bd16', 'big', 'Small office building - 6 suites', 350000, 60000, 2200),
     business('bd17', 'big', 'Warehouse leased to a distributor', 300000, 50000, 1800,
-      'One tenant, ten-year lease. Great until they leave.'),
+      'A single tenant on a ten-year lease.'),
     business('bd18', 'big', 'Sandwich shop - absentee owner', 80000, 20000, 500),
     business('bd19', 'big', 'Landscaping company', 120000, 30000, 900,
       'Comes with crews, trucks and contracts.'),
@@ -340,12 +340,12 @@
     {
       id: 'bd23', deck: 'big', kind: 'trap', title: 'Restaurant with your name on it',
       cost: 60000, addExpense: 400,
-      text: 'Everyone says you should open a restaurant. It loses $400 a month while you "build the brand".'
+      text: 'A 60-seat restaurant. It currently runs $400 a month below break-even.'
     },
     {
       id: 'bd24', deck: 'big', kind: 'trap', title: 'Exotic car "investment"',
       cost: 45000, addExpense: 300,
-      text: 'It will appreciate, the seller assures you. Insurance and storage are $300 a month.'
+      text: 'Insurance and storage come to $300 a month. It earns no rental income.'
     },
     property('bd25', 'big', 'plex', '10-plex - seller financing offered', 280000, 20000, 1100,
       { units: 10, text: 'The seller carries the paper, so the down payment is small and the debt is large.' }),
@@ -374,14 +374,14 @@
     { id: 'dd03', title: 'New work clothes', amount: 300 },
     { id: 'dd06', title: 'Car repair - transmission', amount: 600 },
     { id: 'dd07', title: 'Dentist bill', amount: 300 },
-    { id: 'dd08', title: 'Gym membership renewal', amount: 250, text: 'Paid up front. Used in January.' },
+    { id: 'dd08', title: 'Gym membership renewal', amount: 250, text: 'Twelve months, payable up front.' },
     { id: 'dd10', title: 'Wedding gift for a cousin', amount: 250 },
     { id: 'dd11', title: 'Veterinary bill', amount: 400 },
     { id: 'dd12', title: 'Tickets you already promised to buy', amount: 150 },
     { id: 'dd14', title: 'Speeding ticket', amount: 150 },
     { id: 'dd17', title: 'Emergency plumbing', amount: 350 },
     { id: 'dd18', title: 'Charity gala tickets', amount: 500 },
-    { id: 'dd19', title: 'Subscription catch-up bill', amount: 180, text: 'Eleven of them. You use three.' },
+    { id: 'dd19', title: 'Subscription catch-up bill', amount: 180, text: 'Several months of subscriptions, billed together.' },
     { id: 'dd26', title: 'Broken washing machine', amount: 550 },
     { id: 'dd27', title: 'Car tyres', amount: 450 },
     { id: 'dd28', title: 'Insurance excess after a small accident', amount: 500 },
@@ -392,39 +392,39 @@
     // --- Choices. The expensive ones are always choices. ---
     {
       id: 'dd04', title: 'Home theatre system', amount: 1500, optional: true,
-      text: 'Six speakers. You will use two. You may say no.'
+      text: 'A six-speaker system for the living room.'
     },
     {
       id: 'dd05', title: 'Holiday package', amount: 1200, optional: true,
-      text: 'Everyone at work is going. You may say no.'
+      text: 'Seven nights, flights and hotel included.'
     },
     {
       id: 'dd09', title: 'The newest laptop', amount: 1200, optional: true,
-      text: 'Yours is three years old and works. You may say no.'
+      text: 'The current model. The one you have is three years old.'
     },
     {
       id: 'dd13', title: 'New furniture on sale', amount: 800, optional: true,
-      text: 'A sale is only a saving if you were going to buy it anyway. You may say no.'
+      text: 'A three-piece suite, reduced this week.'
     },
     {
       id: 'dd15', title: 'Designer watch', amount: 2500, optional: true,
-      text: 'It tells the same time as your phone. You may say no.'
+      text: 'A Swiss automatic on a steel bracelet.'
     },
     {
       id: 'dd16', title: 'Golf clubs', amount: 900, optional: true,
-      text: 'The clubs are not the problem with your swing. You may say no.'
+      text: 'A full set, fitted to you.'
     },
     {
       id: 'dd20', title: 'Holiday shopping spree', amount: 700, optional: true,
-      text: 'You may say no.'
+      text: 'Presents for the whole family.'
     },
     {
       id: 'dd24', title: 'New car on finance', amount: 5000, addExpense: 300, optional: true,
-      text: 'A $5,000 deposit and $300 a month, forever. You may say no.'
+      text: 'A $5,000 deposit, then $300 a month for as long as you keep it.'
     },
     {
       id: 'dd25', title: 'Boat on finance', amount: 3000, addExpense: 200, optional: true,
-      text: 'A $3,000 deposit and $200 a month. The two happiest days of a boat owner\'s life are well documented. You may say no.'
+      text: 'A $3,000 deposit, then $200 a month for mooring and upkeep.'
     }
   ];
 

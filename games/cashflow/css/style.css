@@ -857,3 +857,23 @@ button.tiny {
 
 .quickrow { margin-bottom: 12px; }
 #money-dialog .stepper { margin-bottom: 10px; }
+
+/* Progress bar living inside a headline box. */
+.headline .box .progress.inbox { height: 7px; margin-top: 7px; }
+
+/* ---------------- quantity chips + confirm step ---------------- */
+
+.qtyrow button.qtychip { border-radius: 8px; }
+.qtyrow button.qtychip.chosen {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.qtyrow button.qtychip.chosen .qtycost { opacity: .9; }
+
+.confirmstep {
+  border-top: 1px solid var(--line);
+  margin-top: 10px;
+  padding-top: 10px;
+}

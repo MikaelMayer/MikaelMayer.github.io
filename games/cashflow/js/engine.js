@@ -272,7 +272,7 @@
         state.assets.splice(i, 1);
         state.cash += candidate.value;
         log(state, 'Forced sale: sold ' + a.name + ' for ' + money(candidate.value) +
-          ' (a hurried sale, well under what you paid) to cover ' + reason +
+          ' (80% of what you paid) to cover ' + reason +
           '. Passive income falls by ' + money(a.cashflow) + '/mo.', 'loss');
         return;
       }
@@ -302,7 +302,6 @@
     log(state, 'BANKRUPT. You could not pay for ' + reason +
       ', you had ' + money(state.cash) + ' in cash, and you can borrow no more against ' +
       money(stats(state).totalIncome) + ' a month of income.', 'loss');
-    log(state, 'This is what a negative cash flow does if you keep borrowing to feed it.', 'system');
     var err = new Error('BANKRUPT');
     err.bankrupt = true;
     throw err;
@@ -611,7 +610,7 @@
       }
       state.pending = {
         kind: 'bill', title: card.title, amount: card.amount * count,
-        text: card.text + ' Owning things means owning their problems too.',
+        text: card.text,
         reason: card.title
       };
       return;
@@ -718,7 +717,7 @@
     var before = holding.shares;
     holding.shares = Math.floor(holding.shares * card.ratio);
     log(state, card.symbol + ': ' + before + ' shares become ' + holding.shares +
-      '. Your total value is unchanged - a split creates no wealth.', 'system');
+      '. Your total value is unchanged.', 'system');
     if (holding.shares === 0) delete state.stocks[card.symbol];
   }
 
@@ -1026,7 +1025,7 @@
       var freed = slot.payment;
       state.cash -= slot.liability;
       log(state, '-' + money(slot.liability) + '  Paid off ' + LIABILITY_NAMES[which] +
-        ' in full. Expenses fall by ' + money(freed) + '/mo, for good.', 'gain');
+        ' in full. Expenses fall by ' + money(freed) + '/mo.', 'gain');
       slot.liability = 0;
       slot.payment = 0;
       afterAction(state);
@@ -1083,8 +1082,8 @@
       }
       if (p && p.kind === 'doodadOptional') {
         state.refused = (state.refused || 0) + p.amount;
-        log(state, 'Declined ' + p.title + '. ' + money(p.amount) +
-          ' stayed in your pocket (' + money(state.refused) + ' refused so far).', 'gain');
+        log(state, 'Declined ' + p.title + ' (' + money(p.amount) + '). Total declined this game: ' +
+          money(state.refused) + '.', 'system');
       }
       state.pending = null;
       afterAction(state);

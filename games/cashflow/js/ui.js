@@ -87,7 +87,7 @@
     OPPORTUNITY: 'Choose a Small Deal or a Big Deal, then look at the card. Small Deals need a few thousand down; Big Deals need much more and pay much more. Looking is always free and you can always say no.',
     PAYDAY: 'You collect your monthly cash flow — salary plus passive income, less every expense. You collect it whenever you PASS a payday square as well as when you land on one, so there are three per lap.',
     MARKET: 'Something happens to the things you own. Usually a buyer appears for one type of asset and you may sell; sometimes a cost lands on every property or business you hold. If you own nothing that matches, nothing happens.',
-    DOODAD: 'An unplanned expense. Some are bills you simply have to pay — a car repair, a dentist. The expensive ones are things you merely want, and you can always turn those down at no cost. This is where most of a paycheque quietly goes.',
+    DOODAD: 'An unplanned expense. Some must be paid: you are shown the amount and you press Pay. Others are offered, and you may accept or decline them; declining changes none of your numbers.',
     CHARITY: 'You may donate 10% of your total income. If you do, then for the next three turns you may roll one die or two — more control over where you land, and more chances at an Opportunity.',
     BABY: 'A child joins your household, up to three. Each one adds your profession\'s per-child cost to your expenses every month, for good, which raises the bar you have to clear to get out.',
     DOWNSIZED: 'You lose your job. Pay one full month of total expenses and lose your next two turns. The lower your cash flow, the harder this lands.'
@@ -238,7 +238,6 @@
       renderBoard();
       renderStatement();
       renderPending();
-      renderAssets();
       renderBank();
       renderLog();
       renderInvariants();
@@ -612,8 +611,23 @@
        * because "passive income vs total expenses" IS the game, and it used to
        * be a 13px grey subline while cash flow got two large displays. */
       var gap = s.totalExpenses - s.passiveIncome;
-      head.appendChild(box('Passive income', money(s.passiveIncome), 'hero',
-        gap > 0 ? money(gap) + ' short' : 'you are clear'));
+      var passiveBox = box('Passive income', money(s.passiveIncome), 'hero',
+        gap > 0 ? money(gap) + ' short of ' + money(s.totalExpenses) : 'clear of ' + money(s.totalExpenses));
+
+      /* A bar whose full width is your total expenses. Passive income only
+       * means something measured against what it has to cover, so the two
+       * numbers are shown as one shape rather than two figures to subtract. */
+      var pctOut = s.totalExpenses > 0
+        ? Math.min(100, (s.passiveIncome / s.totalExpenses) * 100) : 0;
+      var passiveBar = el('div', {
+        class: 'progress inbox', role: 'progressbar',
+        'aria-valuemin': '0', 'aria-valuemax': String(s.totalExpenses),
+        'aria-valuenow': String(s.passiveIncome),
+        'aria-valuetext': money(s.passiveIncome) + ' of the ' + money(s.totalExpenses) + ' needed'
+      });
+      passiveBar.appendChild(el('i', { style: 'width:' + pctOut.toFixed(1) + '%' }));
+      passiveBox.appendChild(passiveBar);
+      head.appendChild(passiveBox);
       head.appendChild(box('Total expenses', money(s.totalExpenses), 'hero', 'the bar to clear'));
       head.appendChild(box('Cash', money(state.cash)));
       head.appendChild(box('Monthly cash flow', signed(s.cashflow), null, 'what payday pays'));
@@ -665,6 +679,17 @@
       expense('Loans', p.bankLoan),
       row('Total expenses', money(s.totalExpenses), false, true)
     ]));
+
+    /* Assets first, then liabilities: the two sides of the balance sheet,
+     * in the order a financial statement puts them. */
+    var assetsHost = el('div', { class: 'group assets' });
+    assetsHost.appendChild(el('div', { class: 'row' }, [
+      el('span', { class: 'label', text: 'Assets' })
+    ]));
+    var assetsBody = el('div', {});
+    renderAssets(assetsBody);
+    assetsHost.appendChild(assetsBody);
+    st.appendChild(assetsHost);
 
     /* Every debt you can clear gets its own button, right beside the number.
      *
@@ -837,7 +862,7 @@
       card.appendChild(el('div', {
         class: 'hint',
         text: 'Passive income ' + (passiveDelta > 0 ? 'rose ' : 'fell ') + money(Math.abs(passiveDelta)) +
-          ' a month. That is the number that ends the Rat Race.'
+          ' a month, to ' + money(E.stats(state).passiveIncome) + '.'
       }));
     }
     return card;
@@ -882,10 +907,10 @@
       el('h3', { text: p.title }),
       el('p', { text: p.text }),
       el('div', { class: 'buttons' }, [
-        el('button', { class: 'primary', onclick: function () { doAction('chooseDeck', { deck: 'small' }); }, text: 'Small Deal' }),
-        el('button', { class: 'primary', onclick: function () { doAction('chooseDeck', { deck: 'big' }); }, text: 'Big Deal' })
+        el('button', { onclick: function () { doAction('chooseDeck', { deck: 'small' }); }, text: 'Small Deal' }),
+        el('button', { onclick: function () { doAction('chooseDeck', { deck: 'big' }); }, text: 'Big Deal' })
       ]),
-      el('div', { class: 'hint', text: 'You may always look at a deal and then decline it. Deals cost nothing to read.' })
+      el('div', { class: 'hint', text: 'Looking at a deal does not commit you to it.' })
     ]);
   }
 
@@ -908,19 +933,74 @@
     return out.slice(0, 4);
   }
 
-  function quantityRow(label, amounts, unitPrice, onPick) {
+  /* Picking an amount and committing to it are two separate acts.
+   *
+   * A quantity chip used to execute the trade the instant it was tapped, so
+   * the largest amount was one careless tap away and there was never a moment
+   * where the player could see what they were about to do. Chips now only
+   * select; a summary of the consequences appears; and a second, explicit
+   * press carries it out. */
+  var trade = { key: null, mode: null, qty: 0 };
+
+  function resetTrade() { trade = { key: pendingKey(), mode: null, qty: 0 }; }
+
+  function tradeFor(mode) {
+    if (trade.key !== pendingKey()) resetTrade();
+    return trade.mode === mode ? trade.qty : 0;
+  }
+
+  function quantityRow(label, amounts, unitPrice, mode) {
+    if (trade.key !== pendingKey()) resetTrade();
     var row = el('div', { class: 'qtyrow' }, [el('span', { class: 'qtylabel', text: label })]);
     amounts.forEach(function (n, i) {
+      var chosen = trade.mode === mode && trade.qty === n;
       row.appendChild(el('button', {
-        class: i === 0 ? 'primary' : '',
-        onclick: function () { onPick(n); },
-        title: label + ' ' + n + ' for ' + money(n * unitPrice)
+        class: 'qtychip' + (chosen ? ' chosen' : ''),
+        'aria-pressed': chosen ? 'true' : 'false',
+        onclick: function () {
+          trade = { key: pendingKey(), mode: mode, qty: n };
+          cardError = null;
+          render();
+        },
+        title: n + ' for ' + money(n * unitPrice)
       }, [
-        el('span', { class: 'qty', text: (i === 0 ? (label === 'Sell' ? 'All ' : 'Max ') : '') + n }),
+        el('span', { class: 'qty', text: (i === 0 ? (mode === 'sell' ? 'All ' : 'Max ') : '') + n }),
         el('span', { class: 'qtycost', text: money(n * unitPrice) })
       ]));
     });
     return row;
+  }
+
+  /* The second step: what the selected amount actually does, and the button
+   * that does it. */
+  function confirmTrade(opts) {
+    var qty = trade.qty;
+    var total = qty * opts.unitPrice;
+    var buying = trade.mode === 'buy';
+    var rows = [
+      [buying ? 'Buying' : 'Selling', qty + ' ' + (qty === 1 ? opts.unit : opts.units) +
+        ' at ' + money(opts.unitPrice)],
+      ['Total', money(total)],
+      ['Cash now', money(state.cash)],
+      ['Cash after', money(buying ? state.cash - total : state.cash + total)]
+    ];
+    if (opts.extraRows) rows = rows.concat(opts.extraRows(qty, buying));
+
+    return el('div', { class: 'confirmstep' }, [
+      terms(rows),
+      errorSlot(),
+      el('div', { class: 'buttons' }, [
+        el('button', {
+          onclick: function () { opts.onConfirm(qty, buying); },
+          text: (buying ? 'Buy ' : 'Sell ') + qty + ' ' + (qty === 1 ? opts.unit : opts.units)
+        }),
+        el('button', {
+          class: 'ghost',
+          onclick: function () { resetTrade(); render(); },
+          text: 'Change amount'
+        })
+      ])
+    ]);
   }
 
   /* Errors belong next to the control that produced them, not in a banner two
@@ -944,7 +1024,7 @@
 
   function dealCard(p) {
     var c = p.card;
-    var card = el('div', { class: 'card' + (c.kind === 'trap' ? ' danger' : '') }, [
+    var card = el('div', { class: 'card' }, [
       el('h3', { text: c.title })
     ]);
     if (c.text) card.appendChild(el('p', { text: c.text }));
@@ -970,26 +1050,44 @@
        * absurd on a $5 share you could buy 300 of. Each button now carries
        * its own quantity, so nothing can be typed into the wrong operation. */
       if (maxBuy >= 1) {
-        card.appendChild(quantityRow('Buy', buyAmounts(maxBuy), c.price, function (n) {
-          doAction('buyStock', { qty: n });
-        }));
+        card.appendChild(quantityRow('Buy', buyAmounts(maxBuy), c.price, 'buy'));
       } else {
         card.appendChild(el('div', { class: 'hint', text: 'One share costs ' + money(c.price) + ' and you have ' + money(state.cash) + '.' }));
       }
       if (shares > 0) {
-        card.appendChild(quantityRow('Sell', sellAmounts(shares), c.price, function (n) {
-          doAction('sellStock', { qty: n });
-        }));
+        card.appendChild(quantityRow('Sell', sellAmounts(shares), c.price, 'sell'));
       }
-      card.appendChild(errorSlot());
+
+      if (trade.qty > 0) {
+        card.appendChild(confirmTrade({
+          unitPrice: c.price, unit: 'share', units: 'shares',
+          extraRows: function (qty, buying) {
+            var after = buying ? shares + qty : shares - qty;
+            var out = [['Shares after', String(after)]];
+            if (c.dividend) {
+              out.push(['Monthly income from these',
+                money(shares * c.dividend) + '  →  ' + money(after * c.dividend)]);
+            }
+            return out;
+          },
+          onConfirm: function (qty, buying) {
+            doAction(buying ? 'buyStock' : 'sellStock', { qty: qty });
+          }
+        }));
+      } else {
+        card.appendChild(errorSlot());
+      }
+
       card.appendChild(el('div', { class: 'buttons' }, [
         el('button', { class: 'ghost', onclick: function () { doAction('pass'); }, text: 'Pass' })
       ]));
-      if (c.price >= c.range[1] * 0.8) {
-        card.appendChild(el('div', { class: 'hint', text: 'This price is near the top of its range. A good moment to sell, a poor one to buy.' }));
-      } else if (c.price <= c.range[0] * 1.5) {
-        card.appendChild(el('div', { class: 'hint', text: 'This price is near the bottom of its range. A good moment to buy, if you can hold it.' }));
-      }
+      var span = c.range[1] - c.range[0];
+      var pctOfRange = span > 0 ? Math.round(((c.price - c.range[0]) / span) * 100) : 0;
+      card.appendChild(el('div', {
+        class: 'hint',
+        text: 'At ' + money(c.price) + ', this is ' + pctOfRange + '% of the way up its ' +
+          money(c.range[0]) + ' to ' + money(c.range[1]) + ' range.'
+      }));
       return card;
     }
 
@@ -1003,13 +1101,21 @@
       if (maxCoins >= 1) {
         var coinAmounts = [];
         for (var n = maxCoins; n >= 1 && coinAmounts.length < 5; n--) coinAmounts.push(n);
-        card.appendChild(quantityRow('Buy', coinAmounts, c.unitPrice, function (q) {
-          doAction('buyGold', { qty: q });
-        }));
+        card.appendChild(quantityRow('Buy', coinAmounts, c.unitPrice, 'buy'));
       } else {
         card.appendChild(el('div', { class: 'hint', text: 'One coin costs ' + money(c.unitPrice) + ' and you have ' + money(state.cash) + '.' }));
       }
-      card.appendChild(errorSlot());
+
+      if (trade.qty > 0) {
+        card.appendChild(confirmTrade({
+          unitPrice: c.unitPrice, unit: 'coin', units: 'coins',
+          extraRows: function () { return [['Monthly income from these', money(0)]]; },
+          onConfirm: function (qty) { doAction('buyGold', { qty: qty }); }
+        }));
+      } else {
+        card.appendChild(errorSlot());
+      }
+
       card.appendChild(el('div', { class: 'buttons' }, [
         el('button', { class: 'ghost', onclick: function () { doAction('pass'); }, text: 'Pass' })
       ]));
@@ -1037,18 +1143,16 @@
       card.appendChild(terms([
         ['Cost', money(c.cost)],
         ['Monthly income', money(0)],
-        c.addExpense ? ['Added monthly expense', money(c.addExpense)] : null
+        c.addExpense ? ['Added monthly expense', money(c.addExpense)] : null,
+        ['Cash now', money(state.cash)],
+        ['Cash if you buy', money(state.cash - c.cost)]
       ]));
-      /* Refusing is the right answer and gets the primary button, exactly as
-       * on the optional-doodad card. These two cards teach the same lesson and
-       * used to give opposite visual instructions. */
-      buttons.appendChild(el('button', { class: 'primary', onclick: function () { doAction('pass'); }, text: 'Walk away' }));
-      var trapBtn = el('button', { class: 'ghost', onclick: function () { doAction('buyDeal'); }, text: 'Do it anyway' });
+      var trapBtn = el('button', { onclick: function () { doAction('buyDeal'); }, text: 'Buy for ' + money(c.cost) });
       if (c.cost > state.cash) { trapBtn.disabled = true; trapBtn.title = 'Not enough cash'; }
       buttons.appendChild(trapBtn);
+      buttons.appendChild(el('button', { onclick: function () { doAction('pass'); }, text: 'Pass' }));
       card.appendChild(errorSlot());
       card.appendChild(buttons);
-      card.appendChild(el('div', { class: 'hint', text: 'Money out, nothing coming back. An asset puts money in your pocket; this does the opposite.' }));
       return card;
     }
 
@@ -1065,10 +1169,10 @@
     var short = Math.max(0, c.down - state.cash);
     var credit = E.availableCredit(state);
     var outOfReach = short > credit;
-    /* Buy is green only when you can actually pay for it. A deal you cannot
-     * afford must not look like the obvious next tap. */
+    /* No option on this card is highlighted: whether a deal is worth taking
+     * is the judgement the player is here to practise. */
     var buyBtn = el('button', {
-      class: short > 0 ? '' : 'primary',
+      class: '',
       onclick: function () { doAction('buyDeal'); },
       text: 'Buy for ' + money(c.down)
     });
@@ -1086,11 +1190,9 @@
       card.appendChild(el('div', {
         class: 'hint',
         text: short > credit
-          ? 'You are ' + money(short) + ' short, and you could only borrow another ' +
-            money(credit) + '. This one is out of reach today.'
-          : 'You are ' + money(short) + ' short. You could take a loan to cover it — but a loan ' +
-            'costs ' + money(100) + ' a month for every ' + money(1000) + ', every month until you ' +
-            'repay it, and that comes straight off the cash flow this deal is meant to add.'
+          ? 'You are ' + money(short) + ' short. You can borrow at most ' + money(credit) + ' more.'
+          : 'You are ' + money(short) + ' short. A loan of ' + money(Math.ceil(short / 1000) * 1000) +
+            ' would cover it and add ' + money(Math.ceil(short / 1000) * 100) + ' a month to your expenses.'
       }));
     }
     return card;
@@ -1147,24 +1249,29 @@
     return card;
   }
 
-  /* A doodad you may refuse. The refusal is the lesson, so it gets equal
-   * billing with the purchase rather than being a quiet "no thanks" link. */
+  /* An expense you may accept or decline. Both options are presented the
+   * same way, with the figures for each. */
   function optionalDoodadCard(p) {
-    return el('div', { class: 'card danger' }, [
-      el('span', { class: 'tagline', text: 'Your choice — you may refuse this' }),
+    var s = E.stats(state);
+    return el('div', { class: 'card' }, [
+      el('span', { class: 'tagline', text: 'Accept or decline' }),
       el('h3', { text: p.title }),
-      el('p', { text: p.text }),
+      p.text ? el('p', { text: p.text }) : null,
       terms([
         ['Cost', money(p.amount)],
-        ['Your cash', money(state.cash)],
-        p.addExpense ? ['Added monthly expense', money(p.addExpense) + ' forever'] : null
+        ['Cash now', money(state.cash)],
+        ['Cash if you buy', money(state.cash - p.amount)],
+        p.addExpense ? ['Monthly expenses if you buy',
+          money(s.totalExpenses) + '  →  ' + money(s.totalExpenses + p.addExpense)] : null,
+        p.addExpense ? ['Monthly cash flow if you buy',
+          money(s.cashflow) + '  →  ' + money(s.cashflow - p.addExpense)] : null,
+        ['If you decline', 'no change']
       ]),
       errorSlot(),
       el('div', { class: 'buttons' }, [
-        el('button', { class: 'primary', onclick: function () { doAction('acknowledge'); }, text: 'No thanks' }),
-        el('button', { onclick: function () { doAction('doodadAccept'); }, text: 'Buy it (' + money(p.amount) + ')' })
-      ]),
-      el('div', { class: 'hint', text: 'Refusing costs you nothing. That is the whole point of this square.' })
+        el('button', { onclick: function () { doAction('doodadAccept'); }, text: 'Buy for ' + money(p.amount) }),
+        el('button', { onclick: function () { doAction('acknowledge'); }, text: 'Decline' })
+      ])
     ]);
   }
 
@@ -1175,20 +1282,15 @@
       p.amount !== undefined ? terms([['Cost', money(p.amount)], p.addExpense ? ['Added monthly expense', money(p.addExpense)] : null]) : null,
       errorSlot(),
       el('div', { class: 'buttons' }, [
-        el('button', { class: 'primary', onclick: function () { doAction(yesAction); }, text: yesLabel }),
-        el('button', { class: 'ghost', onclick: function () { doAction('acknowledge'); }, text: noLabel })
+        el('button', { onclick: function () { doAction(yesAction); }, text: yesLabel }),
+        el('button', { onclick: function () { doAction('acknowledge'); }, text: noLabel })
       ])
     ]);
   }
 
-  /* Keeping is the default and gets the primary button. Selling is
-   * irreversible, lowers the number that wins, and every row spells out what
-   * it costs you in monthly income before you can tap it.
-   *
-   * One compact row per offer rather than a six-row table each: with four
-   * houses the old card was 24 term rows and five buttons, and after a sale
-   * the card reflowed shorter so the next Sell button landed under the finger
-   * that had just tapped one. */
+  /* One compact row per offer, each stating the cash it raises and the
+   * monthly income it removes. Both outcomes are shown; neither is
+   * recommended. */
   function sellAssetCard(p) {
     var card = el('div', { class: 'card info' }, [
       el('h3', { text: p.title }),
@@ -1208,9 +1310,8 @@
           el('span', { class: 'muted', text: (gain >= 0 ? 'gain ' : 'loss ') + money(Math.abs(gain)) + ' vs the ' + money(o.cost) + ' you paid' })
         ]),
         el('button', {
-          class: loss ? 'danger-btn' : '',
           onclick: function () { doAction('sellAsset', { assetId: o.assetId }); },
-          text: loss ? 'Sell at a loss' : 'Sell'
+          text: 'Sell'
         })
       ]);
       card.appendChild(row);
@@ -1218,11 +1319,11 @@
 
     card.appendChild(errorSlot());
     card.appendChild(el('div', { class: 'buttons' }, [
-      el('button', { class: 'primary', onclick: function () { doAction('acknowledge'); }, text: 'Keep everything' })
+      el('button', { onclick: function () { doAction('acknowledge'); }, text: 'Sell nothing' })
     ]));
     card.appendChild(el('div', {
       class: 'hint',
-      text: 'A lump sum is not the same as income. Selling raises cash but lowers the number that gets you out of the Rat Race.'
+      text: 'A sale raises cash once and removes that property\'s monthly income from then on.'
     }));
     return card;
   }
@@ -1235,12 +1336,20 @@
     ]);
     var amounts = [];
     for (var n = p.maxQty; n >= 1 && amounts.length < 5; n--) amounts.push(n);
-    card.appendChild(quantityRow('Sell', amounts, p.unitPrice, function (q) {
-      doAction('sellGold', { qty: q });
-    }));
-    card.appendChild(errorSlot());
+    card.appendChild(quantityRow('Sell', amounts, p.unitPrice, 'sell'));
+
+    if (trade.qty > 0) {
+      card.appendChild(confirmTrade({
+        unitPrice: p.unitPrice, unit: 'coin', units: 'coins',
+        extraRows: function (qty) { return [['Coins left', String(p.maxQty - qty)]]; },
+        onConfirm: function (qty) { doAction('sellGold', { qty: qty }); }
+      }));
+    } else {
+      card.appendChild(errorSlot());
+    }
+
     card.appendChild(el('div', { class: 'buttons' }, [
-      el('button', { class: 'primary', onclick: function () { doAction('acknowledge'); }, text: 'Hold' })
+      el('button', { onclick: function () { doAction('acknowledge'); }, text: 'Sell none' })
     ]));
     return card;
   }
@@ -1257,8 +1366,8 @@
       ]),
       errorSlot(),
       el('div', { class: 'buttons' }, [
-        el('button', { class: 'primary', onclick: function () { doAction('buyInvestment'); }, text: 'Buy' }),
-        el('button', { class: 'ghost', onclick: function () { doAction('acknowledge'); }, text: 'Pass' })
+        el('button', { onclick: function () { doAction('buyInvestment'); }, text: 'Buy for ' + money(p.cost) }),
+        el('button', { onclick: function () { doAction('acknowledge'); }, text: 'Pass' })
       ])
     ]);
   }
@@ -1270,8 +1379,8 @@
       terms([['Cost', money(p.cost)], ['Your cash', money(state.cash)]]),
       errorSlot(),
       el('div', { class: 'buttons' }, [
-        el('button', { class: 'primary', onclick: function () { doAction('buyDream'); }, text: 'Buy my dream' }),
-        el('button', { class: 'ghost', onclick: function () { doAction('acknowledge'); }, text: 'Not yet' })
+        el('button', { onclick: function () { doAction('buyDream'); }, text: 'Buy for ' + money(p.cost) }),
+        el('button', { onclick: function () { doAction('acknowledge'); }, text: 'Not yet' })
       ])
     ]);
   }
@@ -1280,8 +1389,7 @@
    * Portfolio and bank
    * ------------------------------------------------------------------ */
 
-  function renderAssets() {
-    var host = $('#assets');
+  function renderAssets(host) {
     clear(host);
 
     /* Split by the only question that matters: does this put money in your
@@ -1336,9 +1444,8 @@
       if (note) host.appendChild(el('div', { class: 'hint', text: note }));
     }
 
-    section('Paying you every month', earning);
-    section('Pays nothing until you sell it', speculative,
-      'These only pay off if someone later pays you more than you did.');
+    section('Producing monthly income', earning);
+    section('Producing no monthly income', speculative);
   }
 
   /* ------------------------------------------------------------------ *
@@ -1427,9 +1534,9 @@
     var s = E.stats(state);
     amountDialog({
       title: 'Take a loan',
-      note: 'Loans are interest only. You pay ' + money(100) + ' a month for every ' +
-        money(1000) + ' you borrow — 120% a year — and you keep paying it every single ' +
-        'month until you repay the principal. Nothing else in this game costs that much.',
+      note: 'Interest only: ' + money(100) + ' a month for every ' + money(1000) +
+        ' borrowed, which is 120% a year. The payment continues every month until you ' +
+        'repay the principal.',
       blocked: 'You have no borrowing capacity left.',
       min: 1000, max: Math.floor(available / 1000) * 1000, step: 1000,
       initial: loanAmount,
@@ -1451,9 +1558,9 @@
     var max = Math.min(state.bankLoan, Math.floor(state.cash / 1000) * 1000);
     amountDialog({
       title: 'Repay loans',
-      note: 'You owe ' + money(state.bankLoan) + ', which costs you ' +
-        money(state.bankLoan / 1000 * 100) + ' every month. Every ' + money(1000) +
-        ' you clear gives you ' + money(100) + ' a month back, for good.',
+      note: 'You owe ' + money(state.bankLoan) + ', which costs ' +
+        money(state.bankLoan / 1000 * 100) + ' a month. Each ' + money(1000) +
+        ' repaid removes ' + money(100) + ' a month from your expenses.',
       blocked: 'You need at least ' + money(1000) + ' in cash to repay a block.',
       min: 1000, max: max, step: 1000,
       initial: loanAmount,
@@ -1484,8 +1591,8 @@
     body.appendChild(el('h2', { text: 'Pay off your ' + name }));
     body.appendChild(el('p', {
       class: 'dlg-note',
-      text: 'Clearing a debt is all or nothing, and it removes the monthly payment for ' +
-        'the rest of the game — a guaranteed ' + money(slot.payment) + ' a month back, for good.'
+      text: 'This debt can only be cleared in full. Doing so removes its ' +
+        money(slot.payment) + ' monthly payment for the rest of the game.'
     }));
     body.appendChild(terms([
       ['Balance to clear', money(slot.liability)],
@@ -1556,10 +1663,10 @@
     host.appendChild(el('div', {
       class: 'hint',
       text: owed > 0
-        ? 'Repay loans from the Liabilities list in your financial statement. Every ' +
-          money(1000) + ' you clear gives you back ' + money(100) + ' a month.'
-        : 'Interest only: ' + money(100) + ' a month for every ' + money(1000) +
-          ' borrowed, every month until you repay it.'
+        ? 'Repay from the Liabilities list in your financial statement. Each ' +
+          money(1000) + ' repaid removes ' + money(100) + ' a month.'
+        : 'Interest only: ' + money(100) + ' a month per ' + money(1000) + ' borrowed, ' +
+          'until the principal is repaid.'
     }));
   }
 

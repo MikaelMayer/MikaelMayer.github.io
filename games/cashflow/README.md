@@ -66,6 +66,28 @@ month 50, close the tab, and lose thirty months of decisions without being told.
 
 The engine adjudicates. The interface has to *teach*, and that is a different job.
 
+**It states facts and lets the player judge.** This is the rule everything else
+answers to. An earlier version put the primary button on whichever option it thought
+was correct and made fun of the other one — "it tells the same time as your phone",
+"money out, nothing coming back". That teaches compliance, not judgement: a player who
+is steered to the right answer has not learned to find it, and a game that has already
+decided has nothing left to teach. So:
+
+- Where a card offers a genuine choice, **every option gets identical visual weight**.
+  Nothing is green because the designer approves of it. A button is only emphasised when
+  there is exactly one thing to do — Pay, Roll, Continue.
+- Cards **report figures, not verdicts**: cost, cash before, cash after, the effect on
+  monthly expenses and cash flow. A stock says how far up its range the price sits; it
+  does not say whether that is a good moment to buy.
+- Card copy **describes what is on offer** and stops. No sarcasm about the buyer, no
+  warnings about what a sensible person would do.
+- Disabling a control is still allowed, because "you cannot afford this" is a fact.
+  Recommending against something you *can* afford is not.
+
+The player still has everything needed to reason: the win condition is stated plainly,
+every number that moves is shown moving, and the board explains its own squares. What
+they do not get is the answer.
+
 **Every turn produces a receipt.** Roughly half the squares resolve with no decision to
 make — payday pays you, a baby arrives, the market ignores you. Those turns used to end
 with your money changed and nothing on screen to say why, which is bad teaching and
