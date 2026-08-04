@@ -155,6 +155,7 @@
     for (var i = mark; i < state.log.length; i++) {
       var entry = state.log[i];
       if (entry.type === 'roll') continue;          // the dice are drawn separately
+      if (entry.type === 'rules') continue;         // explained in its own dialog
       receipt.entries.push(entry);
     }
   }
@@ -172,6 +173,7 @@
   function doAction(type, payload) {
     snapshot();
     var mark = state.log.length;
+    var phaseBefore = state.phase;
     var res = E.act(state, type, payload);
     if (!res.ok) {
       undoStack.pop();          // nothing changed, so nothing to undo
@@ -182,6 +184,7 @@
     cardError = null;
     recordSince(mark);
     render();
+    if (phaseBefore === 'ratrace' && state.phase === 'fasttrack') openFastTrackDialog();
     return true;
   }
 
@@ -190,6 +193,7 @@
     squareInfo = null;
     snapshot();
     beginTurn();
+    var phaseBefore = state.phase;
     var from = (state.phase === 'fasttrack' || state.phase === 'won') ? state.ftPosition : state.position;
     var mark = state.log.length;
     try {
@@ -205,13 +209,15 @@
     receipt.square = currentSquareLabel();
 
     var to = (state.phase === 'fasttrack' || state.phase === 'won') ? state.ftPosition : state.position;
-    if (to !== from && !E.isOver(state)) {
+    var entered = phaseBefore === 'ratrace' && state.phase === 'fasttrack';
+    if (to !== from && !E.isOver(state) && !entered) {
       // Draw the board first so the squares exist, then walk the token across
       // them and redraw once it arrives so the landing square lights up.
       render();
       walkToken(from, to, render);
     } else {
       render();
+      if (entered) openFastTrackDialog();
     }
   }
 
@@ -348,9 +354,9 @@
         short = inv.short || inv.name;
       } else if (type === 'DREAM') {
         var dr = E.findById(D.DREAMS, sq.dream);
-        label = dr.name;
-        short = dr.short || dr.name;
         mine = dr.id === state.dream.id;
+        label = (mine ? '\u2605 ' : '') + dr.name;
+        short = (mine ? '\u2605 ' : '') + (dr.short || dr.name);
       } else {
         label = sq.label;
         short = sq.label;
@@ -422,8 +428,17 @@
      * where the player actually is. */
     var wrapRect = $('#board-wrap').getBoundingClientRect();
     var sqRect = sq.getBoundingClientRect();
-    var x = sqRect.left - wrapRect.left + sqRect.width / 2;
-    var y = sqRect.top - wrapRect.top + sqRect.height / 2;
+
+    /* Sit in the bottom-right corner, sized against the square, rather than
+     * dead centre. A token in the middle covers the one thing the square is
+     * there to tell you -- its name. */
+    var size = Math.max(9, Math.min(18, sqRect.width * 0.32));
+    token.style.width = size + 'px';
+    token.style.height = size + 'px';
+
+    var inset = size / 2 + 1;
+    var x = sqRect.left - wrapRect.left + sqRect.width - inset;
+    var y = sqRect.top - wrapRect.top + sqRect.height - inset;
 
     token.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px) translate(-50%,-50%)';
     tokenAt = index;
@@ -544,14 +559,19 @@
       centre.appendChild(el('div', {
         class: 'sub',
         text: 'New investment income ' + money(f.addedIncome) + ' of ' +
-          money(E.constants.FAST_TRACK_CASHFLOW_GOAL)
+          money(E.fastTrackGoal(state))
       }));
-      var pct2 = Math.min(100, (f.addedIncome / E.constants.FAST_TRACK_CASHFLOW_GOAL) * 100);
+      centre.appendChild(el('div', {
+        class: 'sub',
+        text: 'or land on \u2605 ' + (state.dream.short || state.dream.name) +
+          ' and pay ' + money(state.dream.cost)
+      }));
+      var pct2 = Math.min(100, (f.addedIncome / E.fastTrackGoal(state)) * 100);
       var bar2 = el('div', {
         class: 'progress', role: 'progressbar',
         'aria-valuemin': '0', 'aria-valuemax': '100',
         'aria-valuenow': String(Math.round(pct2)),
-        'aria-valuetext': money(f.addedIncome) + ' of ' + money(E.constants.FAST_TRACK_CASHFLOW_GOAL) + ' of new income'
+        'aria-valuetext': money(f.addedIncome) + ' of ' + money(E.fastTrackGoal(state)) + ' of new income'
       });
       bar2.appendChild(el('i', { style: 'width:' + pct2.toFixed(1) + '%' }));
       centre.appendChild(bar2);
@@ -604,8 +624,14 @@
 
     if (state.phase === 'fasttrack' || state.phase === 'won') {
       var f = E.ftStats(state);
-      head.appendChild(box('Cash', money(state.cash)));
-      head.appendChild(box('Cash Flow Day', money(f.totalIncome), 'pos'));
+      var ftGoal = E.fastTrackGoal(state);
+      head.appendChild(box('Cash', money(state.cash),
+        state.cash >= state.dream.cost ? 'hero' : null,
+        state.cash >= state.dream.cost
+          ? 'enough for your dream'
+          : money(state.dream.cost - state.cash) + ' short of your dream'));
+      head.appendChild(box('Cash Flow Day', money(f.totalIncome), null,
+        money(f.addedIncome) + ' of ' + money(ftGoal) + ' new income'));
     } else {
       /* The win condition, side by side, as the first thing in the panel --
        * because "passive income vs total expenses" IS the game, and it used to
@@ -638,14 +664,52 @@
 
     if (state.phase === 'fasttrack' || state.phase === 'won') {
       var ft = E.ftStats(state);
-      st.appendChild(group('Fast Track income', [
-        row('From the Rat Race', money(ft.baseIncome), true),
-        row('From new investments', money(ft.investmentIncome), true),
-        row('Cash Flow Day total', money(ft.totalIncome), false, true)
+      var goal = E.fastTrackGoal(state);
+
+      st.appendChild(group('Cash Flow Day income', [
+        row('Carried from the Rat Race', money(ft.baseIncome), true),
+        row('From investments bought here', money(ft.investmentIncome), true),
+        row('Total per Cash Flow Day', money(ft.totalIncome), false, true)
       ]));
-      st.appendChild(group('Your dream', [
-        row(state.dream.name, money(state.dream.cost), true)
+
+      /* The Rat Race portfolio is not shown here: it no longer produces
+       * anything on its own, it was converted into the income above, and
+       * listing it again reads as though it were still working for you. */
+      var inv = el('div', { class: 'group assets' }, [
+        el('div', { class: 'row' }, [el('span', { class: 'label', text: 'Investments' })])
+      ]);
+      if (!state.ftInvestments.length) {
+        inv.appendChild(el('div', { class: 'empty', text: 'None yet. Land on an investment square to buy one.' }));
+      } else {
+        state.ftInvestments.forEach(function (i) {
+          inv.appendChild(el('div', { class: 'item' }, [
+            el('span', { class: 'n', text: i.name }),
+            el('span', { class: 'm', text: money(i.cost) }),
+            el('span', { class: 'm pos', text: money(i.cashflow) + '/mo' })
+          ]));
+        });
+      }
+      st.appendChild(inv);
+
+      /* The dream name is a sentence, not a label, so it gets a row that lets
+       * it wrap. A plain terms row pins its value to one line and squeezes the
+       * label into a column one character wide. */
+      var win = el('div', { class: 'group' }, [
+        el('div', { class: 'row' }, [el('span', { class: 'label', text: 'Two ways to win' })])
+      ]);
+      win.appendChild(el('div', { class: 'winline' }, [
+        el('span', { class: 'winname', text: '\u2605 ' + state.dream.name }),
+        el('span', { class: 'winval', text: money(state.dream.cost) })
       ]));
+      win.appendChild(row('\u00a0\u00a0cash needed',
+        state.cash >= state.dream.cost ? 'you can afford it'
+          : money(state.dream.cost - state.cash) + ' more', true));
+      win.appendChild(el('div', { class: 'winline' }, [
+        el('span', { class: 'winname', text: 'or new investment income' }),
+        el('span', { class: 'winval', text: money(goal) })
+      ]));
+      win.appendChild(row('\u00a0\u00a0so far', money(ft.addedIncome), true));
+      st.appendChild(win);
       return;
     }
 
@@ -1623,6 +1687,64 @@
 
   /* A summary and one way in. Taking a loan happens in its own dialog, and
    * repaying happens from the Liabilities list beside the debt itself. */
+  /* Leaving the Rat Race changes the rules, so it gets its own dialog rather
+    * than three more lines in the turn receipt. The receipt reports what you
+    * did; this explains what the game now is. */
+  function openFastTrackDialog() {
+    var dlg = $('#money-dialog');
+    var body = $('#money-dialog-body');
+    var f = E.ftStats(state);
+    var goal = E.fastTrackGoal(state);
+
+    clear(body);
+    body.appendChild(el('h2', { text: 'Out of the Rat Race in ' + state.months + ' months' }));
+    body.appendChild(el('p', {
+      class: 'dlg-note',
+      text: 'Your passive income overtook your expenses, so the Rat Race is finished. ' +
+        'From here the game is a different one.'
+    }));
+
+    body.appendChild(el('div', { class: 'ftrules' }, [
+      el('h3', { text: 'What carries over' }),
+      terms([
+        ['Cash Flow Day income', money(f.baseIncome)],
+        ['Cash to start', money(state.cash)]
+      ]),
+      el('p', {
+        class: 'dlg-note',
+        text: 'Everything you built in the Rat Race — the properties, the businesses, the ' +
+          'shares — became that monthly income. Your old salary, expenses and debts are gone.'
+      }),
+
+      el('h3', { text: 'What changes' }),
+      el('ul', {}, [
+        el('li', { text: 'You roll two dice instead of one.' }),
+        el('li', { text: 'Investments are bought with cash. There are no loans here.' }),
+        el('li', { text: 'You collect your Cash Flow Day income each time you pass or land on a Cash Flow Day square.' })
+      ]),
+
+      el('h3', { text: 'Two ways to win' }),
+      el('ul', {}, [
+        el('li', {}, [
+          'Land on ',
+          el('strong', { text: '★ ' + state.dream.name }),
+          ' and pay ' + money(state.dream.cost) + '.'
+        ]),
+        el('li', { text: 'Or add ' + money(goal) + ' a month of new investment income.' })
+      ]),
+      el('p', {
+        class: 'dlg-note',
+        text: 'Your dream is the gold square on the board. Only that one wins the game for ' +
+          'you; the others belong to nobody.'
+      })
+    ]));
+
+    body.appendChild(el('div', { class: 'dlg-actions' }, [
+      el('button', { class: 'primary', onclick: function () { dlg.close(); }, text: 'Start the Fast Track' })
+    ]));
+    if (!dlg.open) dlg.showModal();
+  }
+
   function renderBank() {
     var host = $('#bank');
     clear(host);

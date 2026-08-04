@@ -248,8 +248,13 @@ indistinguishable from a bug.
 
 Your Cash Flow Day income is your Rat Race passive income × 100, and you start with the
 same amount again in cash. There is no borrowing here; investments are bought outright.
-Win by **buying your own dream** when you land on it, or by adding **$50,000 a month**
-of new investment income. Lawsuits and audits cost half your cash; divorce costs all of
+Win by **buying your own dream** when you land on it, or by **doubling the monthly
+income you arrived with** — you must add at least as much again, with a floor of
+$50,000. A flat target does not hold up: a player who escapes on $350,000 a month
+clears a fixed $50,000 with one purchase, while a player who escapes on $10,000 has to
+work for it. Scaling asks the same effort of everyone. (My recollection is that the
+printed rule is a flat $50,000; this is a deliberate change, and it is one function,
+`fastTrackGoal`, if you want the original back.) Lawsuits and audits cost half your cash; divorce costs all of
 it; none of them touch your investments.
 
 ---

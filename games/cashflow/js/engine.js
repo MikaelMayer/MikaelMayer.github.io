@@ -27,7 +27,19 @@
   var LOAN_UNIT = 1000;          // Bank lends in $1,000 blocks
   var LOAN_RATE_PER_UNIT = 100;  // ...at $100/month interest per block (10%)
   var FAST_TRACK_MULTIPLIER = 100;
-  var FAST_TRACK_CASHFLOW_GOAL = 50000;
+  /* Winning the Fast Track on cash flow means DOUBLING the income you arrived
+   * with -- you must add at least as much again as the Rat Race handed you.
+   *
+   * A flat target does not hold up: a player who escapes with $350,000 a month
+   * clears a fixed $50,000 with one purchase, while a player who escapes with
+   * $10,000 has to work for it. Scaling the goal to what you arrived with asks
+   * the same effort of everyone. The floor keeps a very small escape from
+   * having a trivial second act. */
+  var FAST_TRACK_CASHFLOW_GOAL = 50000;   // the floor, not the whole rule
+
+  function fastTrackGoal(state) {
+    return Math.max(FAST_TRACK_CASHFLOW_GOAL, state.ftBaseIncome);
+  }
 
   /* Total bank debt is capped at this many months of total income.
    *
@@ -1145,10 +1157,14 @@
     state.charityTurns = 0;
     log(state, 'OUT OF THE RAT RACE in ' + state.months + ' months. Passive income ' +
       money(s.passiveIncome) + ' beats expenses of ' + money(s.totalExpenses) + '.', 'win');
+    /* Typed 'rules' rather than 'system': this is an explanation of how the
+     * game now works, not something that happened this turn. The interface
+     * keeps it out of the turn receipt and puts it in a dialog of its own. */
     log(state, 'Fast Track: your Cash Flow Day income is ' + money(state.ftBaseIncome) +
-      ' and you start with the same amount in cash.', 'system');
+      ' and you start with the same amount in cash.', 'rules');
     log(state, 'Win by buying your dream (' + state.dream.name + ', ' + money(state.dream.cost) +
-      ') or by adding ' + money(FAST_TRACK_CASHFLOW_GOAL) + '/mo of new investment income.', 'system');
+      ') or by doubling your Cash Flow Day income - adding another ' +
+      money(fastTrackGoal(state)) + '/mo of investment income.', 'rules');
   }
 
   function moveFastTrack(state, steps) {
@@ -1212,7 +1228,7 @@
 
   function afterFastTrack(state) {
     if (state.phase !== 'fasttrack') return;
-    if (ftStats(state).addedIncome >= FAST_TRACK_CASHFLOW_GOAL) win(state, 'cashflow');
+    if (ftStats(state).addedIncome >= fastTrackGoal(state)) win(state, 'cashflow');
   }
 
   function win(state, how) {
@@ -1306,6 +1322,7 @@
     creditLimit: creditLimit,
     availableCredit: availableCredit,
     isOver: isOver,
+    fastTrackGoal: fastTrackGoal,
     canRoll: canRoll,
     diceOptions: diceOptions,
     checkInvariants: checkInvariants,

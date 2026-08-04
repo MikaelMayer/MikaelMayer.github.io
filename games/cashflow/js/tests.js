@@ -668,6 +668,36 @@
       eq(s2.cash, 100000, 'the dream was paid for');
     });
 
+    test('the Fast Track cash flow goal scales to the income you arrived with', function () {
+      // A big escape must double a big number, not clear a token $50,000.
+      var rich = E.createGame({ seed: 210, professionId: 'doctor', dreamId: 'dr05' });
+      rich.phase = 'fasttrack';
+      rich.ftBaseIncome = 350000;
+      rich.cash = 9000000;
+      eq(E.fastTrackGoal(rich), 350000, 'goal should equal the arrival income');
+
+      rich.pending = { kind: 'ftInvestment', investmentId: 'ft18', title: '', cost: 1500000, cashflow: 130000 };
+      assert(E.act(rich, 'buyInvestment').ok, 'purchase failed');
+      eq(rich.phase, 'fasttrack', '130,000 of new income must not win against a 350,000 goal');
+
+      // Enough purchases to double it does win.
+      var added = 130000;
+      var guard = 0;
+      while (rich.phase === 'fasttrack' && guard++ < 10) {
+        rich.pending = { kind: 'ftInvestment', investmentId: 'ft18', title: '', cost: 1500000, cashflow: 130000 };
+        E.act(rich, 'buyInvestment');
+        added += 130000;
+      }
+      eq(rich.phase, 'won', 'doubling the arrival income should win');
+      assert(added >= 350000, 'won only after adding at least the arrival income');
+
+      // A small escape is held to the floor rather than a trivial target.
+      var lean = E.createGame({ seed: 211, professionId: 'janitor', dreamId: 'dr05' });
+      lean.phase = 'fasttrack';
+      lean.ftBaseIncome = 12000;
+      eq(E.fastTrackGoal(lean), 50000, 'the floor applies below it');
+    });
+
     test('you cannot buy another player\'s dream, and cannot buy yours without the cash', function () {
       var s = E.createGame({ seed: 23, professionId: 'doctor', dreamId: 'dr05' });
       s.phase = 'fasttrack';

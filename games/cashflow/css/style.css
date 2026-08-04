@@ -877,3 +877,34 @@ button.tiny {
   margin-top: 10px;
   padding-top: 10px;
 }
+
+/* ---------------- fast track entry dialog ---------------- */
+
+.ftrules h3 {
+  font-size: 12px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 16px 0 6px;
+}
+.ftrules ul { margin: 0 0 10px; padding-left: 18px; font-size: 13px; }
+.ftrules li { margin-bottom: 4px; }
+.ftrules .terms { margin-bottom: 8px; }
+
+/* The dream you chose has to be findable at a glance among nine others. */
+.sq.DREAM.mine { box-shadow: 0 0 0 2px var(--sq-pay-line) inset; }
+
+/* A label that may be a whole sentence, with its figure on the right.
+   A plain .terms row pins the value to one line, which squeezes a long label
+   into a column one character wide. */
+.winline {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 14px;
+  padding: 3px 0;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.winline .winname { min-width: 0; }
+.winline .winval { white-space: nowrap; font-weight: 700; }
