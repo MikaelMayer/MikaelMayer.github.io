@@ -620,7 +620,7 @@
     }
     if (card.optional) {
       state.pending = {
-        kind: 'doodadOptional', title: name(card), text: T.field(card, 'text'),
+        kind: 'doodadOptional', id: card.id, title: card.title, text: card.text || '',
         amount: amount, addExpense: card.addExpense || 0, action: card.action || null
       };
       return;
@@ -631,7 +631,7 @@
      * they hand the money over. Deducting it for them and reporting it as
      * "already paid" is both confusing and a wasted teaching moment. */
     state.pending = {
-      kind: 'bill', title: name(card), text: T.field(card, 'text') || '',
+      kind: 'bill', id: card.id, title: card.title, text: card.text || '',
       amount: amount, reason: 'Expense: ' + card.title
     };
   }
@@ -663,7 +663,7 @@
         return;
       }
       state.pending = {
-        kind: 'bill', title: name(card), amount: card.amount * count,
+        kind: 'bill', id: card.id, title: card.title, amount: card.amount * count,
         text: T.field(card, 'text'),
         reason: name(card)
       };
@@ -678,7 +678,7 @@
         return;
       }
       state.pending = {
-        kind: 'sellGold', title: name(card), text: T.field(card, 'text'),
+        kind: 'sellGold', id: card.id, title: card.title, text: card.text || '',
         unitPrice: card.unitPrice, maxQty: coins
       };
       return;
@@ -692,7 +692,7 @@
       return;
     }
     state.pending = {
-      kind: 'sellAsset', title: name(card), text: T.field(card, 'text'), offers: offers
+      kind: 'sellAsset', id: card.id, title: card.title, text: card.text || '', offers: offers
     };
   }
 
@@ -986,7 +986,7 @@
       } else {
         var remaining = p.offers.filter(function (o) { return o.assetId !== offer.assetId; });
         if (remaining.length === 0) state.pending = null;
-        else state.pending = { kind: 'sellAsset', title: p.title, text: p.text, offers: remaining };
+        else state.pending = { kind: 'sellAsset', id: p.id, title: p.title, text: p.text, offers: remaining };
       }
       afterAction(state);
     },

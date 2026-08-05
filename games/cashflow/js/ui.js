@@ -1290,8 +1290,8 @@
 
   function chooseDeckCard(p) {
     return el('div', { class: 'card' }, [
-      el('h3', { text: T.maybe(p.title) }),
-      el('p', { text: T.maybe(p.text) }),
+      el('h3', { text: pendingField(p, 'title') }),
+      el('p', { text: pendingField(p, 'text') }),
       el('div', { class: 'buttons' }, [
         el('button', { onclick: function () { doAction('chooseDeck', { deck: 'small' }); }, text: t('Small Deal') }),
         el('button', { onclick: function () { doAction('chooseDeck', { deck: 'big' }); }, text: t('Big Deal') })
@@ -1464,6 +1464,14 @@
    * against the old English -- which is exactly how it looks when a
    * translation is wrong. Re-read the wording from the catalogue; only the
    * wording, since the saved numbers are what the decision was offered on. */
+  /* A pending decision names a card. Resolve it in the language being read,
+   * falling back to whatever the pending stored for saves made before the id
+   * was kept. */
+  function pendingField(p, field) {
+    if (p && p.id) return T.field({ id: p.id, title: p.title, text: p.text }, field) || T.maybe(p[field] || '');
+    return T.maybe((p && p[field]) || '');
+  }
+
   function liveCard(c) {
     if (!c || !c.id) return c;
     var decks = [D.SMALL_DEALS, D.BIG_DEALS, D.DOODADS, D.MARKET];
@@ -1715,16 +1723,38 @@
     var credit = E.availableCredit(state);
 
     var card = el('div', { class: 'card danger' }, [
-      el('span', { class: 'tagline', text: t('An expense you have to pay') }),
-      el('h3', { text: T.maybe(p.title) })
+      el('span', { class: 'tagline', text: t('An expense you have to pay') })
     ]);
-    if (p.text) card.appendChild(el('p', { text: T.maybe(p.text) }));
 
-    card.appendChild(terms([
-      [t('Amount'), money(p.amount)],
-      [t('Cash before'), money(state.cash)],
-      ['Cash after', short ? money(0) : money(after)]
+    /* The amount belongs beside the thing you are being charged for. As a row
+     * in a table it was one of three figures of equal weight, which invited
+     * checking that 700 minus 450 is 250 -- arithmetic the card had already
+     * done. */
+    card.appendChild(el('div', { class: 'billhead' }, [
+      el('h3', { text: pendingField(p, 'title') }),
+      el('span', { class: 'billamount', text: money(p.amount) })
     ]));
+    if (p.text) card.appendChild(el('p', { text: pendingField(p, 'text') }));
+
+    /* What it does to you, as one line of helper text rather than two more
+     * rows of bookkeeping. */
+    var help;
+    if (!short) {
+      help = t('You have {$cash}, so this leaves you {$after}.',
+        { cash: state.cash, after: after });
+    } else if (short <= credit) {
+      /* Never "cash after: $0". The money does not evaporate -- the game
+       * borrows for you, and the loan is the part worth knowing about,
+       * because it outlives the bill. */
+      var borrow = Math.ceil(short / 1000) * 1000;
+      help = t('You have {$cash}, so paying this takes a loan of {$borrow}. That adds {$monthly} a month to your expenses until you repay it.',
+        { cash: state.cash, borrow: borrow, monthly: borrow / 1000 * 100 });
+    } else {
+      help = t('You have {$cash} and can borrow at most {$credit}, so paying this will sell whatever it has to.',
+        { cash: state.cash, credit: credit });
+    }
+    card.appendChild(el('div', { class: 'hint billhelp', text: help }));
+
     card.appendChild(errorSlot());
     card.appendChild(el('div', { class: 'buttons' }, [
       el('button', {
@@ -1733,18 +1763,6 @@
         text: t('Pay {$amount}', { amount: p.amount })
       })
     ]));
-
-    if (short > 0) {
-      var borrow = Math.ceil(short / 1000) * 1000;
-      card.appendChild(el('div', {
-        class: 'hint',
-        text: short <= credit
-          ? 'You are ' + money(short) + ' short, so paying takes an automatic loan of ' + money(borrow) +
-            ', adding ' + money(borrow / 1000 * 100) + ' a month to your expenses. You have to pay this one.'
-          : 'You are ' + money(short) + ' short and can only borrow ' + money(credit) +
-            ', so paying will sell whatever it has to.'
-      }));
-    }
     return card;
   }
 
@@ -1754,8 +1772,8 @@
     var s = E.stats(state);
     return el('div', { class: 'card' }, [
       el('span', { class: 'tagline', text: t('Accept or decline') }),
-      el('h3', { text: T.maybe(p.title) }),
-      p.text ? el('p', { text: T.maybe(p.text) }) : null,
+      el('h3', { text: pendingField(p, 'title') }),
+      p.text ? el('p', { text: pendingField(p, 'text') }) : null,
       terms([
         [t('Cost'), money(p.amount)],
         [t('Cash now'), money(state.cash)],
@@ -1777,8 +1795,8 @@
 
   function simpleCard(p, yesLabel, yesAction, noLabel, cls) {
     return el('div', { class: 'card' + (cls ? ' ' + cls : ' info') }, [
-      el('h3', { text: T.maybe(p.title) }),
-      el('p', { text: T.maybe(p.text) }),
+      el('h3', { text: pendingField(p, 'title') }),
+      el('p', { text: pendingField(p, 'text') }),
       /* You cannot judge a donation without knowing what it leaves you. */
       p.amount !== undefined ? terms([
         [t('Cost'), money(p.amount)],
@@ -1799,8 +1817,8 @@
    * recommended. */
   function sellAssetCard(p) {
     var card = el('div', { class: 'card info' }, [
-      el('h3', { text: T.maybe(p.title) }),
-      el('p', { text: T.maybe(p.text) })
+      el('h3', { text: pendingField(p, 'title') }),
+      el('p', { text: pendingField(p, 'text') })
     ]);
 
     var offers = p.offers.slice().sort(function (a, b) { return b.netCash - a.netCash; });
@@ -1836,8 +1854,8 @@
 
   function sellGoldCard(p) {
     var card = el('div', { class: 'card gold' }, [
-      el('h3', { text: T.maybe(p.title) }),
-      el('p', { text: T.maybe(p.text) }),
+      el('h3', { text: pendingField(p, 'title') }),
+      el('p', { text: pendingField(p, 'text') }),
       terms([[t('Price per coin'), money(p.unitPrice)], [t('Coins you own'), String(p.maxQty)]])
     ]);
     var amounts = [];
@@ -1862,8 +1880,8 @@
 
   function ftInvestmentCard(p) {
     return el('div', { class: 'card' }, [
-      el('h3', { text: T.maybe(p.title) }),
-      el('p', { text: T.maybe(p.text) }),
+      el('h3', { text: pendingField(p, 'title') }),
+      el('p', { text: pendingField(p, 'text') }),
       terms([
         [t('Cost (cash)'), money(p.cost)],
         [t('Monthly cash flow'), money(p.cashflow)],
@@ -1880,8 +1898,8 @@
 
   function ftDreamCard(p) {
     return el('div', { class: 'card gold' }, [
-      el('h3', { text: T.maybe(p.title) }),
-      el('p', { text: T.maybe(p.text) }),
+      el('h3', { text: pendingField(p, 'title') }),
+      el('p', { text: pendingField(p, 'text') }),
       terms([[t('Cost'), money(p.cost)], [t('Your cash'), money(state.cash)]]),
       errorSlot(),
       el('div', { class: 'buttons' }, [
