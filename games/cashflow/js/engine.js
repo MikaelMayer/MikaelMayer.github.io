@@ -439,8 +439,8 @@
     };
     state.rngState = rng.getState();
 
-    log(state, 'Game {seed} begins. {job}, take-home {$salary}/mo, savings {$savings}.', { seed: seed, job: T.field(profession, 'name'), salary: profession.salary, savings: profession.savings }, 'system');
-    log(state, 'Dream: {name} ({$cost}).', { name: T.field(dream, 'name'), cost: dream.cost }, 'system');
+    log(state, 'Game {seed} begins. {job}, take-home {$salary}/mo, savings {$savings}.', { seed: seed, job: ref(profession, 'name'), salary: profession.salary, savings: profession.savings }, 'system');
+    log(state, 'Dream: {name} ({$cost}).', { name: ref(dream, 'name'), cost: dream.cost }, 'system');
     var s = stats(state);
     log(state, 'Starting monthly cash flow: {$cf}. Passive income: {$passive} against {$expenses} of expenses.', { cf: s.cashflow, passive: s.passiveIncome, expenses: s.totalExpenses }, 'system');
     return state;
@@ -649,7 +649,7 @@
     var card = drawCard(state, 'market', D.MARKET);
 
     if (card.kind === 'none') {
-      log(state, '{title}. {text}', { title: ref(card), text: T.field(card, 'text') }, 'system');
+      log(state, '{title}. {text}', { title: ref(card), text: ref(card, 'text') }, 'system');
       return;
     }
 
@@ -1081,7 +1081,7 @@
       }
       state.cash -= inv.cost;
       state.ftInvestments.push({ id: inv.id, name: inv.name, cost: inv.cost, cashflow: inv.cashflow });
-      log(state, 'Bought {title} for {$cost}. Adds {$cf}/mo.', { title: T.field(inv, 'name'), cost: inv.cost, cf: inv.cashflow }, 'gain');
+      log(state, 'Bought {title} for {$cost}. Adds {$cf}/mo.', { title: ref(inv, 'name'), cost: inv.cost, cf: inv.cashflow }, 'gain');
       state.pending = null;
       afterAction(state);
     },
@@ -1093,7 +1093,7 @@
         fail('Your dream costs {$cost} and you have {$cash}.', { cost: dream.cost, cash: state.cash });
       }
       state.cash -= dream.cost;
-      log(state, 'You bought your dream: {name}.', { name: T.field(dream, 'name') }, 'gain');
+      log(state, 'You bought your dream: {name}.', { name: ref(dream, 'name') }, 'gain');
       state.pending = null;
       win(state, 'dream');
     },
@@ -1191,7 +1191,7 @@
      * game now works, not something that happened this turn. The interface
      * keeps it out of the turn receipt and puts it in a dialog of its own. */
     log(state, 'Fast Track: your Cash Flow Day income is {$income} and you start with the same amount in cash.', { income: state.ftBaseIncome }, 'rules');
-    log(state, 'Win by buying your dream ({name}, {$cost}) or by doubling your Cash Flow Day income - adding another {$goal}/mo of investment income.', { name: T.field(state.dream, 'name'), cost: state.dream.cost, goal: fastTrackGoal(state) }, 'rules');
+    log(state, 'Win by buying your dream ({name}, {$cost}) or by doubling your Cash Flow Day income - adding another {$goal}/mo of investment income.', { name: ref(state.dream, 'name'), cost: state.dream.cost, goal: fastTrackGoal(state) }, 'rules');
   }
 
   function moveFastTrack(state, steps) {
@@ -1226,7 +1226,7 @@
             text: t('This is the dream you chose. Buy it for {$cost} and you win.', { cost: dream.cost })
           };
         } else {
-          log(state, "Someone else's dream: {name}. Not yours - keep moving.", { name: T.field(dream, 'name') }, 'system');
+          log(state, "Someone else's dream: {name}. Not yours - keep moving.", { name: ref(dream, 'name') }, 'system');
         }
         break;
       case 'SETBACK':

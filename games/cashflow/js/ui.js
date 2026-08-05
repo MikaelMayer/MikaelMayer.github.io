@@ -805,8 +805,30 @@
         state.cash >= state.dream.cost
           ? t('enough for your dream')
           : t('{$gap} short of your dream', { gap: state.dream.cost - state.cash })));
-      head.appendChild(box(t('Cash Flow Day'), money(f.totalIncome), null,
-        t('{$added} of {$goal} new income', { added: f.addedIncome, goal: ftGoal })));
+      /* Two ways to win, two boxes, and this is the one you can measure
+       * progress along. Landing on your dream is a matter of the dice; adding
+       * income is a matter of what you buy. */
+      var ftBox = box(t('Cash Flow Day'), money(f.totalIncome), 'hero',
+        f.addedIncome >= ftGoal
+          ? t('You have added enough to win')
+          : t('{$gap} of new income until you win', { gap: ftGoal - f.addedIncome }));
+      ftBox.className += ' wide';
+
+      var ftPct = ftGoal > 0
+        ? Math.min(100, (f.addedIncome / ftGoal) * 100) : 0;
+      var ftBar = el('div', {
+        class: 'progress inbox', role: 'progressbar',
+        'aria-valuemin': '0', 'aria-valuemax': String(ftGoal),
+        'aria-valuenow': String(f.addedIncome),
+        'aria-valuetext': t('{$added} of {$goal} new income', { added: f.addedIncome, goal: ftGoal })
+      });
+      ftBar.appendChild(el('i', { style: 'width:' + ftPct.toFixed(1) + '%' }));
+      ftBox.appendChild(ftBar);
+      ftBox.appendChild(el('div', { class: 'barends' }, [
+        el('span', { text: money(f.addedIncome) }),
+        el('span', { text: t('the {$goal} of new income you need', { goal: ftGoal }) })
+      ]));
+      head.appendChild(ftBox);
     } else {
       /* The win condition, side by side, as the first thing in the panel --
        * because "passive income vs total expenses" IS the game, and it used to
