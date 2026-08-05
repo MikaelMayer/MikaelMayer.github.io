@@ -45,10 +45,16 @@
     return SUPPORTED.indexOf(base) !== -1 ? base : 'en';
   }
 
-  function setLang(code) {
+  /* `persist` is opt-out so callers keep working, but the boot call passes
+   * false deliberately: detecting a language from the browser is not a choice
+   * the visitor made, and writing it to their device claims otherwise. A
+   * first-time visitor who never opens the picker leaves nothing behind. */
+  function setLang(code, persist) {
     if (SUPPORTED.indexOf(code) === -1) code = 'en';
     current = code;
-    try { localStorage.setItem(LANG_KEY, code); } catch (e) { /* private mode */ }
+    if (persist !== false) {
+      try { localStorage.setItem(LANG_KEY, code); } catch (e) { /* private mode */ }
+    }
     if (global.document) {
       global.document.documentElement.setAttribute('lang', code);
     }
@@ -158,5 +164,5 @@
     missingTranslations: missingTranslations
   };
 
-  setLang(detect());
+  setLang(detect(), false);
 })(typeof window !== 'undefined' ? window : globalThis);

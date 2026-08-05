@@ -285,6 +285,40 @@ To add a language, copy `js/lang-fr.js`, translate the `ui` map (interface and e
 lines) and the `content` map (166 cards, professions, dreams and investments, by id),
 and add the code to `SUPPORTED` in `js/i18n.js`. No other file needs to change.
 
+## Privacy
+
+The game processes no personal data, which is a design property rather than a
+policy: there is no code that could.
+
+- **No network requests at all.** No `fetch`, no `XMLHttpRequest`, no beacons,
+  no WebSocket. Grep for them; there are none outside the test file.
+- **No third-party anything.** No CDN, no web fonts, no external stylesheets,
+  no embedded images, no analytics, no tag manager. The page loads six files,
+  all of them local.
+- **No cookies.** Three `localStorage` keys: `cashflow-solo-save-v1` (the game
+  in progress), `cashflow-solo-lang` (language), `cashflow-solo-stars`
+  (professions completed). None of them contains or derives from anything that
+  identifies a person.
+- **Nothing leaves the browser unless the player asks.** Export writes a file
+  the player places; a share link encodes the seed, profession and dream.
+- **Erasure is a button**, not a promise: *Privacy → Delete everything stored
+  on this device* removes all three keys.
+
+Two things are worth stating plainly to whoever deploys this:
+
+1. **The host sees IP addresses.** Serving the page is a processing activity by
+   the hosting provider, before any of this code runs. That is normal and
+   unavoidable for any website, but it is the one piece that a site-level
+   privacy notice has to cover.
+2. **This holds only as long as it holds.** Adding an analytics snippet, a web
+   font, an embedded video or a leaderboard changes the analysis completely.
+   The claims above are cheap to re-verify: search the source for `http`, for
+   `fetch`, and for `localStorage`.
+
+The wording of the in-game notice is a factual description of the code, not
+legal advice, and should be reviewed by someone qualified before being relied
+on in a jurisdiction that matters to you.
+
 ## On a phone
 
 The game is built to be played on a phone, not merely to survive on one.

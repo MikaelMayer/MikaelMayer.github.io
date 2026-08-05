@@ -2577,6 +2577,35 @@
       e.target.value = '';
     });
     $('#start-btn').addEventListener('click', function (e) { e.preventDefault(); startGame(); });
+    /* The right to erase what is kept, made into a button rather than a
+     * paragraph. Two steps, because it destroys a game in progress, and
+     * without a native confirm() dialog, which blocks the page. */
+    var wipeBtn = $('#wipe-btn');
+    if (wipeBtn) {
+      var armed = false;
+      wipeBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        var note = $('#wipe-note');
+        if (!armed) {
+          armed = true;
+          wipeBtn.textContent = t('Yes, delete it all');
+          wipeBtn.className = 'ghost danger';
+          if (note) note.textContent = t('This deletes your saved game, your language choice and your stars. It cannot be undone.');
+          return;
+        }
+        ['cashflow-solo-save-v1', 'cashflow-solo-lang', 'cashflow-solo-stars'].forEach(function (k) {
+          try { localStorage.removeItem(k); } catch (err) { /* private mode */ }
+        });
+        state = null;
+        undoStack = [];
+        receipt = null;
+        if (note) note.textContent = t('Deleted. Nothing of this game is left on this device.');
+        wipeBtn.disabled = true;
+        wipeBtn.textContent = t('Deleted');
+        location.reload();
+      });
+    }
+
     var shareBtn = $('#share-btn');
     if (shareBtn) shareBtn.addEventListener('click', function (e) { e.preventDefault(); shareSetup(); });
     $('#random-seed-btn').addEventListener('click', function (e) {
