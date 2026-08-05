@@ -301,6 +301,16 @@
     return out;
   }
 
+  /* What a forced sale could actually raise, for the interface to warn with.
+   * Same candidates and same values the forced sale itself would use, so the
+   * warning cannot disagree with what then happens. */
+  function sellableValue(state) {
+    var list = liquidationCandidates(state);
+    var total = 0;
+    for (var i = 0; i < list.length; i++) total += list[i].value;
+    return { count: list.length, value: total };
+  }
+
   function liquidate(state, candidate, reason) {
     if (candidate.type === 'stock') {
       delete state.stocks[candidate.key];
@@ -1347,6 +1357,7 @@
     ftStats: ftStats,
     creditLimit: creditLimit,
     availableCredit: availableCredit,
+    sellableValue: sellableValue,
     isOver: isOver,
     fastTrackGoal: fastTrackGoal,
     canRoll: canRoll,

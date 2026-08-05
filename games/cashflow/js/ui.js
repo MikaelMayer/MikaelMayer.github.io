@@ -1750,8 +1750,15 @@
       help = t('You have {$cash}, so paying this takes a loan of {$borrow}. That adds {$monthly} a month to your expenses until you repay it.',
         { cash: state.cash, borrow: borrow, monthly: borrow / 1000 * 100 });
     } else {
-      help = t('You have {$cash} and can borrow at most {$credit}, so paying this will sell whatever it has to.',
-        { cash: state.cash, credit: credit });
+      /* Nothing left to borrow. Whether that is survivable depends entirely on
+       * whether you own anything sellable -- and only shares and investments
+       * count, not the house or the car. */
+      var sellable = E.sellableValue(state);
+      help = sellable.count > 0
+        ? t('You have {$cash} and can borrow no more, so paying this will sell investments. Selling everything you own would raise about {$raise}.',
+            { cash: state.cash, raise: sellable.value })
+        : t('You have {$cash}, can borrow no more, and own nothing that can be sold. Paying this ends the game.',
+            { cash: state.cash });
     }
     card.appendChild(el('div', { class: 'hint billhelp', text: help }));
 
