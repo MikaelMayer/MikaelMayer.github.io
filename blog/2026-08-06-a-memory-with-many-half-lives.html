@@ -259,6 +259,88 @@ log scale". It is "let the model choose its own timescales, and give it more
 than one to choose from". That is a weaker and much less romantic statement
 than the one I started with, and it is what the data actually supports.</p>
 
+<h2>Where is the memory, actually?</h2>
+
+<p>One question is worth more than all the accuracy numbers. When this thing
+remembers that key K meant value V, <em>where</em> is that fact? Spread across
+all 48 channels, or sitting in one of them?</p>
+
+<p>It matters because the boring answer would deflate the whole idea. If each
+fact owns a channel, this is a lookup table with 48 slots wearing a costume,
+and calling it "weights" is marketing. The interesting answer is that every
+fact is smeared across every channel, and no single channel is load-bearing.</p>
+
+<p>There is a clean way to find out, and it needs no training at all: take the
+trained model and hold channels at zero. If it is a table, knocking out one of
+48 channels should cost you about a 48th of your facts, roughly 2.1 points. If
+it is distributed, it should cost almost nothing.</p>
+
+<div class="demo">
+  <h4>Knocking out channels (3 seeds, learned model)</h4>
+  <table class="res">
+    <tr><th>channels removed (of 48)</th><th>accuracy</th><th>% retained</th><th>a lookup table would give</th></tr>
+    <tr><td>none</td><td>50.8%</td><td>100%</td><td>&mdash;</td></tr>
+    <tr><td>1</td><td>50.6%</td><td>100%</td><td>50.0%</td></tr>
+    <tr><td>8</td><td>48.6%</td><td>96%</td><td>44.4%</td></tr>
+    <tr class="hi"><td>24 &mdash; half of them</td><td>41.9%</td><td>83%</td><td>31.6%</td></tr>
+    <tr><td>40</td><td>28.0%</td><td>55%</td><td>18.9%</td></tr>
+    <tr><td>47 &mdash; one channel left</td><td>14.8%</td><td>29%</td><td>13.3%</td></tr>
+  </table>
+  <div class="caption">Chance is 12.5%. The worst single channel in the whole model costs
+  0.71 points; the average one costs 0.25.</div>
+</div>
+
+<p><b>Throw away half the memory and it keeps 83% of its accuracy.</b> Throw
+away 40 of 48 channels and it is still at 28%, more than double chance. No
+single channel is worth more than three quarters of a point. This is a
+distributed memory, decisively, and it is the one prediction of the original
+idea that came through cleanly.</p>
+
+<h2>The model throws the spectrum away</h2>
+
+<p>Now the finding that reframes everything above.</p>
+
+<p>The best variant in the table was the one that <em>learns</em> its own
+half-lives. I initialised those half-lives log-spaced from 2 to 200 steps and
+let gradient descent move them. Here is where they ended up:</p>
+
+<pre class="code">initial spread:   tau = 2 ... 200      (log-spaced, 48 channels)
+after training:   tau = 8.9 ... 11.2   (all 48 channels)</pre>
+
+<p>Given the freedom to place its timescales anywhere across two orders of
+magnitude, the model collapsed all of them onto approximately one value. It did
+not distribute them. It did not keep a few fast and a few slow. It threw the
+spectrum away and picked a single rate of about ten steps &mdash; and by doing
+so it beat every hand-designed spectrum I gave it.</p>
+
+<p>So "learned timescales win" and "spectra do not help" are the same finding,
+not two. The learned model wins <em>because</em> it converges on one rate while
+keeping all 48 channels working at it. A prescribed spectrum spends half its
+channels on timescales this task has no use for.</p>
+
+<p>The lesion data says exactly that. In the fixed-spectrum model, removing the
+24 fastest channels drops short-delay accuracy from 74.6% to 46.6%, while
+removing the 24 slowest barely touches it (70.5%). The fast channels are doing
+the work. The slow ones sit at 15-17% on long delays, which is barely above the
+12.5% floor: they are close to dead weight. In the learned model the same test
+shows nothing at all &mdash; removing the "slowest" and the "fastest" are
+identical, because after training there is no difference between them.</p>
+
+<p>Channels genuinely do specialise by timescale when you force a spectrum on
+them. It is just that in this task, specialising is a waste of capacity.</p>
+
+<h2>What I would test next</h2>
+
+<p>All of which suggests the obvious experiment, and I think it is the one that
+would actually settle the idea. This task has a single dominant timescale, so
+of course one rate wins. Build a task with genuinely two: facts that matter for
+ten steps mixed with facts that matter for five hundred, both queried often.
+A spectrum should win there, and if it still does not, the idea is dead rather
+than merely unsupported.</p>
+
+<p>That is a real prediction and I am writing it down before running it, which
+is the only way any of this counts for anything.</p>
+
 <h2>What went wrong first, which is the useful part</h2>
 
 <p>My first version of this experiment had four facts and forty-eight channels.
@@ -330,12 +412,10 @@ standard I set before running it, the specific claim &mdash; that a
 <em>continuous log-spaced</em> spectrum is the thing that helps &mdash; is not
 supported. What replaced it is the finding that learned timescales beat both.</p>
 
-<p>The third and fourth I have not finished. The state does not obviously blow
-up over 480-step streams, but I have not measured its norm properly, and the
-lesion test that would distinguish a distributed memory from a lookup table is
-the next thing I would run. It is also the cheapest: it needs no training at
-all, just knocking out channels of an already-trained model and watching the
-accuracy fall gradually or off a cliff.</p>
+<p><b>The fourth did not fire</b>, and that is the good news: the lesion results
+above show a thoroughly distributed memory, not a lookup table. The third I
+still have not measured properly &mdash; the state does not obviously blow up
+over 480-step streams, but I have not tracked its norm.</p>
 
 <h2>Run it yourself</h2>
 
