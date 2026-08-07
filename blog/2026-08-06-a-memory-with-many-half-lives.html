@@ -1,0 +1,357 @@
+<html><head><meta content="text/html; charset=UTF-8" http-equiv="content-type">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A memory with many half-lives</title>
+<link rel="stylesheet" type="text/css" href="index.css">
+<style>
+@media (orientation: landscape) {
+  body > div { margin-left: auto; margin-right: auto; max-width: 34em; }
+}
+@media (orientation: portrait) {
+  body > div { margin-left: 8px; margin-right: 8px; }
+}
+.demo {
+  border: 1px solid #ccc; border-radius: 8px; padding: 12px;
+  margin: 18px 0; background: #fafafa;
+}
+.demo h4 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: .06em; color: #666; }
+.demo .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 8px 0; }
+.demo button {
+  font: inherit; padding: 6px 14px; border-radius: 6px; border: 1px solid #888;
+  background: #fff; cursor: pointer;
+}
+.demo button.go { background: #1a7f4b; border-color: #1a7f4b; color: #fff; }
+.demo button:disabled { opacity: .5; cursor: default; }
+.demo canvas { width: 100%; height: auto; display: block; background: #fff; border: 1px solid #ddd; border-radius: 4px; }
+.demo .readout { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.5; }
+.demo label { font-size: 13px; }
+.demo input[type=range] { vertical-align: middle; }
+pre.code {
+  background: #f4f4f4; border-left: 3px solid #1a7f4b; padding: 10px 12px;
+  overflow-x: auto; font-size: 13px; line-height: 1.45; border-radius: 0 4px 4px 0;
+}
+table.res { border-collapse: collapse; font-size: 13px; width: 100%; }
+table.res th, table.res td { border-bottom: 1px solid #ddd; padding: 4px 6px; text-align: right; }
+table.res th:first-child, table.res td:first-child { text-align: left; }
+table.res tr.hi td { background: #eaf6ef; font-weight: 600; }
+.caption { font-size: 12px; color: #666; margin-top: 6px; }
+.swatch { display: inline-block; width: 11px; height: 11px; border-radius: 2px; vertical-align: baseline; margin-right: 3px; }
+</style>
+</head>
+<body>
+<div>
+
+<h1>A memory with many half-lives</h1>
+<p class="subtitle">6 August 2026</p>
+
+<p>A trained neural network is frozen. You talk to it, it answers, and not one of
+its weights moves. Everything it appears to "remember" about your conversation
+is really just text you keep handing back to it.</p>
+
+<p>Here is a different idea, and it is small enough to build in a blog post.
+Leave the big frozen network alone, and bolt on a few dozen extra numbers that
+<em>do</em> change while it runs. Call them <code>m</code>. Every observation
+nudges them. Between observations they fade. And here is the part worth
+testing: give <strong>every one of those numbers its own half-life</strong>.
+Some forget in three steps. Some forget in two hundred. Most sit somewhere in
+between, spread out on a log scale.</p>
+
+<p>The claim I wanted to test: a spread of half-lives should beat any single
+one, because a memory needs to be good at remembering both what just happened
+and what keeps happening, and one forgetting rate can only be good at one of
+those. It sounds obviously true. It is mostly false, and the way in which it is
+false turns out to be the interesting part.</p>
+
+<p>Everything below runs in your browser. The training is real: about 200 lines
+of JavaScript, no libraries, gradients computed by hand-rolled autodiff. You can
+watch it learn.</p>
+
+<h2>The whole model, in eight lines</h2>
+
+<p>Weights normally look like a big matrix <code>W</code>. We are not going to
+touch it. Instead we bolt a small correction onto it:</p>
+
+<pre class="code">W_now = W_frozen + U · diag(m) · V<sup>T</sup></pre>
+
+<p><code>U</code> and <code>V</code> are thin: if the network is 1000 wide,
+these might be 1000&times;48. They are learned once and then frozen too.
+<code>m</code> is just 48 numbers, and <code>m</code> is the only thing that
+moves while the model is running. That is the memory. Forty-eight numbers.</p>
+
+<p>Written as code, storing and recalling a fact are four lines each:</p>
+
+<pre class="code">// remember: "this key means this value"
+a = key   · V          // where does this key live in the basis?
+c = value · U<sup>T</sup>         // where does this value live?
+d = a * c              // elementwise: the two, agreeing
+m = lambda * m + eta * d
+
+// recall: "what did this key mean?"
+a      = query · V
+logits = (m * a) · U   // elementwise again, then project out</pre>
+
+<p>That is the entire mechanism. <code>d</code> is computed from the thing in
+front of you and nothing else: no history, no backpropagation through the
+conversation. And <code>lambda</code> is a vector, not a number. That vector is
+the whole point of this post.</p>
+
+<p>If you have seen Hebbian learning, <code>d = a * c</code> is "fire together,
+wire together" squashed onto 48 directions. If you have not: it is the outer
+product of key and value, compressed.</p>
+
+<h2>Why one forgetting rate is never enough</h2>
+
+<p>Each channel <code>j</code> fades by a factor <code>lambda_j</code> every
+step, so a fact written <code>t</code> steps ago survives in that channel with
+strength <code>lambda_j<sup>t</sup></code>. Pick <code>lambda</code> close to
+zero and the channel is a goldfish. Pick it close to one and the channel never
+lets go, which sounds good until you realise it also never lets go of the
+thousand irrelevant things it saw in between.</p>
+
+<p>Drag the slider. Nothing is being trained here; this is just arithmetic on
+how much of a memory survives.</p>
+
+<div class="demo" id="d-decay">
+  <h4>How much survives, after how long</h4>
+  <canvas id="decay-canvas" width="620" height="240"></canvas>
+  <div class="row">
+    <label>Delay: <span class="readout" id="decay-delay">20</span> steps</label>
+    <input type="range" id="decay-slider" min="0" max="300" value="20" style="flex:1">
+  </div>
+  <div class="readout" id="decay-out"></div>
+  <div class="caption">
+    <span class="swatch" style="background:#d94f3d"></span>one fast rate
+    <span class="swatch" style="background:#2b6cb0;margin-left:8px"></span>one slow rate
+    <span class="swatch" style="background:#1a7f4b;margin-left:8px"></span>48 rates, log-spaced (their average)
+  </div>
+</div>
+
+<p>The green curve is what a spread of half-lives buys you. It starts high like
+the fast channel and it has a tail like the slow one, because at any delay
+<em>some</em> channel is in its sweet spot. Plot it on log-log axes and it is
+close to a straight line: a power law, not an exponential. That is the shape
+human forgetting curves have, which is not a coincidence and which I will come
+back to.</p>
+
+<h2>Now train it</h2>
+
+<p>Arithmetic is not evidence. The question is whether a model can learn to use
+this thing, so let us train one here, on this page.</p>
+
+<p>The task: a stream of events. A <em>write</em> says "key K means value V".
+A <em>query</em> says "what does K mean?" Keys are freshly invented random
+vectors every single episode, so the network cannot memorise any of them in
+<code>U</code> and <code>V</code>. Whatever it knows at query time it learned
+seconds ago and put in those 48 numbers.</p>
+
+<p>Crucially, the stream is <em>crowded</em>: facts arrive faster than 48
+numbers can hold, so the model has to let go of something. (My first version
+was not crowded, and I will show you later why that made the whole experiment
+worthless.)</p>
+
+<div class="demo" id="d-train">
+  <h4>Meta-training, live</h4>
+  <div class="row">
+    <button class="go" id="train-btn">Train</button>
+    <button id="train-reset">Reset</button>
+    <label>Timescales:
+      <select id="train-spectrum">
+        <option value="spectrum" selected>48 log-spaced half-lives</option>
+        <option value="one">one rate (tau=20)</option>
+        <option value="one-slow">one rate (tau=200)</option>
+        <option value="none">no forgetting at all</option>
+      </select>
+    </label>
+  </div>
+  <canvas id="train-canvas" width="620" height="200"></canvas>
+  <div class="readout" id="train-out">not started &mdash; chance is 12.5%</div>
+  <div class="caption">Each step is 4 episodes of 160 events. Gradients flow back through
+  the whole episode; at test time nothing is trained and only <code>m</code> moves.</div>
+</div>
+
+<p>It should climb past 45% within a couple of hundred steps, against a chance
+rate of 12.5%. That is the "it works" bar: 48 numbers, updated by one
+multiply-add per step, doing real associative recall on keys they have never
+seen.</p>
+
+<h2>The result I did not expect</h2>
+
+<p>Once it is trained, sort the queries by how many times that fact had been
+written before it was asked about. Nothing in the model is told which facts
+matter. There is no importance flag, no priority, no attention over history.</p>
+
+<div class="demo" id="d-reps">
+  <h4>Retention against repetition (from the trained model above)</h4>
+  <div class="row"><button id="reps-btn">Measure</button></div>
+  <canvas id="reps-canvas" width="620" height="200"></canvas>
+  <div class="readout" id="reps-out">train a model first</div>
+</div>
+
+<p>Repeated facts survive dramatically longer than one-off facts. And it falls
+straight out of the arithmetic: repeating a fact writes the same
+<code>d</code> again, so the writes add up &mdash; but only in the channels
+slow enough not to have faded in between. Repetition automatically routes a
+memory into the long-lived channels. Nobody designed that; it is what
+<code>m = lambda*m + eta*d</code> does when <code>lambda</code> is a spread.</p>
+
+<p>In the full run, one-off facts sat at 45% and facts seen four times at 78%.
+The effect is even sharper for the slow variants: a model with a single slow
+rate goes from 37% on one-off facts to 94% on repeated ones. Repetition buys
+survival everywhere, and nothing in any of these models was told which facts
+were important.</p>
+
+<h2>The honest experiment</h2>
+
+<p>A demo that agrees with me is worth very little, so here is the comparison
+run properly: nine variants, identical in every respect except the vector of
+half-lives, trained from scratch in Node.</p>
+
+<p>The one number to look at is the shape across delays, not the average.</p>
+
+<div class="demo">
+  <h4>Accuracy by delay, on streams 3&times; longer than training</h4>
+  <table class="res" id="res-table"></table>
+  <div class="caption">Chance is 12.5%. "Delay" is steps between the last write of a fact
+  and the query about it. <span id="res-provenance"></span></div>
+</div>
+
+<p>And here the idea I started with mostly falls over.</p>
+
+<p>Read the two highlighted rows. <b>A single decay rate, tuned, beats the
+log-spaced spectrum</b> &mdash; 49.3% against 47.0% overall, and better at
+almost every delay in between. The spectrum wins at delay 0 and nowhere else
+that matters. The gap is small but it is five seeds wide: &plusmn;0.4 and
+&plusmn;0.5 points respectively, so it is not noise.</p>
+
+<p>Worse for the idea, look at the shuffled row. Scrambling <em>which</em>
+channel gets <em>which</em> half-life changes essentially nothing: 46.7%
+against 47.0%, and delay curves that agree to within a point almost everywhere.
+I had listed that as a thing that would falsify the idea, and it fired. The
+ordering of the spectrum carries no information; the model is just averaging
+over a bag of rates.</p>
+
+<p>When I ran this with one seed I got the opposite conclusion and wrote an
+excited paragraph here about the spectrum being the only row good at both ends.
+Five seeds later, it is not. I have left the shape of that mistake visible
+rather than quietly swapping the numbers, because a single seed producing a
+clean story is the most common way to fool yourself in this kind of work, and I
+did exactly that.</p>
+
+<h2>The part that did survive</h2>
+
+<p>Two things are solid, and neither is the thing I set out to show.</p>
+
+<p><b>Forgetting matters enormously.</b> Never forgetting is the worst variant
+in the table &mdash; 38.2%, dead last, below every single decay rate. It is
+excellent at facts it has seen many times (94% at four repeats) and hopeless at
+facts it has seen once (35%), because everything it ever saw is still in there,
+drowning the recent stuff. A memory that cannot forget is not a memory with
+infinite capacity; it is a memory full of noise.</p>
+
+<p><b>Learning the half-lives beats prescribing them.</b> The best row in the
+table, by a clear margin, is the one where the timescales themselves are
+trained: 50.8% against 49.3% for the best fixed rate, and 92% versus 76% at
+delay 0. Same channel count, same parameters otherwise, same everything. Give
+the model a spread of rates and let it move them, and it does better than any
+spread I chose by hand and better than any single rate.</p>
+
+<p>So the useful version of the claim is not "spread your timescales out on a
+log scale". It is "let the model choose its own timescales, and give it more
+than one to choose from". That is a weaker and much less romantic statement
+than the one I started with, and it is what the data actually supports.</p>
+
+<h2>What went wrong first, which is the useful part</h2>
+
+<p>My first version of this experiment had four facts and forty-eight channels.
+The spectrum lost to a plain single slow rate, and "no forgetting at all"
+beat everything.</p>
+
+<p>It took me an embarrassing minute to see why. With four facts and
+forty-eight numbers, the memory fits everything comfortably. Forgetting is
+<em>pure loss</em>. I had built a task where the correct policy is to never
+forget, and then expressed surprise that forgetting did not help.</p>
+
+<p>Decay only pays for itself when memory is scarce. Once facts arrive faster
+than the state can hold them, forgetting stops being damage and becomes
+triage. Every result on this page comes from the crowded version, and I have
+left the uncrowded numbers in the repository because a negative result you
+cannot reproduce is just an anecdote.</p>
+
+<p>There was a second bug, and it is the kind worth naming. I had a variant
+where the half-lives themselves were learned rather than prescribed. It
+produced results identical to the fixed version to four decimal places, which I
+briefly took as an interesting finding &mdash; "learning does not help here!"
+&mdash; before noticing that I had built the decay vector as a constant, so no
+gradient ever reached it. It was not learning anything. When two conditions
+agree <em>that</em> exactly, you have found a bug, not a result.</p>
+
+<h2>Is any of this new?</h2>
+
+<p>The honest answer is: the mechanism, no; the framing, a little.</p>
+
+<p>Spreading timescales across channels is what diagonal state-space models
+(S4D, Mamba) already do, and what RetNet does explicitly by giving each
+attention head a different decay rate. Updating weights online from a local
+surprise signal, with forgetting, is what Google's Titans does at scale.
+Storing memories in fast-changing weights goes back to Schmidhuber's fast
+weights in the early nineties.</p>
+
+<p>And the specific claim that a spread of exponentials gives you power-law
+forgetting is older than all of it: Fusi, Drew and Abbott showed it for
+cascades of synaptic states in 2005, and Benna and Fusi built the continuous
+version in 2016. They were modelling actual synapses. The reason your memory of
+last Tuesday fades faster than your memory of your childhood may be exactly
+this mechanism, running in wetware.</p>
+
+<p>What I have not found anyone doing cleanly is the cheap version: freeze the
+basis, keep <em>only</em> the diagonal, and treat those few dozen numbers as a
+persistent per-user memory that rides on top of a model nobody is allowed to
+fine-tune. That is an engineering story rather than a scientific one, and this
+post is the smallest experiment I could build that would falsify it.</p>
+
+<h2>What would kill the idea</h2>
+
+<p>Stated up front, so I cannot move the goalposts afterwards:</p>
+
+<ul>
+<li>If a single well-chosen decay rate matched the spectrum at both short and
+long delays. (It does not, but only under memory pressure.)</li>
+<li>If shuffling which channel gets which half-life made no difference &mdash;
+that would mean the ordering carries no information and the model is just
+averaging.</li>
+<li>If the state saturated or blew up over long streams.</li>
+<li>If it only worked by degenerating into a lookup table, with each fact
+owning its own channel. Lesion a few channels and find out: gradual decline
+means the memory is distributed, a cliff means it is a table.</li>
+</ul>
+
+<p><b>The first two fired.</b> A tuned single rate does match and slightly beat
+the prescribed spectrum, and shuffling the assignment changes nothing. By the
+standard I set before running it, the specific claim &mdash; that a
+<em>continuous log-spaced</em> spectrum is the thing that helps &mdash; is not
+supported. What replaced it is the finding that learned timescales beat both.</p>
+
+<p>The third and fourth I have not finished. The state does not obviously blow
+up over 480-step streams, but I have not measured its norm properly, and the
+lesion test that would distinguish a distributed memory from a lookup table is
+the next thing I would run. It is also the cheapest: it needs no training at
+all, just knocking out channels of an already-trained model and watching the
+accuracy fall gradually or off a cliff.</p>
+
+<h2>Run it yourself</h2>
+
+<pre class="code">git clone &lt;repo&gt; &amp;&amp; cd code
+node smoke.js     # smallest thing that could fail: does it learn at all?
+node study.js     # the nine-variant comparison, 5 seeds
+node study.js --quick</pre>
+
+<p>No Python, no GPU, no dependencies. The whole study is about ten minutes on
+a laptop. The three files it loads are the same three this page is running.</p>
+
+<script src="plastic-memory/autograd.js"></script>
+<script src="plastic-memory/model.js"></script>
+<script src="plastic-memory/task.js"></script>
+<script src="plastic-memory/results.js"></script>
+<script src="plastic-memory/post.js"></script>
+</div>
+</body>
+</html>

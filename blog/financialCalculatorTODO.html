@@ -1,0 +1,132 @@
+<html>
+<head>
+<script>
+// N = number of months to pay (30 years makes N = 360)
+// I = Interest rate (in percent, so 7% is 7)
+// PMT = Monthly payment
+// PV = Present value
+// FV = Future Value
+var functions = {};
+functions["n"] = function n_(dummy, i, pv, pmt, fv) {
+  var principal = pv;
+  var monthlyInterest = i/1200;
+  var months = 0;
+  var principalPayment = 0;
+  while(principal >= fv) {
+    var interest = principal * monthlyInterest;
+    if(interest > pmt) {
+      return "Impossible to reimburse, short of " + (interest - pmt) + " on the first month";
+    } else if(interest == pmt) {
+      return 1/0;
+    }
+    principalPayment = pmt - interest;
+    principal -= principalPayment;
+    months++;
+  }
+  if(principal < fv) {
+    var previousPrincipal = principalPayment + principal;
+    months--;
+    months += (principalPayment + principal - fv)/principalPayment;
+  }
+  return months;
+}
+functions["pv"] = function pv_(n, i, dummy, pmt, fv) {
+  var minPv = fv;
+  var maxPv = fv + (n*pmt)/(i/1200);
+  var ensureDecreases = maxPv-minPv;
+  while(maxPv-minPv >= 0.001) {
+    var middlePv = (maxPv + minPv) / 2;
+    var tmpN = functions["n"](dummy, i, middlePv, pmt, fv);
+    if(tmpN == 1/0 || typeof tmpN == "string") {
+      maxPv = middlePv;
+    } else if(tmpN == n) {
+      return middlePv;
+    } else if(tmpN < n) {
+      minPv = middlePv;
+    } else {
+      maxPv = middlePv;
+    }
+    if(ensureDecreases <= maxPv-minPv) {
+      return "error, not decreasing";
+    }
+  }
+  if(tmpN == 1/0 || typeof tmpN == "string") {
+    return "Impossible to figure out a proper PV with these numbers. Try lowering I or increasing PMT";
+  }
+  return Math.round(maxPv*100)/100;
+}
+functions["pmt"] = function pmt_(n, i, pv, dummy, fv) {
+  var minPmt = pv <= 0 ? pv : 0;
+  var maxPmt = pv <= 0 ? 0 : pv;
+  var ensureDecreases = maxPmt-minPmt;
+  while(maxPmt-minPmt >= 0.001) {
+    var middlePmt = (maxPmt + minPmt) / 2;
+    var tmpN = functions["n"](dummy, i, pv, middlePmt, fv);
+    if(tmpN == 1/0 || typeof tmpN == "string") {
+      minPmt = middlePmt;
+    } else if(tmpN == n) {
+      return middlePmt;
+    } else if(tmpN < n) {
+      maxPmt = middlePmt;
+    } else {
+      minPmt = middlePmt;
+    }
+    if(ensureDecreases <= maxPmt-minPmt) {
+      return "error, not decreasing";
+    }
+  }
+  if(tmpN == 1/0 || typeof tmpN == "string") {
+    return "Impossible to figure out a proper PMT with these numbers. Try lowering I or PV?";
+  }
+  return Math.round(maxPmt*100)/100;
+}
+functions["fv"] = function fv_(n, i, pv, pmt, dummy) {
+  var principal = pv;
+  var monthlyInterest = i/1200;
+  var months = 0;
+  var principalPayment = 0;
+  while(months < n) {
+    var interest = Math.round(principal * monthlyInterest*100)/100;
+    if(interest > pmt) {
+      return "Impossible to reimburse, short of " + (interest - pmt) + " on the first month";
+    }
+    principalPayment = pmt - interest;
+    principal -= principalPayment;
+    months++;
+    principal = Math.round(principal*100)/100;
+  }
+  return principal;
+}
+// TODO: Interactive explainer of the financial calculator in LEO :-)
+</script>
+<style>
+input {
+  width: 100px;
+}
+</style>
+</head>
+<body>
+<input type="text" id="c_n" placeholder="N">
+<input type="text" id="c_i" placeholder="I">
+<input type="text" id="c_pv" placeholder="PV">
+<input type="text" id="c_pmt" placeholder="PMT">
+<input type="text" id="c_fv" placeholder="FV"><br>
+<input type="button" id="b_n" value="N?">
+<input type="button" id="b_i" value="I?">
+<input type="button" id="b_pv" value="PV?">
+<input type="button" id="b_pmt" value="PMT?">
+<input type="button" id="b_fv" value="FV?"><br>
+<div id="equivalent"></div>
+<script>
+for(let m of ["n", "i", "pv", "pmt", "fv"]) {
+  this[m] = (m => function () { return parseFloat(document.getElementById("c_"+m).value); })(m);
+  document.getElementById("b_"+m).onclick = (m => () => {
+    document.getElementById("c_"+m).value = functions[m](this["n"](), this["i"](), this["pv"](), this["pmt"](), this["fv"]());
+    var equivalentInterestOnly = Math.round(10000*(12*this["pmt"]()) / this["pv"]())/100;
+    var years = this["n"]()/60;
+    document.getElementById("equivalent").textContent = `From cash perspective, this is like paying ${equivalentInterestOnly}% of interest for ${years} years and then nothing more.`;
+  })(m);
+}
+</script>
+</body>
+</html>
