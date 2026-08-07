@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>HTML Code Tester (Indent-Based Blocks)</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      margin: 0;
+      background-color: #f0f0f0;
+      padding-bottom: 50px;
+    }
+    h1 {
+      margin-top: 20px;
+    }
+    textarea {
+      width: 80%;
+      height: 150px;
+      margin-bottom: 10px;
+      font-family: monospace;
+      font-size: 14px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      margin: 5px;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    pre#errorLog {
+      width: 80%;
+      background-color: #ffe6e6;
+      color: red;
+      padding: 10px;
+      border: 1px solid red;
+      border-radius: 5px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #copyErrorButton {
+      margin-left: 10px;
+      padding: 5px 10px;
+      font-size: 14px;
+      cursor: pointer;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+    #copyErrorButton:hover {
+      background-color: #218838;
+    }
+    #charCount {
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+    #charCount.exceeds {
+      color: red;
+    }
+
+    /* Highlight states for the second textarea */
+    .highlight-green {
+      background-color: #c6f6c6 !important; /* light green */
+    }
+    .highlight-yellow {
+      background-color: #fff8c4 !important; /* light yellow */
+    }
+    .highlight-orange {
+      background-color: #ffe9cc !important; /* light orange */
+    }
+
+    /* If a previously selected block is lost or mismatched, highlight dropdown in red */
+    .dropdown-red {
+      color: red;
+      font-weight: bold;
+    }
+    .dropdown-orange {
+      color: orange;
+      font-weight: bold;
+    }
+
+    /* Container for the second area & controls */
+    #updateSection {
+      width: 80%;
+      display: flex;
+      flex-direction: column;
+      margin-top: 20px;
+    }
+    #functionSelect {
+      width: 80%;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+    #updateControls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    #updateMessage {
+      margin-top: 5px;
+      color: red;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>HTML Code Tester</h1>
+
+  <!-- Error display container -->
+  <div id="errorContainer" style="width: 80%; display: none;">
+    <pre id="errorLog"></pre>
+    <button id="copyErrorButton" onclick="copyError()">Copy Error</button>
+  </div>
+
+  <!-- Textarea for the entire HTML code -->
+  <textarea 
+    id="htmlInput" 
+    placeholder="Paste your HTML code here... (indentation matters for block detection!)"
+  ></textarea>
+  <div id="charCount">0 characters</div>
+
+  <button onclick="loadHtml()">Load HTML</button>
+  <button onclick="resetPage()">Reset</button>
+  <button onclick="shareHtml()">Share</button>
+
+  <!-- Second area for updating a single block (function/CSS/declaration) -->
+  <div id="updateSection">
+    <select id="functionSelect">
+      <!-- We will populate or keep updated automatically -->
+    </select>
+
+    <textarea 
+      id="functionInput" 
+      placeholder="Edit one block (function or CSS selector) here..."
+    ></textarea>
+
+    <div id="updateControls">
+      <button id="updateButton" onclick="updateBlock()">Update</button>
+    </div>
+    <div id="updateMessage"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/pako/dist/pako.min.js"></script>
+  <script>
+    const $ = id => document.getElementById(id);
+
+    // URL-safe Base64
+    const base64UrlEncode = str =>
+      btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const base64UrlDecode = str =>
+      atob(str.replace(/-/g, '+').replace(/_/g, '/'));
+
+    const encode = data =>
+      base64UrlEncode(String.fromCharCode.apply(null, new Uint8Array(data)));
+    const decode = data =>
+      new Uint8Array(base64UrlDecode(data).split("").map(c => c.charCodeAt(0)));
+
+    // We store the parsed "blocks" of code in an array
+    // Each block = { name, type, code, startLine, endLine, indent, uniqueId }
+    // The "uniqueId" can help us preserve selection if the block hasn't changed drastically.
+    let parsedBlocks = [];
+    // Keep track of the previously selected block's uniqueId (if any),
+    // so we can attempt to preserve selection across parses.
+    let previouslySelectedId = null;
+
+    let searchTimeoutId = null;
+
+    window.onload = () => {
+      // Attempt to restore previous error log
+      const errLog = localStorage.getItem('errLog');
+      if (errLog) {
+        $('errorLog').innerText = errLog;
+        $('errorContainer').style.display = 'flex';
+        localStorage.removeItem('errLog');
+      }
+
+      // Restore last-saved HTML if any
+      const savedHtml = localStorage.getItem('savedHtml');
+      if (savedHtml) $('htmlInput').value = savedHtml;
+
+      // If there's a ?code= param, decompress it
+      const encodedHtml = new URLSearchParams(window.location.search).get('code');
+      if (encodedHtml) {
+        try {
+          const decompressedData = pako.ungzip(decode(encodedHtml), { to: 'string' });
+          $('htmlInput').value = decompressedData;
+          if (window.location.hash === '#run') loadHtml();
+        } catch (e) {
+          logError(e);
+        }
+      }
+
+      updateCharCount();
+      parseAllBlocks(); 
+      updateDeclarationSelect();
+      updateFunctionUIState(); // set correct highlight states
+
+      // Attach input listeners
+      $('htmlInput').addEventListener('input', onMainHtmlChanged);
+      $('functionInput').addEventListener('input', onSecondTextChanged);
+      $('functionSelect').addEventListener('change', onDropdownChanged);
+    };
+
+    // -------------------------------
+    // 1) MAIN TEXTAREA LOGIC
+    // -------------------------------
+    function onMainHtmlChanged() {
+      updateCharCount();
+      parseAllBlocks();
+      // Attempt to keep the same selection if possible
+      updateDeclarationSelect();
+      // After re-parsing, update highlight states in second textarea
+      updateFunctionUIState();
+      localStorage.setItem('savedHtml', $('htmlInput').value);
+    }
+
+    function updateCharCount() {
+      const html = $('htmlInput').value;
+      const compressed = pako.gzip(html);
+      const base64Encoded = encode(compressed);
+      const urlLength = `https://tharzen.com/html.html?code=${base64Encoded}`.length;
+      const charCount = `${html.length} characters (URL length: ${urlLength})`;
+
+      const charCountElement = $('charCount');
+      charCountElement.textContent = charCount;
+      if (urlLength > 2000) {
+        charCountElement.classList.add('exceeds');
+      } else {
+        charCountElement.classList.remove('exceeds');
+      }
+    }
+
+    // Parse the entire code in #htmlInput into "blocks" based on indentation
+    function parseAllBlocks() {
+      parsedBlocks = [];
+
+      const text = document.getElementById('htmlInput').value;
+      const lines = text.split('\n');
+
+      let i = 0;
+      while (i < lines.length) {
+        const line = lines[i];
+
+        if (line.trim().startsWith('<script')) {
+          const scriptLines = [];
+          i++;
+          const startIndex = i;
+          while (i < lines.length && !lines[i].trim().startsWith('</s'+'cript')) {
+            scriptLines.push(lines[i]);
+            i++;
+          }
+          i++;
+          parseJsRegion(scriptLines, startIndex);
+          continue;
+        }
+
+        if (line.trim().startsWith('<style')) {
+          const styleLines = [];
+          i++;
+          const startIndex = i;
+          while (i < lines.length && !lines[i].trim().startsWith('</style')) {
+            styleLines.push(lines[i]);
+            i++;
+          }
+          i++;
+          parseCssRegion(styleLines, startIndex);
+          continue;
+        }
+
+        i++;
+      }
+    }
+    function parseJsRegion(lines, startIndex) {
+      let i = 0;
+      while (i < lines.length) {
+        const line = lines[i];
+        const trimmed = line.trimLeft();
+
+        // 1) Skip empty or comment lines
+        if (!trimmed || trimmed.startsWith('//')) {
+          i++;
+          continue;
+        }
+
+        // 2) Remember block start
+        const blockStart = i;
+        let blockLines = [];
+
+        // 3) Check if it's function or var/let/const, etc.
+        if (trimmed.startsWith('function ')) {
+          const { collected, newIndex } = gatherBlockWithBraces(lines, i);
+          blockLines = collected;
+          i = newIndex;
+          pushJsBlock(blockLines, startIndex + blockStart);
+
+        } else if (/\b(var|let|const)\s+[A-Za-z0-9_]+\s*=/.test(trimmed)) {
+          const { collected, newIndex } = gatherBlockWithBraces(lines, i, true);
+          blockLines = collected;
+          i = newIndex;
+          pushJsBlock(blockLines, startIndex + blockStart);
+
+        } else {
+          // Just treat as single-line block
+          blockLines = [lines[i]];
+          i++;
+          pushJsBlock(blockLines, startIndex + blockStart);
+        }
+      }
+    }
+    function gatherBlockWithBraces(allLines, startIndex) {
+      let collected = [];
+      let i = startIndex;
+      let l = allLines[i];
+      let baseIndent = l.match(/^\s*/)[0]; // Get indentation of starting line
+      let isComment = l.trim().startsWith("//");
+      collected.push(allLines[i++]);
+      while (i < allLines.length) {
+        l = allLines[i];
+        let indent = l.match(/^\s*/)[0];
+
+        if (l.trim() === "") {
+          // Case 2c: Empty line after -> this line is its own block
+          if (startIndex + 1 == i) {
+            break;
+          } else {
+            collected.push(allLines[i++]);
+            continue;
+            // an empty line is just part of the block
+          }
+        } else if (indent.length > baseIndent.length) {
+          // Case 2a: Next line is more indented -> entering a block
+          let subBlock = gatherBlockWithBraces(allLines, i);
+          collected.push(...subBlock.collected);
+          i = Math.max(i+1, subBlock.newIndex); // Ensure termination
+          continue;
+        } else if (indent.length === baseIndent.length) {
+          while (isComment && i < allLines.length && l.trim().startsWith("//")) {
+            collected.push(l);
+            l = allLines[++i] || "";
+          }
+          if (l.trim().startsWith("}")) {
+            // Ending a block only if it's a closing brace at same indentation
+            collected.push(allLines[i++]);
+            break;
+          } else {
+            break; // a different block
+          }
+        } else {
+          break; // a different block
+        }
+      }
+    
+      return { collected, newIndex: i };
+    }
+    function pushJsBlock(blockLines, blockStart) {
+      const code = blockLines.join('\n');
+      const { name, type } = extractNameFromBlock(code, 'js');
+      const uniqueId = `js:${type}:${name}:${Math.random()}`;
+      const indent = countLeadingSpaces(blockLines[0]);
+      parsedBlocks.push({
+        name,
+        type,
+        code,
+        uniqueId,
+        indent,
+        startLine: blockStart,
+        endLine: blockStart + blockLines.length - 1
+      });
+    }
+    function parseCssRegion(lines, startIndex) {
+      let i = 0;
+      while (i < lines.length) {
+        const line = lines[i];
+        const trimmed = line.trimLeft();
+
+        // Skip comments or blank lines
+        if (!trimmed || trimmed.startsWith('/*') || trimmed.startsWith('//')) {
+          i++;
+          continue;
+        }
+
+        const blockStart = i;
+        if (line.includes('{')) {
+          const { collected, newIndex } = gatherBlockWithBraces(lines, i);
+          i = newIndex;
+          pushCssBlock(collected, startIndex + blockStart);
+        } else {
+          i++;
+        }
+      }
+    }
+    function gatherCssBlock(allLines, startIndex) {
+      let braceDepth = 0;
+      let collected = [];
+      let i = startIndex;
+      let foundEnd = false;
+
+      while (i < allLines.length && !foundEnd) {
+        const l = allLines[i];
+        collected.push(l);
+
+        const openCount = (l.match(/\{/g) || []).length;
+        const closeCount = (l.match(/\}/g) || []).length;
+        braceDepth += openCount;
+        braceDepth -= closeCount;
+
+        if (braceDepth <= 0 && openCount > 0) {
+          foundEnd = true;
+        }
+        i++;
+      }
+      return { collected, newIndex: i };
+    }
+    function pushCssBlock(blockLines, blockStart) {
+      const code = blockLines.join('\n');
+      const { name, type } = extractNameFromBlock(code, 'css');
+      const uniqueId = `css:${type}:${name}:${Math.random()}`;
+      const indent = countLeadingSpaces(blockLines[0]);
+      
+      parsedBlocks.push({
+        name,
+        type,
+        code,
+        uniqueId,
+        indent,
+        startLine: blockStart,
+        endLine: blockStart + blockLines.length - 1
+      });
+    }
+    function extractNameFromBlock(code) {
+      const lines = code.split('\n');
+      const firstLine = lines[0].trim();
+
+      let funcMatch = firstLine.match(/\bfunction\s+([A-Za-z0-9_]+)/);
+      if (funcMatch) {
+        return {
+          name: `function ${funcMatch[1]}`,
+          type: 'function'
+        };
+      }
+
+      let declMatch = firstLine.match(/\b(var|let|const)\s+([A-Za-z0-9_]+)([\s\S]*)/);
+      if (declMatch) {
+        return {
+          name: `${declMatch[1]} ${declMatch[2]}${declMatch[3]}`,
+          type: 'declaration'
+        };
+      }
+      let cssMatch = firstLine.match(/^\s*(.+?)\s*\{/);
+      if (cssMatch) {
+        return {
+          name: cssMatch[1].trim(),
+          type: 'css'
+        };
+      }
+      return {
+        name: firstLine,
+        type: 'unknown'
+      };
+    }
+
+    function countLeadingSpaces(str) {
+      let count = 0;
+      for (let c of str) {
+        if (c === ' ') count++;
+        else break;
+      }
+      return count;
+    }
+
+    function removeLeadingIndentationStringcode) {
+      return removeLeadingIndentation(code.split('\n')).join('\n');
+    }
+
+    function removeLeadingIndentation(lines) {
+      // Find the smallest (non-zero) indentation among these lines
+      let minIndent = Infinity;
+      for (const line of lines) {
+        if (line.trim().length > 0) {
+          const indent = countLeadingSpaces(line);
+          if (indent < minIndent) minIndent = indent;
+        }
+      }
+      if (minIndent === Infinity) {
+        minIndent = 0;  // If all lines are empty, no indentation to remove
+      }
+
+      // Strip minIndent spaces from the start of each line
+      return lines.map(line => line.slice(minIndent));
+    }
+
+    // -------------------------------
+    // 2) DROPDOWN LOGIC
+    // -------------------------------
+    function updateDeclarationSelect() {
+      const sel = document.getElementById('functionSelect');
+      const oldValue = sel.value;
+
+      // Clear the dropdown
+      sel.innerHTML = '';
+
+      // If no parsed blocks, show a single "No declarations found"
+      if (parsedBlocks.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '-- No declarations found --';
+        sel.appendChild(opt);
+        previouslySelectedId = null;
+        return;
+      }
+
+      // Insert "Select a declaration..." at the top
+      const defaultOpt = document.createElement('option');
+      defaultOpt.value = '';
+      defaultOpt.textContent = 'Select a declaration...';
+      sel.appendChild(defaultOpt);
+
+      // Sort blocks by their startLine (so the dropdown has a predictable order)
+      parsedBlocks.sort((a, b) => a.startLine - b.startLine);
+
+      // Add each block as an <option>, showing only first line + line number
+      parsedBlocks.forEach(block => {
+        const opt = document.createElement('option');
+        // Grab just the first line of code
+        const firstLine = block.code.split('\n')[0] || '';
+        opt.value = block.uniqueId;
+        opt.textContent = `${firstLine} (line ${block.startLine + 1})`;
+        sel.appendChild(opt);
+      });
+
+      // Attempt to restore previous selection
+      let foundPrevious = false;
+      if (oldValue) {
+        const stillExists = parsedBlocks.find(b => b.uniqueId === oldValue);
+        if (stillExists) {
+          sel.value = oldValue;
+          foundPrevious = true;
+        }
+      }
+      if (!foundPrevious && previouslySelectedId) {
+        const stillExists = parsedBlocks.find(b => b.uniqueId === previouslySelectedId);
+        if (stillExists) {
+          sel.value = stillExists.uniqueId;
+          foundPrevious = true;
+        }
+      }
+
+      // If we still have no valid selection, revert to the default
+      if (!foundPrevious) {
+        sel.value = '';
+      }
+
+      // Remember the final selection
+      previouslySelectedId = sel.value ? sel.value : null;
+
+      // Enable/disable the Update button accordingly
+      updateButtonDisabledState();
+
+      // Optionally re-check whether the dropdown should appear in red,
+      // if you have such logic in highlightDropdownIfNeeded().
+      highlightDropdownIfNeeded();
+    }
+
+    function onDropdownChanged() {
+      // If user manually changes the dropdown, we record that as our "previously selected" ID
+      previouslySelectedId = $('functionSelect').value || null;
+      updateButtonDisabledState();
+      // If a valid block is selected, load its code into the second textarea
+      fillSecondTextAreaFromSelection();
+      // Then re-check highlight state
+      updateFunctionUIState();
+      // Change the color of the dropdown if needed
+      highlightDropdownIfNeeded();
+    }
+
+    function fillSecondTextAreaFromSelection() {
+      const selVal = $('functionSelect').value;
+      if (!selVal) {
+        $('functionInput').value = '';
+        $('updateMessage').textContent = '';
+        return;
+      }
+      const block = parsedBlocks.find(b => b.uniqueId === selVal);
+      if (!block) {
+        $('functionInput').value = '';
+        return;
+      }
+    
+      let snippetLines = block.code.split('\n');
+      // Remove leading indentation before displaying
+      snippetLines = removeLeadingIndentation(snippetLines);
+      $('functionInput').value = snippetLines.join('\n');
+    
+      setTimeout(() => $('functionInput').scrollTop = 0, 1);
+    }
+    
+
+    // -------------------------------
+    // 3) SECOND TEXTAREA LOGIC
+    // -------------------------------
+    function onSecondTextChanged() {
+      // Immediately handle partial search
+      immediatePartialSearch();
+
+      // Clear any pending timeout
+      if (searchTimeoutId) {
+        clearTimeout(searchTimeoutId);
+      }
+      // Schedule a new search after 1 second
+      searchTimeoutId = setTimeout(() => {
+        autoSelectIfUniqueMatch();
+      }, 1000);
+
+      updateFunctionUIState();
+      // Also see if the typed block name matches any existing block, in which case we auto-select
+      autoSelectMatchingBlock();
+    }
+
+    function immediatePartialSearch() {
+      const sel = $('functionSelect');
+      // The raw typed text (with trailing spaces)
+      const rawTyped = $('functionInput').value;
+      // The trimmed, lowercased text
+      const typed = rawTyped.trimEnd().toLowerCase();
+    
+      // If nothing typed, revert dropdown
+      if (!typed) {
+        sel.value = '';
+        return;
+      }
+    
+      // 1) Get partial matches. First prefer names that START with `typed`
+      let candidates = parsedBlocks.filter(b =>
+        b.name.toLowerCase().startsWith(typed)
+      );
+      if (candidates.length === 0) {
+        // 2) Otherwise, pick names that simply CONTAIN `typed`
+        candidates = parsedBlocks.filter(b =>
+          b.name.toLowerCase().includes(typed)
+        );
+      }
+    
+      // -- If user typed a space at the end, and typed is not "function..."
+      // then immediately auto-select & fill second textbox:
+      if (rawTyped.endsWith(' ') && !typed.startsWith('function')) {
+        if (candidates.length > 0) {
+          const chosen = candidates[0];
+          sel.value = chosen.uniqueId;
+          previouslySelectedId = chosen.uniqueId;
+          highlightDropdownIfNeeded();
+    
+          // Now fill the second textarea with the chosen block’s code
+          // using your existing logic:
+          fillSecondTextAreaFromSelection();
+          updateFunctionUIState();
+        } else {
+          // No matches => revert dropdown
+          sel.value = '';
+        }
+        // End here so we don’t fall through to the normal partial selection
+        return;
+      }
+    
+      // -- Otherwise, do the usual partial-match selection (no immediate fill):
+      if (candidates.length > 0) {
+        sel.value = candidates[0].uniqueId;
+        previouslySelectedId = candidates[0].uniqueId;
+        highlightDropdownIfNeeded();
+      } else {
+        sel.value = '';
+      }
+    }
+    
+    
+
+    // If there's only one match, auto-select it
+    function autoSelectIfUniqueMatch() {
+      const typed = $('functionInput').value.trim();
+      if (!typed) return; // Nothing typed => do nothing
+
+      const typedLower = typed.toLowerCase();
+      // Filter blocks that match exactly in a case-insensitive way
+      const exactMatches = parsedBlocks.filter(block =>
+        block.name.toLowerCase() === typedLower
+      );
+      console.log(parsedBlocks, typedLower);
+
+      if (exactMatches.length === 1) {
+        // Exactly one match => auto-select it
+        const match = exactMatches[0];
+        $('functionSelect').value = match.uniqueId;
+        previouslySelectedId = match.uniqueId;
+        fillSecondTextAreaFromSelection();
+        updateFunctionUIState();
+        highlightDropdownIfNeeded();
+        updateButtonDisabledState();
+      }
+    }
+
+    // Determine color highlights and messages for the second text area
+    function updateFunctionUIState() {
+      const funcInput = $('functionInput');
+      const snippet = funcInput.value;
+      clearSecondTextAreaHighlights();
+      $('updateMessage').textContent = '';
+
+      if (!snippet.trim()) {
+        // Nothing typed
+        return;
+      }
+
+      // We'll see if the user is referencing the block that’s selected in the dropdown
+      const selVal = $('functionSelect').value;
+      if (!selVal) {
+        // No valid selection => we do not forcibly highlight
+        // We'll just see if it matches any block by name or code
+        const anyMatch = findBlockMatchingSnippet(snippet);
+        if (anyMatch && anyMatch.exact) {
+          // exact match => green
+          funcInput.classList.add('highlight-green');
+        } else if (anyMatch && !anyMatch.exact) {
+          // same name but different => yellow
+          funcInput.classList.add('highlight-yellow');
+        } else {
+          // doesn't match => orange
+          funcInput.classList.add('highlight-orange');
+        }
+        return;
+      }
+
+      // If we do have a selection, see if snippet matches that block exactly or partially
+      const selBlock = parsedBlocks.find(b => b.uniqueId === selVal);
+      if (!selBlock) {
+        // The user selected a block that no longer exists => highlight dropdown in red
+        // The second text area is not necessarily invalid, but we mark it orange by default
+        funcInput.classList.add('highlight-orange');
+        $('updateMessage').textContent = 'Selected block no longer exists in the main code.';
+        return;
+      }
+
+      // If the snippet is exactly the same as the selected block => green
+      if (removeLeadingIndentationString(selBlock.code) === snippet) {
+        funcInput.classList.add('highlight-green');
+      } else {
+        // If name matches but code differs => yellow
+        // If name differs => we still can do an update, but let's indicate a rename. 
+        // We'll parse the name from snippet
+        const snippetName = extractNameFromBlock(snippet).name;
+        if (snippetName === selBlock.name) {
+          // same name => highlight yellow
+          funcInput.classList.add('highlight-yellow');
+        } else {
+          // different name => user might rename it => highlight orange
+          funcInput.classList.add('highlight-orange');
+        }
+      }
+    }
+
+    function clearSecondTextAreaHighlights() {
+      const funcInput = $('functionInput');
+      funcInput.classList.remove('highlight-green','highlight-yellow','highlight-orange');
+    }
+
+    // Try to see if the snippet references an existing block by name
+    // If so, switch the dropdown to that block. If multiple blocks have the same name, pick the first.
+    // If there's an exact code match, even better.
+    function autoSelectMatchingBlock() {
+      const snippet = $('functionInput').value;
+      if (!snippet.trim()) return;
+      const { name, type } = extractNameFromBlock(snippet);
+
+      // Find if there's a block with that name in parsedBlocks
+      // If there's also an exact code match, that's "better".
+      let bestMatch = null;
+      for (let b of parsedBlocks) {
+        if (b.name === name) {
+          if (b.code === snippet) {
+            bestMatch = b; 
+            break; // exact match is highest priority
+          } else if (!bestMatch) {
+            bestMatch = b; // same name, partial match
+          }
+        }
+      }
+      // If found, select it (unless it's already selected)
+      if (bestMatch) {
+        if ($('functionSelect').value !== bestMatch.uniqueId) {
+          $('functionSelect').value = bestMatch.uniqueId;
+          previouslySelectedId = bestMatch.uniqueId;
+          highlightDropdownIfNeeded();
+        }
+      } else {
+        // If not found, do we unselect the dropdown or remain stable?
+        // The spec says "It should also remain stable when possible."
+        // So we do NOT forcibly unselect if user previously selected something.
+        // We just do nothing in that case.
+      }
+      updateButtonDisabledState();
+    }
+
+    // If we find a block with the same name, we return { block, exact:true|false }
+    // If no block found, return null
+    function findBlockMatchingSnippet(snippet) {
+      const { name } = extractNameFromBlock(snippet);
+      let found = null;
+      for (const b of parsedBlocks) {
+        if (b.name === name) {
+          found = { block: b, exact: (removeLeadingIndentationString(b.code) === snippet) };
+          break;
+        }
+      }
+      return found;
+    }
+
+    // -------------------------------
+    // 4) UPDATE LOGIC
+    // -------------------------------
+    function updateBlock() {
+      const selVal = $('functionSelect').value;
+      if (!selVal) {
+        // "Select a declaration..." or none
+        return;
+      }
+      const selBlock = parsedBlocks.find(b => b.uniqueId === selVal);
+      if (!selBlock) {
+        // No longer exists
+        $('updateMessage').textContent = 'Cannot update: the selected block no longer exists.';
+        return;
+      }
+      const newSnippet = $('functionInput').value;
+      if (!newSnippet.trim()) {
+        $('updateMessage').textContent = 'No code provided to update.';
+        return;
+      }
+
+      // We replace the lines in #htmlInput from selBlock.startLine..endLine with newSnippet lines
+      const allLines = $('htmlInput').value.split('\n');
+      const snippetLines = newSnippet.split('\n');
+
+      // We'll try to preserve the same top-line indentation as the old block for line 0
+      // If user typed something with different indentation, let's forcibly unify. 
+      // We do a simple approach: the difference between oldBlock line0 indentation and snippet line0 indentation
+      // to shift the snippet lines by that offset.
+      const oldIndent = selBlock.indent;
+      const newIndent = countLeadingSpaces(snippetLines[0]);
+      const indentDiff = oldIndent - newIndent;
+      // Normally, newIndent is always less than oldIndent
+
+      // shift all snippet lines by indentDiff (if positive, add spaces; if negative, remove spaces if possible).
+      const adjustedSnippetLines = snippetLines.map(line => {
+        return ' '.repeat(indentDiff) + line;
+      });
+
+      // Now we splice them in
+      const blockLength = selBlock.endLine - selBlock.startLine + 1;
+      allLines.splice(selBlock.startLine, blockLength, ...adjustedSnippetLines);
+
+      const newText = allLines.join('\n');
+      $('htmlInput').value = newText;
+      // re-parse so we see the updated blocks
+      parseAllBlocks();
+      updateDeclarationSelect();
+      // keep selection on the new or renamed block if possible
+      autoSelectMatchingBlock();
+      updateFunctionUIState();
+
+      $('updateMessage').textContent = 'Block updated!';
+      localStorage.setItem('savedHtml', newText);
+    }
+    function updateButtonDisabledState() {
+      const selVal = $('functionSelect').value;
+      // If no selection or empty selection => disable
+      $('updateButton').disabled = !selVal;
+    }
+
+    function highlightDropdownIfNeeded() {
+      const sel = $('functionSelect');
+      sel.classList.remove('dropdown-red');
+      sel.classList.remove('dropdown-orange');
+
+      if (!sel.value) {
+        // "Select a declaration..." 
+        return;
+      }
+      const block = parsedBlocks.find(b => b.uniqueId === sel.value);
+      // If the second textarea references a different block name, highlight in orange
+      if (!block) {
+        // the selected block is missing => highlight red
+        sel.classList.add('dropdown-red');
+        //logError("Did not find selection?!");
+      } else {
+        const snippetName = extractNameFromBlock($('functionInput').value).name;
+        if (snippetName && snippetName !== block.name) {
+          sel.classList.add('dropdown-orange');
+          //logError("Could not find "+snippetName+", expected "+block.name);
+        }
+      }
+    }
+
+    // -------------------------------
+    // 5) LOAD / RESET / SHARE
+    // -------------------------------
+    function loadHtml() {
+      const htmlInput = $('htmlInput').value;
+      localStorage.setItem('savedHtml', htmlInput);
+
+      const errHandlerScript = `
+        <script>
+          // Attach window.onerror to store errors in localStorage
+          window.onerror = (msg, src, line, col, err) => {
+            let errLog = localStorage.getItem('errLog') || '';
+            errLog += 'Error: ' + msg + ' at ' + src + ':' + line + ':' + col + '\\n';
+            localStorage.setItem('errLog', errLog);
+          };
+        <\/script>`;
+
+      const newHtml = insertErrorHandler(htmlInput, errHandlerScript);
+      try {
+        document.open();
+        document.write(newHtml);
+        document.close();
+      } catch (e) {
+        logError(e);
+      }
+    }
+
+    function insertErrorHandler(html, script) {
+      if (html.includes('<head>')) {
+        return html.replace('<head>', '<head>' + script);
+      } else if (html.includes('<html>')) {
+        // If there's <html> but no <head>, insert <head> after <html>
+        return html.replace('<html>', '<html><head>' + script + '</head>');
+      }
+      // If no <html>/<head>, just prepend
+      return script + html;
+    }
+
+    function resetPage() {
+      localStorage.removeItem('savedHtml');
+      $('htmlInput').value = '';
+      $('functionInput').value = '';
+      $('updateMessage').textContent = '';
+      parsedBlocks = [];
+      previouslySelectedId = null;
+      updateDeclarationSelect();
+      clearSecondTextAreaHighlights();
+      updateButtonDisabledState();
+      updateCharCount();
+    }
+
+    function shareHtml() {
+      const html = $('htmlInput').value;
+      const compressed = pako.gzip(html);
+      const base64Encoded = encode(compressed);
+      const url = `https://mikaelmayer.github.io/html.html?code=${base64Encoded}#run`;
+      navigator.clipboard.writeText(url).then(
+        () => alert('URL copied to clipboard!'),
+        err => alert('Failed to copy URL: ' + err)
+      );
+    }
+
+    // -------------------------------
+    // 6) ERROR LOGGING
+    // -------------------------------
+    function logError(err) {
+      let errLog = localStorage.getItem('errLog') || '';
+      errLog += 'Error: ' + (err.message || err) + '\n';
+      localStorage.setItem('errLog', errLog);
+    }
+
+    function copyError() {
+      const errLog = $('errorLog').innerText;
+      navigator.clipboard.writeText(errLog).then(
+        () => alert('Error message copied to clipboard!'),
+        err => alert('Failed to copy error message: ' + err)
+      );
+    }
+
+    window.addEventListener('error', e => logError(e.error || { message: e.message }));
+    window.addEventListener('unhandledrejection', e => logError(e.reason || { message: e.reason }));
+  </script>
+</body>
+</html>

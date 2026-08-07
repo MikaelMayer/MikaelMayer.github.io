@@ -1,0 +1,426 @@
+<!DOCTYPE html><html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Partage une anecdote</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #fffaf2;
+      color: #333;
+      max-width: 600px;
+      margin: 2em auto;
+      padding: 1em;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    h1, h2 {
+      color: #884400;
+    }
+    input, textarea, button {
+      width: 100%;
+      margin: 0.5em 0;
+      padding: 0.6em;
+      font-size: 1em;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+    input[type="text"], textarea {
+      text-transform: none;
+    }
+    button {
+      background-color: #ffcc88;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #ffbb66;
+    }
+    .story {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 1em;
+      margin: 1em 0;
+    }
+    .preview {
+      background: #ffe;
+      border: 1px dashed #cc9;
+    }
+    .hidden { display: none; }
+    .comments {
+  margin-top: 1em;
+  padding-top: 0.5em;
+  border-top: 1px solid #ddd;
+}
+
+.comments textarea {
+  width: 100%;
+  margin-top: 0.5em;
+  border-radius: 6px;
+  padding: 0.5em;
+  font-family: inherit;
+  font-size: 1em;
+  box-sizing: border-box;
+}
+
+.comments button {
+  margin-top: 0.5em;
+  background-color: #e2e2ff;
+  color: #333;
+  border: none;
+  padding: 0.4em 0.8em;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.comments button:hover {
+  background-color: #cfcfff;
+}
+
+.existing-comments p {
+  margin: 0.3em 0;
+}
+
+.existing-comments button {
+  margin-left: 0.5em;
+  background: transparent;
+  border: none;
+  color: red;
+  font-weight: bold;
+  cursor: pointer;
+}
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+</head>
+<body>
+  <h1>Bienvenue dans notre collection d'anecdotes familiales !</h1>  <div id="status"></div>
+  <div id="lockedPreviews"></div>
+  <p id="promptForm" class="hidden">Pour lire ces anecdotes, soumets une anecdote à toi :</p>  <form id="storyForm" class="hidden">
+    <label>Ton nom : <input type="text" id="name" required autocomplete="off" /></label>
+    <label>Une anecdote qui t'a marqué : <textarea id="story" required></textarea></label>
+    <label>Il y a combien de temps ? <input type="text" id="when" required autocomplete="off" /></label>
+    <label>Où étais-tu ? <input type="text" id="where" required autocomplete="off" /></label>
+    <button type="submit">Envoyer et lire les nouvelles</button>
+  </form>  <div id="inviteOthers" class="hidden">
+    <h2>Des anecdotes attendent d'autres personnes !</h2>
+    <p>Voici ceux qui n'ont pas encore lu toutes les anecdotes :</p>
+    <ul id="waitingList"></ul>
+    <button onclick="navigator.clipboard.writeText(location.href)">Copier le lien de l'application</button>
+  </div>  <div>
+    <button id="showPrevious">Relire les anecdotes précédentes</button>
+    <div id="previousStories" class="hidden"></div>
+  </div>  <div id="unlockedStories"></div>  <script>
+    const token = new URLSearchParams(location.search).get("token") ?? prompt("Veuillez entrer le token :").trim() ?? "";
+     
+    function errorLog(...args) {
+      alert("[DEBUG '"+token+"'] "+JSON.stringify([...args]));
+    }
+
+    if (!location.search.includes("token=") && token !== null) {
+      history.replaceState(null, "", `${location.pathname}?token=${encodeURIComponent(token)}`);
+    }
+
+    const testMode = token.trim() === "";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCXjJkj_FUaxsEI-72ikgGGgFXF5fyCD20",
+      authDomain: "anecdotesfamiliales.firebaseapp.com",
+      databaseURL: "https://anecdotesfamiliales-default-rtdb.firebaseio.com",
+      projectId: "anecdotesfamiliales",
+      storageBucket: "anecdotesfamiliales.appspot.com",
+      messagingSenderId: "397937359982",
+      appId: "1:397937359982:web:10cc7fab8db02324cb7a7f"
+    };
+
+    if (!testMode) firebase.initializeApp(firebaseConfig);
+
+    const storyForm = document.getElementById('storyForm');
+    const statusDiv = document.getElementById('status');
+    const lockedPreviewsDiv = document.getElementById('lockedPreviews');
+    const unlockedStoriesDiv = document.getElementById('unlockedStories');
+    const previousStories = document.getElementById('previousStories');
+    const waitingList = document.getElementById('waitingList');
+    const inviteOthers = document.getElementById('inviteOthers');
+    const promptForm = document.getElementById('promptForm');
+    const nameInput = document.getElementById('name');
+    const submitBtn = storyForm.querySelector('button');
+
+    const savedName = document.cookie.replace(/(?:(?:^|.*;\s*)username\s*=\s*([^;]*).*$)|^.*$/, "$1");
+    var currentUser = savedName || "";
+    if (savedName) nameInput.value = savedName;
+
+    nameInput.addEventListener('input', () => {
+      const name = nameInput.value.trim();
+      submitBtn.disabled = name === '' && testMode;
+      currentUser = name;
+      document.cookie = `username=${name}; path=/`;
+      UpdateEverything();
+    });
+
+    let currentAllStories = {};
+    let currentUnread = [];
+
+    function updateUI(allStories, views) {
+      views = views || {};
+      const readKeys = views[currentUser] || [];
+      const storyKeys = Object.keys(allStories);
+      const unread = storyKeys.filter(k => !readKeys.includes(k));
+      //alert(JSON.stringify({allStories, views, currentUser, unread}));
+
+      currentAllStories = allStories;
+      currentUnread = unread;
+
+      statusDiv.innerHTML = unread.length > 0
+        ? `<h2>${unread.length} anecdote${unread.length > 1 ? 's' : ''} prête${unread.length > 1 ? 's' : ''} à être débloquée${unread.length > 1 ? 's' : ''} !</h2>`
+        : `<h2>Tu as tout lu. Merci d'avoir partagé !</h2>`;
+
+      lockedPreviewsDiv.innerHTML = '';
+      if (unread.length > 0 || storyKeys.length === 0) {
+        unread.forEach(k => {
+          const d = allStories[k];
+          const div = document.createElement('div');
+          div.className = 'story preview';
+          div.dataset.key = k;
+          div.innerHTML = renderPreviewAnecdote(d);
+          lockedPreviewsDiv.appendChild(div);
+        });
+        promptForm.classList.remove('hidden');
+        storyForm.classList.remove('hidden');
+      }
+
+      const pending = Object.keys(views).filter(name => name !== currentUser && storyKeys.some(k => !(views[name] || []).includes(k)));
+      if (pending.length > 0) {
+        inviteOthers.classList.remove('hidden');
+        waitingList.innerHTML = '';
+        pending.forEach(name => {
+          const li = document.createElement('li');
+          li.textContent = `${name} n'a pas encore lu toutes les anecdotes.`;
+          waitingList.appendChild(li);
+        });
+      }
+
+      document.getElementById('showPrevious').onclick = () => {
+        previousStories.classList.remove('hidden');
+        previousStories.innerHTML = '';
+        readKeys.forEach(k => {
+          const d = allStories[k];
+          const div = renderFullAnecdote(d, k);
+          previousStories.appendChild(div);
+        });
+      };
+    }
+
+    function ensurePlacePrefix(where) {
+      const trimmed = where.trim();
+      const prefixes = ["à", "au", "aux", "en", "dans", "chez", "sur", "sous"];
+      const lower = trimmed.toLowerCase();
+    
+      const hasPrefix = prefixes.some(prefix => lower.startsWith(prefix + " ") || lower === prefix);
+      return hasPrefix ? trimmed : "à " + uncapitalizeFirst(trimmed);
+    }
+    
+    function renderFullAnecdote(d, key) {
+      const div = document.createElement('div');
+      div.className = 'story';
+      div.innerHTML = `
+        <strong>${capitalizeFirst(formatWhen(d.when, d.timestamp))}</strong>, <em>${d.name}</em> se rappelle :<br>
+        <em>${capitalizeFirst(ensurePlacePrefix(d.where))}</em>, ${d.story}
+         <div class="comments" data-storykey="${key}">
+         <div class="existing-comments"></div>
+          <textarea placeholder="Ton commentaire..."></textarea>
+          <button>Commenter</button>
+         </div>
+       `;
+      attachCommentLogic(div, key);
+      return div;
+    }
+    function renderComment(ref, ts, c, list) {
+      const p = document.createElement('p');
+      p.dataset.ts = ts;
+      p.innerHTML = `<strong>${c.name} :</strong> ${c.comment}`;
+    
+      if (c.name === currentUser) {
+        const delBtn = document.createElement('button');
+        delBtn.textContent = "✖";
+        delBtn.onclick = () => {
+          ref.once('value').then(snapshot => {
+            const count = Object.keys(snapshot.val() || {}).length;
+            if (count === 1) {
+              ref.remove();
+            } else {
+              ref.child(ts).remove();
+            }
+            p.remove();
+          });
+        };
+        p.appendChild(delBtn);
+      }
+    
+      list.appendChild(p);
+    }
+    function attachCommentLogic(div, key) {
+      const commentDiv = div.querySelector('.comments');
+      const btn = commentDiv.querySelector('button');
+      const input = commentDiv.querySelector('textarea');
+      const list = commentDiv.querySelector('.existing-comments');
+    
+      const ref = firebase.database().ref(`comments_${token}/${key}`);
+      
+    
+      // Charger les commentaires existants
+      ref.once('value').then(snap => {
+        const comments = snap.val() || {};
+        Object.entries(comments).forEach(([ts, c]) => {
+          renderComment(ref, ts, c, list);
+        });
+      });
+
+      // Ajouter un commentaire
+      btn.addEventListener('click', () => {
+        const text = input.value.trim();
+        if (!text) return;
+        const ts = Date.now();
+        const comment = { name: currentUser, comment: text };
+        ref.child(ts).set(comment);
+        renderComment(ref, ts, comment, list);
+        input.value = '';
+      });
+    }
+    function renderPreviewAnecdote(d) {
+      return `<strong>${capitalizeFirst(formatWhen(d.when, d.timestamp))}</strong><br><em>${d.name}</em> était <em>${uncapitalizeFirst(replaceFirstPersonPossessive(ensurePlacePrefix(d.where)))}</em>... Veux-tu savoir ce qui s'est passé ?`;
+    }
+
+    function formatWhen(when, timestamp) {
+      const lower = when.toLowerCase();
+      const keywords = ["hier", "avant-hier", "aujourd’hui", "aujourd'hui", "hui"];
+    
+      const containsRelative = keywords.some(word => lower.includes(word));
+      if (!containsRelative) return when;
+    
+      const now = new Date();
+      const date = new Date(timestamp);
+      const diffMs = now - date;
+      const diffHours = diffMs / (1000 * 60 * 60);
+    
+      if (diffHours < 24) return when;
+    
+      const jours = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+      const mois = ["janvier", "février", "mars", "avril", "mai", "juin",
+                    "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+    
+      const jourNom = jours[date.getDay()];
+      const jour = date.getDate();
+      const moisNom = mois[date.getMonth()];
+      const année = date.getFullYear();
+      const nowAnnée = now.getFullYear();
+      const diffDays = Math.floor(diffHours / 24);
+    
+      if (diffDays < 6) {
+        return `${jourNom} dernier`;
+      } else if (année === nowAnnée) {
+        return `${jourNom} ${jour} ${moisNom}`;
+      } else {
+        return `${jourNom} ${jour} ${moisNom} ${année}`;
+      }
+    }
+
+    function capitalizeFirst(str) {
+      return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
+    function uncapitalizeFirst(str) {
+      return str.charAt(0).toLowerCase() + str.slice(1);
+    }
+    function replaceFirstPersonPossessive(str) {
+      return str
+        .replace(/\bmon\b/gi, match => match[0] === 'M' ? 'Son' : 'son')
+        .replace(/\bma\b/gi, match => match[0] === 'M' ? 'Sa' : 'sa')
+        .replace(/\bmes\b/gi, match => match[0] === 'M' ? 'Ses' : 'ses');
+    }
+
+    function simulateData() {
+      const stories = {
+        one: { name: 'Alice', story: "J'ai vu une étoile filante", when: 'il y a 3 ans', where: 'dans le jardin' },
+        two: { name: 'Bob', story: "J'ai nagé avec des dauphins", when: 'cet été', where: 'à Hawaï' }
+      };
+      const views = { Testeur: ['one'] };
+      currentUser.name = "Testeur";
+      nameInput.value = "Testeur";
+      updateUI(stories, views);
+    }
+
+    storyForm.addEventListener('submit', e => {
+        e.preventDefault();
+
+        const name = nameInput.value.trim();
+        const story = document.getElementById('story').value.trim();
+        const when = document.getElementById('when').value.trim();
+        const where = document.getElementById('where').value.trim();
+        if (!name || !story || !when || !where) return;
+
+        document.cookie = `username=${name}; path=/`;
+        const timestamp = Date.now();
+
+        const db = firebase.database();
+        const ref = db.ref('stories_' + token).push();
+        ref.set({ name, story, when, where, timestamp }).then(() => {
+            // Ajoute la nouvelle anecdote à l'état local
+            currentAllStories[ref.key] = { name, story, when, where, timestamp };
+
+            // Marque l'utilisateur comme ayant lu cette anecdote
+            db.ref('views_' + token + '/' + currentUser).once('value').then(
+              (currentUnread => snap => {
+                const seen = snap.val() || [];
+                seen.push(ref.key);
+                currentUnread.forEach(k => seen.push(k));
+                db.ref('views_' + token + '/' + currentUser).set(seen);
+            })(currentUnread));
+
+            // Met à jour l'affichage local immédiatement
+            statusDiv.innerHTML = `<h2>Anecdotes débloquées :</h2>`;
+            storyForm.classList.add('hidden');
+            promptForm.classList.add('hidden');
+            lockedPreviewsDiv.innerHTML = '';
+
+            // Affiche toutes les anecdotes débloquées (celles non encore lues avant)
+            currentUnread.forEach(k => {
+                const d = currentAllStories[k];
+                const div = renderFullAnecdote(d, k);
+                lockedPreviewsDiv.appendChild(div);
+            });
+
+            // Affiche aussi l'anecdote qu'on vient d'écrire
+            const div = renderFullAnecdote(
+              { name, story, when, where, timestamp }, ref.key);
+            lockedPreviewsDiv.appendChild(div);
+
+            // On considère toutes les anecdotes comme lues localement maintenant
+            currentUnread = [];
+
+            // Scroll vers le haut
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    });
+
+    function UpdateEverything() {
+      const db = firebase.database();
+      Promise.all([
+        db.ref('stories_' + token).once('value'),
+        db.ref('views_' + token).once('value')
+      ]).then(([snapStories, snapViews]) => {
+        const stories = snapStories.val() || {};
+        const views = snapViews.val() || {};
+        updateUI(stories, views);
+      }).catch(err => errorLog("Firebase error:", err));
+    }
+    
+    if (testMode) {
+      simulateData();
+    } else {
+      UpdateEverything();
+    }
+  </script></body>
+</html>

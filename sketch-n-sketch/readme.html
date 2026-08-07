@@ -1,0 +1,136 @@
+<h1 id="sketch-n-sketch-application-programming-interface">Sketch-n-sketch Application Programming Interface</h1>
+<p>This npm packages offers a quick but simple API for dealing with the Sketch-n-sketch bidirectional evaluator in Javascript. We hope to provide enough functionalities to enable the creation of web server that serve this language.</p>
+<h2 id="get-familiar-with-sketch-n-sketch">Get familiar with Sketch-n-sketch</h2>
+<p>If you want to get familiar with Sketch-n-sketch for the language, first visit the following link:</p>
+<p><a href="https://github.com/ravichugh/sketch-n-sketch">github.com/ravichugh/sketch-n-sketch</a></p>
+<h2 id="how-to-include-the-api.">How to include the API.</h2>
+<p>In a javascript of your node.js project, simply include the following:</p>
+<pre><code>const sns = require(&quot;sketch-n-sketch&quot;);</code></pre>
+<p>The evaluation of this line will take 3 seconds the first time, the time necessary to evaluate the prelude.</p>
+<h2 id="api-functions">API functions:</h2>
+<p>Given that <code>JSObj</code> represents the native Javascript object type to store key/value pairs, and <code>JSAny</code> any javascript value (in our case: numbers, booleans, arrays and objects), we provide the following API along with their types.</p>
+<pre><code>parse: String -&gt; Result String Exp
+evalExp: Exp -&gt; Result String Val
+updateExp: Exp -&gt; Val -&gt; Val -&gt; Result String (LazyList Exp)
+unparse: Exp -&gt; String
+andThen: (a -&gt; Result err b) -&gt; Result err a -&gt; Result err b
+valToNative: Val -&gt; JSAny
+nativeToVal: JSAny -&gt; Val
+valToString: Val -&gt; String
+valToHTMLSource: Val -&gt; Result String String
+evaluate: String -&gt; Result String Val
+update: String -&gt; Val -&gt; Result String (List String)
+evaluateEnv: JSObj -&gt; String -&gt; Result String Val
+updateEnv: JSObj -&gt; String -&gt; Val -&gt; Result String (List (JSObj, String))</code></pre>
+<h2 id="example-usage">Example usage</h2>
+<p>Here is a detailed workflow using variable assignments, expression parsing and unparsing:</p>
+<pre><code>// sns.parse returns either
+//    {ctor: &quot;Ok&quot;, _0: SNS AST of this program}
+// or {ctor:&quot;Err&quot;, _0: Parse error message}
+var prog = sns.parse(
+  `let f x = x + 1 in
+   let who = &quot;world&quot; in
+   [f 2, &quot;&quot;&quot;Hello @who&quot;&quot;&quot;, &lt;span&gt;Nice&lt;/span&gt;]`)._0;
+
+// sns.evalExp returns either 
+//    {ctor: &quot;Ok&quot;,  _0: Val}
+// or {ctor: &quot;Err&quot;, _0: Evaluation error message}
+var outVal = sns.evalExp(prog)._0;
+
+/* Prints
+   [ 3,
+     &quot;Hello world&quot;,
+     [ &quot;span&quot;,
+       [],
+       [ [ &quot;TEXT&quot;,
+           &quot;Nice&quot;
+         ]
+       ]
+     ]
+   ] */
+console.log(sns.valToString(outVal))
+
+// Returns either
+//    {ctor: &quot;Ok&quot;,  _0: native val}
+// or {ctor: &quot;Err&quot;, _0: Conversion error message}
+// Here nativeOutVal is equal to [3, &quot;Hello world&quot;, [&quot;span&quot;, [], [[&quot;TEXT&quot;, &quot;Nice&quot;]]]]
+var nativeOutVal = sns.valToNative(outVal)._0;
+console.log(nativeOutVal);
+
+// Convert this Javascript value to a SNS value. This always succeed for base types.
+var newOutVal = sns.nativeToVal([2, &quot;Hello earth&quot;, [&quot;span&quot;, [], [[&quot;TEXT&quot;, &quot;Nice&quot;]]]]);
+
+// Invokes our update procedure with the given new out value.
+// The result is either
+//    {ctor: &quot;Ok&quot;,  _0: Lazy list of new exps}
+// or {ctor: &quot;Err&quot;, _0: Update error message}
+var newProgs = sns.updateExp(prog)(outVal)(newOutVal);
+
+// First solution:
+var solutionLazyList = newProgs._0;
+// solutionLazyList.ctor == &quot;Cons&quot; here, se we can access the head _0
+var solutionExp1 = solutionLazyList._0;
+
+// Display the first solution to the update problem.
+console.log(sns.unparse(solutionExp1))
+/*let f x = x + 1 in
+  let who = &quot;earth&quot; in
+  [f 1, &quot;&quot;&quot;Hello @who&quot;&quot;&quot;, &lt;span&gt;Nice&lt;/span&gt;]
+*/
+
+// Tail of solutions.
+var solutionLazyListTail = solutionLazyList._1._0();
+
+// If there is none, then solutionLazyListTail.ctor == &quot;Nil&quot;. Else, it is &quot;Cons&quot; and we can access _0.
+var solutionExp2 = solutionLazyListTail._0
+console.log(sns.unparse(solutionExp2))
+/*let f x = x + 0 in
+  let who = &quot;earth&quot; in
+  [f 2, &quot;&quot;&quot;Hello @who&quot;&quot;&quot;, &lt;span&gt;Nice&lt;/span&gt;]
+ */
+// Third solution, etc.
+// var solutionLazyListTailTail = solutionLazyListTail._1._0();</code></pre>
+<p>We can also encode this workflow in a way that carries errors until the result must be recovered:</p>
+<pre><code>var resProg = sns.parse(
+  `let f x = x + 1 in
+   let who = &quot;world&quot; in
+   [f 2, &quot;&quot;&quot;Hello @who&quot;&quot;&quot;, &lt;span&gt;Nice&lt;/span&gt;]`);
+
+var resOutVal = sns.andThen(prog =&gt; sns.evalExp(prog))(resProg);
+
+// Returns either {ctor: &quot;Ok&quot;, _0: native val} or {ctor: &quot;Err&quot;, _0: Conversion error message}
+// Here nativeOutVal._0 is equal to [3, &quot;Hello world&quot;, [&quot;span&quot;, [], [[&quot;TEXT&quot;, &quot;Nice&quot;]]]]
+var nativeOutVal = sns.andThen(outVal =&gt; sns.valToNative(outVal))(resOutVal);
+console.log(nativeOutVal);
+
+// Convert this Javascript value to a SNS value. This always succeed if we don&#39;t use functions.
+var newOutVal = sns.nativeToVal([2, &quot;Hello earth&quot;, [&quot;span&quot;, [], [[&quot;TEXT&quot;, &quot;Nice&quot;]]]]);
+
+// Invokes our update procedure with the given new out value.
+// The result is either {ctor: &quot;Ok&quot;, _0: Lazy list of new exps} or {ctor: &quot;Err&quot;, _0: Update error message}
+var newProgs =
+  sns.andThen(prog =&gt;
+    sns.andThen(outVal =&gt;
+      sns.updateExp(prog)(outVal)(newOutVal))(resOutVal)
+    )(resProg);
+
+// The remaining works as before.</code></pre>
+<p><code>sns.valToHTMLSource</code> converts a value to a string in such a way it can be served as a web page (e.g. as the content of a http response). It takes care of</p>
+<ul>
+<li>Special characters in attributes.</li>
+<li>&lt; &gt; &amp; in the script and style nodes.</li>
+</ul>
+<p>Here is how you can use it.</p>
+<pre><code>var prog = sns.parse(
+  `let x = &quot;world&quot; in
+   &lt;span&gt;Hello @x&lt;/span&gt;`)._0;
+
+var outVal = sns.evalExp(prog)._0;
+
+// Returns either a
+//    {ctor:&quot;Ok&quot;, _0: The HTML string}
+// or {ctor:&quot;Err&quot;, _0: the error message}.
+var outHTML = sns.valToHTMLSource(outVal);
+
+// Displays &#39;&lt;span&gt;Hello world&lt;/span&gt;&#39;
+console.log(outHTML._0);</code></pre>

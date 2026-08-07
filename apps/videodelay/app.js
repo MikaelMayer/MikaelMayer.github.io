@@ -1,0 +1,1305 @@
+// DelayCam application logic, wired to the DOM. Depends on DelayCamLogic.
+(function () {
+  'use strict';
+
+  // ---- DOM references ----
+  const liveVideo = document.getElementById('liveVideo');
+  const delayedVideo = document.getElementById('delayedVideo');
+  const frozenView = document.getElementById('frozenView');
+  const countdownText = document.getElementById('countdownText');
+  const delayLabel = document.getElementById('delayLabel');
+  const switchBtn = document.getElementById('switchBtn');
+  const copyLinkBtn = document.getElementById('copyLinkBtn');
+  const picBtn = document.getElementById('picBtn');
+  const recBtn = document.getElementById('recBtn');
+  const cancelBtn = document.getElementById('cancelBtn');
+  const recordDot = document.getElementById('recordDot');
+  const zoomControls = document.getElementById('zoomControls');
+
+  // ---- Camera state ----
+  let stream;
+  let currentFacingMode = 'environment';
+  let currentZoomScale = 1;
+  let lastAppliedZoomScale = 1;
+  const CAMERA_QUALITY_PROFILES = [
+    { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30, max: 30 }, aspectRatio: { ideal: 16 / 9 }, resizeMode: 'none' },
+    { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 }, aspectRatio: { ideal: 16 / 9 }, resizeMode: 'none' }
+  ];
+  const LOOP_RECORDING_VIDEO_BITRATE = 4_000_000;
+  const USER_RECORDING_VIDEO_BITRATE = 6_000_000;
+  const USER_RECORDING_AUDIO_BITRATE = 96_000;
+  const USER_RECORDING_TIMESLICE_MS = 250;
+  const RECORDER_STOP_TIMEOUT_MS = 2500;
+
+  // ---- Delay configuration (localStorage) ----
+  const DELAY_STORAGE_KEY = 'videodelay_seconds';
+  let delayMs = (function () {
+    try {
+      const stored = localStorage.getItem(DELAY_STORAGE_KEY);
+      if (stored) {
+        const val = parseInt(stored, 10);
+        if (val > 0) return val * 1000;
+      }
+    } catch (_) {}
+    return 10000;
+  })();
+
+  // ---- View state ----
+  let mainIsLive = true;
+  let delayReady = false;
+  let delayProcessActive = false;
+  let delayGeneration = 0;
+  let countdownRemaining = 0;
+  let countdownInterval = null;
+  let countdownDone = false;
+  let firstChunkReady = false;
+  let firstChunkBlob = null;
+
+  // ---- First-chunk recording state (delay mechanism) ----
+  let firstRecorder;
+  let firstChunkPromise;
+
+  // ---- User recording state (save/share) ----
+  let isRecording = false;
+  let recordStartTime = 0;
+  let readyToSaveBlob = null;
+  let recordingStrategy = DelayCamLogic.chooseRecordingStrategy({});
+  let activeLoopGeneration = 0;
+  let lastLoopChunkBlob = null;
+
+  // Element-capture strategy state
+  let elementRecorder = null;
+  let elementRecorderChunks = [];
+  let elementRecorderStopResolve = null;
+  let elementRecorderStream = null;
+
+  // Canvas-capture strategy state
+  let canvasEl = null;
+  let canvasCtx = null;
+  let canvasRafId = null;
+  let canvasStream = null;
+  let canvasRecorder = null;
+  let canvasRecorderChunks = [];
+  let canvasRecorderStopResolve = null;
+  let canvasRecorderStream = null;
+
+  // Silent audio for recording compatibility
+  let silenceAudioContext = null;
+  let silenceOscillator = null;
+  let silenceGain = null;
+  let silenceDestination = null;
+  let silenceAudioTrack = null;
+
+  // ========================================================================
+  // Silence audio helpers
+  // ========================================================================
+
+  function ensureSilenceAudioTrack() {
+    try {
+      if (silenceAudioTrack && silenceAudioTrack.readyState === 'live') return silenceAudioTrack;
+      const AudioContextCtor = (window.AudioContext || window.webkitAudioContext);
+      if (!AudioContextCtor) return null;
+      silenceAudioContext = silenceAudioContext || new AudioContextCtor();
+      silenceDestination = silenceAudioContext.createMediaStreamDestination();
+      silenceOscillator = silenceAudioContext.createOscillator();
+      silenceGain = silenceAudioContext.createGain();
+      silenceGain.gain.value = 0.00001;
+      silenceOscillator.connect(silenceGain).connect(silenceDestination);
+      try { silenceOscillator.start(); } catch (_) { /* already started */ }
+      const tracks = silenceDestination.stream.getAudioTracks();
+      silenceAudioTrack = tracks && tracks[0] ? tracks[0] : null;
+      return silenceAudioTrack || null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function cleanupSilenceAudioTrack() {
+    try { if (silenceOscillator) silenceOscillator.stop(); } catch (_) {}
+    try { if (silenceAudioTrack) silenceAudioTrack.stop(); } catch (_) {}
+    try { if (silenceAudioContext && typeof silenceAudioContext.close === 'function') silenceAudioContext.close(); } catch (_) {}
+    silenceOscillator = null;
+    silenceGain = null;
+    silenceDestination = null;
+    silenceAudioTrack = null;
+    silenceAudioContext = null;
+  }
+
+  // ========================================================================
+  // MIME type and file helpers
+  // ========================================================================
+
+  function chooseBestMimeType() {
+    const candidates = [
+      'video/webm; codecs=vp8',
+      'video/webm; codecs=vp9',
+      'video/webm',
+      'video/mp4; codecs="avc1.42E01E,mp4a.40.2"',
+      'video/mp4; codecs="avc1.42E01E"',
+      'video/mp4'
+    ];
+    for (const type of candidates) {
+      try {
+        if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(type)) {
+          return type;
+        }
+      } catch (_) { /* ignore */ }
+    }
+    return undefined;
+  }
+
+  function normalizeMimeType(mime) {
+    if (!mime) return 'video/webm';
+    const base = String(mime).split(';')[0].trim();
+    return base || 'video/webm';
+  }
+
+  function getExtensionFromMime(mime) {
+    const base = normalizeMimeType(mime);
+    switch (base) {
+      case 'video/mp4':
+        return 'mp4';
+      case 'video/ogg':
+        return 'ogv';
+      case 'image/jpeg':
+        return 'jpg';
+      case 'image/png':
+        return 'png';
+      case 'image/webp':
+        return 'webp';
+      case 'video/webm':
+      default:
+        return 'webm';
+    }
+  }
+
+  function makeBlobFromChunks(chunks, fallbackMime) {
+    const nonEmpty = (chunks || []).filter(c => c && c.size > 0);
+    if (!nonEmpty.length) return null;
+    const chunkType = (nonEmpty.find(c => c && c.type) || {}).type || fallbackMime || 'video/webm';
+    return new Blob(nonEmpty, { type: normalizeMimeType(chunkType) });
+  }
+
+  function stopTracksSafe(streamRef) {
+    if (!streamRef) return;
+    try { streamRef.getTracks().forEach(t => t.stop()); } catch (_) {}
+  }
+
+  function createRecorder(targetStream, opts) {
+    const cfg = opts || {};
+    const mimeType = chooseBestMimeType();
+    const primary = cfg.forLoop
+      ? { videoBitsPerSecond: LOOP_RECORDING_VIDEO_BITRATE }
+      : { videoBitsPerSecond: USER_RECORDING_VIDEO_BITRATE, audioBitsPerSecond: USER_RECORDING_AUDIO_BITRATE };
+    if (mimeType) primary.mimeType = mimeType;
+    try {
+      return new MediaRecorder(targetStream, primary);
+    } catch (_) {
+      const fallback = cfg.forLoop
+        ? { videoBitsPerSecond: LOOP_RECORDING_VIDEO_BITRATE }
+        : { videoBitsPerSecond: USER_RECORDING_VIDEO_BITRATE, audioBitsPerSecond: USER_RECORDING_AUDIO_BITRATE };
+      return new MediaRecorder(targetStream, fallback);
+    }
+  }
+
+  function stopRecorderWithTimeout(recorder, timeoutMs) {
+    return new Promise(resolve => {
+      let done = false;
+      let timeoutId = null;
+      function finish() {
+        if (done) return;
+        done = true;
+        if (timeoutId) clearTimeout(timeoutId);
+        resolve();
+      }
+      if (!recorder || recorder.state !== 'recording') {
+        finish();
+        return;
+      }
+      const prevStop = recorder.onstop;
+      const prevError = recorder.onerror;
+      recorder.onstop = ev => {
+        try { if (typeof prevStop === 'function') prevStop.call(recorder, ev); } catch (_) {}
+        finish();
+      };
+      recorder.onerror = ev => {
+        try { if (typeof prevError === 'function') prevError.call(recorder, ev); } catch (_) {}
+        finish();
+      };
+      try { recorder.requestData(); } catch (_) {}
+      timeoutId = setTimeout(() => {
+        if (recorder.state === 'recording') {
+          try { recorder.stop(); } catch (_) {}
+        }
+        finish();
+      }, timeoutMs);
+      try { recorder.stop(); } catch (_) { finish(); }
+    });
+  }
+
+  // ========================================================================
+  // Save / Share helpers
+  // ========================================================================
+
+  async function saveBlobAs(blob, suggestedName) {
+    const w = /** @type {any} */ (window);
+    if (typeof w.showSaveFilePicker === 'function') {
+      try {
+        const ext = `.${getExtensionFromMime(blob.type)}`;
+        const handle = await w.showSaveFilePicker({
+          suggestedName,
+          types: [
+            {
+              description: 'Media',
+              accept: { [normalizeMimeType(blob.type)]: [ext] }
+            }
+          ]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return true;
+      } catch (_) {
+        // fall through to anchor-based download
+      }
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = suggestedName;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    let clicked = false;
+    try {
+      a.click();
+      clicked = true;
+    } catch (_) {
+      try { window.open(url, '_blank', 'noopener'); } catch (_) {}
+    } finally {
+      setTimeout(() => {
+        try { a.remove(); } catch (_) {}
+        try { URL.revokeObjectURL(url); } catch (_) {}
+      }, 60000);
+    }
+    return clicked;
+  }
+
+  async function shareBlobOrSave(blob, suggestedName, shareTitle) {
+    try {
+      const file = new File([blob], suggestedName, { type: blob.type || 'application/octet-stream' });
+      const canShareFiles = (function () {
+        try {
+          if (typeof navigator === 'undefined' || typeof navigator.share !== 'function') return false;
+          if (typeof navigator.canShare !== 'function') return true;
+          return !!navigator.canShare({ files: [file] });
+        } catch (_) {
+          return false;
+        }
+      }());
+      if (canShareFiles) {
+        await navigator.share({ files: [file], title: shareTitle || 'Delayed capture' });
+        return true;
+      }
+    } catch (_) { /* fallback to save */ }
+    return saveBlobAs(blob, suggestedName);
+  }
+
+  function extractCssUrl(value) {
+    const m = /^url\((['"]?)(.+?)\1\)$/.exec(String(value || '').trim());
+    return m ? m[2] : '';
+  }
+
+  function imageFromUrl(url) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = url;
+    });
+  }
+
+  function getCurrentMainViewSource() {
+    if (!delayProcessActive || mainIsLive) return liveVideo;
+    if (delayReady) return delayedVideo;
+    return frozenView;
+  }
+
+  async function capturePhotoBlobFromCurrentView() {
+    const source = getCurrentMainViewSource();
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas not supported');
+
+    if (source === frozenView) {
+      const bgUrl = extractCssUrl(frozenView.style.backgroundImage);
+      if (bgUrl) {
+        const img = await imageFromUrl(bgUrl);
+        const w = img.naturalWidth || 1280;
+        const h = img.naturalHeight || 720;
+        canvas.width = w;
+        canvas.height = h;
+        ctx.drawImage(img, 0, 0, w, h);
+      } else {
+        const w = liveVideo.videoWidth || 1280;
+        const h = liveVideo.videoHeight || 720;
+        canvas.width = w;
+        canvas.height = h;
+        ctx.drawImage(liveVideo, 0, 0, w, h);
+      }
+    } else {
+      const w = source.videoWidth || 0;
+      const h = source.videoHeight || 0;
+      if (!w || !h) throw new Error('Video frame not ready');
+      canvas.width = w;
+      canvas.height = h;
+      ctx.drawImage(source, 0, 0, w, h);
+    }
+
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(blob => {
+        if (blob && blob.size > 0) resolve(blob);
+        else reject(new Error('Could not encode image'));
+      }, 'image/jpeg', 0.92);
+    });
+  }
+
+  async function takePicture() {
+    if (!picBtn) return;
+    const previous = picBtn.textContent || '📸';
+    try {
+      picBtn.disabled = true;
+      picBtn.textContent = '...';
+      const blob = await capturePhotoBlobFromCurrentView();
+      const filename = `delayed-picture-${Date.now()}.${getExtensionFromMime(blob.type)}`;
+      await shareBlobOrSave(blob, filename, 'Delayed snapshot');
+    } catch (e) {
+      console.error('Picture capture failed', e);
+    } finally {
+      picBtn.disabled = false;
+      picBtn.textContent = previous;
+    }
+  }
+
+  // ========================================================================
+  // Camera
+  // ========================================================================
+
+  async function getCameraStream(facingMode) {
+    const attempts = [];
+    CAMERA_QUALITY_PROFILES.forEach(profile => {
+      attempts.push({ video: { ...profile, facingMode: { exact: facingMode } }, audio: false });
+      attempts.push({ video: { ...profile, facingMode }, audio: false });
+    });
+    attempts.push({ video: { facingMode: { exact: facingMode } }, audio: false });
+    attempts.push({ video: { facingMode }, audio: false });
+    attempts.push({ video: true, audio: false });
+    let lastError;
+    for (const constraints of attempts) {
+      try {
+        return await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    throw lastError || new Error('getUserMedia failed');
+  }
+
+  async function startCamera() {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    try {
+      stream = await getCameraStream(currentFacingMode);
+      liveVideo.srcObject = stream;
+      try {
+        const videoTrack = stream.getVideoTracks && stream.getVideoTracks()[0];
+        if (videoTrack && typeof videoTrack.contentHint === 'string') {
+          videoTrack.contentHint = 'detail';
+        }
+      } catch (_) {}
+      await liveVideo.play();
+      try { applyZoom(currentZoomScale); } catch (_) {}
+
+      function onReady() {
+        if (!delayProcessActive || !delayReady) beginDelayProcess();
+      }
+      liveVideo.addEventListener('loadeddata', onReady, { once: true });
+      if (liveVideo.readyState >= 2) onReady();
+    } catch (e) {
+      delayLabel.textContent = 'Camera error';
+      console.error(e);
+    }
+  }
+
+  // ========================================================================
+  // Layout management
+  // ========================================================================
+
+  function updateDelayLabel() {
+    const seconds = Math.round(delayMs / 1000);
+    delayLabel.textContent = `Delay ${seconds}s`;
+  }
+
+  function setMainPosition(el) {
+    el.style.position = 'absolute';
+    el.style.top = '0';
+    el.style.left = '0';
+    el.style.bottom = 'auto';
+    el.style.right = 'auto';
+    el.style.width = '100vw';
+    el.style.height = '100vh';
+    el.style.borderRadius = '0';
+    el.style.zIndex = '1';
+    el.style.boxSizing = 'border-box';
+    el.style.cursor = 'default';
+    el.style.overflow = 'hidden';
+  }
+
+  function setThumbPosition(el) {
+    el.style.position = 'absolute';
+    el.style.top = 'auto';
+    el.style.left = 'auto';
+    el.style.bottom = '10px';
+    el.style.right = '10px';
+    el.style.width = '25vw';
+    el.style.height = '20vh';
+    el.style.borderRadius = '8px';
+    el.style.zIndex = '2';
+    el.style.boxSizing = 'border-box';
+    el.style.cursor = 'pointer';
+    el.style.overflow = 'hidden';
+  }
+
+  function updateLayout() {
+    if (!delayProcessActive) {
+      setMainPosition(liveVideo);
+      liveVideo.style.display = 'block';
+      liveVideo.style.border = 'none';
+      delayedVideo.style.display = 'none';
+      frozenView.style.display = 'none';
+      recBtn.style.display = 'none';
+      cancelBtn.style.display = 'none';
+      return;
+    }
+
+    const showFrozen = !delayReady;
+
+    if (mainIsLive) {
+      // Big view: live
+      setMainPosition(liveVideo);
+      liveVideo.style.display = 'block';
+      liveVideo.style.border = 'none';
+
+      if (showFrozen) {
+        // Thumb: frozen frame with countdown
+        setThumbPosition(frozenView);
+        frozenView.style.display = 'flex';
+        frozenView.style.border = '4px solid yellow';
+        delayedVideo.style.display = 'none';
+      } else {
+        // Thumb: delayed video
+        setThumbPosition(delayedVideo);
+        delayedVideo.style.display = 'block';
+        delayedVideo.style.border = '4px solid yellow';
+        frozenView.style.display = 'none';
+      }
+    } else {
+      // Thumb: live
+      setThumbPosition(liveVideo);
+      liveVideo.style.display = 'block';
+      liveVideo.style.border = '2px solid white';
+
+      if (showFrozen) {
+        // Big view: frozen frame with countdown
+        setMainPosition(frozenView);
+        frozenView.style.display = 'flex';
+        frozenView.style.border = '4px solid yellow';
+        delayedVideo.style.display = 'none';
+      } else {
+        // Big view: delayed video
+        setMainPosition(delayedVideo);
+        delayedVideo.style.display = 'block';
+        delayedVideo.style.border = '4px solid yellow';
+        frozenView.style.display = 'none';
+      }
+    }
+
+    // Countdown text size adapts to which slot frozenView occupies
+    if (showFrozen) {
+      const frozenIsMain = !mainIsLive;
+      countdownText.style.fontSize = frozenIsMain ? '20vmin' : '8vh';
+    }
+
+    // Zoom and camera-switch controls: visible only when live is the big view
+    zoomControls.style.display = mainIsLive ? 'flex' : 'none';
+    switchBtn.style.display = mainIsLive ? 'flex' : 'none';
+
+    // REC button: visible only when big=delayed AND delayed stream is ready
+    const showRec = !mainIsLive && delayReady;
+    recBtn.style.display = showRec ? 'block' : 'none';
+    if (!showRec && !isRecording && !readyToSaveBlob) {
+      cancelBtn.style.display = 'none';
+    }
+
+  }
+
+  // ========================================================================
+  // Delay process
+  // ========================================================================
+
+  function beginDelayProcess() {
+    delayProcessActive = true;
+    delayGeneration++;
+    const gen = delayGeneration;
+    activeLoopGeneration += 1;
+    lastLoopChunkBlob = null;
+
+    // Reset state
+    if (countdownInterval) clearInterval(countdownInterval);
+    stopFirstChunkRecording();
+    countdownDone = false;
+    firstChunkReady = false;
+    firstChunkBlob = null;
+    delayReady = false;
+
+    // Hide copy-link button once delay process starts
+    if (copyLinkBtn) copyLinkBtn.style.display = 'none';
+
+    // Capture first frame for frozen view background
+    captureFirstFrame();
+
+    // Start recording the first chunk
+    firstChunkPromise = startFirstChunkRecording();
+    firstChunkPromise.then(blob => {
+      if (gen !== delayGeneration) return;
+      firstChunkBlob = blob;
+      firstChunkReady = true;
+      tryStartDelayed();
+    });
+
+    // Auto-stop recording after delayMs
+    setTimeout(() => {
+      if (gen !== delayGeneration) return;
+      stopFirstChunkRecording();
+    }, delayMs);
+
+    // Countdown
+    countdownRemaining = Math.ceil(delayMs / 1000);
+    updateCountdownDisplay();
+    countdownInterval = setInterval(() => {
+      if (gen !== delayGeneration) { clearInterval(countdownInterval); return; }
+      countdownRemaining--;
+      if (countdownRemaining <= 0) {
+        countdownRemaining = 0;
+        clearInterval(countdownInterval);
+        countdownDone = true;
+        updateCountdownDisplay();
+        tryStartDelayed();
+        return;
+      }
+      updateCountdownDisplay();
+    }, 1000);
+
+    updateLayout();
+  }
+
+  function captureFirstFrame() {
+    try {
+      const vw = liveVideo.videoWidth || 640;
+      const vh = liveVideo.videoHeight || 480;
+      const maxDim = 1280;
+      const scale = Math.min(maxDim / vw, maxDim / vh, 1);
+      const w = Math.round(vw * scale);
+      const h = Math.round(vh * scale);
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      c.getContext('2d').drawImage(liveVideo, 0, 0, w, h);
+      frozenView.style.backgroundImage = `url(${c.toDataURL('image/jpeg', 0.9)})`;
+    } catch (_) {
+      frozenView.style.backgroundColor = '#333';
+    }
+  }
+
+  function updateCountdownDisplay() {
+    countdownText.textContent = countdownRemaining > 0 ? String(countdownRemaining) : '';
+  }
+
+  function tryStartDelayed() {
+    if (delayReady) return;
+    if (!countdownDone || !firstChunkReady) return;
+    delayReady = true;
+
+    recordingStrategy = DelayCamLogic.chooseRecordingStrategy({
+      canCaptureElement: !!(delayedVideo && delayedVideo.captureStream),
+      canCaptureCanvas: !!(typeof HTMLCanvasElement !== 'undefined' &&
+        HTMLCanvasElement.prototype && HTMLCanvasElement.prototype.captureStream)
+    });
+
+    updateLayout();
+    const loopGeneration = activeLoopGeneration;
+    playAndRecordLoop(firstChunkBlob, delayMs, loopGeneration);
+  }
+
+  // ========================================================================
+  // First-chunk recording (for delay mechanism)
+  // ========================================================================
+
+  function startFirstChunkRecording() {
+    return new Promise(resolve => {
+      const recorder = createRecorder(stream, { forLoop: true });
+      let blob = null;
+      recorder.ondataavailable = e => {
+        if (e.data && e.data.size > 0) blob = e.data;
+      };
+      recorder.onerror = () => resolve(null);
+      recorder.onstop = () => {
+        if (blob && blob.size > 0) lastLoopChunkBlob = blob;
+        resolve(blob);
+      };
+      try { recorder.start(); } catch (_) { resolve(null); return; }
+      firstRecorder = recorder;
+    });
+  }
+
+  function stopFirstChunkRecording() {
+    if (firstRecorder && firstRecorder.state === 'recording') {
+      try { firstRecorder.stop(); } catch (_) {}
+    }
+  }
+
+  // ========================================================================
+  // Chunk recording for playback loop
+  // ========================================================================
+
+  async function recordChunk(durationMs, generationId) {
+    return new Promise(resolve => {
+      if (generationId !== activeLoopGeneration) {
+        resolve(null);
+        return;
+      }
+      const recorder = createRecorder(stream, { forLoop: true });
+      const chunks = [];
+      let stopped = false;
+      let stopTimer = null;
+      let settleTimer = null;
+      function done(blob) {
+        if (stopped) return;
+        stopped = true;
+        if (stopTimer) clearTimeout(stopTimer);
+        if (settleTimer) clearTimeout(settleTimer);
+        resolve(blob || null);
+      }
+      recorder.ondataavailable = e => {
+        if (e.data && e.data.size > 0) chunks.push(e.data);
+      };
+      recorder.onerror = () => done(makeBlobFromChunks(chunks, recorder.mimeType));
+      recorder.onstop = () => done(makeBlobFromChunks(chunks, recorder.mimeType));
+      try { recorder.start(250); } catch (_) { done(null); return; }
+      stopTimer = setTimeout(() => {
+        try { recorder.requestData(); } catch (_) {}
+        settleTimer = setTimeout(() => {
+          if (recorder.state === 'recording') {
+            try { recorder.stop(); } catch (_) { done(makeBlobFromChunks(chunks, recorder.mimeType)); }
+          }
+        }, 120);
+      }, durationMs);
+    });
+  }
+
+  // ========================================================================
+  // Playback loop
+  // ========================================================================
+
+  async function playAndRecordLoop(initialChunk, durationMs, generationId) {
+    let currentChunk = initialChunk;
+    if (currentChunk && currentChunk.size > 0) lastLoopChunkBlob = currentChunk;
+    let nextChunkPromise = recordChunk(durationMs, generationId);
+
+    async function playChunk(blob) {
+      return new Promise(resolve => {
+        if (!(blob && blob.size > 0)) { resolve(); return; }
+        const url = URL.createObjectURL(blob);
+        let finished = false;
+        const clean = () => {
+          if (finished) return;
+          finished = true;
+          try { delayedVideo.onloadeddata = null; } catch (_) {}
+          try { delayedVideo.onended = null; } catch (_) {}
+          try { delayedVideo.onerror = null; } catch (_) {}
+          try { URL.revokeObjectURL(url); } catch (_) {}
+          resolve();
+        };
+        delayedVideo.src = url;
+        delayedVideo.onloadeddata = () => { void delayedVideo.play().catch(() => {}); };
+        delayedVideo.onended = clean;
+        delayedVideo.onerror = clean;
+      });
+    }
+
+    while (generationId === activeLoopGeneration) {
+      await playChunk(currentChunk);
+      if (generationId !== activeLoopGeneration) break;
+      let nextChunk = await nextChunkPromise;
+      if (generationId !== activeLoopGeneration) break;
+      if (!(nextChunk && nextChunk.size > 0)) {
+        nextChunk = await recordChunk(durationMs, generationId);
+      }
+      if (!(nextChunk && nextChunk.size > 0)) continue;
+      currentChunk = nextChunk;
+      lastLoopChunkBlob = currentChunk;
+      nextChunkPromise = recordChunk(durationMs, generationId);
+    }
+  }
+
+  // ========================================================================
+  // User recording – element-capture strategy
+  // ========================================================================
+
+  function startElementCaptureRecording() {
+    const srcStream = delayedVideo.captureStream ? delayedVideo.captureStream() : null;
+    if (!srcStream) return false;
+    elementRecorderChunks = [];
+    const recStream = new MediaStream();
+    try { srcStream.getVideoTracks().forEach(t => recStream.addTrack(t)); } catch (_) {}
+    const silentTrack = ensureSilenceAudioTrack();
+    if (silentTrack) {
+      try { recStream.addTrack(silentTrack); } catch (_) {}
+    }
+    let recorder;
+    try {
+      recorder = createRecorder(recStream, { forLoop: false });
+    } catch (_) {
+      stopTracksSafe(srcStream);
+      stopTracksSafe(recStream);
+      cleanupSilenceAudioTrack();
+      return false;
+    }
+    elementRecorderStream = recStream;
+    elementRecorder = recorder;
+    recorder.ondataavailable = e => {
+      if (e.data && e.data.size > 0) elementRecorderChunks.push(e.data);
+    };
+    recorder.onstop = () => {
+      if (elementRecorderStopResolve) {
+        elementRecorderStopResolve(makeBlobFromChunks(elementRecorderChunks, recorder.mimeType));
+        elementRecorderStopResolve = null;
+      }
+      stopTracksSafe(srcStream);
+      stopTracksSafe(elementRecorderStream);
+      elementRecorderStream = null;
+      elementRecorder = null;
+    };
+    recorder.onerror = () => {
+      if (elementRecorderStopResolve) {
+        elementRecorderStopResolve(makeBlobFromChunks(elementRecorderChunks, recorder.mimeType));
+        elementRecorderStopResolve = null;
+      }
+    };
+    try { recorder.start(USER_RECORDING_TIMESLICE_MS); } catch (_) {
+      stopTracksSafe(srcStream);
+      stopTracksSafe(elementRecorderStream);
+      elementRecorderStream = null;
+      elementRecorder = null;
+      cleanupSilenceAudioTrack();
+      return false;
+    }
+    return true;
+  }
+
+  async function stopElementCaptureRecording() {
+    const recorder = elementRecorder;
+    if (!recorder || recorder.state !== 'recording') {
+      stopTracksSafe(elementRecorderStream);
+      elementRecorderStream = null;
+      cleanupSilenceAudioTrack();
+      return null;
+    }
+    const blob = await new Promise(resolve => {
+      let settled = false;
+      let fallbackTimer = null;
+      elementRecorderStopResolve = result => {
+        if (settled) return;
+        settled = true;
+        if (fallbackTimer) clearTimeout(fallbackTimer);
+        resolve(result || makeBlobFromChunks(elementRecorderChunks, recorder.mimeType));
+      };
+      fallbackTimer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        elementRecorderStopResolve = null;
+        resolve(makeBlobFromChunks(elementRecorderChunks, recorder.mimeType));
+      }, RECORDER_STOP_TIMEOUT_MS);
+      try { recorder.requestData(); } catch (_) {}
+      stopRecorderWithTimeout(recorder, RECORDER_STOP_TIMEOUT_MS).catch(() => {});
+    });
+    cleanupSilenceAudioTrack();
+    return blob;
+  }
+
+  // ========================================================================
+  // User recording – canvas-capture strategy
+  // ========================================================================
+
+  function startCanvasCaptureRecording() {
+    if (!delayedVideo) return false;
+    const sourceWidth = delayedVideo.videoWidth || 1280;
+    const sourceHeight = delayedVideo.videoHeight || 720;
+    const maxWidth = 1280;
+    const maxHeight = 720;
+    const scl = Math.min(maxWidth / sourceWidth, maxHeight / sourceHeight, 1);
+    const width = Math.max(2, Math.floor(sourceWidth * scl));
+    const height = Math.max(2, Math.floor(sourceHeight * scl));
+    if (!canvasEl) {
+      canvasEl = document.createElement('canvas');
+      canvasCtx = canvasEl.getContext('2d');
+    }
+    canvasEl.width = width;
+    canvasEl.height = height;
+
+    function drawFrame() {
+      try {
+        const sw = delayedVideo.videoWidth || sourceWidth;
+        const sh = delayedVideo.videoHeight || sourceHeight;
+        if (sw > 0 && sh > 0 && canvasCtx) {
+          canvasCtx.drawImage(delayedVideo, 0, 0, canvasEl.width, canvasEl.height);
+        }
+      } catch (_) {}
+      canvasRafId = requestAnimationFrame(drawFrame);
+    }
+    canvasRafId = requestAnimationFrame(drawFrame);
+
+    canvasStream = canvasEl.captureStream ? canvasEl.captureStream(30) : null;
+    if (!canvasStream) {
+      if (canvasRafId) {
+        cancelAnimationFrame(canvasRafId);
+        canvasRafId = null;
+      }
+      return false;
+    }
+
+    canvasRecorderChunks = [];
+    const recStream = new MediaStream();
+    try { canvasStream.getVideoTracks().forEach(t => recStream.addTrack(t)); } catch (_) {}
+    const silentTrack = ensureSilenceAudioTrack();
+    if (silentTrack) {
+      try { recStream.addTrack(silentTrack); } catch (_) {}
+    }
+    let recorder;
+    try {
+      recorder = createRecorder(recStream, { forLoop: false });
+    } catch (_) {
+      stopTracksSafe(canvasStream);
+      stopTracksSafe(recStream);
+      if (canvasRafId) {
+        cancelAnimationFrame(canvasRafId);
+        canvasRafId = null;
+      }
+      cleanupSilenceAudioTrack();
+      return false;
+    }
+    canvasRecorderStream = recStream;
+    canvasRecorder = recorder;
+    recorder.ondataavailable = e => {
+      if (e.data && e.data.size > 0) canvasRecorderChunks.push(e.data);
+    };
+    recorder.onstop = () => {
+      if (canvasRecorderStopResolve) {
+        canvasRecorderStopResolve(makeBlobFromChunks(canvasRecorderChunks, recorder.mimeType));
+        canvasRecorderStopResolve = null;
+      }
+      stopTracksSafe(canvasRecorderStream);
+      canvasRecorderStream = null;
+      canvasRecorder = null;
+    };
+    recorder.onerror = () => {
+      if (canvasRecorderStopResolve) {
+        canvasRecorderStopResolve(makeBlobFromChunks(canvasRecorderChunks, recorder.mimeType));
+        canvasRecorderStopResolve = null;
+      }
+    };
+    try { recorder.start(USER_RECORDING_TIMESLICE_MS); } catch (_) {
+      stopTracksSafe(canvasStream);
+      stopTracksSafe(canvasRecorderStream);
+      canvasRecorderStream = null;
+      canvasRecorder = null;
+      if (canvasRafId) {
+        cancelAnimationFrame(canvasRafId);
+        canvasRafId = null;
+      }
+      cleanupSilenceAudioTrack();
+      return false;
+    }
+    return true;
+  }
+
+  async function stopCanvasCaptureRecording() {
+    if (canvasRafId) {
+      cancelAnimationFrame(canvasRafId);
+      canvasRafId = null;
+    }
+    const recorder = canvasRecorder;
+    if (!recorder || recorder.state !== 'recording') {
+      stopTracksSafe(canvasStream);
+      canvasStream = null;
+      stopTracksSafe(canvasRecorderStream);
+      canvasRecorderStream = null;
+      cleanupSilenceAudioTrack();
+      return null;
+    }
+    const blob = await new Promise(resolve => {
+      let settled = false;
+      let fallbackTimer = null;
+      canvasRecorderStopResolve = result => {
+        if (settled) return;
+        settled = true;
+        if (fallbackTimer) clearTimeout(fallbackTimer);
+        resolve(result || makeBlobFromChunks(canvasRecorderChunks, recorder.mimeType));
+      };
+      fallbackTimer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        canvasRecorderStopResolve = null;
+        resolve(makeBlobFromChunks(canvasRecorderChunks, recorder.mimeType));
+      }, RECORDER_STOP_TIMEOUT_MS);
+      try { recorder.requestData(); } catch (_) {}
+      stopRecorderWithTimeout(recorder, RECORDER_STOP_TIMEOUT_MS).catch(() => {});
+    });
+    stopTracksSafe(canvasStream);
+    canvasStream = null;
+    cleanupSilenceAudioTrack();
+    return blob;
+  }
+
+  // ========================================================================
+  // Toggle user recording (REC / STOP / SHARE|SAVE)
+  // ========================================================================
+
+  async function toggleRecording() {
+    if (!isRecording) {
+      // If a previous recording is ready to save, treat this click as the save gesture
+      if (readyToSaveBlob && readyToSaveBlob.size > 0) {
+        const blob = readyToSaveBlob;
+        readyToSaveBlob = null;
+        const ext = getExtensionFromMime(blob.type);
+        const filename = `delayed-recording-${Date.now()}.${ext}`;
+        try {
+          recBtn.disabled = true;
+          await shareBlobOrSave(blob, filename, 'Delayed recording');
+        } finally {
+          recBtn.disabled = false;
+          recBtn.textContent = 'REC';
+          try { cancelBtn.style.display = 'none'; } catch (_) {}
+        }
+        return;
+      }
+
+      isRecording = true;
+      recBtn.textContent = 'STOP';
+      try { recBtn.classList.add('recording'); } catch (_) {}
+      recordDot.style.display = 'block';
+      try { cancelBtn.style.display = 'inline-block'; } catch (_) {}
+      recordStartTime = performance.now();
+      let started = false;
+      if (recordingStrategy === 'element-capture' && delayedVideo.captureStream) {
+        started = startElementCaptureRecording();
+        if (!started) started = startCanvasCaptureRecording();
+      } else if (recordingStrategy === 'canvas-capture') {
+        started = startCanvasCaptureRecording();
+        if (!started && delayedVideo.captureStream) started = startElementCaptureRecording();
+      }
+      if (!started) {
+        recBtn.textContent = 'REC';
+        try { recBtn.classList.remove('recording'); } catch (_) {}
+        recordDot.style.display = 'none';
+        try { cancelBtn.style.display = 'none'; } catch (_) {}
+        isRecording = false;
+      }
+      return;
+    }
+
+    isRecording = false;
+    recBtn.textContent = '…';
+    try { recBtn.disabled = true; } catch (_) {}
+    recordDot.style.display = 'none';
+    try { recBtn.classList.remove('recording'); } catch (_) {}
+
+    let blob = null;
+    const recordStopTime = performance.now();
+    if (recordingStrategy === 'element-capture') {
+      blob = await stopElementCaptureRecording();
+      if (!(blob && blob.size > 0)) blob = await stopCanvasCaptureRecording();
+    } else if (recordingStrategy === 'canvas-capture') {
+      blob = await stopCanvasCaptureRecording();
+      if (!(blob && blob.size > 0)) blob = await stopElementCaptureRecording();
+    }
+    if (!(blob && blob.size > 0) && lastLoopChunkBlob && lastLoopChunkBlob.size > 0) {
+      blob = lastLoopChunkBlob;
+    }
+
+    if (blob && blob.size > 0) {
+      const actualDurationMs = recordStopTime - recordStartTime;
+      blob = await DelayCamLogic.fixWebmDuration(blob, actualDurationMs);
+      readyToSaveBlob = blob;
+      const supportsShare = (function () {
+        try {
+          return typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+        } catch (_) { return false; }
+      }());
+      recBtn.textContent = supportsShare ? 'SHARE' : 'SAVE';
+    } else {
+      recBtn.textContent = 'REC';
+      try { cancelBtn.style.display = 'none'; } catch (_) {}
+    }
+    try { recBtn.disabled = false; } catch (_) {}
+  }
+
+  // ========================================================================
+  // Event handlers
+  // ========================================================================
+
+  // Thumbnail click: toggle which feed is in big view vs thumbnail.
+  // liveVideo is the thumbnail when mainIsLive is false.
+  liveVideo.addEventListener('click', () => {
+    if (!mainIsLive && delayProcessActive) {
+      mainIsLive = true;
+      updateLayout();
+    }
+  });
+
+  // delayedVideo is the thumbnail when mainIsLive is true and delayReady.
+  delayedVideo.addEventListener('click', () => {
+    if (mainIsLive && delayProcessActive) {
+      mainIsLive = false;
+      updateLayout();
+    }
+  });
+
+  // frozenView is the thumbnail when mainIsLive is true and !delayReady.
+  frozenView.addEventListener('click', () => {
+    if (mainIsLive && delayProcessActive) {
+      mainIsLive = false;
+      updateLayout();
+    }
+  });
+
+  // Delay label: click to change delay value via prompt
+  delayLabel.addEventListener('click', () => {
+    const currentSeconds = Math.round(delayMs / 1000);
+    const input = prompt('Set delay in seconds:', String(currentSeconds));
+    if (input === null) return;
+    const newSeconds = parseInt(input, 10);
+    if (isNaN(newSeconds) || newSeconds < 1) return;
+
+    delayMs = newSeconds * 1000;
+    try { localStorage.setItem(DELAY_STORAGE_KEY, String(newSeconds)); } catch (_) {}
+    updateDelayLabel();
+
+    if (!delayReady && delayProcessActive) {
+      // Restart countdown and recording with the new delay
+      beginDelayProcess();
+    }
+  });
+
+  // Switch camera
+  switchBtn.addEventListener('click', async () => {
+    currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+    await startCamera();
+  });
+
+  // Share/Copy app link button
+  if (copyLinkBtn) {
+    const HARD_CODED_APP_URL = 'https://mikaelmayer.github.io/apps/videodelay/';
+    const canNativeShareLink = (() => {
+      try {
+        return typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+      } catch (_) { return false; }
+    })();
+
+    try {
+      copyLinkBtn.style.display = 'inline-block';
+      copyLinkBtn.textContent = canNativeShareLink ? 'share app link 🔗' : 'copy app link 🔗';
+      copyLinkBtn.setAttribute('aria-label', canNativeShareLink ? 'Share app link' : 'Copy app link');
+    } catch (_) {}
+
+    copyLinkBtn.addEventListener('click', async () => {
+      const url = HARD_CODED_APP_URL;
+      try {
+        if (canNativeShareLink) {
+          try {
+            await navigator.share({
+              url,
+              title: 'Capture key moments without filling your phone',
+              text: 'Record key soccer moments or catch shooting stars with a delayed camera.'
+            });
+            return;
+          } catch (_) {
+            // fall through to clipboard
+          }
+        }
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(url);
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = url;
+          ta.setAttribute('readonly', '');
+          ta.style.position = 'absolute';
+          ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+        const previous = copyLinkBtn.textContent;
+        copyLinkBtn.textContent = 'copied! ✅';
+        setTimeout(() => { try { copyLinkBtn.textContent = previous || (canNativeShareLink ? 'share app link 🔗' : 'copy app link 🔗'); } catch (_) {} }, 1500);
+      } catch (_) {
+        // no-op
+      }
+    });
+  }
+
+  // REC button
+  recBtn.addEventListener('click', () => { void toggleRecording(); });
+
+  // Picture button
+  if (picBtn) {
+    picBtn.addEventListener('click', () => { void takePicture(); });
+  }
+
+  // Cancel button: stop current recording and reset UI
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', async () => {
+      if (isRecording) {
+        isRecording = false;
+        recBtn.textContent = '…';
+        try { recBtn.disabled = true; } catch (_) {}
+        recordDot.style.display = 'none';
+        try { recBtn.classList.remove('recording'); } catch (_) {}
+        if (recordingStrategy === 'element-capture') {
+          await stopElementCaptureRecording();
+        } else if (recordingStrategy === 'canvas-capture') {
+          await stopCanvasCaptureRecording();
+        }
+      }
+      readyToSaveBlob = null;
+      recBtn.textContent = 'REC';
+      try { recBtn.disabled = false; } catch (_) {}
+      try { cancelBtn.style.display = 'none'; } catch (_) {}
+    });
+  }
+
+  // ========================================================================
+  // Initialization
+  // ========================================================================
+
+  updateDelayLabel();
+  updateLayout();
+  startCamera();
+
+  if ('serviceWorker' in navigator) {
+    try { navigator.serviceWorker.register('service-worker.js'); } catch (_) {}
+  }
+
+  // ========================================================================
+  // Zoom controls
+  // ========================================================================
+
+  const ZOOM_STEPS = [1, 1.4, 2, 2.8, 4];
+
+  function labelForZoom(scale) {
+    const fixed = Number.isInteger(scale) ? String(scale) : scale.toFixed(1);
+    return `${fixed}x`;
+  }
+
+  function markSelectedZoom(scale) {
+    if (!zoomControls) return;
+    const btns = zoomControls.querySelectorAll('.zoomBtn');
+    btns.forEach(btn => {
+      const val = Number(btn.getAttribute('data-zoom') || '1');
+      if (Math.abs(val - scale) < 1e-6) btn.classList.add('selected');
+      else btn.classList.remove('selected');
+    });
+  }
+
+  let zoomAnimFrameId = null;
+
+  function getCurrentVideoTrack() {
+    try {
+      return stream && stream.getVideoTracks && stream.getVideoTracks()[0] ? stream.getVideoTracks()[0] : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function applyPtzZoom(scale) {
+    const track = getCurrentVideoTrack();
+    if (!track || typeof track.getCapabilities !== 'function') return;
+    let caps;
+    try { caps = track.getCapabilities(); } catch (_) { return; }
+    if (!caps || caps.zoom == null) return;
+    const zoomCaps = typeof caps.zoom === 'number' ? { min: 1, max: caps.zoom } : caps.zoom;
+    const min = Number.isFinite(zoomCaps.min) ? zoomCaps.min : 1;
+    const max = Number.isFinite(zoomCaps.max) ? zoomCaps.max : Math.max(2, scale);
+    const clamped = Math.min(Math.max(scale, min), max);
+    try {
+      track.applyConstraints({ advanced: [{ zoom: clamped }] });
+    } catch (_) {
+      try { track.applyConstraints({ zoom: clamped }); } catch (_) {}
+    }
+  }
+
+  function easeInOut(t) {
+    return t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t);
+  }
+
+  function applyZoom(scale) {
+    if (zoomAnimFrameId) { cancelAnimationFrame(zoomAnimFrameId); zoomAnimFrameId = null; }
+
+    markSelectedZoom(scale);
+    currentZoomScale = scale;
+
+    const startZoom = lastAppliedZoomScale;
+    if (Math.abs(startZoom - scale) < 1e-6) {
+      applyPtzZoom(scale);
+      return;
+    }
+
+    const logStart = Math.log2(startZoom);
+    const logTarget = Math.log2(scale);
+    const logDist = Math.abs(logTarget - logStart);
+    const duration = Math.max(100, logDist * 500);
+    const startTime = performance.now();
+
+    function tick(now) {
+      const t = Math.min(1, (now - startTime) / duration);
+      const eased = easeInOut(t);
+      const logCurrent = logStart + (logTarget - logStart) * eased;
+      applyPtzZoom(Math.pow(2, logCurrent));
+      if (t < 1) {
+        zoomAnimFrameId = requestAnimationFrame(tick);
+      } else {
+        zoomAnimFrameId = null;
+        lastAppliedZoomScale = scale;
+      }
+    }
+    zoomAnimFrameId = requestAnimationFrame(tick);
+  }
+
+  function setupZoomControls() {
+    if (!zoomControls) return;
+    zoomControls.innerHTML = '';
+    ZOOM_STEPS.forEach(scale => {
+      const btn = document.createElement('button');
+      btn.className = 'zoomBtn';
+      btn.type = 'button';
+      btn.setAttribute('data-zoom', String(scale));
+      btn.textContent = labelForZoom(scale);
+      btn.addEventListener('click', () => { applyZoom(scale); });
+      zoomControls.appendChild(btn);
+    });
+    markSelectedZoom(currentZoomScale);
+  }
+
+  setupZoomControls();
+}());

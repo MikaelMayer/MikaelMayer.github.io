@@ -1,0 +1,32 @@
+{
+  "name": "workspace",
+  "version": "1.0.0",
+  "description": "When asked to create any web application, follow these steps:",
+  "main": "playwright.config.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "reflex4you:version": "node scripts/reflex4you-version.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MikaelMayer/MikaelMayer.github.io.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/MikaelMayer/MikaelMayer.github.io/issues"
+  },
+  "homepage": "https://github.com/MikaelMayer/MikaelMayer.github.io#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.48.2",
+    "http-server": "^14.1.1"
+  },
+  "dependencies": {
+    "@sparticuz/chromium": "^143.0.4",
+    "playwright-core": "^1.58.1"
+  }
+}
