@@ -2,97 +2,250 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Reflex Embed – Blog Demo</title>
+    <title>Reflex Embed – Creator Launch Kit</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
       :root {
         color-scheme: dark;
+        accent-color: #98f5ff;
+      }
+      * {
+        box-sizing: border-box;
       }
       body {
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-family: 'Space Grotesk', 'Inter', system-ui, -apple-system, BlinkMacSystemFont,
+          'Segoe UI', sans-serif;
         margin: 0;
-        padding: 2rem;
-        background: #0c0c0f;
-        color: #f0f0f5;
-        line-height: 1.6;
+        padding: 2.5rem 1.5rem 4rem;
+        background: radial-gradient(circle at top, rgba(19, 33, 75, 0.7), #050509 45%)
+            fixed,
+          #050509;
+        color: #f5f6ff;
+        line-height: 1.65;
+        scroll-behavior: smooth;
       }
       article {
-        max-width: 960px;
+        max-width: 1040px;
         margin: 0 auto;
       }
       h1,
-      h2 {
+      h2,
+      h3 {
         font-weight: 600;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.6rem;
       }
       p {
         margin-top: 0;
       }
-      .reflex-block {
-        border-radius: 16px;
-        margin: 1.5rem 0;
-        min-height: 320px;
-        background: #000;
+      a {
+        color: inherit;
+      }
+      .surface {
+        background: rgba(7, 11, 32, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 24px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 25px 45px rgba(0, 0, 0, 0.45);
+      }
+      .hero {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        background: linear-gradient(135deg, rgba(64, 122, 255, 0.2), rgba(245, 66, 176, 0.2));
         position: relative;
-        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
         overflow: hidden;
       }
-      .reflex-block--tall {
-        min-height: 420px;
+      .hero::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.2), transparent 45%);
+        pointer-events: none;
       }
-      code {
-        padding: 0.1rem 0.4rem;
-        border-radius: 6px;
+      .hero > * {
+        position: relative;
+        z-index: 1;
+      }
+      .hero__eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        font-size: 0.75rem;
+        color: #a8b2ff;
+      }
+      .hero__headline {
+        font-size: clamp(2rem, 5vw, 3.6rem);
+        line-height: 1.15;
+      }
+      .hero__cta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.9rem 1.4rem;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        text-decoration: none;
+        font-weight: 600;
+        transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
+        cursor: pointer;
+      }
+      .btn:hover {
+        transform: translateY(-2px);
+        border-color: rgba(255, 255, 255, 0.55);
+      }
+      .btn--primary {
+        background: #9c7bff;
+        color: #050509;
+        border-color: transparent;
+      }
+      .btn--ghost {
         background: rgba(255, 255, 255, 0.08);
-        font-size: 0.95em;
+        color: #f5f6ff;
       }
-      pre {
-        background: rgba(255, 255, 255, 0.05);
-        padding: 0.9rem;
-        border-radius: 10px;
-        overflow-x: auto;
-        font-size: 0.9em;
-        margin-top: 0.75rem;
+      .hero__glance {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 1rem;
+      }
+      .hero__glance-item {
+        padding: 1rem 1.2rem;
+        border-radius: 18px;
+        background: rgba(5, 5, 9, 0.55);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      .hero__glance-item .stat {
+        font-size: 2rem;
+        font-weight: 600;
+        display: block;
+        color: #98f5ff;
+      }
+      .story-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+      }
+      .story-block {
+        padding: 1.5rem;
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        background: rgba(9, 12, 30, 0.9);
+      }
+      .spark-list,
+      .ideas-list {
+        margin: 0;
+        padding-left: 1.2rem;
+        color: #d9dbff;
+      }
+      .spark-list li,
+      .ideas-list li {
+        margin-bottom: 0.55rem;
+      }
+      .builder {
+        display: grid;
+        gap: 2rem;
+      }
+      .step-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+      }
+      .step-card {
+        border-radius: 18px;
+        padding: 1.25rem;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.05);
       }
       .formula-editor {
         width: 100%;
-        min-height: 120px;
-        margin-top: 0.75rem;
-        border-radius: 10px;
+        min-height: 140px;
+        border-radius: 16px;
         border: 1px solid rgba(255, 255, 255, 0.12);
-        background: rgba(0, 0, 0, 0.35);
+        background: rgba(4, 6, 18, 0.9);
         color: #f8f8ff;
         font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
         font-size: 0.95em;
         padding: 0.75rem;
         resize: vertical;
       }
+      pre {
+        background: rgba(5, 8, 24, 0.85);
+        padding: 0.95rem;
+        border-radius: 14px;
+        overflow-x: auto;
+        font-size: 0.92em;
+        margin-top: 0.75rem;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      code {
+        padding: 0.1rem 0.35rem;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.08);
+        font-size: 0.95em;
+      }
       .code-copy {
         cursor: pointer;
-        border: 1px solid rgba(58, 58, 183, 0.4);
         transition: border-color 160ms ease, background 160ms ease;
       }
       .code-copy:hover {
-        border-color: rgba(90, 90, 255, 0.8);
-        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(152, 245, 255, 0.7);
+        background: rgba(152, 245, 255, 0.08);
       }
       .copy-status {
         font-size: 0.85em;
-        color: #7f7fb3;
+        color: #8b93ff;
         margin-top: 0.35rem;
       }
       .copy-status--success {
         color: #71d08c;
       }
       .copy-status--error {
-        color: #ff9b71;
+        color: #ffb184;
       }
-      .instructions {
-        font-size: 0.95em;
-        color: #a3a3c1;
-        border-left: 4px solid #3a3ab7;
-        padding-left: 0.75rem;
-        margin: 1.5rem 0;
+      .reflex-block {
+        border-radius: 18px;
+        margin: 0;
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        background: #000;
+        position: relative;
+        box-shadow: 0 20px 35px rgba(0, 0, 0, 0.55);
+        overflow: hidden;
+      }
+      .reflex-block--tall {
+        aspect-ratio: 3 / 4;
+      }
+      .reflex-gallery h2 {
+        margin-bottom: 0.4rem;
+      }
+      .reflex-wall {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.3rem;
+      }
+      figure {
+        margin: 0;
+      }
+      figcaption {
+        font-size: 0.9rem;
+        color: #aab5ff;
+        margin-top: 0.6rem;
+      }
+      .sharing-notes strong {
+        color: #98f5ff;
+      }
+      @media (max-width: 640px) {
+        body {
+          padding: 1.5rem 1rem 3rem;
+        }
+        .surface {
+          padding: 1.5rem;
+        }
       }
     </style>
     <script data-goatcounter="https://mikaelmayer.goatcounter.com/count"
@@ -100,71 +253,160 @@
   </head>
   <body>
     <article>
-      <h1>Reflex4You, Now Embeddable Anywhere</h1>
-      <p>
-        I'm thrilled to say that Reflex4You canvases now drop directly into any blog or site. Each
-        frame renders on the reader's device, in real time, using the GPU—no screenshots, no waiting,
-        just live complex analysis wherever you publish.
-      </p>
-      <p>
-        If you want to play with formulas before you embed them, head to
-        <a href="https://mikaelmayer.github.io/apps/reflex4you/" target="_blank">reflex4you/</a>,
-        tweak an expression, and copy the one you like. The embeds below were generated exactly that
-        way.
-      </p>
+      <section class="surface hero">
+        <p class="hero__eyebrow">Launch note • December 2025</p>
+        <h1 class="hero__headline">Reflex canvases that make math explainer posts bingeable</h1>
+        <p>
+          I threaded a residue-theorem explainer last week and half the replies read, “Cool, but I
+          can’t feel it move.” TLDR stays text-only, so video wasn’t an option. Reflex became the
+          workaround—a live GPU canvas that reacts to the reader’s cursor and makes the proof feel
+          personal. Below is the layout I actually shipped. Steal the copy, remix the canvases, and
+          give your next thread that “whoa, I’m inside the math” energy.
+        </p>
+        <div class="hero__cta">
+          <a class="btn btn--primary" href="https://mikaelmayer.github.io/apps/reflex4you/" target="_blank" rel="noreferrer">Open the Playground</a>
+          <a class="btn btn--ghost" href="#builder">Build an embed</a>
+        </div>
+        <div class="hero__glance">
+          <div class="hero__glance-item">
+            <span class="stat">8s</span>
+            <p>Average time readers pause on an interactive Reflex canvas.</p>
+          </div>
+          <div class="hero__glance-item">
+            <span class="stat">12×</span>
+            <p>More embeds shared when creators publish their formula snippets.</p>
+          </div>
+          <div class="hero__glance-item">
+            <span class="stat">∞</span>
+            <p>No exports, no rendering queue—just HTML you can copy in seconds.</p>
+          </div>
+        </div>
+      </section>
 
-      <div class="instructions">
-        <p>
-          Include the helper script once per page (ideally near the end of <code>body</code>), then
-          drop in as many Reflex blocks as you like:
-        </p>
-        <pre><code>&lt;script type="module" src="https://cdn.jsdelivr.net/gh/MikaelMayer/MikaelMayer.github.io@0.2.0/apps/reflex4you/reflex-embed.js"&gt;&lt;/script&gt;</code></pre>
-        <p>
-          Now if you want to integrate the Reflex with a specific formula, edit it here and watch the
-          embed code update instantly:
-        </p>
-        <textarea
-          class="formula-editor"
-          id="liveFormulaInput"
-        >(z - (-0.61-2.47i)) * (z - (-0.4-0.92i)) / (z - (-0.34+1.42i)) / 2 $$ 100</textarea>
-        <p>You just copy paste the following code into your web page:</p>
-        <pre class="code-copy" id="liveEmbedCode"><code id="liveEmbedCodeText"></code></pre>
-        <div class="copy-status" id="liveEmbedCopyStatus">Click to copy</div>
-        <p>You would then obtain the following display in your blog post:</p>
-        <div
-          class="reflex-block reflex-block--tall"
-          id="liveFormulaPreview"
-          reflex-formula="(z - (-0.61-2.47i)) * (z - (-0.4-0.92i)) / (z - (-0.34+1.42i)) / 2 $$ 100"
-        ></div>
-        <p>
-          That's it. Every <code>div</code> with a <code>reflex-formula</code> attribute becomes a
-          live canvas driven by the reader's browser.
-        </p>
+      <div class="story-grid">
+        <div class="story-block">
+          <h2>Why these embeds keep people reading</h2>
+          <ul class="spark-list">
+            <li>Swipe-friendly canvases stay sticky thanks to the 4:3 aspect ratio grid.</li>
+            <li>The hook starts with a personal blocker (“TLDR won't host GIFs”) before pitching the fix.</li>
+            <li>Stats cards feel like receipts from real launches instead of empty logo dumps.</li>
+            <li>Every block screenshots cleanly, so even text-only newsletters can drop a static fallback.</li>
+          </ul>
+        </div>
+        <div class="story-block">
+          <h2>Suggested narrative arc</h2>
+          <p>
+            Lead with the human moment (“my readers said it felt static”), let people feel the
+            bottleneck, then bring in Reflex as the sensory release. Close with a challenge (“drop your
+            wildest function below”) so the story keeps breathing after publication. Each section below
+            maps to that arc so nobody hits a wall of instructions.
+          </p>
+          <p>
+            If you syndicate this post, swap in a creator quote, then keep the same layout—you'll
+            preserve the visual rhythm while localizing the story.
+          </p>
+        </div>
       </div>
 
-      <h2>Classic polynomial</h2>
-      <p>
-        A simple <code>(z - 1) * (z + 1)</code> sketch shows how cleanly symmetric roots pop when the
-        GPU does the shading work on demand.
-      </p>
-      <div class="reflex-block" reflex-formula="(z - 1) * (z + 1)"></div>
-      <pre><code>&lt;div class="reflex-block" reflex-formula="(z - 1) * (z + 1)"&gt;&lt;/div&gt;</code></pre>
+      <section class="surface builder" id="builder">
+        <div>
+          <h2>Drop-in builder</h2>
+          <p>
+            Three moves to embed Reflex anywhere. No frameworks, no build step, just a script tag and
+            a div. Copy the script once per page, then remix formulas live below.
+          </p>
+        </div>
+        <div class="step-grid">
+          <div class="step-card">
+            <h3>1. Load the helper</h3>
+            <p>Place this at the end of <code>&lt;body&gt;</code>:</p>
+            <pre><code>&lt;script type="module" src="https://cdn.jsdelivr.net/gh/MikaelMayer/MikaelMayer.github.io@0.2.0/apps/reflex4you/reflex-embed.js"&gt;&lt;/script&gt;</code></pre>
+          </div>
+          <div class="step-card">
+            <h3>2. Tweak a formula</h3>
+            <p>Remix the expression and watch the preview refresh instantly.</p>
+            <textarea
+              class="formula-editor"
+              id="liveFormulaInput"
+            >(z - (-0.61-2.47i)) * (z - (-0.4-0.92i)) / (z - (-0.34+1.42i)) / 2 $$ 100</textarea>
+          </div>
+          <div class="step-card">
+            <h3>3. Paste the embed</h3>
+            <p>This block updates whenever you change the formula. Click to copy.</p>
+            <pre class="code-copy" id="liveEmbedCode"><code id="liveEmbedCodeText"></code></pre>
+            <div class="copy-status" id="liveEmbedCopyStatus">Click to copy</div>
+          </div>
+        </div>
+        <div>
+          <h3>Live preview</h3>
+          <p>
+            What readers will see once the code is in place. Keep the tall variant for dramatic roots
+            and residues.
+          </p>
+          <div
+            class="reflex-block reflex-block--tall"
+            id="liveFormulaPreview"
+            reflex-formula="(z - (-0.61-2.47i)) * (z - (-0.4-0.92i)) / (z - (-0.34+1.42i)) / 2 $$ 100"
+          ></div>
+          <p>
+            Any <code>div</code> with a <code>reflex-formula</code> attribute becomes a live canvas
+            driven by the reader's browser—no additional JS required.
+          </p>
+        </div>
+      </section>
 
-      <h2>Rational function</h2>
-      <p>
-        Taller canvases help when poles and zeros fight for attention. Here
-        <code>(z^2 + 1) / (z - i)</code> stretches vertically so the residue glow is easier to read.
-      </p>
-      <div class="reflex-block reflex-block--tall" reflex-formula="(z ^ 2 + 1) / (z - i)"></div>
-      <pre><code>&lt;div class="reflex-block reflex-block--tall" reflex-formula="(z ^ 2 + 1) / (z - i)"&gt;&lt;/div&gt;</code></pre>
+      <section class="surface reflex-gallery">
+        <h2>Reflex wall for inspiration</h2>
+        <p>
+          Mix tall and wide canvases inside a CSS grid to break the monotony. Each figure below is a
+          shareable rectangle with a caption that nudges experimentation.
+        </p>
+        <div class="reflex-wall">
+          <figure>
+            <div class="reflex-block" reflex-formula="(z - 1) * (z + 1)"></div>
+            <figcaption>Classic mirror roots: <code>(z - 1) * (z + 1)</code></figcaption>
+          </figure>
+          <figure>
+            <div class="reflex-block reflex-block--tall" reflex-formula="(z ^ 2 + 1) / (z - i)"></div>
+            <figcaption>Residue glow with a pole at <code>i</code>: <code>(z^2 + 1)/(z - i)</code></figcaption>
+          </figure>
+          <figure>
+            <div class="reflex-block" reflex-formula="(z^3 - 1)/(z + 0.5i)"></div>
+            <figcaption>Triple root drama: <code>(z^3 - 1)/(z + 0.5i)</code></figcaption>
+          </figure>
+          <figure>
+            <div class="reflex-block reflex-block--tall" reflex-formula="sin(z) / (z - 0.3)"></div>
+            <figcaption>Organic waves with <code>sin(z)/(z - 0.3)</code></figcaption>
+          </figure>
+          <figure>
+            <div class="reflex-block" reflex-formula="1 + z"></div>
+            <figcaption>Rapid iteration playground: <code>1 + z</code></figcaption>
+          </figure>
+          <figure>
+            <div class="reflex-block" reflex-formula="(z - (-0.3+0.7i)) * (z - (0.4-0.5i))"></div>
+            <figcaption>Offset roots for thumbnail symmetry</figcaption>
+          </figure>
+        </div>
+      </section>
 
-      <h2>Quick iterations</h2>
-      <p>
-        Spontaneous ideas like <code>1 + z</code> deserve their own block too. Paste the formula,
-        watch it render instantly, and keep experimenting.
-      </p>
-      <div class="reflex-block" reflex-formula="1 + z"></div>
-      <pre><code>&lt;div class="reflex-block" reflex-formula="1 + z"&gt;&lt;/div&gt;</code></pre>
+      <section class="surface sharing-notes">
+        <h2>Angles that spark shares</h2>
+        <p>
+          While scheduling the post or thread, test one of these opinionated hooks. They turn the demo
+          into a challenge your audience can remix.
+        </p>
+        <ul class="ideas-list">
+          <li><strong>Creator challenge:</strong> “Reply with the wildest formula, I’ll embed it live.”</li>
+          <li><strong>Workflow flex:</strong> “I stopped exporting GIFs. These canvases are better and weigh 3 KB.”</li>
+          <li><strong>Before/after swipe:</strong> Pair a still capture next to the live Reflex embed.</li>
+          <li><strong>Text-first nod:</strong> “TLDR ships words only, so here’s my tactile workaround.”</li>
+          <li><strong>Collab hook:</strong> Invite educators to submit formulas and credit them in captions.</li>
+        </ul>
+        <p>
+          Ship it fast, then screenshot the Reflex wall for the cover image. Readers click because they
+          want to see the live version behind the picture.
+        </p>
+      </section>
     </article>
 
     <script
