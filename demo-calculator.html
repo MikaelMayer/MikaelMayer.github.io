@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧮 Multi-Notation Calculator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            overflow: hidden; /* Disable scrolling */
+        }
+
+        .calculator {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+            max-width: 400px;
+            width: 100%;
+        }
+
+        .title {
+            text-align: center;
+            color: white;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            font-weight: 600;
+        }
+
+
+
+        .display {
+            background: rgba(0, 0, 0, 0.8);
+            color: #00ff88;
+            font-size: 1.8em;
+            font-weight: 300;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: right;
+            margin-bottom: 15px;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            word-break: break-all;
+            border: 1px solid rgba(0, 255, 136, 0.2);
+            font-family: 'Courier New', monospace;
+        }
+
+        .stack-display {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            height: 120px; /* Fixed height instead of min-height */
+            border: 1px solid rgba(0, 255, 136, 0.2);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-start;
+            justify-content: flex-end;
+            font-size: 1.8em;
+            overflow: hidden; /* Prevent internal scrolling */
+            align-content: flex-start;
+        }
+
+        .stack-item {
+            padding: 12px 16px;
+            border-radius: 25px;
+            font-size: 1em;
+            font-weight: 600;
+            display: inline-block;
+            min-width: 40px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .stack-item.number {
+            background: linear-gradient(135deg, #e8f4fd 0%, #d1e7dd 100%);
+            color: #0d6efd;
+            border-color: rgba(13, 110, 253, 0.2);
+        }
+
+        .stack-item.operator {
+            background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+            color: white;
+            border-color: rgba(220, 53, 69, 0.3);
+        }
+
+        .stack-group {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 12px;
+            border-radius: 30px;
+            border: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .stack-group.ready-to-compute {
+            border-color: #00ff88;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.6);
+            animation: pulse-ready 2s infinite;
+        }
+
+        .stack-group.partial-expression {
+            border-color: #ffc107;
+            box-shadow: 0 0 15px rgba(255, 193, 7, 0.5);
+            animation: pulse-partial 2s infinite;
+        }
+
+        .stack-group .stack-item {
+            box-shadow: none;
+            margin: 0;
+        }
+
+        .current-input {
+            color: #00ff88;
+            font-weight: 300;
+            opacity: 0.8;
+            font-style: italic;
+        }
+
+        .empty-display {
+            color: #888;
+            font-style: italic;
+            opacity: 0.6;
+        }
+
+        .overflow-indicator {
+            color: #888;
+            font-size: 0.8em;
+            opacity: 0.7;
+            align-self: center;
+            padding: 8px 12px;
+        }
+
+        .stack-item.highlighted-number {
+            border-color: #0d6efd;
+            box-shadow: 0 0 15px rgba(13, 110, 253, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+            animation: pulse-number 1.5s infinite;
+        }
+
+        .stack-item.highlighted-operator {
+            border-color: #dc3545;
+            box-shadow: 0 0 15px rgba(220, 53, 69, 0.7), 0 2px 8px rgba(0, 0, 0, 0.3);
+            animation: pulse-operator 1.5s infinite;
+        }
+
+        @keyframes pulse-number {
+            0%, 100% { box-shadow: 0 0 15px rgba(13, 110, 253, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3); }
+            50% { box-shadow: 0 0 25px rgba(13, 110, 253, 0.8), 0 4px 12px rgba(0, 0, 0, 0.4); }
+        }
+
+        @keyframes pulse-operator {
+            0%, 100% { box-shadow: 0 0 15px rgba(220, 53, 69, 0.7), 0 2px 8px rgba(0, 0, 0, 0.3); }
+            50% { box-shadow: 0 0 25px rgba(220, 53, 69, 1.0), 0 4px 12px rgba(0, 0, 0, 0.4); }
+        }
+
+        @keyframes pulse-ready {
+            0%, 100% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.6); }
+            50% { box-shadow: 0 0 30px rgba(0, 255, 136, 0.9); }
+        }
+
+        @keyframes pulse-partial {
+            0%, 100% { box-shadow: 0 0 15px rgba(255, 193, 7, 0.5); }
+            50% { box-shadow: 0 0 25px rgba(255, 193, 7, 0.8); }
+        }
+
+
+
+        .buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+        }
+
+        .btn {
+            background: rgba(20, 20, 35, 0.8);
+            border: none;
+            border-radius: 15px;
+            color: #e0e0e0;
+            font-size: 1.2em;
+            font-weight: 500;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn:hover {
+            background: rgba(40, 40, 60, 0.9);
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn.operator {
+            background: rgba(220, 38, 127, 0.4);
+            color: #ff6b9d;
+            border-color: rgba(220, 38, 127, 0.3);
+        }
+
+        .btn.operator:hover {
+            background: rgba(220, 38, 127, 0.6);
+            color: white;
+            border-color: rgba(220, 38, 127, 0.5);
+        }
+
+        .btn.compute {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+            border-color: rgba(0, 255, 136, 0.3);
+        }
+
+        .btn.compute:hover {
+            background: rgba(0, 255, 136, 0.4);
+            color: white;
+            border-color: rgba(0, 255, 136, 0.5);
+        }
+
+        .btn.clear {
+            background: rgba(255, 159, 67, 0.3);
+            color: #ff9f43;
+            border-color: rgba(255, 159, 67, 0.3);
+        }
+
+        .btn.clear:hover {
+            background: rgba(255, 159, 67, 0.5);
+            color: white;
+            border-color: rgba(255, 159, 67, 0.5);
+        }
+
+        .demo-info {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.8);
+            margin-top: 20px;
+            font-size: 0.85em;
+            line-height: 1.4;
+        }
+
+        @media (max-width: 480px) {
+            .calculator {
+                padding: 20px;
+            }
+            
+            .btn {
+                padding: 15px;
+                font-size: 1.1em;
+            }
+            
+            .display {
+                font-size: 1.5em;
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="calculator">
+        <div class="title">🧮 Smart Multi-Notation Calculator</div>
+        
+        <div class="stack-display" id="stack">Stack: []</div>
+        
+        <div class="buttons">
+            <button class="btn clear" onclick="clearAll()">AC</button>
+            <button class="btn clear" onclick="deleteLast()">⌫</button>
+            <button class="btn operator" onclick="inputOperator('/')">/</button>
+            <button class="btn operator" onclick="inputOperator('*')">×</button>
+            
+            <button class="btn" onclick="inputNumber('7')">7</button>
+            <button class="btn" onclick="inputNumber('8')">8</button>
+            <button class="btn" onclick="inputNumber('9')">9</button>
+            <button class="btn operator" onclick="inputOperator('-')">-</button>
+            
+            <button class="btn" onclick="inputNumber('4')">4</button>
+            <button class="btn" onclick="inputNumber('5')">5</button>
+            <button class="btn" onclick="inputNumber('6')">6</button>
+            <button class="btn operator" onclick="inputOperator('+')">+</button>
+            
+            <button class="btn" onclick="inputNumber('1')">1</button>
+            <button class="btn" onclick="inputNumber('2')">2</button>
+            <button class="btn" onclick="inputNumber('3')">3</button>
+            <button class="btn" onclick="inputNumber('0')" style="grid-row: span 2;">0</button>
+            
+            <button class="btn" onclick="inputNumber('.')">.</button>
+            <button class="btn compute" onclick="compute()" style="grid-column: span 2;">↵</button>
+        </div>
+        
+
+    </div>
+
+    <script>
+        // Calculator state
+        let stack = [];
+        let currentInput = '';
+        let stackDisplay = document.getElementById('stack');
+
+        // Operator functions
+        const operators = {
+            '+': (a, b) => a + b,
+            '-': (a, b) => a - b,
+            '*': (a, b) => a * b,
+            '/': (a, b) => b !== 0 ? a / b : NaN
+        };
+
+        function updateDisplay() {
+            updateStackDisplay();
+        }
+
+        function updateStackDisplay() {
+            stackDisplay.innerHTML = '';
+            
+            if (stack.length === 0 && !currentInput) {
+                const emptyMsg = document.createElement('span');
+                emptyMsg.className = 'empty-display';
+                emptyMsg.textContent = '0';
+                stackDisplay.appendChild(emptyMsg);
+                return;
+            }
+            
+            // Analyze stack for grouping opportunities
+            const groups = analyzeStackForGrouping();
+            
+            // Calculate display with overflow management
+            const displayElements = [];
+            
+            // Convert groups to display elements
+            groups.forEach(group => {
+                if (group.type === 'single') {
+                    displayElements.push({ element: createStackItem(group.item), type: 'item' });
+                } else if (group.type === 'group') {
+                    displayElements.push({ element: createStackGroup(group.items, group.groupType), type: 'group' });
+                }
+            });
+            
+            // Add current input if any
+            if (currentInput) {
+                const inputElement = document.createElement('span');
+                inputElement.className = 'current-input';
+                inputElement.textContent = currentInput;
+                displayElements.push({ element: inputElement, type: 'input' });
+            }
+            
+            // Implement overflow logic - show "..." if too many elements
+            const maxDisplayElements = calculateMaxElements();
+            
+            if (displayElements.length > maxDisplayElements) {
+                // Add overflow indicator
+                const overflowElement = document.createElement('span');
+                overflowElement.className = 'overflow-indicator';
+                overflowElement.textContent = '...';
+                stackDisplay.appendChild(overflowElement);
+                
+                // Show only the last elements that fit
+                const elementsToShow = displayElements.slice(-maxDisplayElements);
+                elementsToShow.forEach(({ element }) => {
+                    stackDisplay.appendChild(element);
+                });
+            } else {
+                // Show all elements
+                displayElements.forEach(({ element }) => {
+                    stackDisplay.appendChild(element);
+                });
+            }
+        }
+
+        function calculateMaxElements() {
+            // Estimate how many elements can fit in 3 lines
+            // This is a rough estimate - in practice we'd need to measure actual widths
+            const stackWidth = stackDisplay.clientWidth || 350; // Fallback width
+            const avgElementWidth = 80; // Rough estimate for grouped elements
+            const elementsPerLine = Math.floor(stackWidth / avgElementWidth);
+            return Math.max(elementsPerLine * 3, 6); // At least 6 elements, or 3 lines worth
+        }
+
+        function analyzeStackForGrouping() {
+            if (stack.length === 0) return [];
+            
+            const groups = [];
+            let i = 0;
+            
+            while (i < stack.length) {
+                // Greedy left-to-right grouping, prioritizing operator building
+                
+                // Look for operator patterns first (number + operator, operator + number)
+                if (i <= stack.length - 2) {
+                    const pair = [stack[i], stack[i + 1]];
+                    
+                    // Greedily group operator patterns
+                    if (isPartialExpression(pair, i === stack.length - 2)) {
+                        groups.push({
+                            type: 'group',
+                            items: pair,
+                            groupType: 'partial-expression'
+                        });
+                        i += 2;
+                        continue;
+                    }
+                }
+                
+                // Only look for complete expressions if we can't build operator patterns
+                if (i <= stack.length - 3) {
+                    const triple = [stack[i], stack[i + 1], stack[i + 2]];
+                    
+                    if (isCompleteExpression(triple)) {
+                        groups.push({
+                            type: 'group',
+                            items: triple,
+                            groupType: 'ready-to-compute'
+                        });
+                        i += 3;
+                        continue;
+                    }
+                }
+                
+                // Single item that couldn't be grouped
+                groups.push({
+                    type: 'single',
+                    item: stack[i]
+                });
+                i++;
+            }
+            
+            return groups;
+        }
+
+        function isCompleteExpression(triple) {
+            const [a, b, c] = triple;
+            return (
+                (typeof a === 'number' && typeof b === 'number' && typeof c === 'string') || // postfix
+                (typeof a === 'string' && typeof b === 'number' && typeof c === 'number') || // prefix
+                (typeof a === 'number' && typeof b === 'string' && typeof c === 'number')    // infix
+            );
+        }
+
+        function isPartialExpression(pair, isLast) {
+            const [a, b] = pair;
+            
+            // Greedily group operator patterns anywhere in the stack
+            
+            // Number + operator (partial infix operation)
+            if (typeof a === 'number' && typeof b === 'string') return true;
+            
+            // Operator + number (partial prefix operation)
+            if (typeof a === 'string' && typeof b === 'number') return true;
+            
+            // Two numbers only at the end (waiting for operator)
+            if (typeof a === 'number' && typeof b === 'number' && isLast) return true;
+            
+            return false;
+        }
+
+        function createStackItem(item) {
+            const itemElement = document.createElement('span');
+            itemElement.className = 'stack-item';
+            itemElement.textContent = item;
+            
+            if (typeof item === 'number') {
+                itemElement.classList.add('number');
+            } else {
+                itemElement.classList.add('operator');
+            }
+            
+            return itemElement;
+        }
+
+        function createStackGroup(items, groupType) {
+            const groupElement = document.createElement('div');
+            groupElement.className = `stack-group ${groupType}`;
+            
+            items.forEach(item => {
+                const itemElement = createStackItem(item);
+                groupElement.appendChild(itemElement);
+            });
+            
+            return groupElement;
+        }
+
+
+
+        function clearAll() {
+            stack = [];
+            currentInput = '';
+            updateDisplay();
+        }
+
+        function deleteLast() {
+            if (currentInput.length > 0) {
+                currentInput = currentInput.slice(0, -1);
+                updateDisplay();
+            }
+        }
+
+        function inputNumber(num) {
+            if (currentInput === '0' && num !== '.') {
+                currentInput = num;
+            } else {
+                currentInput += num;
+            }
+            updateDisplay();
+        }
+
+        function inputOperator(op) {
+            const calcOp = op === '×' ? '*' : op;
+            
+            // Push current number to stack if any
+            if (currentInput) {
+                stack.push(parseFloat(currentInput));
+                currentInput = '';
+                
+                // After pushing a number, check for immediate collapse
+                collapseOperatorNumber();
+            }
+            
+            // Try to compute before adding the new operator (for infix chaining)
+            tryCompute();
+            
+            // Add operator to stack
+            stack.push(calcOp);
+            
+            // Try to compute again if we have enough operands
+            tryCompute();
+            
+            updateDisplay();
+        }
+
+        function compute() {
+            // Push current number to stack if any
+            if (currentInput) {
+                stack.push(parseFloat(currentInput));
+                currentInput = '';
+                
+                // After pushing a number, check for immediate collapse
+                // Rule: if last element is operator followed by number, compute immediately
+                collapseOperatorNumber();
+            }
+            
+            // Try to compute
+            tryCompute();
+            
+            updateDisplay();
+        }
+
+        function collapseOperatorNumber() {
+            // Check if we can collapse operator + number patterns at the end
+            while (stack.length >= 3) {
+                const last3 = stack.slice(-3);
+                const [first, second, third] = last3;
+                
+                // Prefix pattern: operator number number -> compute
+                if (typeof first === 'string' && typeof second === 'number' && typeof third === 'number') {
+                    const result = operators[first](second, third);
+                    stack.splice(-3, 3, result);
+                    continue;
+                }
+                
+                // Can't collapse further
+                break;
+            }
+        }
+
+        function tryCompute() {
+            // Only compute when it doesn't break the visual grouping structure
+            while (canCompute() && shouldComputeNow()) {
+                executeComputation();
+            }
+        }
+
+        function shouldComputeNow() {
+            // Check if computing would break existing operator groups
+            // But allow computation of complete expressions at the end
+            
+            // Analyze the current grouping structure
+            const groups = analyzeStackForGrouping();
+            
+            // Check if we have a complete expression that can be computed
+            const hasCompleteExpression = groups.some(g => g.type === 'group' && g.groupType === 'ready-to-compute');
+            
+            // If there's a complete expression, always allow it to compute
+            if (hasCompleteExpression) {
+                return true;
+            }
+            
+            // Check for the pattern where currentInput completes an expression
+            // Example: "243 + * 13 + 9" [currentInput: "2"] should compute "+ 9 2"
+            if (currentInput && stack.length >= 2) {
+                const lastTwo = stack.slice(-2);
+                const [secondLast, last] = lastTwo;
+                
+                // If we have operator + number + [currentInput], this forms a complete expression
+                if (typeof secondLast === 'string' && typeof last === 'number') {
+                    return true; // Allow prefix completion: + 9 2
+                }
+                
+                // If we have number + operator + [currentInput], this forms a complete expression  
+                if (typeof secondLast === 'number' && typeof last === 'string') {
+                    return true; // Allow infix completion: 9 + 2
+                }
+            }
+            
+            // Count partial operator groups
+            const partialGroups = groups.filter(g => g.type === 'group' && g.groupType === 'partial-expression');
+            
+            // If there are multiple partial expressions, it suggests a complex operator chain
+            // Don't compute unless we identified a safe complete expression above
+            if (partialGroups.length > 1) {
+                return false;
+            }
+            
+            // If there's only one or no partial groups, it's safe to compute
+            return true;
+        }
+
+        function canCompute() {
+            // Check if we can compute with stack + currentInput
+            if (currentInput && stack.length >= 2) {
+                // Check for infix pattern: number operator [currentInput]
+                if (typeof stack[stack.length-2] === 'number' && 
+                    typeof stack[stack.length-1] === 'string') {
+                    return true;
+                }
+                // Check for prefix pattern: operator number [currentInput]  
+                if (typeof stack[stack.length-2] === 'string' && 
+                    typeof stack[stack.length-1] === 'number') {
+                    return true;
+                }
+            }
+            
+            // Check patterns in stack only
+            if (stack.length < 3) return false;
+            
+            // Check for postfix pattern: number number operator (at end)
+            if (typeof stack[stack.length-3] === 'number' && 
+                typeof stack[stack.length-2] === 'number' && 
+                typeof stack[stack.length-1] === 'string') {
+                return true;
+            }
+            
+            // Check for prefix pattern: operator number number (at end)
+            if (typeof stack[stack.length-3] === 'string' && 
+                typeof stack[stack.length-2] === 'number' && 
+                typeof stack[stack.length-1] === 'number') {
+                return true;
+            }
+            
+            // Check for infix pattern: number operator number (at end)
+            if (typeof stack[stack.length-3] === 'number' && 
+                typeof stack[stack.length-2] === 'string' && 
+                typeof stack[stack.length-1] === 'number') {
+                return true;
+            }
+            
+            return false;
+        }
+
+        function executeComputation() {
+            let result;
+            let elementsToRemove = 0;
+            
+            // First check if we can compute with currentInput
+            if (currentInput && stack.length >= 2) {
+                const inputNum = parseFloat(currentInput);
+                
+                // Infix pattern: number operator [currentInput]
+                if (typeof stack[stack.length-2] === 'number' && 
+                    typeof stack[stack.length-1] === 'string') {
+                    result = operators[stack[stack.length-1]](stack[stack.length-2], inputNum);
+                    elementsToRemove = 2; // Remove last 2 from stack
+                    currentInput = ''; // Clear current input
+                }
+                // Prefix pattern: operator number [currentInput]
+                else if (typeof stack[stack.length-2] === 'string' && 
+                         typeof stack[stack.length-1] === 'number') {
+                    result = operators[stack[stack.length-2]](stack[stack.length-1], inputNum);
+                    elementsToRemove = 2; // Remove last 2 from stack
+                    currentInput = ''; // Clear current input
+                }
+            }
+            
+            // If no computation with currentInput, check stack only
+            if (result === undefined && stack.length >= 3) {
+                const last3 = stack.slice(-3);
+                const [first, second, third] = last3;
+                
+                // Postfix: number number operator
+                if (typeof first === 'number' && typeof second === 'number' && typeof third === 'string') {
+                    result = operators[third](first, second);
+                    elementsToRemove = 3;
+                }
+                // Prefix: operator number number  
+                else if (typeof first === 'string' && typeof second === 'number' && typeof third === 'number') {
+                    result = operators[first](second, third);
+                    elementsToRemove = 3;
+                }
+                // Infix: number operator number
+                else if (typeof first === 'number' && typeof second === 'string' && typeof third === 'number') {
+                    result = operators[second](first, third);
+                    elementsToRemove = 3;
+                }
+            }
+            
+            if (result !== undefined) {
+                // Remove the computed elements and replace with result
+                stack.splice(-elementsToRemove, elementsToRemove, result);
+            }
+        }
+
+        // Keyboard support
+        document.addEventListener('keydown', (e) => {
+            if (e.key >= '0' && e.key <= '9' || e.key === '.') {
+                inputNumber(e.key);
+            } else if (['+', '-'].includes(e.key)) {
+                inputOperator(e.key);
+            } else if (e.key === '*') {
+                inputOperator('*');
+            } else if (e.key === '/') {
+                e.preventDefault();
+                inputOperator('/');
+            } else if (e.key === 'Enter' || e.key === '=') {
+                compute();
+            } else if (e.key === 'Escape' || e.key === 'c' || e.key === 'C') {
+                clearAll();
+            } else if (e.key === 'Backspace') {
+                deleteLast();
+            }
+        });
+
+        // Initialize
+        updateDisplay();
+
+        // Focus on load for keyboard support
+        window.addEventListener('load', () => {
+            document.body.focus();
+        });
+    </script>
+</body>
+</html>

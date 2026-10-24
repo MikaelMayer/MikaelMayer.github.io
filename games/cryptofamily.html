@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Scavenger Hunt Collaboration</title>
+  <style>
+    /* Basic resets */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: sans-serif;
+      padding: 1rem;
+      background: #f8f8f8;
+    }
+    h1, h2, h3 {
+      margin-bottom: 0.5rem;
+    }
+    input, textarea, button {
+      font-size: 1rem;
+      padding: 0.5rem;
+      margin-bottom: 0.5rem;
+      width: 100%;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    label {
+      display: block;
+      margin: 0.5rem 0 0.25rem;
+      font-weight: bold;
+    }
+    /* Form container */
+    .form-container {
+      background: #fff;
+      padding: 1rem;
+      border-radius: 4px;
+      margin-bottom: 1rem;
+    }
+    /* Child name inputs */
+    .child-names {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .child-name-field {
+      display: flex;
+      flex-direction: column;
+    }
+    /* Generate Button */
+    .generate-btn {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: 0.75rem 1.5rem;
+      cursor: pointer;
+      border: none;
+      background-color: #007BFF;
+      color: white;
+      font-weight: bold;
+      border-radius: 4px;
+    }
+    /* The printable area */
+    .print-area {
+      display: none; /* Hidden until user generates */
+    }
+    .mapping-section {
+      background: white;
+      margin-bottom: 2rem;
+      border-radius: 4px;
+      padding: 1rem;
+      page-break-inside: avoid;
+    }
+    .alphabet-table {
+      margin-bottom: 1rem;
+      border-collapse: collapse;
+      width: 100%;
+      text-align: center;
+    }
+    .alphabet-table th,
+    .alphabet-table td {
+      padding: 0.25rem;
+      border: 1px solid #aaa;
+    }
+
+    /* Each "line-group" is one clue's group. We can separate these for cutting */
+    .line-group {
+      background: #eee;
+      margin-bottom: 2rem;
+      border-radius: 4px;
+      padding: 1rem;
+      page-break-inside: avoid; /* keep each clue group together if possible */
+    }
+
+    .child-section {
+      background: white;
+      margin-bottom: 1rem;
+      border-radius: 4px;
+      padding: 1rem;
+      page-break-inside: avoid; /* each child’s code within a line-group */
+    }
+
+    .child-section h3 {
+      margin-bottom: 0.5rem;
+    }
+
+    .message-line {
+      display: flex;
+      flex-wrap: wrap; /* allow wrapping if it’s too wide */
+      margin-top: 1rem;
+      margin-bottom: 1rem;
+      gap: 0.5rem;
+    }
+    .message-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+    .message-box {
+      width: 2rem;
+      height: 2rem;
+      border: 1px solid #ccc;
+      margin-bottom: 0.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      color: #EEE;
+    }
+    .info-below {
+      font-size: 0.8rem;
+      text-align: center;
+      min-height: 1rem;
+    }
+    /* Print styles */
+    @media print {
+      body {
+        background: #fff;
+      }
+      .form-container {
+        display: none;
+      }
+      .print-area {
+        display: block !important;
+      }
+    }
+
+    /* Consent overlay classes */
+    body.consent-block .page-content {
+      pointer-events: none;
+      filter: blur(2px);
+    }
+    .consent-overlay {
+      position: fixed;
+      z-index: 9999; /* above everything */
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: none;  /* hidden by default */
+      align-items: center;
+      justify-content: center;
+    }
+    .consent-modal {
+      background: #fff;
+      border-radius: 4px;
+      width: 90%;
+      max-width: 500px;
+      padding: 1rem;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+    .consent-content {
+      margin-bottom: 1rem;
+    }
+    .consent-content h3 {
+      margin-bottom: 0.5rem;
+    }
+    .consent-content p {
+      margin-bottom: 0.5rem;
+      line-height: 1.4;
+    }
+    .consent-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 1rem;
+    }
+    .consent-buttons button {
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #consentAcceptBtn {
+      background-color: #007BFF;
+      color: #fff;
+    }
+    #consentDeclineBtn {
+        background-color: #ccc;
+        color: #333;
+    }
+    .explanation {
+        background: #fff;
+        padding: 1rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+        line-height: 1.5;
+    }
+    
+    .explanation strong {
+        display: block;
+        margin-top: 0.75rem;
+        font-size: 1.1rem;
+    }
+    
+    .explanation ul {
+        padding-left: 1.5rem;
+        margin-top: 0.5rem;
+        list-style-type: disc;
+    }
+    
+    .explanation li {
+        margin-bottom: 0.3rem;
+    }
+    
+  </style>
+</head>
+<body>
+  <div class="page-content">
+
+
+    <div class="form-container">
+    <h1>Scavenger Hunt Collaboration</h1>
+    <p class="explanation">
+  This tool generates a collaborative scavenger hunt where children must work together to reveal their next destination.
+  <br><br>
+  Enter the children's names (youngest to oldest) and list, one per line, the locations where you will hide the next steps. 
+  The last line should be the final destination where the treasure awaits. Click "Generate Printable Sheets."
+  <br><br>
+  Place each message where it is labeled, and pre-cut the sheets so that each child can easily collect their own blank-coded message. 
+  Keep the first message and the letter mappings with you. Do this in secret before the hunt begins!
+  <br><br>
+  When the scavenger hunt starts, give the children their codes and the first message. Let the adventure begin!
+</p>
+      <h2>Setup</h2>
+      <label for="messageInput">Please put the scavenger hunt stops here, one per line.</label>
+      <textarea
+        id="messageInput"
+        rows="6"
+        placeholder="Type multiple lines – each line is a separate clue..."></textarea>
+
+      <label for="numChildren">Number of Children (from youngest to oldest)</label>
+      <input type="number" id="numChildren" min="1" value="2" />
+
+      <div class="child-names" id="childNamesContainer"></div>
+
+      <p>Press Generate, then print. The alphabets are saved locally, so you can come back later with the same number of children and keep the same mapping.</p>
+
+      <button class="generate-btn" id="generateBtn">Generate Printable Sheets</button>
+    </div>
+
+    <div class="print-area" id="printArea">
+      <!-- Generated mapping and clues go here -->
+    </div>
+  </div>
+
+  <!-- RGPD-Like Consent Overlay (NOT inside .page-content) -->
+  <div id="consentOverlay" class="consent-overlay">
+    <div class="consent-modal">
+      <div class="consent-content">
+        <h3>We Value Your Privacy</h3>
+        <p>
+          We use local storage to remember your data (child names, secret mapping) across page refreshes.
+          No data is sent to a server.
+        </p>
+        <p>
+          Please confirm that you accept the use of local storage in your browser.
+          If you choose to decline, we will erase the data and disable the page.
+        </p>
+      </div>
+      <div class="consent-buttons">
+        <button id="consentAcceptBtn">Accept</button>
+        <button id="consentDeclineBtn">Decline</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /************************************************************
+     * RGPD-Like Consent Script
+     ************************************************************/
+    (function() {
+      const overlay    = document.getElementById("consentOverlay");
+      const acceptBtn  = document.getElementById("consentAcceptBtn");
+      const declineBtn = document.getElementById("consentDeclineBtn");
+
+      // Key under which we store consent in localStorage
+      const CONSENT_KEY = "myLocalStorageConsent";
+
+      // Check if user has already given consent
+      function hasConsent() {
+        return localStorage.getItem(CONSENT_KEY) === "true";
+      }
+
+      function showConsentModal() {
+        document.body.classList.add("consent-block");
+        overlay.style.display = "flex"; // show overlay
+      }
+
+      function hideConsentModal() {
+        document.body.classList.remove("consent-block");
+        overlay.style.display = "none"; // hide overlay
+      }
+
+      function acceptConsent() {
+        localStorage.setItem(CONSENT_KEY, "true");
+        hideConsentModal();
+      }
+
+      function declineConsent() {
+        // Clear local storage and effectively disable the page
+        localStorage.clear();
+        document.body.innerHTML = "<h1>Local Storage usage declined. Page disabled.</h1>";
+      }
+
+      // On DOM load, if there's no stored consent, show the modal
+      document.addEventListener("DOMContentLoaded", () => {
+        if (!hasConsent()) {
+          showConsentModal();
+        }
+      });
+
+      // Hook up button events
+      acceptBtn.addEventListener("click", acceptConsent);
+      declineBtn.addEventListener("click", declineConsent);
+    })();
+  </script>
+
+  <script>
+    /********************************************************
+     *                  DOM references
+     ********************************************************/
+    const messageInput        = document.getElementById('messageInput');
+    const numChildrenInput    = document.getElementById('numChildren');
+    const childNamesContainer = document.getElementById('childNamesContainer');
+    const generateBtn         = document.getElementById('generateBtn');
+    const printArea           = document.getElementById('printArea');
+
+    /********************************************************
+     *              Constants and helper functions
+     ********************************************************/
+    const ALPHABET            = "ABCDEFGHIJKLMNOPQRSTUVWXYZ ";
+    const ALPHABET_LENGTH     = ALPHABET.length; // 27
+    const LS_KEY_MESSAGE      = 'secretMessage';
+    const LS_KEY_CHILDNAMES   = 'childNames';
+    const LS_KEY_ALPHABETS    = 'randomAlphabets';
+
+    // Shuffle array in-place using Fisher-Yates
+    function shuffleArray(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    // Create an array of 1..27
+    function makeNumberSequence() {
+      return Array.from({ length: ALPHABET_LENGTH }, (_, i) => i + 1);
+    }
+
+    // Generate a random permutation of A..Z plus space
+    function generateRandomAlphabet() {
+      const arr = ALPHABET.split('');
+      shuffleArray(arr);
+      return arr;
+    }
+
+    // Retrieve or set data in localStorage
+    function saveToLocalStorage(lines, childNames, alphabets) {
+      // We'll store the text lines joined by \n for convenience
+      localStorage.setItem(LS_KEY_MESSAGE, lines.join('\n'));
+      localStorage.setItem(LS_KEY_CHILDNAMES, JSON.stringify(childNames));
+      if (alphabets) {
+        localStorage.setItem(LS_KEY_ALPHABETS, JSON.stringify(alphabets));
+      }
+    }
+
+    function getFromLocalStorage() {
+      const savedMessage    = localStorage.getItem(LS_KEY_MESSAGE);
+      const savedChildNames = localStorage.getItem(LS_KEY_CHILDNAMES);
+      const savedAlphabets  = localStorage.getItem(LS_KEY_ALPHABETS);
+
+      return {
+        message: savedMessage || '',
+        childNames: savedChildNames ? JSON.parse(savedChildNames) : [],
+        alphabets: savedAlphabets ? JSON.parse(savedAlphabets) : null
+      };
+    }
+
+    /********************************************************
+     *          Populate form from local storage
+     ********************************************************/
+    function loadFormFromLocalStorage() {
+      const { message, childNames } = getFromLocalStorage();
+      messageInput.value = message;
+      // If childNames array is not empty, set numChildren accordingly
+      if (childNames.length > 0) {
+        numChildrenInput.value = childNames.length;
+      }
+      generateChildNameFields();
+      // Populate child name fields
+      childNames.forEach((name, idx) => {
+        const field = document.getElementById(`childNameInput_${idx}`);
+        if (field) {
+          field.value = name;
+        }
+      });
+    }
+
+    /********************************************************
+     *    Create child name input fields dynamically
+     ********************************************************/
+    function generateChildNameFields() {
+      const count = parseInt(numChildrenInput.value, 10) || 0;
+      childNamesContainer.innerHTML = "";
+      for (let i = 0; i < count; i++) {
+        const wrapper = document.createElement('div');
+        wrapper.classList.add('child-name-field');
+
+        const label = document.createElement('label');
+        label.textContent = `Child #${i + 1} Name (youngest first)`;
+
+        const input = document.createElement('input');
+        input.type  = 'text';
+        input.id    = `childNameInput_${i}`;
+        input.placeholder = `Enter child #${i + 1} name`;
+
+        // Save to localStorage on change
+        input.addEventListener('input', () => {
+          storeFormInputs();
+        });
+
+        wrapper.appendChild(label);
+        wrapper.appendChild(input);
+        childNamesContainer.appendChild(wrapper);
+      }
+    }
+
+    /********************************************************
+     *   Store form inputs in localStorage
+     ********************************************************/
+    function storeFormInputs() {
+      // We'll store all lines, ignoring trailing blank lines
+      const allLinesRaw = messageInput.value.split('\n');
+      const lines = allLinesRaw.map(l => l.trim()).filter(l => l !== "");
+
+      const count = parseInt(numChildrenInput.value, 10) || 0;
+      const childNames = [];
+      for (let i = 0; i < count; i++) {
+        const field = document.getElementById(`childNameInput_${i}`);
+        childNames.push((field.value || '').trim());
+      }
+
+      saveToLocalStorage(lines, childNames, null);
+    }
+
+    // Whenever inputs change, store them
+    messageInput.addEventListener('input', storeFormInputs);
+    numChildrenInput.addEventListener('change', () => {
+      generateChildNameFields();
+      storeFormInputs();
+    });
+    const treasureHuntClues = [
+      "Everyone must hold hands or link arms and then release them.",
+      "Each person picks up a treat and hands it to the person on their right.",
+      "Everyone must make the sound of an animal.",
+      "Before moving forward, each person must gently tap the shoulder of the person next to them and say, ‘Let’s go together!’.",
+      "Together, count down from 7 to 0. At ‘0,’ everyone says Hurray!",
+      "Form a circle and place your hands in the center. On the count of three, lift them up together!",
+      "Everyone gives a side hug or a high five to someone else!",
+      "Hold the clue in the center—everyone must touch it."
+    ];
+
+    /********************************************************
+     *   Main "Generate" button: builds the printable sections
+     ********************************************************/
+    generateBtn.addEventListener('click', () => {
+      // Clear out old content
+      printArea.innerHTML = "";
+      printArea.style.display = "block";
+
+      // Gather current form data
+      const allLinesRaw = messageInput.value.split('\n');
+      const lines = allLinesRaw.map(l => l.trim()).filter(l => l !== ""); // non-empty lines
+      const count = parseInt(numChildrenInput.value, 10) || 0;
+
+      const childNames = [];
+      for (let i = 0; i < count; i++) {
+        const field = document.getElementById(`childNameInput_${i}`);
+        childNames.push(field.value.trim() || `Child#${i + 1}`);
+      }
+
+      if (count < 1) {
+        alert("Please enter at least 1 child.");
+        return;
+      }
+
+      // Retrieve or create random alphabets
+      let { alphabets } = getFromLocalStorage();
+      let randomAlphabets = [];
+      if (alphabets && Array.isArray(alphabets) && alphabets.length === count) {
+        // Reuse them
+        randomAlphabets = alphabets;
+      } else {
+        // Generate new
+        for (let i = 0; i < count; i++) {
+          randomAlphabets.push(generateRandomAlphabet());
+        }
+        // Save them for future usage
+        saveToLocalStorage(lines, childNames, randomAlphabets);
+      }
+
+      /* ==============================================================
+       * 1) Print a "Your secret code" section for each child
+       * ============================================================== */
+      childNames.forEach((name, i) => {
+        const mapSection = document.createElement('div');
+        mapSection.classList.add('mapping-section');
+
+        const heading = document.createElement('h2');
+        heading.textContent = `${name} — Your Secret Code`;
+        mapSection.appendChild(heading);
+
+        // Show the table: 1..27 and the random alphabet
+        const table = document.createElement('table');
+        table.classList.add('alphabet-table');
+
+        // Row of numbers
+        const numRow = document.createElement('tr');
+        makeNumberSequence().forEach(num => {
+          const th = document.createElement('th');
+          th.textContent = num;
+          numRow.appendChild(th);
+        });
+        table.appendChild(numRow);
+
+        // Row of letters
+        const alphaRow = document.createElement('tr');
+        randomAlphabets[i].forEach(letter => {
+          const td = document.createElement('td');
+          td.textContent = letter;
+          alphaRow.appendChild(td);
+        });
+        table.appendChild(alphaRow);
+
+        mapSection.appendChild(table);
+        printArea.appendChild(mapSection);
+      });
+
+      /* ==============================================================
+       * 2) For each line, generate a “group” with coded messages
+       *    for each child. Keep the same alphabets across lines.
+       * ============================================================== */
+      lines.forEach((line, lineIdx) => {
+        // If there's no actual text, skip
+        if (!line) return;
+
+        // Prepare distribution for this line:
+        // distribution[childIndex][charIndex] => name, number, or ""
+        const distribution = Array.from({ length: count }, () => []);
+        const msgChars = line.split('');
+
+        // Track which child encodes each character (for internal reference if needed)
+        // but for “one item below each box,” we only store distribution directly
+        msgChars.forEach((ch, charIndex) => {
+          // 1) Choose a random child to encode
+          const encodingChildIdx = Math.floor(Math.random() * count);
+
+          // 2) Find the letter's index in that child's random alphabet
+          let encIndex = randomAlphabets[encodingChildIdx].indexOf(ch.toUpperCase());
+          if (encIndex === -1) {
+            // If punctuation or something not in A–Z/space, everyone sees blank
+            for (let c = 0; c < count; c++) {
+              distribution[c][charIndex] = "";
+            }
+            return;
+          }
+          encIndex += 1; // 0-based to 1-based
+
+          // 3) Exactly two children get the crucial info (or 1 if only 1 child)
+          let chosen;
+          if (count === 1) {
+            chosen = [0];
+          } else if (count === 2) {
+            chosen = [0, 1];
+            shuffleArray(chosen);
+          } else {
+            // pick any 2 distinct children
+            chosen = [];
+            while (chosen.length < 2) {
+              const r = Math.floor(Math.random() * count);
+              if (!chosen.includes(r)) chosen.push(r);
+            }
+            shuffleArray(chosen);
+          }
+
+          // Initialize all distribution entries to blank
+          for (let c = 0; c < count; c++) {
+            distribution[c][charIndex] = "";
+          }
+
+          // The first chosen sees the *encoding child's name* (later replaced by "me" if it’s them)
+          // The second chosen sees the numeric index
+          if (chosen.length >= 2) {
+            distribution[chosen[0]][charIndex] = childNames[encodingChildIdx];
+            distribution[chosen[1]][charIndex] = encIndex.toString();
+          } else if (chosen.length === 1) {
+            // only 1 child, so they see the index
+            distribution[chosen[0]][charIndex] = encIndex.toString();
+          }
+        });
+
+        // Each line is a “line-group” containing child-sections
+        const lineGroup = document.createElement('div');
+        lineGroup.classList.add('line-group');
+
+        // Maybe label the group with “Clue #X (lineIdx+1)”
+        const groupHeading = document.createElement('h2');
+        if (lineIdx === 0) {
+          groupHeading.textContent = `Starting Point`;
+        } else {
+          groupHeading.textContent = `You arrived at ${lines[lineIdx - 1]}. Next destination is...`;
+        }
+        lineGroup.appendChild(groupHeading);
+
+        // Leader is child (lineIdx mod count), if you want the “go together” line
+        const leaderIdx = lineIdx % count;
+
+        // Now create each child's coded message
+        for (let i = 0; i < count; i++) {
+          const childSection = document.createElement('div');
+          childSection.classList.add('child-section');
+
+          const subHeading = document.createElement('h3');
+          subHeading.textContent = `${childNames[i]}`;
+          childSection.appendChild(subHeading);
+
+          // Optional “we will go together” line:
+          const nextLine = document.createElement('p');
+          if (childNames[i] === childNames[leaderIdx]) {
+            nextLine.innerHTML = `You are in charge. <i>${treasureHuntClues[lineIdx%treasureHuntClues.length]}</i> After, decode: for each box, announce its number, ask others for their hints, write the letter. Then, lead the way to the next place.<br>`;
+          } else {
+            nextLine.textContent = `Follow the lead of ${childNames[leaderIdx]} to decrypt this:`;
+          }
+          childSection.appendChild(nextLine);
+
+          const messageLine = document.createElement('div');
+          messageLine.classList.add('message-line');
+
+          // Fill in each character distribution for this child
+          msgChars.forEach((ch, charIndex) => {
+            const itemDiv = document.createElement('div');
+            itemDiv.classList.add('message-item');
+
+            // The box for the child to fill once decoded
+            const boxDiv = document.createElement('div');
+            boxDiv.classList.add('message-box');
+            boxDiv.textContent = charIndex;
+
+            // The raw info (could be the encoding child's name, or a number, or "")
+            let rawInfo = distribution[i][charIndex] || "";
+
+            // If rawInfo is exactly this child's own name, replace with "you"
+            if (rawInfo === childNames[i]) {
+              rawInfo = "you";
+            }
+
+            const infoDiv = document.createElement('div');
+            infoDiv.classList.add('info-below');
+            infoDiv.textContent = rawInfo; // either "you", another child's name, a number, or blank
+
+            itemDiv.appendChild(boxDiv);
+            itemDiv.appendChild(infoDiv);
+            messageLine.appendChild(itemDiv);
+          });
+
+          childSection.appendChild(messageLine);
+          lineGroup.appendChild(childSection);
+        }
+
+        // Add the whole group to printArea
+        printArea.appendChild(lineGroup);
+      });
+
+      // Scroll down
+      printArea.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    // On load, populate from local storage
+    window.addEventListener('DOMContentLoaded', () => {
+      loadFormFromLocalStorage();
+    });
+  </script>
+</body>
+</html>

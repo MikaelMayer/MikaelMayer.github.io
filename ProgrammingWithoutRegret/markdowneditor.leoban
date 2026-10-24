@@ -1,0 +1,86 @@
+let original = 
+"#This is markdown\n :\"text\": that **boldly** do _italics_" in
+letrec trim s = s match {
+  case " " + sp => trim sp
+  case "\n" + sp => trim sp
+  case sp + " " => trim sp
+  case sp + "\n" => trim sp
+  case sp => sp
+} in
+letrec sprintf str inline = inline match {
+  case [a] ++ tail => sprintf (replaceFirstIn "%s" str a) tail
+  case [] => str
+  case "" + a => replaceFirstIn "%s" str a
+} in
+let strlen str = str.length  in
+letrec foldLeft init list fun = list match {
+  case [] => init
+  case [head] ++ tail => foldLeft (fun init head) tail fun
+} in
+let markdown text = 
+    let self = {
+    para = \regs. 
+      let line = regs.group 1 in
+      let trimmed = trim line in
+      if (matchIn "^</?(ul|ol|li|h|p|bl)" trimmed) (
+        "\n" + line + "\n"
+      ) else (
+        sprintf "\n<p>%s</p>\n" trimmed
+      )
+    ,
+    ul_list = \regs.
+      let item = regs.group 1 in
+      sprintf "\n<ul>\n\t<li>%s</li>\n</ul>" (trim item)
+	  ,
+    ol_list = \regs.
+      let item = regs.group 1 in
+      sprintf "\n<ol>\n\t<li>%s</li>\n</ol>" (trim item)
+    ,
+    blockquote = \regs.
+      let item = regs.group 2 in
+      sprintf "\n<blockquote>%s</blockquote>" (trim item)
+    ,
+    header = \regs.
+      let {group= [tmp, chars, header]} = regs in
+      let level = chars.length.toString in
+      sprintf "<h%s>%s</h%s>" [level, trim header, level]
+  } in
+  let rules = [
+		["(#+)(.*)", self.header],                                     // headers
+		["\\[([^\\[]+)\\]\\(([^\\)]+)\\)", "<a href='$2'>$1</a>"], // links
+		["(\\*\\*|__)(.*?)\\1", "<strong>$2</strong>"],               // bold
+		["(\\*|_)(.*?)\\1", "<em>$2</em>"],                           // emphasis
+		["\\~\\~(.*?)\\~\\~", "<del>$1</del>"],                       // del
+		["\\:\"(.*?)\"\\:", "<q>$1</q>"],                             // quote
+		["`(.*?)`", "<code>$1</code>"],                               // inline code
+		["\n\\*(.*)", self.ul_list],                                   // ul lists
+		["\n[0-9]+\\.(.*)", self.ol_list],                             // ol lists
+		["\n(&gt;|\\>)(.*)", self.blockquote],                         // blockquotes
+		["\n-{5,}", "\n<hr />"],                                       // horizontal rule
+		["\n([^\n]+)\n", self.para],                                   // add paragraphs
+		["</ul>\\s?<ul>", ""],                                         // fix extra ul
+		["</ol>\\s?<ol>", ""],                                         // fix extra ol
+		["</blockquote><blockquote>", "\n"]                            // fix extra blockquote
+  ] in
+  let finaltext = "\n" + text + "\n" in
+  foldLeft finaltext rules (\acc.\elem. elem match {
+      case [regex, replacement] => replaceAllIn regex acc replacement
+    }
+  )
+in
+"<pre>" + original + "</pre><br>" + (!markdown original)
+
+
+
+
+// Source :https://gist.github.com/jbroadway/2836900
+/*let original = """# Header
+
+_one bar_ __two bars__ ___three bars___
+*one asterix* **two asterisks** ***three asterisks***
+
+1. A numbered list with some `code in it`. Pretty neat !
+1. Another item
+
+* A dot list
+* Other item""" in*/

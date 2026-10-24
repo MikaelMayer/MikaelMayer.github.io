@@ -1,0 +1,1234 @@
+<html>
+<body><div class="outer"><div class="inner" contenteditable="False"><h1>Sketch-n-sketch Tutorial - Multilingual Memory game</h1>
+<i>This tutorial assumes that you have
+<a href="https://mikaelmayer.github.io/sketch-n-sketch/">Sketch-n-sketch</a> running on your browser.
+The 'left pane' references the left half of that interface, whereas the 'right pane' references the right half of that interface. If you encounter editing issues, try resizing your window.</i><br><br>The memory game consists of pairs of identical cards placed face down.
+The player turns over two cards. If they are the same, they are left face up.
+If they are not, they are turned back face down.<br><br>In this tutorial, we will create an educational variant of the memory game
+ to associate images to their transcriptions in a given language.
+This is our roadmap:
+<ul>
+<li>Import images and descriptions</li>
+<li>Design a functional memory game</li>
+<li>Add translations to the game</li>
+</ul><h2>Import images and descriptions</h2>
+We will import images and descriptions from <a href="https://www.englisch-hilfen.de/en/words/kitchen.htm">this website</a>. Visit the link to see what the table looks like.<br>We want to import this table as source code we can work with.
+For that, the trick is to actually write source code with some dummy data,
+transform it to be rendered as a table,
+and add the remaining rows by copying them from the website and pasting them into the output.
+Sketch-n-sketch will figure out for us how to reverse the execution and, finally,
+update our source data to produce the given table.<br>In sketch-n-sketch, erase the program in the left pane and replace it with the following:
+<newcode code="images = [&#13;&#10;  Image &quot;dog&quot; &quot;https://upload.wikimedia.org/wikipedia/commons/7/7d/Labrador_Chocolate.jpg&quot;&#13;&#10;]&#13;&#10;&#13;&#10;-- We will write code here #1&#13;&#10;&#13;&#10;main = <table>&#13;&#10;@Update.expressionFreeze<|<tbody>@(&#13;&#10;  images&#13;&#10;  |> List.map (\Image name url ->&#13;&#10;     <tr><td><img src=url></td><td>@name</td></tr>)&#13;&#10;  |> Update.onUpdate (&#13;&#10;     Html.filter (not << Html.isEmptyText))&#13;&#10;  )</tbody>&#13;&#10;</table>"></newcode>
+<code class="snippet">images = [
+  Image "dog" "https://upload.wikimedia.org/wikipedia/commons/7/7d/Labrador_Chocolate.jpg"
+]
+
+-- We will write code here #1
+
+main = &lt;table>
+@Update.expressionFreeze&lt;|&lt;tbody>@(
+  images
+  |> List.map (\Image name url ->
+     &lt;tr>&lt;td>&lt;img src=url>&lt;/td>&lt;td>@name&lt;/td>&lt;/tr>)
+  |> Update.onUpdate (
+     Html.filter (not &lt;&lt; Html.isEmptyText))
+  )&lt;/tbody>
+&lt;/table></code>
+After clicking on "Run", you should see the below result in the right pane.<br><div class="outputwrapper"><table>
+<tbody><tr><td><img src="https://upload.wikimedia.org/wikipedia/commons/7/7d/Labrador_Chocolate.jpg"></td><td>dog</td></tr></tbody>
+</table></div>
+Let us explain this code a bit.<br>First because we want to change the data, we prepend <code>@Update.expressionFreeze</code> to the rendered table to make sure the expression itself will not be modified when we change the output, only the data.<br>Second, we transform the list of images to a list of <code>&lt;tr></code> rows, each containing two <code>&lt;td></code> cells. The first cell contains the image, the second cell the name.<br>Because the rows we are importing will contain whitespace, mostly newlines (which our program does not produce), we make sure to remove them with the instruction <code>Update.onUpdate (Html.filter (not &lt;&lt; Html.isEmptyText))</code>.
+This instruction is the last one because it will be the first to execute when the program executes in reverse.<br>Note that the <code>main = </code> is optional, if the program ends with an expression, it will automatically insert <code>main = </code> in front of it.<br>Great. You can try to rename "dog" in the output to see that the rename propagates to the corresponding <code>Image</code>.<br>Now, time to import the images.<br>On the website, right-click on the table. In major browsers a menu item "Inspect" or "Inspector" will lead you to a developer console that will display the source code of the page at this point. To display the actual source code, you might have to right-click the element again and "edit as HTML".
+Now select the first 8 rows in the Html source. A row starts with &lt;tr> and ends with &lt;/tr>.
+Alternatively, you can copy the rows from the box below.<br><code class="snippet">&lt;tr>
+&lt;td>&lt;img src="/images/kitchen/034.jpg">&lt;/td>
+&lt;td>barbecue&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>&lt;img src="/images/kitchen/024.jpg">&lt;/td>
+&lt;td>bread basket&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>&lt;img src="/images/kitchen/037.jpg">&lt;/td>
+&lt;td>cake slice&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>&lt;img src="/images/kitchen/007.jpg">&lt;/td>
+&lt;td>champagne cooler&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>&lt;img src="/images/kitchen/020.jpg">&lt;/td>
+&lt;td>chest freezer&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>&lt;img src="/images/kitchen/035.jpg">&lt;/td>
+&lt;td>coffee machine&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>&lt;img src="/images/kitchen/032.jpg">&lt;/td>
+&lt;td>cooker, stove&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td>&lt;img src="/images/kitchen/006.jpg">&lt;/td>
+&lt;td>corkscrew&lt;/td>
+&lt;/tr></code><br>Once you have this data is in the clipboard, click on the "Html" button to the right of the Sketch-n-sketch interface to see the source code as html. Paste the clipboard contents right after the last <code>&lt;/tr></code>.
+The popup "Output Editor" appears; hover over "Update program" and click on the first solution.
+The variable 'images' is now populated.<br>You've successfully imported data that would have normally required the use of regular expressions or custom programs to parse.<br><br>You now need to fix the URL of the images you imported, because they are relative.
+In the code, <b>delete the first row</b> containing the information about the dog (and the comma in front of the second entry).
+<hiddenreplace placeholder="images = [&#13;&#10;  Image &quot;dog&quot; &quot;https://upload.wikimedia.org/wikipedia/commons/7/7d/Labrador_Chocolate.jpg&quot;&#13;&#10;]" code="images = [&#13;&#10;  Image &quot;barbecue&quot; &quot;/images/kitchen/034.jpg&quot;&#13;&#10;, Image &quot;bread basket&quot; &quot;/images/kitchen/024.jpg&quot;&#13;&#10;, Image &quot;cake slice&quot; &quot;/images/kitchen/037.jpg&quot;&#13;&#10;, Image &quot;champagne cooler&quot; &quot;/images/kitchen/007.jpg&quot;&#13;&#10;, Image &quot;chest freezer&quot; &quot;/images/kitchen/020.jpg&quot;&#13;&#10;, Image &quot;coffee machine&quot; &quot;/images/kitchen/035.jpg&quot;&#13;&#10;, Image &quot;cooker, stove&quot; &quot;/images/kitchen/032.jpg&quot;&#13;&#10;, Image &quot;corkscrew&quot; &quot;/images/kitchen/006.jpg&quot;&#13;&#10;]"></hiddenreplace>
+<span>Replace the code <code>img src=url</code> (line 18) with<code class="snippet">img src="https://www.englisch-hilfen.de"+url</code></span><br>You should now obtain the following table:
+<div class="outputwrapper"><table>
+<tbody><tr><td><img src="https://www.englisch-hilfen.de/images/kitchen/034.jpg"></td><td>barbecue</td></tr><tr><td><img src="https://www.englisch-hilfen.de/images/kitchen/024.jpg"></td><td>bread basket</td></tr><tr><td><img src="https://www.englisch-hilfen.de/images/kitchen/037.jpg"></td><td>cake slice</td></tr><tr><td><img src="https://www.englisch-hilfen.de/images/kitchen/007.jpg"></td><td>champagne cooler</td></tr><tr><td><img src="https://www.englisch-hilfen.de/images/kitchen/020.jpg"></td><td>chest freezer</td></tr><tr><td><img src="https://www.englisch-hilfen.de/images/kitchen/035.jpg"></td><td>coffee machine</td></tr><tr><td><img src="https://www.englisch-hilfen.de/images/kitchen/032.jpg"></td><td>cooker, stove</td></tr><tr><td><img src="https://www.englisch-hilfen.de/images/kitchen/006.jpg"></td><td>corkscrew</td></tr></tbody>
+</table></div><br>FYI: the source code at this point is:
+<code class="snippet">images = [
+  Image "barbecue" "/images/kitchen/034.jpg"
+, Image "bread basket" "/images/kitchen/024.jpg"
+, Image "cake slice" "/images/kitchen/037.jpg"
+, Image "champagne cooler" "/images/kitchen/007.jpg"
+, Image "chest freezer" "/images/kitchen/020.jpg"
+, Image "coffee machine" "/images/kitchen/035.jpg"
+, Image "cooker, stove" "/images/kitchen/032.jpg"
+, Image "corkscrew" "/images/kitchen/006.jpg"
+]
+
+-- We will write code here #1
+
+main = &lt;table>
+@Update.expressionFreeze&lt;|&lt;tbody>@(
+  images
+  |> List.map (\Image name url ->
+     &lt;tr>&lt;td>&lt;img src="https://www.englisch-hilfen.de"+url>&lt;/td>&lt;td>@name&lt;/td>&lt;/tr>)
+  |> Update.onUpdate (
+     Html.filter (not &lt;&lt; Html.isEmptyText))
+  )&lt;/tbody>
+&lt;/table></code><h2>Design the logic</h2>
+We want to create two cards for each image, one for the name,
+the other for the picture. We will then shuffle these cards and,
+using css tricks, display them 'face down' on a 4x4 grid.
+With the power of Javascript, we will handle clicks and even
+show a modal dialog to congratulate the player at the end.<br>Fortunately, we coded all of this in Javascript and CSS
+for you so you just need to do some replacements.
+First, the logic for building the deck.
+<span>Replace the code <code>-- We will write code here #1</code> (line 12) with<code class="snippet">-- We will write code here #2
+
+g = random.generator (random.seedOf 1)
+
+pairs = images
+  |> List.indexedConcatMap (\i (Image name url) -> [(i, Named name), (i, Image url)])
+  |> flip g.shuffleList_ (\_ list ->
+    list |> List.map (\(i, elem) -> case elem of 
+    Named name -> card i &lt;span>@name&lt;/span>
+    Image url -> card i &lt;img src=("https://www.englisch-hilfen.de"+url)>)
+  )
+
+card i child =
+&lt;div class="flip-container" num=i
+  ignore-selected="false">
+	&lt;div class="flipper">
+		&lt;div class="front"
+		  onclick="""if(@(isOkToSelect "this.parentNode.parentNode.parentNode")) this.parentNode.parentNode.setAttribute('ignore-selected', '' + (this.parentNode.parentNode.getAttribute('ignore-selected') == 'false'));@(checkPair "this.parentNode.parentNode.parentNode")""">&lt;/div>
+		&lt;div class="back">@child&lt;/div>
+	&lt;/div>
+&lt;/div>
+</code></span>
+Now, we add the css and javascript for displaying the deck.
+<span>Replace the code <code>main = &lt;table>...&lt;/table></code> (line 35) with<code class="snippet">main = Html.forceRefresh &lt;div>
+  Translation menu coming soon. The game is in English.
+  &lt;div class="pairsContainer">
+    @pairs
+    &lt;div id="successBox" class="modal" ignore-visible="false">
+      &lt;div class="modal-content">
+        &lt;span class="close">×&lt;/span>
+        &lt;p>Congratulations! You finished the memory game.&lt;/p>
+      &lt;/div>
+    &lt;/div>
+  &lt;/div>
+  &lt;style>@css&lt;/style>
+  &lt;/div>
+
+css = """
+.pairsContainer {
+  max-width: 535px;
+  margin: 10px;
+  outline: 2px solid #8A9;
+  outline-radius: 2px;
+  padding: 2px;
+  padding-left: 5px;
+  background: #AFC
+}
+
+/* Credits to https://davidwalsh.name/css-flip */
+/* entire container, keeps perspective */
+.flip-container {
+	perspective: 250px;
+	display:inline-block;
+}
+	/* flip the pane when clicked */
+.flip-container[ignore-selected=true] .flipper {
+		transform: rotateY(180deg);
+}
+
+.flip-container, .front, .back {
+	width: 128px;
+	height: 128px;
+	margin: 2px;
+}
+
+/* flip speed goes here */
+.flipper {
+	transition: 0.6s;
+	transform-style: preserve-3d;
+
+	position: relative;
+}
+
+/* hide back of pane during swap */
+.front, .back {
+	backface-visibility: hidden;
+	position: absolute;
+	top: 0;
+	left: 0;
+}
+
+/* front pane, placed above back */
+.front {
+	z-index: 2;
+	/* for firefox 31 */
+	transform: rotateY(0deg);
+	background-image: linear-gradient(to top left, #F00, #FF0);
+}
+
+/* back, initially hidden pane */
+.back {
+	transform: rotateY(180deg);
+	text-align: center;
+  display: inline-table;
+  font-size: 20px;
+  background-image: linear-gradient(to bottom right, #EEE, #CCC);
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.back > span {
+	display:table-cell;
+	vertical-align: middle;
+	text-align: center;
+}
+/* The Modal (background) */
+.modal {
+    display: none; /* Hidden by default */
+    position: absolute; /* Stay in place */
+    z-index: 7; /* Sit on top */
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%; /* Full width */
+    height: 100%; /* Full height */
+    overflow: auto; /* Enable scroll if needed */
+    background-color: rgb(0,0,0); /* Fallback color */
+    background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+}
+
+/* Modal Content/Box */
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto; /* 15% from the top and centered */
+    padding: 20px;
+    border: 1px solid #888;
+    width: 50%; /* Could be more or less, depending on screen size */
+}
+
+/* The Close Button */
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+[ignore-visible=false] {
+  display:none;
+}
+[ignore-visible=true] {
+  display:block;
+}"""
+
+notInPair parent = """(function(parent) {
+    var selected = parent.querySelectorAll("[ignore-selected=true]");
+    var notInPair = []
+    for(var i = 0; i &lt; selected.length; i++) {
+      var hasPair = false;
+      for(var j = 0; j &lt; selected.length; j++) {
+        if(i != j &amp;&amp; selected[j].getAttribute("num") == selected[i].getAttribute("num")) {
+          console.log(i, j);
+          hasPair = true;
+          break;
+        }
+      }
+      if(!hasPair) {
+        notInPair.push(selected[i])
+      }
+    }
+    return notInPair;
+  })(@parent)"""
+
+isOkToSelect parent = """(@(notInPair parent)).length == 0 || (@(notInPair parent)).length % 2 == 1"""
+
+checkPair parent = """
+// If the number of selected cards is odd, do nothing.
+// Else, set a timer to hide the cards that are not in pairs.
+var notInPair = @(notInPair parent)
+if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {
+  setTimeout((function(notInPair) {
+    return function() {
+      for(var i = 0; i &lt; notInPair.length; i++) {
+        notInPair[i].setAttribute("ignore-selected", "false")
+      }
+    }
+  })(notInPair), 1000)
+} else {
+  console.log("launching timeout to check everything on on", @parent)
+  setTimeout((function(parentNode) {
+    return function() {
+      var hidden = parentNode.querySelectorAll("[ignore-selected=false]");
+      if(hidden.length == 0) {
+        parentNode.querySelector("#successBox").setAttribute("ignore-visible", "true");
+        parentNode.querySelector("#successBox .close").onclick = function() {
+          parentNode.querySelector("#successBox").setAttribute("ignore-visible", "false");
+        }
+      }
+    }
+  })(@parent), 1000)
+}"""</code></span><br>After running the program, you should obtain the following game.
+Click on the squares to reveal them.
+<div class="outputwrapper"><dummy1537659928008><div>
+  Translation menu coming soon. The game is in English.
+  <div class="pairsContainer">
+    <div class="flip-container" num="0" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><span>barbecue</span></div>
+	</div>
+</div><div class="flip-container" num="6" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><img src="https://www.englisch-hilfen.de/images/kitchen/032.jpg"></div>
+	</div>
+</div><div class="flip-container" num="5" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><img src="https://www.englisch-hilfen.de/images/kitchen/035.jpg"></div>
+	</div>
+</div><div class="flip-container" num="7" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><span>corkscrew</span></div>
+	</div>
+</div><div class="flip-container" num="2" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><span>cake slice</span></div>
+	</div>
+</div><div class="flip-container" num="7" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><img src="https://www.englisch-hilfen.de/images/kitchen/006.jpg"></div>
+	</div>
+</div><div class="flip-container" num="4" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><img src="https://www.englisch-hilfen.de/images/kitchen/020.jpg"></div>
+	</div>
+</div><div class="flip-container" num="6" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><span>cooker, stove</span></div>
+	</div>
+</div><div class="flip-container" num="1" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><img src="https://www.englisch-hilfen.de/images/kitchen/024.jpg"></div>
+	</div>
+</div><div class="flip-container" num="0" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><img src="https://www.englisch-hilfen.de/images/kitchen/034.jpg"></div>
+	</div>
+</div><div class="flip-container" num="1" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><span>bread basket</span></div>
+	</div>
+</div><div class="flip-container" num="3" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><img src="https://www.englisch-hilfen.de/images/kitchen/007.jpg"></div>
+	</div>
+</div><div class="flip-container" num="5" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><span>coffee machine</span></div>
+	</div>
+</div><div class="flip-container" num="2" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><img src="https://www.englisch-hilfen.de/images/kitchen/037.jpg"></div>
+	</div>
+</div><div class="flip-container" num="4" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><span>chest freezer</span></div>
+	</div>
+</div><div class="flip-container" num="3" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><span>champagne cooler</span></div>
+	</div>
+</div>
+    <div id="successBox" class="modal" ignore-visible="false">
+      <div class="modal-content">
+        <span class="close">×</span>
+        <p>Congratulations! You finished the memory game.</p>
+      </div>
+    </div>
+  </div>
+  <style>
+.pairsContainer {
+  max-width: 535px;
+  margin: 10px;
+  outline: 2px solid #8A9;
+  outline-radius: 2px;
+  padding: 2px;
+  padding-left: 5px;
+  background: #AFC
+}
+
+/* Credits to https://davidwalsh.name/css-flip */
+/* entire container, keeps perspective */
+.flip-container {
+	perspective: 250px;
+	display:inline-block;
+}
+	/* flip the pane when clicked */
+.flip-container[ignore-selected=true] .flipper {
+		transform: rotateY(180deg);
+}
+
+.flip-container, .front, .back {
+	width: 128px;
+	height: 128px;
+	margin: 2px;
+}
+
+/* flip speed goes here */
+.flipper {
+	transition: 0.6s;
+	transform-style: preserve-3d;
+
+	position: relative;
+}
+
+/* hide back of pane during swap */
+.front, .back {
+	backface-visibility: hidden;
+	position: absolute;
+	top: 0;
+	left: 0;
+}
+
+/* front pane, placed above back */
+.front {
+	z-index: 2;
+	/* for firefox 31 */
+	transform: rotateY(0deg);
+	background-image: linear-gradient(to top left, #F00, #FF0);
+}
+
+/* back, initially hidden pane */
+.back {
+	transform: rotateY(180deg);
+	text-align: center;
+  display: inline-table;
+  font-size: 20px;
+  background-image: linear-gradient(to bottom right, #EEE, #CCC);
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.back > span {
+	display:table-cell;
+	vertical-align: middle;
+	text-align: center;
+}
+/* The Modal (background) */
+.modal {
+    display: none; /* Hidden by default */
+    position: absolute; /* Stay in place */
+    z-index: 7; /* Sit on top */
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%; /* Full width */
+    height: 100%; /* Full height */
+    overflow: auto; /* Enable scroll if needed */
+    background-color: rgb(0,0,0); /* Fallback color */
+    background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+}
+
+/* Modal Content/Box */
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto; /* 15% from the top and centered */
+    padding: 20px;
+    border: 1px solid #888;
+    width: 50%; /* Could be more or less, depending on screen size */
+}
+
+/* The Close Button */
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+[ignore-visible=false] {
+  display:none;
+}
+[ignore-visible=true] {
+  display:block;
+}</style>
+  </div></dummy1537659928008></div><br>A few notes for how we achieved this result:
+<ul>
+<li>When attributes are prefixed with <code>ignore-</code>, their modifications are ignored by the update engine. Hence, we only allow the javascript to modify these attributes. Because CSS can read attributes, we can change the appearance of cards when we click on them, without triggering the update engine.</li>
+<li>We actually create complex javascript code inside the "onclick" events of cards, by inlining the code for <code>isOkToSelecct</code> and <code>checkPair</code>. That's fine, we are not looking at the generated source code anyway.</li>
+<li>We use similar tricks to display the modal dialog box when the game is over.</li>
+</ul>
+Now try to find the corkscrew and its image (hints: 2North-2East, 1North-1West).
+<h2>Translation logic</h2>
+We now want to translate the game to make it available in several languages.
+For this, let us add a table of translations.
+<span>Replace the code <code>-- We will write code here #2</code> (line 12) with<code class="snippet">translations = [
+  ("English", [("translation1", "corkscrew")
+              ]),
+  ("French", [("translation1", "corkscrew")
+             ])]
+
+languages = List.map Tuple.first translations
+languageIndex = 1
+language = nth languages languageIndex
+
+-- We will write code here #3</code></span>
+The table of translations is a list of pairs of language name and translations.
+Translations are a list of keywords associated to a word in the language.
+From this table, we extract the list of available languages (<code>languages</code>),
+and given a <code>languageIndex</code> we can compute the current language's name.<br>We did not translate the word into French yet because we are going to do so from the game itself soon.<br><br>We need to know when to use translated text and when not to. Let us use the convention that any word prefixed with a $ will be subject to translation using the table above.
+<span>Replace the code <code>Image "corkscrew"</code> (line 9) with<code class="snippet">Image "$translation1"</code></span>
+Now, the 'corkscrew' card shows '$translation1' instead - we want to see it go back to being 'corkscrew' again.
+<span>Replace the code <code>-- We will write code here #3</code> (line 22) with<code class="snippet">translate translations languageIndex node =
+  let currentTranslation = nth translations languageIndex |> Tuple.second |> Dict.fromList in
+  Html.replace """\$(\w+|\$)""" (\m -> 
+    if m.match == "$" then [["TEXT", m.match]] else
+      let key = nth m.group 1 in
+      case Dict.get key currentTranslation of
+        Nothing -> [["TEXT", m.match]]
+        Just definition -> [["TEXT", definition]]
+    ) node
+  -- We will write code here #4</code></span>
+<span>Replace the code <code>main = Html.forceRefresh &lt;div></code> (line 54) with<code class="snippet">main = translate translations languageIndex &lt;|
+  Html.forceRefresh &lt;div></code></span>
+<span>Replace the code <code>The game is in English.</code> (line 56) with<code class="snippet">The game is in @(language).</code></span><br>Good job. Now it's back to "corkscrew" again.
+But wait, doesn't the game say that the language is French?
+Directly on the corkscrew card, replace "corkscrew" with "tire-bouchon" (the French translation).
+Make sure <span>line 15</span> is visible to see the changes.
+<hiddenreplace placeholder="(&quot;French&quot;, [(&quot;translation1&quot;, &quot;corkscrew&quot;)" code="(&quot;French&quot;, [(&quot;translation1&quot;, &quot;tire-bouchon&quot;)"></hiddenreplace>
+<h2>Add translations from the output</h2>
+For now, we cannot translate anything other than "corkscrew", because it is the only entry in the translation table.
+We wish we could directly edit the output and add a flag that says "Add a translation entry for this word".
+We can use lenses for this purpose. We decide that if we write '{:word:}' in the game, it should create an entry for 'word' in every language.
+<span>Replace the code <code>-- We will write code here #4</code> (line 31) with<code class="snippet">|> \htmlNode ->
+    Update.lens2 {
+      apply (htmlNode, _) = htmlNode
+      update {input = (_, translations), outputNew=newHtmlNode} =
+        Html.find """\{:([^\}]*(?!\})\S[^\}]*):\}""" newHtmlNode
+        |> List.foldl (\matchToTranslate (updatedHtmlNode, currentTranslation, translations) ->
+            let definition = nth matchToTranslate.group 1
+                name = freshVarName "translation" 1 currentTranslation
+                textToFind = """\{:@(tutorialUtils.escape definition):\}"""
+            in
+            (Html.replace textToFind (\_ -> [["TEXT", "$" + name]]) updatedHtmlNode,
+             Dict.insert name definition currentTranslation,
+             List.map (\(lang, d) -> (lang, d ++ [(name, definition)])) translations)
+          ) (newHtmlNode, currentTranslation, translations)
+        |> \(finalHtmlNode, _, newTranslations) ->
+          Ok (Inputs [(finalHtmlNode, newTranslations)])
+    } htmlNode translations
+
+freshVarName name i dictionary =
+    if Dict.member (name + toString i) (dictionary) then freshVarName name (i + 1) (dictionary) else name + toString i
+
+-- We will write code here #5</code></span>
+Be careful about the whitespace - there should be two spaces before the first <code>|></code> you just inserted, so that this code stays inside the function.
+Here is an explanation of how the above code works:
+<ul>
+<li>We name the result of translation <code>htmlNode</code>.</li>
+<li>We apply a lens to this result and the list of all translations.</li>
+<li>In the forward evaluation, this lens returns the html node.</li>
+<li>In the backwards evaluation, it looks for occurrences of {:...:}, creates variable names for them, and adds the definitions to all languages in translations. Furthermore, it replaces them with the new variables prefixed with '$'.</li>
+<li>The new variable names are guaranteed to not yet exist.</li></ul>
+<li>The notation <code>|></code> means "pass whatever is before <code>|></code> as the argument to the function that comes after <code>|></code>".</li>
+Good. In the output, find and rename "cake slice" to "{:cake slice:}".
+<hiddenreplace placeholder="&quot;translation1&quot;, &quot;corkscrew&quot;)" code="&quot;translation1&quot;, &quot;corkscrew&quot;)&#13;&#10;              , (&quot;translation2&quot;, &quot;cake slice&quot;)"></hiddenreplace>
+<hiddenreplace placeholder="&quot;translation1&quot;, &quot;tire-bouchon&quot;)" code="&quot;translation1&quot;, &quot;corkscrew&quot;)&#13;&#10;              , (&quot;translation2&quot;, &quot;pelle à tarte&quot;)"></hiddenreplace>
+After update, the braces and colon should disappear in the output. You can now replace "cake slice" by "pelle à tarte" and see that this modification is propagated right into the code.
+Had we done this translation automatically, we would have had the French equivalent of "slice of cake", which is not at all the same thing. Translating in context can be very useful.
+<h2>Translation toolbar</h2>
+It can be tedious to manually type the characters {:...:} to translate every word. Fortunately, using Javascript we can make a button that does this on the selected text:<br><span>Replace the code <code>Translation menu coming soon.</code> (line 79) with<code class="snippet">&lt;menu>
+      &lt;button
+      title="Make the selected text translatable"
+      onclick="""
+        var r = window.getSelection().getRangeAt(0);
+        var t = r.cloneContents().textContent;
+        document.execCommand( 'insertText', false, "{:" + t + ":}")"""
+      contenteditable="false">Make selection translatable&lt;/button>
+      Other menu items coming soon.
+    &lt;/menu></code></span><br>Good. Now, in the output, find and select the text "cooker, stove". Click on the button "Make selection translatable". After the update roundtrip, you can edit the translation to "cuisinière, four". 
+<hiddenreplace placeholder="&quot;translation2&quot;, &quot;cake slice&quot;)" code="&quot;translation1&quot;, &quot;corkscrew&quot;)&#13;&#10;              , (&quot;translation3&quot;, &quot;cooker, stove&quot;)"></hiddenreplace>
+<hiddenreplace placeholder="&quot;translation2&quot;, &quot;pelle à tarte&quot;)" code="&quot;translation1&quot;, &quot;corkscrew&quot;)&#13;&#10;              , (&quot;translation3&quot;, &quot;cuisinière, four&quot;)"></hiddenreplace>
+This is much easier than manually writing {:...:}.<br>What about selecting the language in which we are displaying the game? Easy.
+<span>Replace the code <code>Other menu items coming soon.</code> (line 89) with<code class="snippet">@(Html.select [] languages languageIndex)
+Other menu items coming soon.</code></span>
+<code>Html.select</code> is a lens that displays options, with the third argument designating the selected one. It is coded in such a way that, if you change the selection, it changes the third argument.
+Select English, and then go back to French, to see how this works.<br>What about adding a new language? For that, we display an input text box that, if submitted,
+uses its value as a new language name and copies the current translations for it.<br><span>Replace the code <code>-- We will write code here #5</code> (line 56) with<code class="snippet">langAdder = Update.lens2 {
+  apply (languageIndex, translations) = ""
+  update {input=(languageIndex, translations), outputNew=newLanguage} =
+    let translationsDict = Dict.fromList translations in
+    if not (newLanguage == "") &amp;&amp; not (Dict.member newLanguage translationsDict) then 
+      let toCopy = Dict.apply translationsDict language in
+      let newLanguageIndex = List.length translations in
+      Ok (InputsWithDiffs [((newLanguageIndex, translations ++ [(newLanguage, toCopy)])
+                           ,Just (
+                             Update.vTupleDiffs_1_2
+                               VConstDiffs
+                               (VListDiffs [(List.length translations, ListElemInsert 1)])))])
+    else
+      Ok (InputsWithDiffs [((languageIndex, translations), Nothing)])
+  } languageIndex translations</code></span>
+<span>Replace the code <code>Other menu items coming soon.</code> (line 104) with<code class="snippet">&lt;input style="margin-left:10px;width:180px;" type="text"
+  v=langAdder
+  placeholder="New Language (e.g. German)"
+  title="Enter the name of a new language here and press ENTER"
+  onchange="this.setAttribute('v',this.value)"></code></span><br>A few notes on what we just did.
+<ul>
+<li>The variable <code>langAdder</code> is computed as the empty string.</li>
+<li>When the input is submitted, the Javascript updates langAdder with the new language name.</li>
+<li>The lens has the power to change the languageIndex and the translations. It duplicates the current translation and appends it to the end of the table of translations, and changes the language index to switch to the new language.</li>
+<li>So far, we've returned values in lenses with <code>Inputs</code> and a list of possible values.
+Another (more advanced) way is to use <code>InputsWithDiffs</code> and a list of pair of possible values
+and their <i>difference</i> to the old values. That way, the engine does not need to compute differences itself.</li>
+</ul>
+<br>The result should look like:
+<div class="outputwrapper"><dummy1537659928554><div>
+  <menu>
+      <button title="Make the selected text translatable" onclick="&#13;&#10;        var r = window.getSelection().getRangeAt(0);&#13;&#10;        var t = r.cloneContents().textContent;&#13;&#10;        document.execCommand( &#39;insertText&#39;, false, &quot;{:&quot; + t + &quot;:}&quot;)" contenteditable="false">Make selection translatable</button>
+      <select selected-index="1" onchange="this.setAttribute(&#39;selected-index&#39;, this.selectedIndex)"><option v="0">English</option><option v="1" selected="selected">French</option></select>
+<input style="margin-left:10px;width:180px;" type="text" v="" placeholder="New Language (e.g. German)" title="Enter the name of a new language here and press ENTER" onchange="this.setAttribute(&#39;v&#39;,this.value)">
+    </menu> The game is in French.
+  <div class="pairsContainer">
+    <div class="flip-container" num="0" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><span>barbecue</span></div>
+	</div>
+</div><div class="flip-container" num="6" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><img src="https://www.englisch-hilfen.de/images/kitchen/032.jpg"></div>
+	</div>
+</div><div class="flip-container" num="5" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><img src="https://www.englisch-hilfen.de/images/kitchen/035.jpg"></div>
+	</div>
+</div><div class="flip-container" num="7" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><span>corkscrew</span></div>
+	</div>
+</div><div class="flip-container" num="2" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><span>cake slice</span></div>
+	</div>
+</div><div class="flip-container" num="7" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><img src="https://www.englisch-hilfen.de/images/kitchen/006.jpg"></div>
+	</div>
+</div><div class="flip-container" num="4" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><img src="https://www.englisch-hilfen.de/images/kitchen/020.jpg"></div>
+	</div>
+</div><div class="flip-container" num="6" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><span>cooker, stove</span></div>
+	</div>
+</div><div class="flip-container" num="1" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><img src="https://www.englisch-hilfen.de/images/kitchen/024.jpg"></div>
+	</div>
+</div><div class="flip-container" num="0" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><img src="https://www.englisch-hilfen.de/images/kitchen/034.jpg"></div>
+	</div>
+</div><div class="flip-container" num="1" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><span>bread basket</span></div>
+	</div>
+</div><div class="flip-container" num="3" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><img src="https://www.englisch-hilfen.de/images/kitchen/007.jpg"></div>
+	</div>
+</div><div class="flip-container" num="5" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><span>coffee machine</span></div>
+	</div>
+</div><div class="flip-container" num="2" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><img src="https://www.englisch-hilfen.de/images/kitchen/037.jpg"></div>
+	</div>
+</div><div class="flip-container" num="4" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><span>chest freezer</span></div>
+	</div>
+</div><div class="flip-container" num="3" ignore-selected="false">
+	<div class="flipper">
+		<div class="front" onclick="if(((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length == 0 || ((function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)).length % 2 == 1) this.parentNode.parentNode.setAttribute(&#39;ignore-selected&#39;, &#39;&#39; + (this.parentNode.parentNode.getAttribute(&#39;ignore-selected&#39;) == &#39;false&#39;));&#13;&#10;// If the number of selected cards is odd, do nothing.&#13;&#10;// Else, set a timer to hide the cards that are not in pairs.&#13;&#10;var notInPair = (function(parent) {&#13;&#10;    var selected = parent.querySelectorAll(&quot;[ignore-selected=true]&quot;);&#13;&#10;    var notInPair = []&#13;&#10;    for(var i = 0; i < selected.length; i++) {&#13;&#10;      var hasPair = false;&#13;&#10;      for(var j = 0; j < selected.length; j++) {&#13;&#10;        if(i != j &amp;&amp; selected[j].getAttribute(&quot;num&quot;) == selected[i].getAttribute(&quot;num&quot;)) {&#13;&#10;          console.log(i, j);&#13;&#10;          hasPair = true;&#13;&#10;          break;&#13;&#10;        }&#13;&#10;      }&#13;&#10;      if(!hasPair) {&#13;&#10;        notInPair.push(selected[i])&#13;&#10;      }&#13;&#10;    }&#13;&#10;    return notInPair;&#13;&#10;  })(this.parentNode.parentNode.parentNode)&#13;&#10;if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {&#13;&#10;  setTimeout((function(notInPair) {&#13;&#10;    return function() {&#13;&#10;      for(var i = 0; i < notInPair.length; i++) {&#13;&#10;        notInPair[i].setAttribute(&quot;ignore-selected&quot;, &quot;false&quot;)&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(notInPair), 1000)&#13;&#10;} else {&#13;&#10;  console.log(&quot;launching timeout to check everything on on&quot;, this.parentNode.parentNode.parentNode)&#13;&#10;  setTimeout((function(parentNode) {&#13;&#10;    return function() {&#13;&#10;      var hidden = parentNode.querySelectorAll(&quot;[ignore-selected=false]&quot;);&#13;&#10;      if(hidden.length == 0) {&#13;&#10;        parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;true&quot;);&#13;&#10;        parentNode.querySelector(&quot;#successBox .close&quot;).onclick = function() {&#13;&#10;          parentNode.querySelector(&quot;#successBox&quot;).setAttribute(&quot;ignore-visible&quot;, &quot;false&quot;);&#13;&#10;        }&#13;&#10;      }&#13;&#10;    }&#13;&#10;  })(this.parentNode.parentNode.parentNode), 1000)&#13;&#10;}"></div>
+		<div class="back"><span>champagne cooler</span></div>
+	</div>
+</div>
+    <div id="successBox" class="modal" ignore-visible="false">
+      <div class="modal-content">
+        <span class="close">×</span>
+        <p>Congratulations! You finished the memory game.</p>
+      </div>
+    </div>
+  </div>
+  <style>
+.pairsContainer {
+  max-width: 535px;
+  margin: 10px;
+  outline: 2px solid #8A9;
+  outline-radius: 2px;
+  padding: 2px;
+  padding-left: 5px;
+  background: #AFC
+}
+
+/* Credits to https://davidwalsh.name/css-flip */
+/* entire container, keeps perspective */
+.flip-container {
+	perspective: 250px;
+	display:inline-block;
+}
+	/* flip the pane when clicked */
+.flip-container[ignore-selected=true] .flipper {
+		transform: rotateY(180deg);
+}
+
+.flip-container, .front, .back {
+	width: 128px;
+	height: 128px;
+	margin: 2px;
+}
+
+/* flip speed goes here */
+.flipper {
+	transition: 0.6s;
+	transform-style: preserve-3d;
+
+	position: relative;
+}
+
+/* hide back of pane during swap */
+.front, .back {
+	backface-visibility: hidden;
+	position: absolute;
+	top: 0;
+	left: 0;
+}
+
+/* front pane, placed above back */
+.front {
+	z-index: 2;
+	/* for firefox 31 */
+	transform: rotateY(0deg);
+	background-image: linear-gradient(to top left, #F00, #FF0);
+}
+
+/* back, initially hidden pane */
+.back {
+	transform: rotateY(180deg);
+	text-align: center;
+  display: inline-table;
+  font-size: 20px;
+  background-image: linear-gradient(to bottom right, #EEE, #CCC);
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.back > span {
+	display:table-cell;
+	vertical-align: middle;
+	text-align: center;
+}
+/* The Modal (background) */
+.modal {
+    display: none; /* Hidden by default */
+    position: absolute; /* Stay in place */
+    z-index: 7; /* Sit on top */
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%; /* Full width */
+    height: 100%; /* Full height */
+    overflow: auto; /* Enable scroll if needed */
+    background-color: rgb(0,0,0); /* Fallback color */
+    background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+}
+
+/* Modal Content/Box */
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto; /* 15% from the top and centered */
+    padding: 20px;
+    border: 1px solid #888;
+    width: 50%; /* Could be more or less, depending on screen size */
+}
+
+/* The Close Button */
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+[ignore-visible=false] {
+  display:none;
+}
+[ignore-visible=true] {
+  display:block;
+}</style>
+  </div></dummy1537659928554></div><br>As an exercise, you can translate the remaining cards into the language of your choice.
+<h2>Experiments</h2>
+If you have more time, you can try to accomplish the following tasks:
+<ul>
+<li>Can you translate the text of the button "Make selection translatable" itself?</li>
+<li>And how can we translate the tooltip that appears when we hover over this button?</li>
+<li>Right now, translation names are "translation1", "translation2", which is boring.
+Could you infer a better (unique) name from the content itself? You might find the following code snippet useful: <code>Regex.replace """[^a-zA-Z0-9]""" (\_ -> "") "Word with space"</code></li>
+<li>It can be tedious to see which text is translated and which is not.
+You could replace <code>[["TEXT", definition]]</code> (<span>line 33</span>) with <code>
+[&lt;span style="outline: 2px solid lightgreen">@definition&lt;/span>]]</code> to see the difference (e.g. <span style="outline: 2px solid lightgreen">tire-bouchon</span>).
+Could you add a toolbar button that allows you to do the switch easily? Hint: create a boolean <code>doHighlight = True</code> and render a bidirectional checkbox using <code>Html.checkbox "Highlights" "Highlight translatable text" doHighlight</code>.
+</li>
+<li>How can you translate the language names that are displayed?</li>
+</ul>
+<h2>Final code</h2>
+Here is the code used in this tutorial for reference.
+<code class="snippet">images = [
+  Image "barbecue" "/images/kitchen/034.jpg"
+, Image "bread basket" "/images/kitchen/024.jpg"
+, Image "cake slice" "/images/kitchen/037.jpg"
+, Image "champagne cooler" "/images/kitchen/007.jpg"
+, Image "chest freezer" "/images/kitchen/020.jpg"
+, Image "coffee machine" "/images/kitchen/035.jpg"
+, Image "cooker, stove" "/images/kitchen/032.jpg"
+, Image "$translation1" "/images/kitchen/006.jpg"
+]
+
+translations = [
+  ("English", [("translation1", "corkscrew")
+              , ("translation1", "corkscrew")
+              , ("translation3", "cooker, stove")
+              ]),
+  ("French", [("translation1", "corkscrew")
+              , ("translation1", "corkscrew")
+              , ("translation3", "cuisinière, four")
+             ])]
+
+languages = List.map Tuple.first translations
+languageIndex = 1
+language = nth languages languageIndex
+
+translate translations languageIndex node =
+  let currentTranslation = nth translations languageIndex |> Tuple.second |> Dict.fromList in
+  Html.replace """\$(\w+|\$)""" (\m -> 
+    if m.match == "$" then [["TEXT", m.match]] else
+      let key = nth m.group 1 in
+      case Dict.get key currentTranslation of
+        Nothing -> [["TEXT", m.match]]
+        Just definition -> [["TEXT", definition]]
+    ) node
+  |> \htmlNode ->
+    Update.lens2 {
+      apply (htmlNode, _) = htmlNode
+      update {input = (_, translations), outputNew=newHtmlNode} =
+        Html.find """\{:([^\}]*(?!\})\S[^\}]*):\}""" newHtmlNode
+        |> List.foldl (\matchToTranslate (updatedHtmlNode, currentTranslation, translations) ->
+            let definition = nth matchToTranslate.group 1
+                name = freshVarName "translation" 1 currentTranslation
+                textToFind = """\{:@(tutorialUtils.escape definition):\}"""
+            in
+            (Html.replace textToFind (\_ -> [["TEXT", "$" + name]]) updatedHtmlNode,
+             Dict.insert name definition currentTranslation,
+             List.map (\(lang, d) -> (lang, d ++ [(name, definition)])) translations)
+          ) (newHtmlNode, currentTranslation, translations)
+        |> \(finalHtmlNode, _, newTranslations) ->
+          Ok (Inputs [(finalHtmlNode, newTranslations)])
+    } htmlNode translations
+
+freshVarName name i dictionary =
+    if Dict.member (name + toString i) (dictionary) then freshVarName name (i + 1) (dictionary) else name + toString i
+
+langAdder = Update.lens2 {
+  apply (languageIndex, translations) = ""
+  update {input=(languageIndex, translations), outputNew=newLanguage} =
+    let translationsDict = Dict.fromList translations in
+    if not (newLanguage == "") &amp;&amp; not (Dict.member newLanguage translationsDict) then 
+      let toCopy = Dict.apply translationsDict language in
+      let newLanguageIndex = List.length translations in
+      Ok (InputsWithDiffs [((newLanguageIndex, translations ++ [(newLanguage, toCopy)])
+                           ,Just (
+                             Update.vTupleDiffs_1_2
+                               VConstDiffs
+                               (VListDiffs [(List.length translations, ListElemInsert 1)])))])
+    else
+      Ok (InputsWithDiffs [((languageIndex, translations), Nothing)])
+  } languageIndex translations
+
+g = random.generator (random.seedOf 1)
+
+pairs = images
+  |> List.indexedConcatMap (\i (Image name url) -> [(i, Named name), (i, Image url)])
+  |> flip g.shuffleList_ (\_ list ->
+    list |> List.map (\(i, elem) -> case elem of 
+    Named name -> card i &lt;span>@name&lt;/span>
+    Image url -> card i &lt;img src=("https://www.englisch-hilfen.de"+url)>)
+  )
+
+card i child =
+&lt;div class="flip-container" num=i
+  ignore-selected="false">
+	&lt;div class="flipper">
+		&lt;div class="front"
+		  onclick="""if(@(isOkToSelect "this.parentNode.parentNode.parentNode")) this.parentNode.parentNode.setAttribute('ignore-selected', '' + (this.parentNode.parentNode.getAttribute('ignore-selected') == 'false'));@(checkPair "this.parentNode.parentNode.parentNode")""">&lt;/div>
+		&lt;div class="back">@child&lt;/div>
+	&lt;/div>
+&lt;/div>
+
+
+main = translate translations languageIndex &lt;|
+  Html.forceRefresh &lt;div>
+  &lt;menu>
+      &lt;button
+      title="Make the selected text translatable"
+      onclick="""
+        var r = window.getSelection().getRangeAt(0);
+        var t = r.cloneContents().textContent;
+        document.execCommand( 'insertText', false, "{:" + t + ":}")"""
+      contenteditable="false">Make selection translatable&lt;/button>
+      @(Html.select [] languages languageIndex)
+&lt;input style="margin-left:10px;width:180px;" type="text"
+  v=langAdder
+  placeholder="New Language (e.g. German)"
+  title="Enter the name of a new language here and press ENTER"
+  onchange="this.setAttribute('v',this.value)">
+    &lt;/menu> The game is in @(language).
+  &lt;div class="pairsContainer">
+    @pairs
+    &lt;div id="successBox" class="modal" ignore-visible="false">
+      &lt;div class="modal-content">
+        &lt;span class="close">×&lt;/span>
+        &lt;p>Congratulations! You finished the memory game.&lt;/p>
+      &lt;/div>
+    &lt;/div>
+  &lt;/div>
+  &lt;style>@css&lt;/style>
+  &lt;/div>
+
+css = """
+.pairsContainer {
+  max-width: 535px;
+  margin: 10px;
+  outline: 2px solid #8A9;
+  outline-radius: 2px;
+  padding: 2px;
+  padding-left: 5px;
+  background: #AFC
+}
+
+/* Credits to https://davidwalsh.name/css-flip */
+/* entire container, keeps perspective */
+.flip-container {
+	perspective: 250px;
+	display:inline-block;
+}
+	/* flip the pane when clicked */
+.flip-container[ignore-selected=true] .flipper {
+		transform: rotateY(180deg);
+}
+
+.flip-container, .front, .back {
+	width: 128px;
+	height: 128px;
+	margin: 2px;
+}
+
+/* flip speed goes here */
+.flipper {
+	transition: 0.6s;
+	transform-style: preserve-3d;
+
+	position: relative;
+}
+
+/* hide back of pane during swap */
+.front, .back {
+	backface-visibility: hidden;
+	position: absolute;
+	top: 0;
+	left: 0;
+}
+
+/* front pane, placed above back */
+.front {
+	z-index: 2;
+	/* for firefox 31 */
+	transform: rotateY(0deg);
+	background-image: linear-gradient(to top left, #F00, #FF0);
+}
+
+/* back, initially hidden pane */
+.back {
+	transform: rotateY(180deg);
+	text-align: center;
+  display: inline-table;
+  font-size: 20px;
+  background-image: linear-gradient(to bottom right, #EEE, #CCC);
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.back > span {
+	display:table-cell;
+	vertical-align: middle;
+	text-align: center;
+}
+/* The Modal (background) */
+.modal {
+    display: none; /* Hidden by default */
+    position: absolute; /* Stay in place */
+    z-index: 7; /* Sit on top */
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%; /* Full width */
+    height: 100%; /* Full height */
+    overflow: auto; /* Enable scroll if needed */
+    background-color: rgb(0,0,0); /* Fallback color */
+    background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+}
+
+/* Modal Content/Box */
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto; /* 15% from the top and centered */
+    padding: 20px;
+    border: 1px solid #888;
+    width: 50%; /* Could be more or less, depending on screen size */
+}
+
+/* The Close Button */
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+[ignore-visible=false] {
+  display:none;
+}
+[ignore-visible=true] {
+  display:block;
+}"""
+
+notInPair parent = """(function(parent) {
+    var selected = parent.querySelectorAll("[ignore-selected=true]");
+    var notInPair = []
+    for(var i = 0; i &lt; selected.length; i++) {
+      var hasPair = false;
+      for(var j = 0; j &lt; selected.length; j++) {
+        if(i != j &amp;&amp; selected[j].getAttribute("num") == selected[i].getAttribute("num")) {
+          console.log(i, j);
+          hasPair = true;
+          break;
+        }
+      }
+      if(!hasPair) {
+        notInPair.push(selected[i])
+      }
+    }
+    return notInPair;
+  })(@parent)"""
+
+isOkToSelect parent = """(@(notInPair parent)).length == 0 || (@(notInPair parent)).length % 2 == 1"""
+
+checkPair parent = """
+// If the number of selected cards is odd, do nothing.
+// Else, set a timer to hide the cards that are not in pairs.
+var notInPair = @(notInPair parent)
+if(notInPair.length > 0 &amp;&amp; notInPair.length % 2 == 0) {
+  setTimeout((function(notInPair) {
+    return function() {
+      for(var i = 0; i &lt; notInPair.length; i++) {
+        notInPair[i].setAttribute("ignore-selected", "false")
+      }
+    }
+  })(notInPair), 1000)
+} else {
+  console.log("launching timeout to check everything on on", @parent)
+  setTimeout((function(parentNode) {
+    return function() {
+      var hidden = parentNode.querySelectorAll("[ignore-selected=false]");
+      if(hidden.length == 0) {
+        parentNode.querySelector("#successBox").setAttribute("ignore-visible", "true");
+        parentNode.querySelector("#successBox .close").onclick = function() {
+          parentNode.querySelector("#successBox").setAttribute("ignore-visible", "false");
+        }
+      }
+    }
+  })(@parent), 1000)
+}"""</code>
+</div>
+<style>
+#outputCanvas {
+  overflow: hidden
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+div.outer {
+  width:100%;
+  height:calc(100% - 0px);
+  background:#BBB;
+  overflow-y: scroll;
+  font-size: 16pt;
+}
+div.inner {
+  padding-top:10pt;
+  padding-left:10pt;
+  padding-right:10pt;
+  margin:0px;
+  max-width:500pt;
+  margin-left:auto;
+  margin-right:auto;
+  background:white;
+  line-height:1.2em;
+}
+@media only screen and (orientation: portrait) {
+    div.outer {
+        font-size: 16pt;
+    }
+    div.inner {
+      margin:0px;
+      width: calc(100%-10pt);
+      max-width: 98%  !important;
+      margin-left:auto;
+      margin-right:auto;
+      background:white
+    }
+    code.snippet {
+      font-size: 2em;
+    }
+}
+div.inner h1 {
+  line-height: 1em;
+}
+div.inner h2 {
+  padding-top: 20px;
+}
+div.intermediateresult {
+  font-style: italic;
+  color: #AAA;
+}
+code.snippet {
+  white-space:pre;
+  display:block;
+  margin:10px;
+  padding: 5px;
+  border:1px solid black;
+  overflow-x: scroll;
+  line-height:1em;
+}
+code.error {
+  color:red;
+  white-space:pre;
+}
+div.outputwrapper {
+  -webkit-box-shadow: 5px 10px 5px 0px rgba(0,0,0,0.5);
+  -moz-box-shadow: 5px 10px 5px 0px rgba(0,0,0,0.5);
+  box-shadow: 5px 10px 5px 0px rgba(0,0,0,0.5);
+  margin:10px;
+  padding:10px;
+  border:2px solid black;
+  margin-bottom: 15px;
+}</style>
+</div></body>
+</html>
