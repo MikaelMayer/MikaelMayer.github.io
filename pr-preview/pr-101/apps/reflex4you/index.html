@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="description" content="Interactive complex-function explorer with gesture-driven handles." />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Reflex4You" />
+  <script>
+    // Some static hosts serve this page at `/apps/reflex4you` (no trailing slash)
+    // without redirecting to `/apps/reflex4you/`. In that case, relative asset
+    // URLs like `./main.js` resolve to `/apps/main.js` and the app fails to load.
+    // Normalize to a trailing-slash URL before loading any modules.
+    (function () {
+      try {
+        const { pathname, search, hash } = window.location;
+        if (pathname && !pathname.endsWith('/') && !pathname.endsWith('.html')) {
+          window.location.replace(`${pathname}/${search || ''}${hash || ''}`);
+        }
+      } catch (_) {
+        // Ignore redirect failures (non-browser contexts).
+      }
+    })();
+  </script>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
+  <title>Reflex GPU demo – full-screen + live formulas</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      font-family: system-ui, sans-serif;
+    }
+
+    :root {
+      --viewport-top-offset: 0px;
+      --viewport-bottom-offset: 0px;
+      --safe-area-top: 0px;
+      --safe-area-bottom: 0px;
+    }
+
+    @supports (top: env(safe-area-inset-top)) {
+      :root {
+        --safe-area-top: env(safe-area-inset-top);
+        --safe-area-bottom: env(safe-area-inset-bottom);
+      }
+    }
+
+    /* Fullscreen canvas like in the working version */
+    #glcanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none; /* 1-finger pan on mobile */
+    }
+
+    #glcanvas.glcanvas--unavailable {
+      filter: grayscale(1);
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    mjx-assistive-mml {
+      display: none !important;
+    }
+
+    /* Error overlay positioned beneath finger indicators */
+    #error {
+      position: fixed;
+      left: 12px;
+      right: 12px;
+      top: calc(var(--safe-area-top) + var(--viewport-top-offset) + 104px);
+      padding: 8px 12px;
+      font-size: 13px;
+      color: #ffb4b4;
+      background: rgba(20, 0, 0, 0.9);
+      box-sizing: border-box;
+      max-height: 40vh;
+      overflow: hidden;
+      display: none;
+      pointer-events: none;
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      white-space: pre;
+      z-index: 20;
+    }
+
+    #error[data-error-severity="fatal"] {
+      pointer-events: auto;
+      user-select: text;
+      overflow: auto;
+    }
+
+    #error .error-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    #error .error-actions button {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.92);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 13px;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    #error .error-actions button:hover,
+    #error .error-actions button:focus-visible {
+      border-color: rgba(255, 255, 255, 0.4);
+      background: rgba(255, 255, 255, 0.12);
+      outline: none;
+    }
+
+    /* Formula panel: overlay above rendering, semi-transparent */
+    #formula-panel {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: calc(var(--viewport-bottom-offset) + var(--safe-area-bottom));
+      background: rgba(0, 0, 0, 0.65); /* transparent over the fractal */
+      color: #ddd;
+      padding: 8px 10px calc(10px + var(--safe-area-bottom));
+      box-sizing: border-box;
+      display: block;
+      pointer-events: auto;
+    }
+
+    #formula {
+      width: 100%;
+      resize: none;
+      border-radius: 4px;
+      border: 1px solid #555;
+      background: rgba(10, 10, 10, 0.9);
+      color: #eee;
+      font-family: monospace;
+      font-size: 24px;
+      padding: 8px;
+      line-height: 1.35;
+      max-height: 40vh;
+      min-height: 4.8em;
+      transition: min-height 0.15s ease, box-shadow 0.15s ease;
+      box-sizing: border-box;
+    }
+
+    #formula.expanded {
+      min-height: 16em; /* more lines visible when focused */
+      box-shadow: 0 0 0 1px #888;
+    }
+
+    #finger-indicator-stack {
+      position: fixed;
+      top: calc(var(--safe-area-top) + var(--viewport-top-offset) + 12px);
+      left: 12px;
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 30;
+      pointer-events: auto;
+    }
+
+    #finger-solo-anchor {
+      position: relative;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    #finger-solo-button {
+      max-width: min(78vw, 520px);
+      padding: 8px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.65);
+      color: #fefefe;
+      font-size: 14px;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s ease, border-color 0.15s ease;
+      text-align: left;
+      white-space: pre;
+      line-height: 1.35;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      touch-action: manipulation;
+    }
+
+    #finger-solo-button:hover,
+    #finger-solo-button:focus-visible {
+      background: rgba(0, 0, 0, 0.8);
+      border-color: rgba(255, 255, 255, 0.7);
+      outline: none;
+    }
+
+    #finger-solo-button[data-solo-mode="true"] {
+      border-style: dashed;
+      border-color: rgba(255, 255, 255, 0.75);
+    }
+
+    #finger-solo-dropdown {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      background: rgba(0, 0, 0, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 10px;
+      min-width: 240px;
+      max-width: min(86vw, 520px);
+      padding: 10px 10px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      opacity: 0;
+      transform: translateY(-6px);
+      pointer-events: none;
+      visibility: hidden;
+      overflow-x: hidden; /* prevent sideways scrolling on mobile */
+      transition: opacity 0.12s ease, transform 0.12s ease;
+    }
+
+    #finger-solo-dropdown[data-open="true"] {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+      visibility: visible;
+    }
+
+    .finger-solo-dropdown__title {
+      color: rgba(255, 255, 255, 0.88);
+      font-size: 13px;
+      letter-spacing: 0.02em;
+      display: flex;
+      gap: 10px;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+
+    .finger-solo-dropdown__hint {
+      color: rgba(255, 255, 255, 0.55);
+      font-size: 12px;
+      letter-spacing: 0.01em;
+    }
+
+    .finger-solo-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: min(48vh, 360px);
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .finger-solo-row {
+      display: grid;
+      grid-template-columns: 22px auto minmax(0, 1fr); /* value column can shrink */
+      align-items: center;
+      gap: 10px;
+      padding: 6px 6px;
+      border-radius: 8px;
+      min-width: 0;
+    }
+
+    .finger-solo-row--single {
+      grid-template-columns: auto 1fr;
+    }
+
+    .finger-solo-row:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .finger-solo-row__label {
+      color: rgba(255, 255, 255, 0.92);
+      font-size: 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      letter-spacing: 0.02em;
+      min-width: 0;
+    }
+
+    .finger-solo-row__value-wrap {
+      display: flex;
+      justify-content: flex-end;
+      min-width: 0;
+    }
+
+    .finger-solo-row__value {
+      width: 100%;
+      min-width: 0;
+      text-align: right;
+      padding: 6px 8px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(255, 255, 255, 0.03);
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 14px;
+      line-height: 1.2;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      box-sizing: border-box;
+    }
+
+    .finger-solo-row__value:hover,
+    .finger-solo-row__value:focus-visible {
+      border-color: rgba(255, 255, 255, 0.30);
+      background: rgba(255, 255, 255, 0.06);
+      outline: none;
+    }
+
+    .finger-solo-row__value-editor {
+      width: 100%;
+      display: none; /* toggled via inline styles */
+      gap: 6px;
+      align-items: center;
+      min-width: 0;
+      flex-direction: column; /* put ✓/✕ below the input */
+      align-items: stretch;
+    }
+
+    .finger-solo-row__value-input {
+      flex: 1 1 auto;
+      min-width: 0; /* avoid forcing horizontal overflow */
+      text-align: right;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.30);
+      background: rgba(0, 0, 0, 0.65);
+      color: rgba(255, 255, 255, 0.88);
+      font-size: 16px; /* avoid iOS zoom + improve readability */
+      line-height: 1.2;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      letter-spacing: 0.02em;
+      outline: none;
+      box-sizing: border-box;
+      width: 100%;
+    }
+
+    .finger-solo-row__value-actions {
+      display: flex;
+      gap: 6px;
+      flex: 0 0 auto;
+      justify-content: flex-end;
+    }
+
+    .finger-solo-row__value-action {
+      width: 36px;
+      height: 34px;
+      padding: 0;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.92);
+      font-size: 16px;
+      line-height: 1;
+      letter-spacing: 0.01em;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .finger-solo-row__value-action--cancel {
+      background: rgba(255, 255, 255, 0.03);
+      color: rgba(255, 255, 255, 0.70);
+    }
+
+    .finger-solo-row__value-action:hover,
+    .finger-solo-row__value-action:focus-visible {
+      border-color: rgba(255, 255, 255, 0.38);
+      background: rgba(255, 255, 255, 0.10);
+      outline: none;
+    }
+
+    .finger-solo-row__checkbox {
+      width: 18px;
+      height: 18px;
+      accent-color: #9ef0ff;
+    }
+
+    .finger-solo-row__edit {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.92);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      touch-action: manipulation;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .finger-solo-row__edit:hover,
+    .finger-solo-row__edit:focus-visible {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.38);
+      outline: none;
+    }
+
+    .finger-solo-row__edit svg {
+      width: 16px;
+      height: 16px;
+      display: block;
+    }
+
+    #finger-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 25;
+      display: none;
+    }
+
+    .finger-dot {
+      position: absolute;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.9);
+      background: rgba(0, 0, 0, 0.35);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      transform: translate(-50%, -50%);
+      text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+    }
+
+    .finger-dot.visible {
+      display: flex;
+    }
+
+    .finger-dot--fixed {
+      border-color: rgba(114, 176, 255, 0.9);
+      background: rgba(70, 130, 255, 0.3);
+    }
+
+    .finger-dot--dynamic {
+      border-color: rgba(255, 179, 71, 0.9);
+      background: rgba(255, 179, 71, 0.3);
+    }
+
+    .finger-dot--w {
+      border-color: rgba(183, 136, 255, 0.9);
+      background: rgba(183, 136, 255, 0.3);
+    }
+
+    .finger-dot[data-solo-mode="true"] {
+      border-style: dashed;
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
+    }
+
+    #menu-container {
+      position: fixed;
+      top: calc(var(--safe-area-top) + var(--viewport-top-offset) + 12px);
+      right: 12px;
+      z-index: 40;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+      pointer-events: auto;
+    }
+
+    #menu-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    #menu-anchor {
+      position: relative;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+
+    .icon-button {
+      width: 44px;
+      height: 44px;
+      border-radius: 22px;
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      background: rgba(0, 0, 0, 0.65);
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      padding: 0;
+      color: #fff;
+      touch-action: manipulation;
+      transition: border-color 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+    }
+
+    .icon-button:hover,
+    .icon-button:focus-visible {
+      border-color: rgba(255, 255, 255, 0.9);
+      background: rgba(0, 0, 0, 0.85);
+      outline: none;
+    }
+
+    .icon-button:disabled {
+      opacity: 0.35;
+      cursor: default;
+      pointer-events: none;
+    }
+
+    .icon-button svg {
+      width: 22px;
+      height: 22px;
+      display: block;
+    }
+
+    #menu-button {
+      width: 44px;
+      height: 44px;
+      border-radius: 22px;
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      background: rgba(0, 0, 0, 0.65);
+      display: inline-flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      padding: 0;
+      color: #fff;
+      touch-action: manipulation;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    #menu-button:hover,
+    #menu-button:focus-visible {
+      border-color: rgba(255, 255, 255, 0.9);
+      background: rgba(0, 0, 0, 0.85);
+      outline: none;
+    }
+
+    #menu-button span {
+      width: 20px;
+      height: 2px;
+      border-radius: 2px;
+      background: currentColor;
+      display: block;
+    }
+
+    #menu-dropdown {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      background: rgba(0, 0, 0, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 10px;
+      min-width: 160px;
+      padding: 6px 0;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      opacity: 0;
+      transform: translateY(-6px);
+      pointer-events: none;
+      visibility: hidden;
+      transition: opacity 0.12s ease, transform 0.12s ease;
+    }
+
+    #menu-dropdown.menu-dropdown--open {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+      visibility: visible;
+    }
+
+  #app-version-pill {
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(158, 240, 255, 0.8);
+      background: linear-gradient(120deg, rgba(11,17,34,0.85), rgba(16,57,89,0.9));
+      color: #9ef0ff;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+      text-transform: uppercase;
+  }
+
+    .menu-dropdown__item {
+      background: transparent;
+      border: 0;
+      color: #f1f1f1;
+      font-size: 14px;
+      padding: 10px 16px;
+      text-align: right;
+      cursor: pointer;
+      width: 100%;
+    }
+
+    .menu-dropdown__item:hover,
+    .menu-dropdown__item:focus-visible {
+      background: rgba(255, 255, 255, 0.08);
+      outline: none;
+    }
+
+    @media (max-width: 640px) {
+      .menu-dropdown__item {
+        font-size: 18px;
+      }
+    }
+
+    /* Viewer mode: hide UI chrome until first interaction. */
+    html.viewer-mode #menu-container,
+    html.viewer-mode #formula-panel,
+    html.viewer-mode #finger-indicator-stack,
+    html.viewer-mode #finger-overlay,
+    html.viewer-mode #error {
+      display: none !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+
+    /* Boot/recovery overlay should always be visible, even in viewer mode. */
+    #boot-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      z-index: 9999;
+      background: rgba(0, 0, 0, 0.92);
+      color: rgba(255, 255, 255, 0.92);
+      padding: calc(var(--safe-area-top) + 18px) 16px calc(var(--safe-area-bottom) + 18px);
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+
+    #boot-overlay .boot-card {
+      max-width: 720px;
+      margin: 0 auto;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.06);
+      padding: 14px 14px;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    #boot-overlay .boot-title {
+      font-weight: 650;
+      letter-spacing: 0.01em;
+      margin-bottom: 8px;
+    }
+
+    #boot-overlay .boot-msg {
+      white-space: pre-wrap;
+      color: rgba(255, 255, 255, 0.82);
+      font-size: 13px;
+      line-height: 1.4;
+      margin: 0 0 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    #boot-overlay .boot-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    #boot-overlay button {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.92);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+  </style>
+</head>
+<body>
+<div id="finger-indicator-stack" aria-live="polite"></div>
+<canvas id="glcanvas"></canvas>
+
+<div id="finger-overlay" aria-hidden="true"></div>
+
+<div id="menu-container">
+  <div id="menu-top-row">
+    <button
+      id="undo-button"
+      class="icon-button"
+      type="button"
+      aria-label="Undo"
+      title="Undo"
+      disabled
+    >
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+          d="M9 9H4V4"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+        <path
+          d="M4 9c1.6-3.4 5-5.5 8.8-5.5 5.4 0 9.7 4.3 9.7 9.7 0 5.4-4.3 9.7-9.7 9.7-3.4 0-6.4-1.6-8.2-4.2"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </button>
+    <button
+      id="redo-button"
+      class="icon-button"
+      type="button"
+      aria-label="Redo"
+      title="Redo"
+      disabled
+    >
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+          d="M15 9h5V4"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+        <path
+          d="M20 9c-1.6-3.4-5-5.5-8.8-5.5C5.8 3.5 1.5 7.8 1.5 13.2c0 5.4 4.3 9.7 9.7 9.7 3.4 0 6.4-1.6 8.2-4.2"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </button>
+    <div id="menu-anchor">
+      <button
+        id="menu-button"
+        type="button"
+        aria-label="Open menu"
+        aria-haspopup="menu"
+        aria-expanded="false"
+        aria-controls="menu-dropdown"
+      >
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+      </button>
+      <div id="menu-dropdown" role="menu" aria-hidden="true">
+        <button
+          type="button"
+          class="menu-dropdown__item"
+          data-menu-action="copy-share-link"
+          role="menuitem"
+        >
+          Copy share link
+        </button>
+        <button
+          type="button"
+          class="menu-dropdown__item"
+          data-menu-action="open-explore"
+          role="menuitem"
+        >
+          Explore parameters
+        </button>
+        <button
+          type="button"
+          class="menu-dropdown__item"
+          data-menu-action="reset"
+          role="menuitem"
+        >
+          Reset
+        </button>
+        <button
+          type="button"
+          class="menu-dropdown__item"
+          data-menu-action="set-animation-start"
+          role="menuitem"
+        >
+          Set animation start
+        </button>
+        <button
+          type="button"
+          class="menu-dropdown__item"
+          data-menu-action="set-animation-end"
+          role="menuitem"
+        >
+          Set animation end
+        </button>
+        <button
+          type="button"
+          class="menu-dropdown__item"
+          data-menu-action="set-animation-time"
+          role="menuitem"
+        >
+          Set animation time
+        </button>
+        <button
+          type="button"
+          class="menu-dropdown__item"
+          data-menu-action="save-image"
+          role="menuitem"
+        >
+          Save image
+        </button>
+        <button
+          type="button"
+          class="menu-dropdown__item"
+          data-menu-action="open-formula-view"
+          role="menuitem"
+        >
+          Show formula
+        </button>
+      </div>
+    </div>
+  </div>
+  <div id="app-version-pill" aria-live="polite" aria-label="Reflex4You version">v21</div>
+</div>
+
+<div id="error"></div>
+
+<div id="boot-overlay" role="dialog" aria-modal="true" aria-label="Reflex4You recovery">
+  <div class="boot-card">
+    <div class="boot-title">Reflex4You didn’t load</div>
+    <div id="boot-overlay-message" class="boot-msg"></div>
+    <div class="boot-actions">
+      <button id="boot-overlay-reload" type="button">Reload</button>
+    </div>
+  </div>
+</div>
+
+<div id="formula-panel">
+  <textarea id="formula" spellcheck="false" aria-label="Formula"></textarea>
+</div>
+
+<script type="module">
+  // Boot via dynamic import so we can catch failures (instead of a blank white screen).
+  (async function () {
+    const HTML_BUILD_ID = 'pr101-7b2ac406bb73f82ee0701833ce0354f7146d7670';
+    const error = document.getElementById('error');
+    const bootOverlay = document.getElementById('boot-overlay');
+    const bootOverlayMessage = document.getElementById('boot-overlay-message');
+    const bootOverlayReload = document.getElementById('boot-overlay-reload');
+    const key = 'reflex4you:bootReloadedOnce';
+
+    function showBootError(msg) {
+      const withBuild = `${msg}\n\nHTML build: ${HTML_BUILD_ID}`;
+      try {
+        if (bootOverlay) bootOverlay.style.display = 'block';
+        if (bootOverlayMessage) bootOverlayMessage.textContent = String(withBuild || '');
+      } catch (_) {
+        // ignore
+      }
+      if (!error) return;
+      error.setAttribute('data-error-severity', 'fatal');
+      error.textContent = withBuild;
+      error.style.display = 'block';
+    }
+
+    function reloadOnce(reason) {
+      try {
+        if (sessionStorage.getItem(key)) return false;
+        sessionStorage.setItem(key, String(Date.now()));
+      } catch (_) {
+        // If sessionStorage is unavailable, still try once (best effort).
+      }
+      try {
+        const url = new URL(location.href);
+        url.searchParams.set('bootfix', String(Date.now()));
+        url.hash = location.hash || '';
+        location.replace(url.toString());
+        return true;
+      } catch (_) {
+        try { location.reload(); } catch (_) {}
+        return true;
+      }
+    }
+
+    // If we don’t finish boot quickly, show a message and try a one-time reload.
+    const bootTimer = setTimeout(() => {
+      showBootError('Reflex4You did not finish loading.\nReloading to recover…');
+      reloadOnce('timeout');
+    }, 3500);
+
+    try {
+      // If a SW update is mid-flight, "controllerchange" can fix weird cold-start states.
+      if ('serviceWorker' in navigator && navigator.serviceWorker) {
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          reloadOnce('sw-controllerchange');
+        });
+        try {
+          const reg = await navigator.serviceWorker.getRegistration();
+          if (reg?.waiting) {
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          }
+        } catch (_) {
+          // ignore
+        }
+      }
+
+      if (bootOverlayReload) {
+        bootOverlayReload.addEventListener('click', () => reloadOnce('button'));
+      }
+
+      // IMPORTANT: PR previews often update HTML faster than JS due to browser/SW caching.
+      // Cache-bust the module URL using a per-deploy build id injected by CI.
+      window.__reflexHtmlBuildId = HTML_BUILD_ID;
+      await import(`./main.js?build=${encodeURIComponent(HTML_BUILD_ID)}`);
+      clearTimeout(bootTimer);
+    } catch (e) {
+      clearTimeout(bootTimer);
+      const details = e && (e.stack || e.message) ? String(e.stack || e.message) : String(e);
+      showBootError(`Reflex4You failed to start.\n\n${details}\n\nTap to reload.`);
+      // Make the “tap -> white screen” become “tap -> recover”.
+      document.addEventListener(
+        'pointerdown',
+        () => reloadOnce('tap'),
+        { once: true, capture: true },
+      );
+      reloadOnce('import-failed');
+    }
+  })();
+</script>
+
+</body>
+</html>

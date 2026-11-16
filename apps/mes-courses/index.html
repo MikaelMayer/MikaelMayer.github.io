@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Mes Courses - Budget</title>
+<!-- iPhone : ajoutée à l'écran d'accueil, la page s'ouvre en plein écran
+     comme une appli, avec son icône et son nom. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Mes Courses">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#ffffff">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, Roboto, "Segoe UI", Arial, sans-serif; color: #222; padding-bottom: 150px; background-color: #ece0cd; background-image: radial-gradient(circle at 22% 30%, rgba(214,158,138,.45) 0 17px, transparent 18px), radial-gradient(circle at 74% 62%, rgba(193,158,102,.40) 0 21px, transparent 22px), radial-gradient(circle at 56% 14%, rgba(214,158,138,.32) 0 11px, transparent 12px), radial-gradient(circle at 34% 82%, rgba(168,146,110,.35) 0 14px, transparent 15px), radial-gradient(circle at 86% 22%, rgba(193,158,102,.28) 0 9px, transparent 10px); background-size: 250px 250px, 310px 310px, 190px 190px, 270px 270px, 220px 220px; }
+  .barre-haut { background: #fff; padding: calc(10px + env(safe-area-inset-top)) 14px 10px; position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+  .barre-titre { font-size: 22px; font-weight: 800; color: #333; }
+  .barre-actions { display: flex; gap: 8px; }
+  .barre-actions button { width: 50px; height: 50px; font-size: 26px; border: none; border-radius: 50%; background: transparent; color: #333; }
+  .carte { background: #fff; border-radius: 24px; margin: 16px 14px; padding: 22px 18px 12px; box-shadow: 0 4px 18px rgba(60,45,20,.20); }
+  .carte-titre { font-size: 27px; font-weight: 800; color: #333; }
+  .filet-or { height: 3px; background: #d9b98c; border-radius: 2px; margin: 12px 0 2px; }
+  .produit { background: transparent; margin: 0; padding: 17px 2px; border-radius: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; border-bottom: 1px solid #ececec; }
+  .produit.pris { background: #eef0e9; border-radius: 12px; }
+  .produit.pris .nom { text-decoration: line-through; text-decoration-thickness: 3px; }
+  .info { flex: 1; min-width: 0; }
+  .nom { font-size: 23px; font-weight: 700; line-height: 1.25; color: #333; }
+  .ligne-total { min-width: 86px; cursor: pointer; padding: 8px 2px; text-align: right; font-size: 23px; font-weight: 700; color: #333; }
+  .coche { -webkit-appearance: none; appearance: none; width: 46px; height: 46px; flex: none; border: 3px solid #555; border-radius: 10px; background: #fff; position: relative; margin: 0; }
+  .coche:checked { background: #444; border-color: #444; }
+  .coche:checked::after { content: "✓"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 900; color: #fff; line-height: 1; }
+  footer { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; color: #111; padding: 14px 18px calc(12px + env(safe-area-inset-bottom)); z-index: 20; border-radius: 20px 20px 0 0; box-shadow: 0 -3px 14px rgba(0,0,0,.18); }
+  footer .tot { display: flex; justify-content: space-between; font-size: 22px; margin-bottom: 3px; color: #555; }
+  footer .tot.grand { font-size: 30px; font-weight: 800; color: #111; }
+  section.panneau { margin: 14px 12px; background: #fff; border-radius: 12px; padding: 14px; }
+  .panneau summary { font-size: 23px; font-weight: 700; cursor: pointer; }
+  section.panneau .dedans { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .panneau button, .panneau label.btn { display: block; text-align: center; padding: 17px; font-size: 23px; font-weight: 600; border: none; border-radius: 10px; background: #e8f3e9; color: #1b5e20; }
+  .panneau button.danger, .panneau label.danger { background: #fdecea; color: #b3261e; }
+  .panneau input, .panneau select { width: 100%; padding: 13px; font-size: 19px; border: 1px solid #b9beb6; border-radius: 8px; }
+  .vide { text-align: center; color: #555; padding: 34px 20px; font-size: 21px; line-height: 1.5; }
+  .astuce { font-size: 19px; color: #555; line-height: 1.5; }
+  input[type="file"] { display: none; }
+  .fond-prix { position: fixed; inset: 0; background: rgba(0,0,0,.38); z-index: 50; display: none; align-items: flex-end; }
+  .clavier-prix { background: #fff; width: 100%; border-radius: 24px 24px 0 0; padding: 20px 16px calc(16px + env(safe-area-inset-bottom)); box-shadow: 0 -4px 24px rgba(0,0,0,.25); }
+  .clavier-entete { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 0 2px 14px; border-bottom: 1px solid #eeeeee; }
+  #nomProduitPrix { font-size: 25px; font-weight: 700; color: #333; line-height: 1.15; }
+  #affichePrix { font-size: 42px; font-weight: 500; color: #333; min-width: 120px; text-align: right; line-height: 1; }
+  .clavier-grille { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px; }
+  .clavier-grille button { height: 66px; border: none; border-radius: 16px; background: #f7f7f7; color: #333; font-size: 30px; font-weight: 500; }
+  .clavier-grille button.bleu { background: #2f7df6; color: #fff; font-weight: 700; }
+  .clavier-grille button.enregistrer { background: #2f7df6; color: #fff; font-size: 22px; font-weight: 700; grid-column: span 2; }
+  .clavier-grille button.fermer { font-size: 22px; }
+
+  .modes { display: flex; padding: 12px 14px 0; }
+  .modes button { flex: 1; padding: 17px 6px; font-size: 20px; font-weight: 700; border: 2px solid #3a3a3a; border-radius: 12px; background: #fff; color: #3a3a3a; }
+  .modes button.actif { background: #3a3a3a; color: #fff; }
+  .produit.choisi { background: #fdf3d8; border-radius: 12px; }
+
+  /* Quantité : [−] 2 [+] sous le nom, sur les produits de la liste */
+  .ligne-qte { flex-basis: 100%; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-left: 58px; margin-top: -2px; }
+  .btn-qte { width: 50px; height: 50px; flex: none; padding: 0; border: 3px solid #555; border-radius: 12px; background: #fff; color: #222; font: inherit; font-size: 32px; font-weight: 800; line-height: 1; }
+  .btn-qte:disabled { opacity: .3; }
+  .val-qte { min-width: 56px; height: 50px; padding: 0 10px; border: 2px solid #9a9a9a; border-radius: 12px; background: #fff; color: #222; font: inherit; font-size: 25px; font-weight: 800; }
+  .detail-qte { font-size: 19px; font-weight: 700; color: #555; white-space: nowrap; }
+  #zoneFin { padding: 2px 14px 6px; }
+  #btnFin { width: 100%; padding: 19px; font-size: 21px; font-weight: 800; border: none; border-radius: 14px; background: #3a3a3a; color: #fff; }
+
+  .fenetre-reglages { position: fixed; inset: 0; z-index: 40; background: #f7f3ec; overflow-y: auto; padding: 18px 14px calc(20px + env(safe-area-inset-bottom)); }
+  .reglages-entete { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .reglages-titre { font-size: 26px; font-weight: 800; color: #333; }
+  .btn-fermer-reglages { font-size: 21px; font-weight: 700; padding: 13px 20px; border: none; border-radius: 12px; background: #3a3a3a; color: #fff; }
+  .reglages-corps { display: flex; flex-direction: column; gap: 10px; }
+  .zone-danger { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; border-top: 2px solid #f0d9d6; padding-top: 14px; }
+
+  /* Choix Clair / Sombre dans les réglages */
+  .reglage-titre { font-size: 21px; font-weight: 800; color: #333; margin-bottom: 2px; }
+  .choix-theme { display: flex; gap: 10px; margin-bottom: 14px; }
+  .panneau .choix-theme button { flex: 1; padding: 17px 6px; font-size: 22px; font-weight: 700; border: 3px solid #3a3a3a; border-radius: 12px; background: #fff; color: #3a3a3a; }
+  .panneau .choix-theme button.actif { background: #3a3a3a; color: #fff; }
+
+  /* Fenêtres (question, confirmation, saisie) dessinées dans la page :
+     elles marchent partout, même là où les fenêtres du navigateur sont
+     bloquées, et restent grosses et contrastées. */
+  .fond-dialogue { position: fixed; inset: 0; z-index: 70; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; padding: 16px; }
+  .fond-dialogue.avec-saisie { align-items: flex-start; padding-top: calc(28px + env(safe-area-inset-top)); }
+  .dialogue { background: #fff; width: 100%; max-width: 480px; border-radius: 22px; padding: 24px 20px 18px; box-shadow: 0 8px 30px rgba(0,0,0,.3); }
+  .dlg-texte { font-size: 23px; font-weight: 600; line-height: 1.4; color: #222; white-space: pre-line; overflow-wrap: anywhere; }
+  .dlg-saisie { display: none; width: 100%; margin-top: 16px; padding: 14px 12px; font: inherit; font-size: 23px; font-weight: 600; color: #222; background: #fff; border: 3px solid #555; border-radius: 12px; }
+  .dlg-boutons { display: flex; gap: 12px; margin-top: 22px; }
+  .dlg-boutons button { flex: 1; min-height: 62px; padding: 10px 8px; font: inherit; font-size: 22px; font-weight: 800; border-radius: 14px; }
+  .dlg-annuler { background: #fff; color: #333; border: 3px solid #555; }
+  .dlg-ok { background: #3a3a3a; color: #fff; border: 3px solid #3a3a3a; }
+
+  /* ============================ MODE SOMBRE ===============================
+     Pensé pour une vue basse : texte presque blanc sur fond presque noir
+     (contraste maximal sans éblouir), bordures épaisses et claires, aucun
+     motif décoratif en fond, cases et boutons actifs en négatif net. */
+  :root[data-theme="sombre"] { color-scheme: dark; }
+  [data-theme="sombre"] body { color: #f2f2f2; background: #121212; }
+  [data-theme="sombre"] .barre-haut { background: #1e1e1e; box-shadow: 0 2px 0 #3a3a3a; }
+  [data-theme="sombre"] .barre-titre,
+  [data-theme="sombre"] .barre-actions button,
+  [data-theme="sombre"] .carte-titre,
+  [data-theme="sombre"] .nom,
+  [data-theme="sombre"] .ligne-total,
+  [data-theme="sombre"] .reglages-titre,
+  [data-theme="sombre"] .reglage-titre,
+  [data-theme="sombre"] #nomProduitPrix,
+  [data-theme="sombre"] #affichePrix { color: #f2f2f2; }
+  [data-theme="sombre"] .carte { background: #1e1e1e; border: 2px solid #3a3a3a; box-shadow: none; }
+  [data-theme="sombre"] .filet-or { background: #c9a46e; }
+  [data-theme="sombre"] .produit { border-bottom-color: #3a3a3a; }
+  [data-theme="sombre"] .produit.choisi { background: #3d3415; }
+  [data-theme="sombre"] .btn-qte { background: #121212; color: #f2f2f2; border-color: #e0e0e0; }
+  [data-theme="sombre"] .val-qte { background: #121212; color: #f2f2f2; border-color: #8a8a8a; }
+  [data-theme="sombre"] .detail-qte { color: #d6d6d6; }
+  [data-theme="sombre"] .produit.pris { background: #1f3322; }
+  [data-theme="sombre"] .coche { background: #121212; border-color: #e0e0e0; }
+  [data-theme="sombre"] .coche:checked { background: #f2f2f2; border-color: #f2f2f2; }
+  [data-theme="sombre"] .coche:checked::after { color: #111; }
+  [data-theme="sombre"] footer { background: #1e1e1e; color: #f2f2f2; box-shadow: 0 -2px 0 #3a3a3a; }
+  [data-theme="sombre"] footer .tot { color: #d6d6d6; }
+  [data-theme="sombre"] footer .tot.grand { color: #fff; }
+  [data-theme="sombre"] .modes button { background: #1e1e1e; color: #f2f2f2; border-color: #e0e0e0; }
+  [data-theme="sombre"] .modes button.actif { background: #f2f2f2; color: #111; }
+  [data-theme="sombre"] #btnFin { background: #f2f2f2; color: #111; }
+  [data-theme="sombre"] .vide,
+  [data-theme="sombre"] .astuce { color: #d6d6d6; }
+  [data-theme="sombre"] .fenetre-reglages { background: #121212; }
+  [data-theme="sombre"] section.panneau,
+  [data-theme="sombre"] .panneau { background: #1e1e1e; }
+  [data-theme="sombre"] .btn-fermer-reglages { background: #f2f2f2; color: #111; }
+  [data-theme="sombre"] .panneau button,
+  [data-theme="sombre"] .panneau label.btn { background: #1f3a24; color: #b9f0bd; }
+  [data-theme="sombre"] .panneau button.danger,
+  [data-theme="sombre"] .panneau label.danger { background: #45201d; color: #ffc4bd; }
+  [data-theme="sombre"] .panneau input,
+  [data-theme="sombre"] .panneau select { background: #121212; color: #f2f2f2; border-color: #8a8a8a; }
+  [data-theme="sombre"] .zone-danger { border-top-color: #5a3a37; }
+  [data-theme="sombre"] .panneau .choix-theme button { background: #121212; color: #f2f2f2; border-color: #e0e0e0; }
+  [data-theme="sombre"] .panneau .choix-theme button.actif { background: #f2f2f2; color: #111; }
+  [data-theme="sombre"] .fond-prix { background: rgba(0,0,0,.65); }
+  [data-theme="sombre"] .fond-dialogue { background: rgba(0,0,0,.7); }
+  [data-theme="sombre"] .dialogue { background: #1e1e1e; border: 2px solid #5a5a5a; box-shadow: none; }
+  [data-theme="sombre"] .dlg-texte { color: #f2f2f2; }
+  [data-theme="sombre"] .dlg-saisie { background: #121212; color: #f2f2f2; border-color: #e0e0e0; }
+  [data-theme="sombre"] .dlg-annuler { background: #121212; color: #f2f2f2; border-color: #e0e0e0; }
+  [data-theme="sombre"] .dlg-ok { background: #f2f2f2; color: #111; border-color: #f2f2f2; }
+  [data-theme="sombre"] .clavier-prix { background: #1e1e1e; box-shadow: none; border-top: 2px solid #3a3a3a; }
+  [data-theme="sombre"] .clavier-entete { border-bottom-color: #3a3a3a; }
+  [data-theme="sombre"] .clavier-grille button { background: #2e2e2e; color: #f2f2f2; }
+  [data-theme="sombre"] .clavier-grille button.bleu,
+  [data-theme="sombre"] .clavier-grille button.enregistrer { background: #8ab4f8; color: #0b1a33; }
+</style>
+<script>
+  /* Applique le thème choisi avant l'affichage, pour éviter un flash blanc. */
+  try { if (localStorage.getItem('coursesTheme') === 'sombre') document.documentElement.setAttribute('data-theme', 'sombre'); } catch (e) {}
+</script>
+</head>
+<body>
+<div class="barre-haut">
+  <div class="barre-titre">🛒 Courses</div>
+  <div class="barre-actions">
+    <button onclick="ajouterProduit()" aria-label="Ajouter un produit">＋</button>
+    <button onclick="ouvrirReglages()" aria-label="Réglages">⚙️</button>
+  </div>
+</div>
+
+
+<div class="modes">
+  <button id="btnMode" onclick="basculerMode()">🛒 Aller au magasin</button>
+</div>
+
+<div class="carte">
+  <div class="carte-titre" id="titreMagasin" onclick="renommerMagasin()">Mes courses</div>
+  <div class="filet-or"></div>
+  <main id="liste"></main>
+</div>
+
+<div id="zoneFin" style="display:none;"><button id="btnFin" onclick="finirCourses()">✅ Fini les courses</button></div>
+
+<div id="fondReglages" class="fenetre-reglages" style="display:none;">
+  <div class="reglages-entete">
+    <div class="reglages-titre">⚙️ Réglages</div>
+    <button class="btn-fermer-reglages" onclick="fermerReglages()">Fermer</button>
+  </div>
+  <div class="panneau reglages-corps">
+    <div class="reglage-titre">Affichage</div>
+    <div class="choix-theme" role="group" aria-label="Affichage">
+      <button id="themeClair" onclick="choisirTheme('clair')">☀️ Clair</button>
+      <button id="themeSombre" onclick="choisirTheme('sombre')">🌙 Sombre</button>
+    </div>
+    <label class="btn" for="fichierProduits">📥 Importer un fichier</label>
+    <input type="file" id="fichierProduits" accept=".xlsx,.xls,.csv" onchange="importerProduits(this)">
+    <div class="astuce">Le fichier est lu ici, sur ton téléphone. Rien n'est envoyé sur internet.</div>
+    <button onclick="exporterSauvegarde()">💾 Sauvegarder</button>
+    <div class="astuce">Copie de sécurité, au cas où le navigateur serait réinitialisé.</div>
+    <div class="zone-danger">
+      <button class="danger" onclick="nouvelleListe()">🗑 Vider la liste</button>
+      <label class="btn danger" for="fichierSauvegarde">📤 Restaurer une sauvegarde</label>
+      <input type="file" id="fichierSauvegarde" accept=".json" onchange="importerSauvegarde(this)">
+      <button class="danger" id="btnDefaut" onclick="restaurerDefaut()">↩️ Restaurer la liste par défaut</button>
+    </div>
+  
+  </div>
+</div>
+
+<footer>
+  <div class="tot grand"><span>Total</span><span id="totEstime">0.00</span></div>
+  <div class="tot" id="lignePris" style="display:none;"><span>Pris</span><span id="totPris">0.00</span></div>
+  <div class="tot" id="ligneReste" style="display:none;"><span>Reste</span><span id="totReste">0.00</span></div>
+  <div class="tot" id="ligneAide" style="display:none;"><span id="ligneInfos"></span></div>
+</footer>
+
+<div id="fondPrix" class="fond-prix">
+  <div class="clavier-prix" role="dialog" aria-modal="true" aria-label="Changer le prix">
+    <div class="clavier-entete">
+      <div id="nomProduitPrix">Produit</div>
+      <div id="affichePrix">0.00</div>
+    </div>
+    <div class="clavier-grille">
+      <button onclick="touchePrix('7')">7</button>
+      <button onclick="touchePrix('8')">8</button>
+      <button onclick="touchePrix('9')">9</button>
+      <button class="bleu" onclick="touchePrix('effacer')">⌫</button>
+      <button onclick="touchePrix('4')">4</button>
+      <button onclick="touchePrix('5')">5</button>
+      <button onclick="touchePrix('6')">6</button>
+      <button class="bleu" onclick="touchePrix('+')">+</button>
+      <button onclick="touchePrix('1')">1</button>
+      <button onclick="touchePrix('2')">2</button>
+      <button onclick="touchePrix('3')">3</button>
+      <button class="bleu" onclick="touchePrix('-')">-</button>
+      <button onclick="touchePrix('.')">.</button>
+      <button onclick="touchePrix('0')">0</button>
+      <button onclick="touchePrix('÷')">÷</button>
+      <button class="bleu" onclick="touchePrix('×')">×</button>
+      <button class="fermer" onclick="fermerPrix()">Fermer</button>
+      <button class="enregistrer" onclick="enregistrerPrix()">Enregistrer</button>
+      <button class="bleu" onclick="touchePrix('=')">=</button>
+    </div>
+  </div>
+</div>
+
+<div id="fondDialogue" class="fond-dialogue">
+  <div class="dialogue" role="dialog" aria-modal="true" aria-labelledby="dlgTexte">
+    <div id="dlgTexte" class="dlg-texte"></div>
+    <input id="dlgSaisie" class="dlg-saisie" type="text" autocomplete="off" enterkeyhint="done">
+    <div class="dlg-boutons">
+      <button id="dlgAnnuler" class="dlg-annuler" onclick="annulerDialogue()">Annuler</button>
+      <button id="dlgOk" class="dlg-ok" onclick="validerDialogue()">OK</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================================
+   MES COURSES - BUDGET — code de l'application
+   ----------------------------------------------------------------------------
+   Fichier unique et autonome : aucun serveur, aucune librairie externe,
+   aucune connexion nécessaire. Tout se passe sur le téléphone.
+
+   STRUCTURE DES DONNÉES (variable "etat", sauvegardée en localStorage) :
+     etat.produits  : [{ id, nom, prix, unite, rayon }]
+                      unite vaut "pièce", "kg" ou "L" ; prix = prix à
+                      l'unité, au kg ou au litre selon le cas.
+     etat.selection : { idProduit: true } si le produit est sur la liste
+                      de courses (coché en préparation)
+     etat.pris      : { idProduit: true } si l'article est dans le
+                      chariot (coché en magasin)
+     etat.mode      : "prep" (préparation) ou "courses" (en magasin)
+     etat.quantites : { idProduit: nombre } quantité voulue pour un
+                      produit de la liste (absent = 1). Pièces : entier ;
+                      kg ou L : par pas de 0,5. Le prix d'une ligne vaut
+                      prix × quantité, arrondi au centime.
+   Le catalogue (etat.produits) est la liste de tout ce qu'il peut
+   acheter, ce n'est PAS la liste de courses. En préparation, il coche
+   ce qu'il lui faut : ça forme sa liste, et le Total en bas est le
+   budget estimé de cette liste. En magasin, il ne voit que sa liste ;
+   cocher = mis dans le chariot, l'article reste visible barré.
+   « Fini les courses » retire de la liste tout ce qui a été pris ; le
+   reste y reste pour la prochaine fois (sa quantité revient à 1 quand
+   il est retiré). Sur chaque ligne de la liste : [−] quantité [+] ;
+   toucher la quantité ouvre le clavier pour la taper directement.
+     etat.magasin   : titre affiché en haut de la liste
+                      (par exemple "Mes courses")
+
+   THÈME (clé localStorage séparée "coursesTheme" : "clair" ou "sombre") :
+     choisi dans ⚙️ Réglages > Affichage. Stocké à part de "etat" pour ne
+     pas être effacé par un import, une restauration ou « Vider la liste ».
+     Les couleurs du mode sombre sont dans la section CSS "MODE SOMBRE".
+     Dans l'appli Android, AppNative.setTheme() adapte aussi les barres du
+     téléphone et les fenêtres natives.
+
+   POUR MODIFIER L'APPLICATION : les fonctions d'affichage sont dans la
+   section "AFFICHAGE ET ACTIONS", les lectures de fichiers Excel/CSV dans
+   la section "PARSEURS". Les noms de fonctions appelés depuis le HTML
+   (afficher, importerProduits, ajouterProduit, exporterSauvegarde, basculerPris,
+   importerSauvegarde, nouvelleListe) ne doivent pas être renommés.
+   ============================================================================ */
+
+var CLE_STOCKAGE = 'coursesBudgetV1';
+var etat = { produits: [], quantites: {}, pris: {}, selection: {}, aideVue: false, mode: 'prep', magasin: 'Mes courses' };
+
+/* Version publique : aucun catalogue pré-rempli. */
+var PRODUITS_DEFAUT = [];
+
+function $(id) { return document.getElementById(id); }
+
+/* ==================== FENÊTRES DE DIALOGUE ====================
+   Remplacent alert / confirm / prompt du navigateur, qui sont bloqués
+   dans certains aperçus (le bouton ne faisait alors rien du tout).
+   S'utilisent avec await :
+     await informer('texte')               -> OK
+     if (await demander('texte ?')) ...    -> true (OK) ou false (Annuler)
+     var t = await saisir('texte', 'défaut') -> texte, ou null si Annuler */
+var dialogueEnCours = null;
+
+function ouvrirDialogue(texte, options) {
+  options = options || {};
+  if (dialogueEnCours) dialogueEnCours.resoudre(options.saisie != null ? null : false);
+  return new Promise(function (resoudre) {
+    dialogueEnCours = { resoudre: resoudre, saisie: options.saisie != null };
+    $('dlgTexte').textContent = texte;
+    var champ = $('dlgSaisie');
+    champ.style.display = options.saisie != null ? 'block' : 'none';
+    $('fondDialogue').classList.toggle('avec-saisie', options.saisie != null);
+    champ.value = options.saisie != null ? options.saisie : '';
+    $('dlgAnnuler').style.display = options.annuler ? '' : 'none';
+    $('dlgAnnuler').textContent = options.annuler || 'Annuler';
+    $('dlgOk').textContent = options.ok || 'OK';
+    $('fondDialogue').style.display = 'flex';
+    setTimeout(function () {
+      if (options.saisie != null) { champ.focus(); champ.select(); } else { $('dlgOk').focus(); }
+    }, 50);
+  });
+}
+
+function fermerDialogue(valeur) {
+  $('fondDialogue').style.display = 'none';
+  var d = dialogueEnCours;
+  dialogueEnCours = null;
+  if (d) d.resoudre(valeur);
+}
+
+function validerDialogue() {
+  if (!dialogueEnCours) return;
+  fermerDialogue(dialogueEnCours.saisie ? $('dlgSaisie').value : true);
+}
+
+function annulerDialogue() {
+  if (!dialogueEnCours) return;
+  fermerDialogue(dialogueEnCours.saisie ? null : false);
+}
+
+function informer(texte) { return ouvrirDialogue(texte, {}); }
+function demander(texte, oui, non) { return ouvrirDialogue(texte, { annuler: non || 'Annuler', ok: oui || 'OK' }); }
+function saisir(texte, defaut) { return ouvrirDialogue(texte, { annuler: 'Annuler', ok: 'OK', saisie: defaut || '' }); }
+
+function pluriel(n, un, plusieurs) { return n + ' ' + (n > 1 ? plusieurs : un); }
+
+/* Bouton « retour » du téléphone (appli Android) : ferme d'abord ce qui
+   est ouvert. Renvoie true si quelque chose a été fermé. */
+function retourAndroid() {
+  if (dialogueEnCours) { annulerDialogue(); return true; }
+  if ($('fondPrix').style.display === 'flex') { fermerPrix(); return true; }
+  if ($('fondReglages').style.display === 'block') { fermerReglages(); return true; }
+  return false;
+}
+
+/* La marge du bas suit la hauteur réelle du bandeau Total : avec une
+   grande taille de texte, le bandeau grandit et ne doit jamais
+   recouvrir le dernier produit ni le bouton « Fini les courses ». */
+function ajusterMargeBas() {
+  var pied = document.querySelector('footer');
+  if (pied) document.body.style.paddingBottom = (pied.offsetHeight + 24) + 'px';
+}
+
+function echapperHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/* ============================ PARSEURS (fonctions pures, testables) ======= */
+/* === DEBUT PARSEURS === */
+
+/* Minuscules sans accents, pour comparer les en-têtes de colonnes. */
+function normaliserTexte(s) {
+  return String(s == null ? '' : s).toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ').trim();
+}
+
+/* "1,25 €" -> 1.25 ; "1 234,56" -> 1234.56 ; nombre déjà numérique accepté. */
+function parseNombre(v) {
+  if (typeof v === 'number') return v;
+  if (v == null) return NaN;
+  var t = String(v).replace(/[€$£]/g, '').replace(/[\s\u00a0\u202f]/g, '')
+    .replace(',', '.');
+  if (t === '') return NaN;
+  var n = parseFloat(t);
+  return isNaN(n) ? NaN : n;
+}
+
+/* Devine l'unité de vente d'après le texte de la colonne unité. */
+function parseUnite(v) {
+  var t = normaliserTexte(v);
+  if (/kg|kilo/.test(t)) return 'kg';
+  if (/litre/.test(t) || t === 'l' || /\bl\b/.test(t) || /cl\b|ml\b/.test(t)) return 'L';
+  return 'pièce';
+}
+
+function decoderEntitesXml(s) {
+  return String(s)
+    .replace(/&#x([0-9a-fA-F]+);/g, function (m, h) { return String.fromCharCode(parseInt(h, 16)); })
+    .replace(/&#(\d+);/g, function (m, d) { return String.fromCharCode(parseInt(d, 10)); })
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
+/* Décompresse une entrée ZIP "deflate" (méthode 8) via DecompressionStream. */
+async function gonflerOctets(octets) {
+  if (typeof DecompressionStream === 'undefined') {
+    throw new Error('Navigateur trop ancien pour lire ce fichier Excel : exporte-le en CSV.');
+  }
+  var flux = new Blob([octets]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  var tampon = await new Response(flux).arrayBuffer();
+  return new Uint8Array(tampon);
+}
+
+/* Lit un fichier ZIP (donc un .xlsx) et renvoie { chemin: contenuTexte }
+   pour les seuls fichiers XML qu'il contient. */
+async function lireZipXml(tampon) {
+  var dv = new DataView(tampon);
+  var decodeur = new TextDecoder('utf-8');
+  var fin = -1;
+  var debutRecherche = Math.max(0, dv.byteLength - 22 - 65536);
+  for (var i = dv.byteLength - 22; i >= debutRecherche; i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { fin = i; break; }
+  }
+  if (fin < 0) throw new Error('Fichier illisible : ce n\'est pas un fichier Excel valide.');
+  var nombre = dv.getUint16(fin + 10, true);
+  var pos = dv.getUint32(fin + 16, true);
+  var fichiers = {};
+  for (var n = 0; n < nombre; n++) {
+    if (dv.getUint32(pos, true) !== 0x02014b50) break;
+    var methode = dv.getUint16(pos + 10, true);
+    var tailleComp = dv.getUint32(pos + 20, true);
+    var longNom = dv.getUint16(pos + 28, true);
+    var longExtra = dv.getUint16(pos + 30, true);
+    var longComm = dv.getUint16(pos + 32, true);
+    var posLocale = dv.getUint32(pos + 42, true);
+    var nom = decodeur.decode(new Uint8Array(tampon, pos + 46, longNom));
+    if (/\.xml$/.test(nom) || /\.rels$/.test(nom)) {
+      var longNomLocal = dv.getUint16(posLocale + 26, true);
+      var longExtraLocal = dv.getUint16(posLocale + 28, true);
+      var debutDonnees = posLocale + 30 + longNomLocal + longExtraLocal;
+      var comprime = new Uint8Array(tampon, debutDonnees, tailleComp);
+      if (methode === 0) {
+        fichiers[nom] = decodeur.decode(comprime);
+      } else if (methode === 8) {
+        fichiers[nom] = decodeur.decode(await gonflerOctets(comprime));
+      }
+    }
+    pos += 46 + longNom + longExtra + longComm;
+  }
+  return fichiers;
+}
+
+/* Extrait le texte de toutes les balises <t>...</t> d'un fragment XML. */
+function textesBaliseT(fragment) {
+  var morceaux = [];
+  var motif = /<t[^>]*>([\s\S]*?)<\/t>/g;
+  var m;
+  while ((m = motif.exec(fragment)) !== null) morceaux.push(decoderEntitesXml(m[1]));
+  return morceaux.join('');
+}
+
+/* Analyse un .xlsx (ArrayBuffer) et renvoie un tableau de lignes,
+   chaque ligne étant un tableau de chaînes (une par colonne). */
+async function analyserXlsx(tampon) {
+  var fichiers = await lireZipXml(tampon);
+  var partagees = [];
+  if (fichiers['xl/sharedStrings.xml']) {
+    var morceaux = fichiers['xl/sharedStrings.xml'].split('<si>');
+    for (var i = 1; i < morceaux.length; i++) {
+      var finSi = morceaux[i].indexOf('</si>');
+      partagees.push(textesBaliseT(finSi >= 0 ? morceaux[i].substring(0, finSi) : morceaux[i]));
+    }
+  }
+  var clesFeuilles = Object.keys(fichiers)
+    .filter(function (k) { return /^xl\/worksheets\/[^/]+\.xml$/.test(k); }).sort();
+  if (!clesFeuilles.length) throw new Error('Aucune feuille de calcul trouvée dans ce fichier.');
+  var cleFeuille = clesFeuilles.indexOf('xl/worksheets/sheet1.xml') >= 0
+    ? 'xl/worksheets/sheet1.xml' : clesFeuilles[0];
+  var xml = fichiers[cleFeuille];
+  var lignes = [];
+  var motifLigne = /<row[^>]*>([\s\S]*?)<\/row>/g;
+  var ml;
+  while ((ml = motifLigne.exec(xml)) !== null) {
+    var contenu = ml[1];
+    var cellules = [];
+    var motifCellule = /<c\b[^>]*?(?:\/>|>([\s\S]*?)<\/c>)/g;
+    var mc;
+    while ((mc = motifCellule.exec(contenu)) !== null) {
+      var balise = mc[0];
+      var corps = mc[1] || '';
+      var refM = /r="([A-Z]+)\d+"/.exec(balise);
+      var col = cellules.length;
+      if (refM) {
+        col = 0;
+        for (var j = 0; j < refM[1].length; j++) col = col * 26 + (refM[1].charCodeAt(j) - 64);
+        col = col - 1;
+      }
+      var typeM = /t="(\w+)"/.exec(balise);
+      var type = typeM ? typeM[1] : 'n';
+      var valeur = '';
+      var vM = /<v>([\s\S]*?)<\/v>/.exec(corps);
+      if (type === 's' && vM) {
+        var idx = parseInt(decoderEntitesXml(vM[1]), 10);
+        valeur = isNaN(idx) || partagees[idx] == null ? '' : partagees[idx];
+      } else if (type === 'inlineStr') {
+        valeur = textesBaliseT(corps);
+      } else if (vM) {
+        valeur = decoderEntitesXml(vM[1]);
+      }
+      while (cellules.length < col) cellules.push('');
+      cellules[col] = valeur;
+    }
+    lignes.push(cellules);
+  }
+  return lignes;
+}
+
+/* Analyse un texte CSV (séparateur ; ou , , guillemets gérés). */
+function analyserCsv(texte) {
+  var premiereLigne = texte.split(/\r\n|\r|\n/, 1)[0] || '';
+  var sep = premiereLigne.indexOf(';') >= 0 ? ';' : ',';
+  var lignes = [];
+  var ligne = [];
+  var champ = '';
+  var dansGuillemets = false;
+  var t = String(texte).replace(/^\uFEFF/, '');
+  for (var i = 0; i < t.length; i++) {
+    var c = t[i];
+    if (dansGuillemets) {
+      if (c === '"') {
+        if (t[i + 1] === '"') { champ += '"'; i++; } else { dansGuillemets = false; }
+      } else { champ += c; }
+    } else if (c === '"') {
+      dansGuillemets = true;
+    } else if (c === sep) {
+      ligne.push(champ); champ = '';
+    } else if (c === '\n' || c === '\r') {
+      if (c === '\r' && t[i + 1] === '\n') i++;
+      ligne.push(champ); champ = '';
+      lignes.push(ligne); ligne = [];
+    } else { champ += c; }
+  }
+  if (champ !== '' || ligne.length) { ligne.push(champ); lignes.push(ligne); }
+  return lignes;
+}
+
+var MOTS_PRODUIT = ['produit', 'article', 'nom', 'designation', 'libelle', 'item'];
+var MOTS_PRIX = ['prix', 'tarif', 'montant', 'cout', 'price'];
+var MOTS_UNITE = ['unite', 'vente', 'conditionnement'];
+var MOTS_RAYON = ['rayon', 'categorie', 'famille', 'secteur'];
+
+/* Cherche la ligne d'en-tête dans les 10 premières lignes et renvoie
+   { colonnes: {nom, prix, unite, rayon}, debut: indexPremièreDonnée }.
+   Sans en-tête : colonnes 0,1,2,3 par défaut. */
+function detecterColonnes(lignes) {
+  var defaut = { colonnes: { nom: 0, prix: 1, unite: 2, rayon: 3 }, debut: 0 };
+  function colonnePour(entete, mots) {
+    for (var c = 0; c < entete.length; c++) {
+      var h = normaliserTexte(entete[c]);
+      for (var k = 0; k < mots.length; k++) {
+        if (h === mots[k] || h.indexOf(mots[k]) >= 0) return c;
+      }
+    }
+    return -1;
+  }
+  for (var r = 0; r < Math.min(10, lignes.length); r++) {
+    var entete = lignes[r] || [];
+    var cNom = colonnePour(entete, MOTS_PRODUIT);
+    var cPrix = colonnePour(entete, MOTS_PRIX);
+    if (cNom >= 0 && cPrix >= 0 && cNom !== cPrix) {
+      var cUnite = colonnePour(entete, MOTS_UNITE);
+      var cRayon = colonnePour(entete, MOTS_RAYON);
+      return {
+        colonnes: {
+          nom: cNom, prix: cPrix,
+          unite: cUnite >= 0 ? cUnite : -1,
+          rayon: cRayon >= 0 ? cRayon : -1
+        },
+        debut: r + 1
+      };
+    }
+  }
+  return defaut;
+}
+
+/* Transforme les lignes brutes (Excel ou CSV) en liste de produits. */
+function lignesEnProduits(lignes, prefixeId) {
+  var detection = detecterColonnes(lignes);
+  var col = detection.colonnes;
+  var produits = [];
+  for (var r = detection.debut; r < lignes.length; r++) {
+    var ligne = lignes[r] || [];
+    var nom = String(ligne[col.nom] == null ? '' : ligne[col.nom]).trim();
+    if (!nom) continue;
+    var prix = parseNombre(ligne[col.prix]);
+    if (isNaN(prix) || prix < 0) continue;
+    produits.push({
+      id: prefixeId + '_' + r,
+      nom: nom,
+      prix: prix,
+      unite: col.unite >= 0 ? parseUnite(ligne[col.unite]) : 'pièce',
+      rayon: col.rayon >= 0 ? String(ligne[col.rayon] == null ? '' : ligne[col.rayon]).trim() : ''
+    });
+  }
+  return produits;
+}
+
+/* === FIN PARSEURS === */
+
+/* ============================ PERSISTANCE ================================== */
+
+function sauvegarder() {
+  try { localStorage.setItem(CLE_STOCKAGE, JSON.stringify(etat)); } catch (e) { /* stockage plein ou bloqué : on continue sans planter */ }
+}
+
+function charger() {
+  /* Renvoie true si des données existaient déjà en mémoire. */
+  try {
+    var brut = localStorage.getItem(CLE_STOCKAGE);
+    if (!brut) return false;
+    var donnees = JSON.parse(brut);
+    if (donnees && Array.isArray(donnees.produits)) {
+      etat.produits = donnees.produits;
+      etat.quantites = donnees.quantites || {};
+      etat.pris = donnees.pris || {};
+      etat.selection = donnees.selection || {};
+      etat.aideVue = !!donnees.aideVue;
+      etat.mode = donnees.mode === 'courses' ? 'courses' : 'prep';
+      etat.magasin = donnees.magasin || 'Mes courses';
+      return true;
+    }
+  } catch (e) { /* données corrompues : on repart de zéro */ }
+  return false;
+}
+
+/* ============================ IMPORT PRODUITS ============================== */
+
+async function importerProduits(champ) {
+  var fichier = champ.files && champ.files[0];
+  champ.value = '';
+  if (!fichier) return;
+  var nomFichier = fichier.name.toLowerCase();
+  try {
+    var lignes;
+    if (/\.csv$/.test(nomFichier)) {
+      lignes = analyserCsv(await fichier.text());
+    } else if (/\.xlsx$/.test(nomFichier)) {
+      lignes = await analyserXlsx(await fichier.arrayBuffer());
+    } else if (/\.xls$/.test(nomFichier)) {
+      await informer('Ce format Excel ancien (.xls) n\'est pas lu directement.\nRéenregistre le fichier en .xlsx ou en .csv, puis réessaie.');
+      return;
+    } else {
+      await informer('Format non reconnu : choisis un fichier .xlsx ou .csv.');
+      return;
+    }
+    var nouveaux = lignesEnProduits(lignes, 'p' + Date.now().toString(36));
+    if (!nouveaux.length) {
+      await informer('Aucun produit trouvé dans ce fichier.\nVérifie qu\'il contient bien une colonne produit et une colonne prix.');
+      return;
+    }
+    if (etat.produits.length &&
+        !(await demander('Importer ' + nouveaux.length + ' produits et remplacer le catalogue actuel ?\nLa liste en cours sera effacée.', 'Importer'))) {
+      return;
+    }
+    etat.produits = nouveaux;
+    etat.quantites = {};
+    etat.pris = {};
+    etat.mode = 'prep';
+    sauvegarder();
+    afficher();
+    await informer(nouveaux.length + ' produits importés. 🎉\nTu peux maintenant préparer ta liste.');
+  } catch (err) {
+    await informer('Impossible de lire ce fichier.\n' + (err && err.message ? err.message : '') +
+      '\n\nAstuce : dans Excel, "Enregistrer sous" au format CSV, puis importe le CSV.');
+  }
+}
+
+async function ajouterProduit() {
+  var nom = await saisir('Nom du nouveau produit :', '');
+  if (nom === null) return;
+  nom = nom.trim();
+  if (!nom) return;
+  ouvrirEditeurPrix({ nouveauNom: nom }, 0, nom);
+}
+
+/* ============================ SAUVEGARDE FICHIER ========================= */
+
+function estIPhone() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function exporterSauvegarde() {
+  var contenu = JSON.stringify({
+    application: 'courses-budget', version: 1,
+    produits: etat.produits, quantites: etat.quantites, pris: etat.pris, selection: etat.selection, magasin: etat.magasin
+  }, null, 2);
+  /* iPhone : le téléchargement direct marche mal dans une appli d'écran
+     d'accueil ; le menu Partager propose « Enregistrer dans Fichiers ». */
+  if (estIPhone() && window.File && navigator.canShare) {
+    try {
+      var fichier = new File([contenu], 'courses-sauvegarde.json', { type: 'application/json' });
+      if (navigator.canShare({ files: [fichier] })) {
+        navigator.share({ files: [fichier], title: 'Sauvegarde Mes Courses' }).catch(function () {});
+        return;
+      }
+    } catch (e) { /* on passe au téléchargement classique */ }
+  }
+  var lien = document.createElement('a');
+  lien.href = URL.createObjectURL(new Blob([contenu], { type: 'application/json' }));
+  lien.download = 'courses-sauvegarde.json';
+  document.body.appendChild(lien);
+  lien.click();
+  lien.remove();
+  setTimeout(function () { URL.revokeObjectURL(lien.href); }, 4000);
+}
+
+async function importerSauvegarde(champ) {
+  var fichier = champ.files && champ.files[0];
+  champ.value = '';
+  if (!fichier) return;
+  try {
+    var donnees = JSON.parse(await fichier.text());
+    if (!donnees || !Array.isArray(donnees.produits)) throw new Error('format');
+    etat.produits = donnees.produits;
+    etat.quantites = donnees.quantites || {};
+    etat.pris = donnees.pris || {};
+    etat.selection = donnees.selection || {};
+    etat.magasin = donnees.magasin || etat.magasin;
+    sauvegarder();
+    afficher();
+    await informer('Sauvegarde restaurée : ' + etat.produits.length + ' produits retrouvés.');
+  } catch (e) {
+    await informer('Ce fichier de sauvegarde n\'a pas pu être lu.');
+  }
+}
+
+/* ============================ AFFICHAGE ET ACTIONS ========================= */
+
+/* Un seul bouton pour passer de la préparation au magasin, et retour. */
+function formaterPrix(n) {
+  /* Même présentation que l'ancienne application de l'utilisateur :
+     deux décimales avec un point, sans symbole (ex. 1.79, 189.92). */
+  return n.toFixed(2);
+}
+
+function produitParId(id) {
+  for (var i = 0; i < etat.produits.length; i++) {
+    if (etat.produits[i].id === id) return etat.produits[i];
+  }
+  return null;
+}
+
+/* ==================== QUANTITÉS ==================== */
+
+/* Pas du [−]/[+] : 1 pour les pièces, 0,5 pour le kg et le litre. */
+function pasQte(p) { return p && p.unite !== 'pièce' ? 0.5 : 1; }
+
+function qte(id) {
+  var q = etat.quantites[id];
+  return (typeof q === 'number' && isFinite(q) && q > 0) ? q : 1;
+}
+
+function formaterQte(q) { return (Math.round(q * 1000) / 1000).toString(); }
+
+function texteQte(p) {
+  var t = formaterQte(qte(p.id));
+  return p.unite === 'pièce' ? t : t + ' ' + p.unite;
+}
+
+/* Prix d'une ligne de la liste, en centimes (évite les erreurs d'arrondi). */
+function centimesLigne(p) { return Math.round(p.prix * qte(p.id) * 100); }
+
+/* [−] 2 [+] × 1.79 : sur sa propre ligne, sous le nom, pour les produits
+   de la liste (les trois boutons restent côte à côte même sur un petit écran). */
+function htmlQte(p) {
+  var q = qte(p.id);
+  var id = p.id;
+  return '<div class="ligne-qte">' +
+    '<button class="btn-qte" aria-label="Moins" onclick="changerQte(\'' + id + '\', -1)"' +
+      (q <= pasQte(p) ? ' disabled' : '') + '>−</button>' +
+    '<button class="val-qte" aria-label="Quantité : toucher pour la taper" onclick="saisirQte(\'' + id + '\')">' +
+      echapperHtml(texteQte(p)) + '</button>' +
+    '<button class="btn-qte" aria-label="Plus" onclick="changerQte(\'' + id + '\', 1)">+</button>' +
+    (q !== 1 ? '<span class="detail-qte">× ' + formaterPrix(p.prix) + '</span>' : '') +
+    '</div>';
+}
+
+/* Met à jour une seule ligne (quantité et prix) sans tout réafficher,
+   pour ne pas perdre sa place dans la liste. */
+function majLigne(id) {
+  var p = produitParId(id);
+  var ligne = document.querySelector('.produit[data-id="' + CSS.escape(id) + '"]');
+  if (!p || !ligne) return;
+  var ancienne = ligne.querySelector('.ligne-qte');
+  if (ancienne) ancienne.remove();
+  var surListe = !!etat.selection[id];
+  if (surListe) ligne.insertAdjacentHTML('beforeend', htmlQte(p));
+  ligne.querySelector('.ligne-total').textContent =
+    formaterPrix((surListe ? centimesLigne(p) : Math.round(p.prix * 100)) / 100);
+}
+
+function changerQte(id, sens) {
+  var p = produitParId(id);
+  if (!p) return;
+  var pas = pasQte(p);
+  var q = Math.round((qte(id) + sens * pas) * 1000) / 1000;
+  if (q < pas) q = pas;
+  if (q === 1) delete etat.quantites[id]; else etat.quantites[id] = q;
+  sauvegarder();
+  majLigne(id);
+  majTotaux();
+}
+
+/* Toucher la quantité : le clavier s'ouvre pour la taper (ex. 12). */
+function saisirQte(id) {
+  var p = produitParId(id);
+  if (!p) return;
+  ouvrirEditeurPrix({ quantite: id }, qte(id), 'Quantité — ' + p.nom, formaterQte(qte(id)));
+}
+
+function majTotaux() {
+  var total = 0, prisTotal = 0, nb = 0; /* en centimes */
+  etat.produits.forEach(function (p) {
+    if (etat.selection[p.id]) {
+      nb++;
+      var c = centimesLigne(p);
+      total += c;
+      if (etat.pris[p.id]) prisTotal += c;
+    }
+  });
+  $('totEstime').textContent = formaterPrix(total / 100);
+  var enMagasin = etat.mode === 'courses';
+  /* En magasin seulement : Pris et Reste, chacun sur sa ligne. */
+  $('lignePris').style.display = enMagasin ? 'flex' : 'none';
+  $('ligneReste').style.display = enMagasin ? 'flex' : 'none';
+  if (enMagasin) {
+    $('totPris').textContent = formaterPrix(prisTotal / 100);
+    $('totReste').textContent = formaterPrix((total - prisTotal) / 100);
+  }
+  var texte = '';
+  if (!enMagasin && !etat.aideVue) {
+    /* Le seul texte d'aide, montre une unique fois au premier lancement. */
+    if (nb === 0) texte = 'Coche ce qu\'il faut acheter.';
+    etat.aideVue = true;
+    sauvegarder();
+  }
+  $('ligneInfos').textContent = texte;
+  $('ligneAide').style.display = texte ? 'flex' : 'none';
+}
+
+function afficher() {
+  fermerReglages();
+  $('titreMagasin').textContent = etat.magasin || 'Courses';
+  var modeCourses = etat.mode === 'courses';
+  var btnMode = $('btnMode');
+  btnMode.textContent = modeCourses ? '📝 Retour à la préparation' : '🛒 Aller au magasin';
+  btnMode.classList.toggle('actif', modeCourses);
+  $('zoneFin').style.display = modeCourses ? 'block' : 'none';
+  var liste = $('liste');
+
+  if (!etat.produits.length) {
+    liste.innerHTML = '<div class="vide">Aucun produit.<br><br>' +
+      'Ajoute-en avec le ＋ en haut.<br><br>Ou, dans ⚙️ Réglages : importe ton fichier Excel, ou restaure une sauvegarde.</div>';
+    majTotaux();
+    return;
+  }
+
+  var produitsTries = etat.produits.slice().sort(function (a, b) { return a.nom.localeCompare(b.nom, 'fr'); });
+  var html = '';
+
+  if (!modeCourses) {
+    /* PREPARATION : tout le catalogue, c'est-a-dire tout ce qu'il peut
+       acheter. Cocher un produit le met sur la liste de courses. */
+    produitsTries.forEach(function (p) {
+      var choisi = !!etat.selection[p.id];
+      html += '<div class="produit' + (choisi ? ' choisi' : '') + '" data-id="' + echapperHtml(p.id) + '">' +
+        '<input type="checkbox" class="coche"' + (choisi ? ' checked' : '') +
+        ' onchange="basculerSelection(\'' + p.id + '\', this)">' +
+        '<div class="info"><div class="nom" onclick="renommerProduit(\'' + p.id + '\')">' + echapperHtml(p.nom) + '</div></div>' +
+        '<div class="ligne-total" onclick="modifierPrix(\'' + p.id + '\')">' +
+        formaterPrix((choisi ? centimesLigne(p) : Math.round(p.prix * 100)) / 100) + '</div>' +
+        (choisi ? htmlQte(p) : '') +
+        '</div>';
+    });
+  } else {
+    /* EN MAGASIN : seulement la liste de courses. Cocher = dans le
+       chariot ; l'article reste visible, barre, totaux toujours en bas. */
+    var selection = produitsTries.filter(function (p) { return etat.selection[p.id]; });
+    if (!selection.length) {
+      html = '<div class="vide">Ta liste est vide.<br><br>Coche tes produits en préparation.</div>';
+    }
+    selection.forEach(function (p) {
+      var coche = !!etat.pris[p.id];
+      html += '<div class="produit' + (coche ? ' pris' : '') + '" data-id="' + echapperHtml(p.id) + '">' +
+        '<input type="checkbox" class="coche"' + (coche ? ' checked' : '') +
+        ' onchange="basculerPris(\'' + p.id + '\', this)">' +
+        '<div class="info"><div class="nom">' + echapperHtml(p.nom) + '</div></div>' +
+        '<div class="ligne-total">' + formaterPrix(centimesLigne(p) / 100) + '</div>' +
+        htmlQte(p) +
+        '</div>';
+    });
+  }
+  liste.innerHTML = html;
+  majTotaux();
+}
+
+/* En magasin : cocher met à jour la ligne et les totaux sans tout
+   réafficher, pour ne pas perdre sa place dans la liste. */
+function basculerPris(id, caseACocher) {
+  if (caseACocher.checked) { etat.pris[id] = true; } else { delete etat.pris[id]; }
+  var ligne = caseACocher.closest('.produit');
+  if (ligne) ligne.classList.toggle('pris', caseACocher.checked);
+  sauvegarder();
+  majTotaux();
+}
+
+/* ==================== MODES, SELECTION, CHARIOT ==================== */
+
+function basculerMode() {
+  etat.mode = etat.mode === 'courses' ? 'prep' : 'courses';
+  sauvegarder();
+  afficher();
+}
+
+/* Preparation : cocher met le produit sur la liste de courses (ou l'en
+   retire, et dans ce cas il sort aussi du chariot). Mise a jour de la
+   ligne et des totaux sans reafficher toute la liste. */
+function basculerSelection(id, caseACocher) {
+  if (caseACocher.checked) { etat.selection[id] = true; }
+  else { delete etat.selection[id]; delete etat.pris[id]; delete etat.quantites[id]; }
+  var ligne = caseACocher.closest('.produit');
+  if (ligne) ligne.classList.toggle('choisi', caseACocher.checked);
+  sauvegarder();
+  majLigne(id);
+  majTotaux();
+}
+
+/* Fini les courses : tout ce qui est dans le chariot (coche en magasin)
+   sort de la liste, c'est achete. Ce qui n'a pas ete pris reste sur la
+   liste pour la prochaine fois. */
+async function finirCourses() {
+  var nbPris = etat.produits.filter(function (p) { return etat.pris[p.id] && etat.selection[p.id]; }).length;
+  if (!nbPris) {
+    await informer('Aucun article n\'est coché.\n\nCoche d\'abord les articles mis dans le chariot, puis touche « Fini les courses ».');
+    return;
+  }
+  if (!(await demander('Fini les courses ?\n\n' + pluriel(nbPris, 'article pris sera retiré', 'articles pris seront retirés') + ' de la liste.',
+      'Oui, fini', 'Pas encore'))) return;
+  etat.produits.forEach(function (p) {
+    if (etat.pris[p.id]) { delete etat.pris[p.id]; delete etat.selection[p.id]; delete etat.quantites[p.id]; }
+  });
+  sauvegarder();
+  afficher();
+  var reste = etat.produits.filter(function (p) { return etat.selection[p.id]; }).length;
+  await informer('✅ Courses terminées.\n\n' + pluriel(nbPris, 'article retiré', 'articles retirés') + ' de la liste.' +
+    (reste ? '\n' + pluriel(reste, 'article reste', 'articles restent') + ' pour la prochaine fois.' : ''));
+}
+
+/* ==================== CLAVIER DE PRIX ====================
+   Même principe que sur sa capture des Tortis : quand on touche un
+   prix, un panneau monte du bas avec le nom du produit, le prix en
+   très gros, et un grand clavier numérique bleu et gris, avec les
+   touches + - × ÷ = comme une calculatrice. « Enregistrer » écrit le
+   prix, « Fermer » annule. Aucune boîte native du navigateur. */
+var editionPrix = null;
+var saisiePrix = '0';
+var operationPrix = null;
+var valeurPrecedentePrix = null;
+var repartirSaisiePrix = false;
+
+/* Le même clavier sert pour les prix et pour les quantités :
+   cible = { id } (prix), { nouveauNom } (nouveau produit) ou { quantite: id }.
+   texteInitial, s'il est donné, remplace l'affichage « 0.00 ». */
+function ouvrirEditeurPrix(cible, prixInitial, nomAffiche, texteInitial) {
+  editionPrix = cible;
+  saisiePrix = texteInitial != null ? String(texteInitial) : (prixInitial || 0).toFixed(2);
+  operationPrix = null;
+  valeurPrecedentePrix = null;
+  repartirSaisiePrix = true;
+  $('nomProduitPrix').textContent = nomAffiche;
+  $('fondPrix').style.display = 'flex';
+  majAffichagePrix();
+}
+
+function modifierPrix(id) {
+  var p = produitParId(id);
+  if (!p) return;
+  /* Avec une quantité, la ligne montre le total : on précise que le
+     clavier modifie le prix d'UN article. */
+  var titre = etat.selection[id] && qte(id) !== 1 ? 'Prix à l\'unité — ' + p.nom : p.nom;
+  ouvrirEditeurPrix({ id: id }, p.prix, titre);
+}
+
+function majAffichagePrix() {
+  $('affichePrix').textContent = saisiePrix || '0';
+}
+
+function nombreSaisiePrix() {
+  var n = parseFloat(saisiePrix);
+  return isNaN(n) ? 0 : n;
+}
+
+function formaterResultatPrix(n) {
+  if (!isFinite(n)) return '0';
+  return (Math.round(n * 1000000) / 1000000).toString();
+}
+
+function calculerOperationPrix(a, b, op) {
+  if (op === '+') return a + b;
+  if (op === '-') return a - b;
+  if (op === '×') return a * b;
+  if (op === '÷') return b === 0 ? a : a / b;
+  return b;
+}
+
+function resoudreSaisiePrix() {
+  if (operationPrix !== null && valeurPrecedentePrix !== null) {
+    saisiePrix = formaterResultatPrix(calculerOperationPrix(valeurPrecedentePrix, nombreSaisiePrix(), operationPrix));
+    operationPrix = null;
+    valeurPrecedentePrix = null;
+    repartirSaisiePrix = true;
+  }
+}
+
+function touchePrix(t) {
+  if (!editionPrix) return;
+  if (t >= '0' && t <= '9') {
+    if (repartirSaisiePrix) { saisiePrix = ''; repartirSaisiePrix = false; }
+    if (saisiePrix === '0') saisiePrix = t;
+    else if (saisiePrix.replace('.', '').length < 12) saisiePrix += t;
+  } else if (t === '.') {
+    if (repartirSaisiePrix) { saisiePrix = '0'; repartirSaisiePrix = false; }
+    if (saisiePrix.indexOf('.') < 0) saisiePrix += '.';
+  } else if (t === 'effacer') {
+    repartirSaisiePrix = false;
+    saisiePrix = saisiePrix.length > 1 ? saisiePrix.slice(0, -1) : '0';
+  } else if (t === '+' || t === '-' || t === '×' || t === '÷') {
+    if (operationPrix !== null && valeurPrecedentePrix !== null && !repartirSaisiePrix) resoudreSaisiePrix();
+    valeurPrecedentePrix = nombreSaisiePrix();
+    operationPrix = t;
+    repartirSaisiePrix = true;
+  } else if (t === '=') {
+    resoudreSaisiePrix();
+  }
+  majAffichagePrix();
+}
+
+function fermerPrix() {
+  editionPrix = null;
+  $('fondPrix').style.display = 'none';
+}
+
+async function enregistrerPrix() {
+  if (!editionPrix) return;
+  resoudreSaisiePrix();
+  if (editionPrix.quantite) {
+    var idQ = editionPrix.quantite;
+    var pQ = produitParId(idQ);
+    var q = nombreSaisiePrix();
+    q = pQ && pQ.unite === 'pièce' ? Math.round(q) : Math.round(q * 1000) / 1000;
+    fermerPrix();
+    if (!pQ) return;
+    if (!isFinite(q) || q <= 0) {
+      if (!(await demander('Retirer « ' + pQ.nom + ' » de la liste ?', 'Retirer'))) return;
+      delete etat.selection[idQ]; delete etat.pris[idQ]; delete etat.quantites[idQ];
+    } else if (q === 1) {
+      delete etat.quantites[idQ];
+    } else {
+      etat.quantites[idQ] = q;
+    }
+    sauvegarder();
+    afficher();
+    return;
+  }
+  var prix = Math.round(nombreSaisiePrix() * 100) / 100;
+  if (!isFinite(prix) || prix < 0) prix = 0;
+  if (editionPrix.id) {
+    var p = produitParId(editionPrix.id);
+    if (p) p.prix = prix;
+  } else if (editionPrix.nouveauNom) {
+    etat.produits.push({ id: 'p' + Date.now(), nom: editionPrix.nouveauNom, prix: prix, unite: 'pièce', rayon: '' });
+  }
+  fermerPrix();
+  sauvegarder();
+  afficher();
+}
+
+/* Le titre en haut de la carte est le nom de la liste / du magasin,
+   comme dans l'ancienne application (ex. « Mes courses »).
+   On le change en le touchant. */
+async function renommerMagasin() {
+  var reponse = await saisir('Titre de la liste :', etat.magasin || 'Courses');
+  if (reponse === null) return;
+  reponse = reponse.trim();
+  if (!reponse) return;
+  etat.magasin = reponse;
+  $('titreMagasin').textContent = reponse;
+  sauvegarder();
+}
+
+/* ==================== THÈME CLAIR / SOMBRE ==================== */
+var CLE_THEME = 'coursesTheme';
+
+function themeEnregistre() {
+  try { return localStorage.getItem(CLE_THEME) === 'sombre' ? 'sombre' : 'clair'; }
+  catch (e) { return 'clair'; }
+}
+
+function appliquerTheme(theme) {
+  var sombre = theme === 'sombre';
+  if (sombre) document.documentElement.setAttribute('data-theme', 'sombre');
+  else document.documentElement.removeAttribute('data-theme');
+  var bc = $('themeClair'), bs = $('themeSombre');
+  bc.classList.toggle('actif', !sombre); bc.setAttribute('aria-pressed', String(!sombre));
+  bs.classList.toggle('actif', sombre); bs.setAttribute('aria-pressed', String(sombre));
+  /* Appli Android : barres du téléphone et fenêtres natives assorties. */
+  try { if (window.AppNative && window.AppNative.setTheme) window.AppNative.setTheme(sombre ? 'sombre' : 'clair'); } catch (e) {}
+  var meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', sombre ? '#1e1e1e' : '#ffffff');
+}
+
+function choisirTheme(theme) {
+  try { localStorage.setItem(CLE_THEME, theme); } catch (e) {}
+  appliquerTheme(theme);
+}
+
+/* Boutons ＋ et ⚙️ de la barre du haut : ils ouvrent le panneau du bas. */
+function ouvrirReglages() {
+  $('btnDefaut').style.display = PRODUITS_DEFAUT.length ? '' : 'none';
+  $('fondReglages').style.display = 'block';
+}
+
+function fermerReglages() {
+  $('fondReglages').style.display = 'none';
+}
+
+/* Modifications sur place, sans passer par un écran de réglages :
+   toucher le nom d'un produit propose de le renommer. */
+async function renommerProduit(id) {
+  var p = produitParId(id);
+  if (!p) return;
+  var reponse = await saisir('Nom du produit\n(tout effacer = supprimer le produit) :', p.nom);
+  if (reponse === null) return;
+  reponse = reponse.trim();
+  if (!reponse) { await supprimerProduit(id); return; }
+  p.nom = reponse;
+  sauvegarder();
+  afficher();
+}
+
+async function supprimerProduit(id) {
+  var p = produitParId(id);
+  if (!p) return;
+  if (!(await demander('Supprimer « ' + p.nom + ' » de la liste des produits ?', 'Supprimer'))) return;
+  etat.produits = etat.produits.filter(function (x) { return x.id !== id; });
+  delete etat.quantites[id];
+  delete etat.pris[id];
+  delete etat.selection[id];
+  sauvegarder();
+  afficher();
+}
+
+/* Restaurer la liste par défaut : le catalogue redevient celui
+   d'origine (les 70 produits pré-chargés avec leurs prix vérifiés).
+   Copie profonde pour ne jamais modifier le modèle d'origine. */
+async function restaurerDefaut() {
+  if (!PRODUITS_DEFAUT.length) return;
+  if (!(await demander('Restaurer la liste par défaut ?\n\nLe catalogue redevient celui d\'origine : 70 produits avec leurs prix.\nTes ajouts et modifications de produits seront perdus.', 'Restaurer'))) return;
+  etat.produits = PRODUITS_DEFAUT.map(function (p) {
+    return { id: p.id, nom: p.nom, prix: p.prix, unite: p.unite, rayon: p.rayon };
+  });
+  etat.selection = {};
+  etat.pris = {};
+  etat.quantites = {};
+  etat.mode = 'prep';
+  sauvegarder();
+  afficher();
+}
+
+async function nouvelleListe() {
+  if (!(await demander('Vider la liste ?\nTout sera désélectionné et décoché.', 'Vider'))) return;
+  etat.selection = {};
+  etat.pris = {};
+  etat.quantites = {};
+  etat.mode = 'prep';
+  sauvegarder();
+  afficher();
+}
+
+/* ============================ DÉMARRAGE ==================================== */
+
+if (!charger()) {
+  /* Aucune mémoire : premier lancement, on pré-remplit avec le catalogue
+     actuel du magasin (PRODUITS_DEFAUT ci-dessus). */
+  etat.produits = PRODUITS_DEFAUT.slice();
+  sauvegarder();
+}
+appliquerTheme(themeEnregistre());
+afficher();
+ajusterMargeBas();
+
+/* Version en ligne (iPhone ou navigateur) : l'appli est gardée sur le
+   téléphone pour marcher sans réseau dans le magasin (sw.js), et on
+   demande que sa mémoire ne soit jamais effacée automatiquement.
+   Rien de tout ça dans l'appli Android, qui a déjà tout en interne. */
+if (!window.AppNative && window.isSecureContext && /^https?:$/.test(location.protocol)) {
+  try { if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {}); } catch (e) {}
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {}); } catch (e) {}
+}
+window.addEventListener('resize', ajusterMargeBas);
+if (window.ResizeObserver) new ResizeObserver(ajusterMargeBas).observe(document.querySelector('footer'));
+$('dlgSaisie').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); validerDialogue(); } });
+</script>
+</body>
+</html>

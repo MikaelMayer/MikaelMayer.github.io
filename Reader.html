@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Read With Me</title>
+    <style>
+        .word {
+            display: inline-block;
+            margin: 5px;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        .highlight {
+            /*outline: 2px solid green;*/
+            background-color: rgb(249, 249, 104); /* Add a subtle background color */
+        }
+        .helper {
+            font-size: 12px;
+            color: gray;
+            position: absolute;
+        }
+        /* .word.incorrect is immediately turned red, but when .incorrect is removed
+          after 1 second it fades out. */
+        .word.incorrect {
+          background-color: rgb(251, 169, 169);
+          transition: background-color 1s;
+        }
+        .word.incorrect.helper {
+          color: red;
+        }
+        video:not(.hidden) {
+          cursor: pointer;
+          /*It should be flipped from left to right*/
+          transform: scaleX(-1);
+        }
+        video.hidden {
+            display: none;
+        }
+        video:not(.hidden) + canvas {
+            display: none;
+        }
+        canvas {
+          position: relative;
+        }
+        .dragRect {
+            position: absolute;
+            border: 1px solid white;
+            background-color: rgba(255, 255, 255, 0.5);
+        }
+        
+    </style>
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+</head>
+<body>
+    <div>
+        <!--
+          New input method: it's possible to take a picture of a page and
+          use OCR to get the text. Let's do that using 
+          https://developer.mozilla.org/en-US/docs/Web/API/Media_Capture_and_Streams_API/Taking_still_photos
+          to take pictures and
+          https://tesseract.projectnaptha.com/ for the OCR
+        -->
+        <video id="video" width="640" height="480" autoplay></video>
+        <canvas id="canvas" width="640" height="480"></canvas>
+        <script>
+            // Grab elements, create settings, etc.
+            var video = document.getElementById('video');
+
+            // Get access to the camera!
+            if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                // Not adding `{ audio: true }` since we only want video now
+                navigator.mediaDevices.getUserMedia({ video: true }).then(function(stream) {
+                    //video.src = window.URL.createObjectURL(stream);
+                    video.srcObject = stream;
+                    video.play();
+                });
+            }
+
+            /* Legacy code below: getUserMedia 
+            else if(navigator.getUserMedia) { // Standard
+                navigator.getUserMedia({ video: true }, function(stream) {
+                    video.src = stream;
+                    video.play();
+                }, errBack);
+            } else if(navigator.webkitGetUserMedia) { // WebKit-prefixed
+                navigator.webkitGetUserMedia({ video: true }, function(stream){
+                    video.src = window.webkitURL.createObjectURL(stream);
+                    video.play();
+                }, errBack);
+            } else if(navigator.mozGetUserMedia) { // Mozilla-prefixed
+                navigator.mozGetUserMedia({ video: true }, function(stream){
+                    video.srcObject = stream;
+                    video.play();
+                }, errBack);
+            }
+            */
+
+            var createWorker = Tesseract.createWorker;
+
+            // Elements for taking the snapshot
+            var canvas = document.getElementById('canvas');
+            var context = canvas.getContext('2d');
+            var video = document.getElementById('video');
+
+            function opticalCharacterRecognition() {
+              var img = canvas.toDataURL("image/png");
+              (async () => {
+                const worker = await createWorker('eng');
+                const ret = await worker.recognize(img);
+                document.getElementById('inputText').value = ret.data.text;
+                document.getElementById('submitText').click();
+                await worker.terminate();
+              })();
+            }
+
+            // Trigger photo take
+            document.getElementById("video").addEventListener("click", function() {
+                document.getElementById("video").classList.add("hidden");
+                context.drawImage(video, 0, 0, 640, 480);
+                opticalCharacterRecognition();
+            });
+            // If a user drags on the canvas itself, we draw white rectangles
+            // from the top, the left, the right or the bottom, as needed.
+            // This is to help the user crop the image.
+            var dragging = false;
+            var dragStartX = 0;
+            var dragStartY = 0;
+            var dragEndX = 0;
+            var dragEndY = 0;
+            var dragRect = null;
+            var dragRects = [];
+            var dragRectsElem = document.getElementById('dragRects');
+            function UpdateDrag(event) {
+              dragEndX = event.offsetX;
+              dragEndY = event.offsetY;
+              var isAboveDiagUp = dragEndY > dragEndX*480/640;
+              var isAboveDiagDown = dragEndY < 480 - dragEndX*480/640;
+              var isTop = !isAboveDiagUp && isAboveDiagDown;
+              var isBottom = isAboveDiagUp && !isAboveDiagDown;
+              var isLeft = isAboveDiagUp && isAboveDiagDown;
+              var isRight = !isAboveDiagUp && !isAboveDiagDown;
+              console.log("isTop", isTop, "isBottom", isBottom, "isLeft", isLeft, "isRight", isRight)
+              var rect =
+                isTop ? {x: 0, y: 0, width: 640, height: dragEndY} :
+                isBottom ? {x: 0, y: dragEndY, width: 640, height: 480 - dragEndY} :
+                isLeft ? {x: 0, y: 0, width: dragEndX, height: 480} :
+                isRight || true ? {x: dragEndX, y: 0, width: 640 - dragEndX, height: 480} : null;
+              if(rect != null) {
+                dragRect.style.left = rect.x + 'px';
+                dragRect.style.top = rect.y + 'px';
+                dragRect.style.width = rect.width + 'px';
+                dragRect.style.height = rect.height + 'px';
+                dragRect.rect = rect;
+              }
+            }
+            canvas.addEventListener('mousedown', function(event) {
+                dragging = true;
+                dragStartX = event.offsetX;
+                dragStartY = event.offsetY;
+                dragEndX = event.offsetX;
+                dragEndY = event.offsetY;
+                dragRect = document.createElement('div');
+                dragRect.classList.add('dragRect');
+                // Make sure dragRect does not capture mouse events
+                dragRect.style.pointerEvents = 'none';
+                canvas.parentElement.appendChild(dragRect);
+                UpdateDrag(event);
+            });
+            canvas.addEventListener('mousemove', function(event) {
+                if(dragging) {
+                    dragEndX = event.offsetX;
+                    dragEndY = event.offsetY;
+                    var isAboveDiagUp = dragEndY > dragEndX*480/640;
+                    var isAboveDiagDown = dragEndY < 480 - dragEndX*480/640;
+                    var isTop = !isAboveDiagUp && isAboveDiagDown;
+                    var isBottom = isAboveDiagUp && !isAboveDiagDown;
+                    var isLeft = isAboveDiagUp && isAboveDiagDown;
+                    var isRight = !isAboveDiagUp && !isAboveDiagDown;
+                    console.log("isTop", isTop, "isBottom", isBottom, "isLeft", isLeft, "isRight", isRight)
+                    var rect =
+                      isTop ? {x: 0, y: 0, width: 640, height: dragEndY} :
+                      isBottom ? {x: 0, y: dragEndY, width: 640, height: 480 - dragEndY} :
+                      isLeft ? {x: 0, y: 0, width: dragEndX, height: 480} :
+                      isRight || true ? {x: dragEndX, y: 0, width: 640 - dragEndX, height: 480} : null;
+                    if(rect != null) {
+                      dragRect.style.left = rect.x + 'px';
+                      dragRect.style.top = rect.y + 'px';
+                      dragRect.style.width = rect.width + 'px';
+                      dragRect.style.height = rect.height + 'px';
+                      dragRect.rect = rect;
+                    }
+                }
+            });
+            canvas.addEventListener('mouseup', function(event) {
+                dragging = false;
+                // Let's draw on the canvas a white rectangle from the top, the left, the right or the bottom, as needed.
+                // This is to help the user crop the image.
+                var rect = dragRect.rect;                
+                dragRect.remove();
+                if(rect != null) {
+                  console.log("printing rect", rect);
+                  var ctx = canvas.getContext("2d");
+                  ctx.fillStyle = "white";
+                  ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+                  opticalCharacterRecognition();
+                }
+            });
+        </script>
+        <textarea id="inputText" rows="4" cols="50">
+When Jack and Annie receive an invitation to spend Christmas Eve in Camelot - a magical place
+that exists only in myth and fantasy - they know they are in for their biggest adventure yet.
+What they don't know is that the invitation will send them on a quest to save Camelot.
+Can they succeed even though Camelot's greatest knights have failed?
+        </textarea>
+        <button id="submitText">Submit Text</button>
+    </div>
+    <div id="displayText"></div>
+
+    <script>
+var recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+recognition.lang = 'en-US';
+recognition.continuous = true; // Set to continuous
+recognition.interimResults = true; // Get both interim and final results
+recognition.maxAlternatives = 4;
+
+var displayedWords = []; // This will hold the original text, including punctuation.
+var comparisonWords = []; // This will hold the text without punctuation, for comparison purposes.
+var currentIndex = 0;
+var helperTimeout = null;
+var lastHelper = null;
+
+document.getElementById('submitText').addEventListener('click', function() {
+    var inputText = document.getElementById('inputText').value;
+    displayedWords = inputText.split(/\s+/);
+    comparisonWords = displayedWords.map(function(word) {
+        return cleanWord(word); // Use the cleanWord function to strip punctuation.
+    });
+    var displayArea = document.getElementById('displayText');
+    displayArea.innerHTML = '';
+
+    displayedWords.forEach(function(word, index) {
+        var wordSpan = document.createElement('span');
+        wordSpan.classList.add('word');
+        wordSpan.textContent = word;
+        wordSpan.addEventListener('click', function() {
+            nextWord(index);
+        });
+        displayArea.appendChild(wordSpan);
+        displayArea.appendChild(document.createTextNode(' '));
+    });
+    nextWord(0);
+    /* If recognition alreaddy started, don't start it */
+    if(recognition.started) {
+      return;
+    }
+    recognition.start();
+});
+var events = [];
+recognition.onresult = function(event) {
+  // TODO: Look not just at results but also alternatives
+    var alternatives = [...event.results[event.results.length - 1]];
+    var allResults = alternatives.map(result => result.transcript.trim().toLowerCase().split(' '));
+    console.log("allResults", allResults);
+    var spokenWordAlternatives = allResults.map(result => result[result.length - 1]);
+    events.push({w: spokenWordAlternatives.join("|"), event});
+
+    var currentWord = currentIndex < comparisonWords .length ? comparisonWords[currentIndex].toLowerCase() : "";
+    var currentWordNext = currentIndex + 1 < comparisonWords.length ? comparisonWords[currentIndex + 1].toLowerCase() : "";
+    console.log("spokenWord: ", spokenWordAlternatives, " expected: " + currentWord
+     // , event
+    );
+    if (spokenWordAlternatives.indexOf(currentWord) != -1) {
+      console.log("Got it right");
+      removeHelperAt(currentIndex);
+      clearTimeout(helperTimeout);
+      nextWord(currentIndex + 1);
+    } else {
+      // If it's the next word, we move on to the next word but keep the hint on the previous word for 1 second
+      if (currentWordNext != "" && spokenWordAlternatives.indexOf(currentWordNext) != -1) {
+        console.log("Was fuzzy but let's just move on and display a hint");
+        clearTimeout(helperTimeout);
+        removeHelperAt(currentIndex, 1000);
+        indicateWrong(currentIndex);
+        removeHelperAt(currentIndex + 1);
+        nextWord(currentIndex + 2);
+        return;
+      }
+
+      var spokenWord = spokenWordAlternatives[0];
+      // Use speech synthesis API to say the word we're expecting.
+      // See if we said one of the first words of the current sentence.
+      var previousWords =
+      comparisonWords.slice(Math.max(0, currentIndex - 5),
+                  Math.max(0, currentIndex));
+      previousWords = previousWords.map(w => w.toLowerCase());
+      // True if one of the elements in spokenWordAlternatives
+      // is in previousWords
+      var alreadySaid = spokenWordAlternatives.some(w => previousWords.indexOf(w) != -1);
+      if (!alreadySaid && spokenWordAlternatives[0] != "") {
+        clearTimeout(helperTimeout);
+        // Display a list of all the words that the speech synthesizer
+        // think we said, below the expected word.
+        var index = currentIndex;
+        setHelperAt(index, spokenWordAlternatives.join(', '));
+        helperTimeout = setTimeout(function() {
+          removeHelperAt(index, 1000);
+          events.push({help: currentWord});
+          // Make sure we use en-US
+          var utterance = new SpeechSynthesisUtterance(currentWord);
+          utterance.lang = 'en-US';
+          speechSynthesis.speak(utterance);
+          nextWord(currentIndex + 1);
+        }, 1000);
+      }
+    }
+};
+
+recognition.onspeechend = function() {
+    //recognition.stop();
+};
+
+recognition.onerror = function(event) {
+    console.error('Speech recognition error', event.error);
+};
+
+function setHelperAt(index, text) {
+  var helper = allWords()[index].querySelector(".helper");
+  if(helper == null) {
+    helper = document.createElement('div');
+    helper.classList.add('helper');
+    allWords()[index].appendChild(helper);
+  }
+  helper.textContent = text;
+}
+
+function removeHelperAt(index, delay = 0) {
+  var helper = allWords()[index].querySelector(".helper");
+  if(helper != null) {
+    setTimeout(() => helper.remove(), delay);
+  }
+}
+
+function indicateWrong(index) {
+  // Will put a temporary red background on the word
+  var word = allWords()[index];
+  word.classList.add('incorrect');
+  setTimeout(() => word.classList.remove('incorrect'), 1000);
+}
+
+function cleanWord(word) {
+    // Use a regular expression to replace punctuation marks with an empty string
+    return word.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "").toLowerCase();
+}
+
+function allWords() {
+  let wordsElems = document.querySelectorAll('.word');
+  return [...wordsElems];
+}
+
+function nextWord(index) {
+    currentIndex = index;
+    if(index < comparisonWords.length && comparisonWords[index] == "") {
+      return nextWord(index + 1);
+    }
+    let wordsElems = allWords();
+    wordsElems.forEach(word => word.classList.remove('highlight'));
+    //console.log("index set to ", currentIndex, "wordsElems", wordsElems);
+    if(index < wordsElems.length) {
+      wordsElems[index].classList.add('highlight');
+      console.log("Now expecting " + comparisonWords[index]);
+    }
+}
+</script>
+</body>
+</html>
