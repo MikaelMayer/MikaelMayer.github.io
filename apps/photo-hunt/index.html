@@ -127,6 +127,8 @@ h1,h2{font-family:"Baloo 2",Nunito,sans-serif;line-height:1.05;letter-spacing:-.
 .itext{text-align:center;max-width:540px;margin:0 auto;min-height:150px}
 .itext h2{font-size:clamp(30px,8vw,46px);margin:4px 0 10px}
 .itext p{margin:0;font-size:18px;font-weight:700;line-height:1.4}
+.itext .itip{margin-top:12px;display:inline-block;background:#fff;border-radius:14px;padding:8px 14px;font-size:16px}
+.tipline{max-width:900px;margin:10px auto 0;background:var(--soft);border-radius:12px;padding:10px 14px;font-weight:700;font-size:15px}
 .slide-in{animation:slin .35s ease-out}
 @keyframes slin{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
 .idots{display:flex;gap:8px;justify-content:center;margin:14px 0}
@@ -161,6 +163,7 @@ h1,h2{font-family:"Baloo 2",Nunito,sans-serif;line-height:1.05;letter-spacing:-.
   <div class="scroll">
     <div id="grid" class="grid"></div>
     <p id="hint" class="hint"></p>
+    <p class="tipline" data-i18n="tip">Astuce</p>
     <div class="more"><button id="b-order" class="btn sec" data-i18n="order" hidden>Choisir l'ordre en touchant les photos</button><button id="b-send" class="btn sec" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/></svg><span data-i18n="send">Envoyer sur le téléphone d'un enfant (QR code)</span></button><div class="two"><button id="b-how" class="btn sec" data-i18n="howTo">Comment ça marche</button><button id="b-lang" class="btn sec" data-i18n="langBtn">English</button></div></div>
     <p class="sync" data-sync></p>
   </div>
@@ -321,14 +324,15 @@ fr: {
   jNoNet: "Pas de connexion internet.", jDead: "Ce code n'est plus actif : demande à Papa de rouvrir le QR code.", jFail: "Connexion impossible. Vérifie internet puis rescanne.",
   jCut: "La connexion a coupé avant la fin. Rescanne le QR code.", jRecvN: (a, n) => `Réception des photos : ${a} sur ${n}`,
   jArrived: "La chasse est arrivée !", jArrivedP: n => `${n} endroit${n > 1 ? 's' : ''} à trouver. Pour chaque endroit trouvé, prenez un selfie devant.`,
+  tip: "Astuce : sois toi-même sur la dernière photo pour un selfie mémorable !",
   stamp: "Trouvé !", wait: "Un instant…",
   iSkip: "Passer", iNext: "Suivant", iBack: "Retour", iGo: "C'est parti !", iLang: "EN",
   slides: [
     ["Une chasse aux selfies", "Prends en photo jusqu'à 12 endroits : un arbre, une porte, un détail du parc…"],
     ["Dans l'ordre du parcours", "Importe tes photos d'un coup, puis touche-les dans l'ordre où les enfants doivent les trouver."],
     ["À eux de jouer", "Les enfants voient la photo d'un endroit. Quand ils le trouvent, ils prennent un selfie devant, puis l'endroit suivant apparaît."],
-    ["Sur leur propre téléphone", "Ils ont un téléphone ? Montre-leur un QR code : la chasse passe directement d'un téléphone à l'autre, rien n'est stocké en ligne."],
-    ["Retournez voir Papa !", "À la fin, une photo souvenir réunit chaque endroit et son selfie, prête à partager."]
+    ["Sur leur propre téléphone", "Ils ont chacun un téléphone ? Montre un QR code : chaque enfant le scanne et reçoit la chasse sur son téléphone. Rien n'est stocké en ligne."],
+    ["Ils reviennent vers toi !", "À la fin, une photo souvenir réunit chaque endroit et son selfie, prête à partager.", "Astuce : sois toi-même sur la dernière photo pour un selfie mémorable !"]
   ]
 },
 en: {
@@ -393,14 +397,15 @@ en: {
   jNoNet: "No internet connection.", jDead: "This code isn't active anymore: ask Dad to reopen the QR code.", jFail: "Can't connect. Check the internet, then scan again.",
   jCut: "The connection dropped before the end. Scan the QR code again.", jRecvN: (a, n) => `Receiving photos: ${a} of ${n}`,
   jArrived: "The hunt has arrived!", jArrivedP: n => `${n} spot${n > 1 ? 's' : ''} to find. At each spot you find, take a selfie in front of it.`,
+  tip: "Tip: be in the last picture yourself to take a memorable selfie!",
   stamp: "Found!", wait: "One moment…",
   iSkip: "Skip", iNext: "Next", iBack: "Back", iGo: "Let's start!", iLang: "FR",
   slides: [
     ["A selfie treasure hunt", "Take photos of up to 12 spots: a tree, a door, a detail in the park…"],
     ["In trail order", "Import your photos in one go, then tap them in the order the kids should find them."],
     ["Their turn", "The kids see a photo of a spot. When they find it, they take a selfie in front of it, and the next spot appears."],
-    ["On their own phone", "Do they have a phone? Show them a QR code: the hunt goes straight from one phone to the other, nothing is stored online."],
-    ["Go back to Dad!", "At the end, a souvenir picture puts each spot next to its selfie, ready to share."]
+    ["On their own phones", "Does each kid have a phone? Show a QR code: every kid scans it and gets the hunt on their own phone. Nothing is stored online."],
+    ["They come back to you!", "At the end, a souvenir picture puts each spot next to its selfie, ready to share.", "Tip: be in the last picture yourself to take a memorable selfie!"]
   ]
 }
 };
@@ -577,8 +582,9 @@ function rIntro() {
   const sl = t('slides'), n = sl.length;
   if (slide >= n) slide = n - 1;
   $('#i-pic').innerHTML = ART[slide];
-  $('#i-text').innerHTML = '<h2></h2><p></p>';
+  $('#i-text').innerHTML = '<h2></h2><p></p>' + (sl[slide][2] ? '<p class="itip"></p>' : '');
   $('#i-text h2').textContent = sl[slide][0]; $('#i-text p').textContent = sl[slide][1];
+  if (sl[slide][2]) $('#i-text .itip').textContent = sl[slide][2];
   ['#i-pic', '#i-text'].forEach(q => { const el = $(q); el.classList.remove('slide-in'); void el.offsetWidth; el.classList.add('slide-in'); });
   $('#i-dots').innerHTML = sl.map((_, i) => `<i class="${i === slide ? 'n' : ''}"></i>`).join('');
   $('#i-back').style.visibility = slide ? 'visible' : 'hidden';
