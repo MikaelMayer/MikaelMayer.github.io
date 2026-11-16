@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Photo Hunt</title>
+<meta name="theme-color" content="#ffc83d">
+<script src="peerjs.min.js" defer></script>
+<script src="qrcode.js" defer></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE   occasion: a kids' outdoor treasure hunt, bright and bold; Papa's screens calm and tidy
+   IDEA    a trail stamp card: each place found earns a stamp, the 12 slots fill up like a card
+   PICTURE the place photo as a big tilted polaroid for the kids; the 12-slot grid for Papa
+   COLOUR  sun yellow field, tomato red action, ink purple-black, white paper
+   TYPE    Baloo 2 for shouting, Nunito for reading
+   LAYOUT  one screen per step (progress, photo, big button); landscape puts controls to the right */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#16122a);--ink:light-dark(#1a1530,#f4f0ff);--soft:light-dark(#fff3cf,#251e40);--line:light-dark(#e6d9b0,#3d3463);--mute:light-dark(#6b6480,#a49cc0);--sun:#ffc83d;--red:#ff4b3e;--redd:#c22d22;--blue:#2f80ed;--kink:#1a1530}
+:root[data-theme=light]{color-scheme:light}
+:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 Nunito,system-ui,sans-serif;overflow:hidden;-webkit-tap-highlight-color:transparent}
+h1,h2{font-family:"Baloo 2",Nunito,sans-serif;line-height:1.05;letter-spacing:-.02em;margin:0;text-wrap:balance}
+.vh{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0 0 0 0)}
+.view{position:fixed;inset:0;display:grid;height:100%;height:100dvh}
+.view[hidden]{display:none}
+.papa{grid-template-rows:auto minmax(0,1fr) auto;background:var(--bg)}
+.ph{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px max(16px,4vw) 10px}
+.ph h1{font-size:32px}
+.sub{margin:4px 0 0;color:var(--mute);font-size:15px}
+.count{flex:none;width:76px;height:76px;border-radius:50%;background:var(--sun);color:var(--kink);display:grid;place-content:center;text-align:center;line-height:1}
+.count b{font:800 32px "Baloo 2",sans-serif}
+.count span{font-weight:800;font-size:14px}
+.scroll{overflow-y:auto;padding:6px max(16px,4vw) 16px;-webkit-overflow-scrolling:touch}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;max-width:900px;margin:0 auto}
+@media(min-width:520px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(min-width:900px){.grid{grid-template-columns:repeat(6,minmax(0,1fr))}}
+.tile{position:relative;aspect-ratio:3/4;border-radius:14px;overflow:hidden;background:var(--soft);border:0;padding:0;cursor:pointer;transition:transform .15s;touch-action:manipulation}
+.tile img{width:100%;height:100%;object-fit:cover;display:block}
+.tile.on{outline:4px solid var(--blue);outline-offset:2px;transform:scale(.95)}
+.num{position:absolute;top:6px;left:6px;min-width:30px;height:30px;padding:0 8px;border-radius:15px;background:var(--red);color:#fff;font:800 16px/30px Nunito,sans-serif;text-align:center}
+.got{position:absolute;right:6px;bottom:6px;width:26px;height:26px;border-radius:50%;background:#fff;display:grid;place-items:center}
+.slot{border:2.5px dashed var(--line);background:transparent;display:grid;place-content:center;justify-items:center;gap:2px;color:var(--mute);font-weight:800}
+.slot svg{width:30px;height:30px}
+.hint{max-width:900px;margin:12px auto 0;color:var(--mute);font-size:15px}
+.sync{max-width:900px;margin:6px auto 0;font-size:13px;color:var(--mute);display:flex;gap:6px;align-items:center}
+.sync.err{color:#d62f22}
+.bar{display:grid;gap:10px;padding:10px max(16px,4vw) max(14px,env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--bg)}
+.bar[hidden]{display:none}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.four{grid-template-columns:repeat(4,minmax(0,1fr))}
+.three{grid-template-columns:1fr 1.3fr 1fr}
+.tile.pick .num{background:var(--blue)}
+.tile.wait img{opacity:.38;filter:grayscale(.6)}
+.tile.wait::after{content:"";position:absolute;inset:0;border:3px dashed var(--blue);border-radius:14px}
+.grid.ordering .slot{opacity:.35;pointer-events:none}
+.view.drag .grid{outline:3px dashed var(--blue);outline-offset:6px;border-radius:14px}
+.btn{min-height:52px;border-radius:16px;border:0;padding:0 14px;font:800 16px Nunito,sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;touch-action:manipulation;text-align:center;line-height:1.15;user-select:none;-webkit-user-select:none}
+.btn svg{width:24px;height:24px;flex:none}
+.go{background:var(--red);color:#fff;box-shadow:0 5px 0 var(--redd)}
+.go:active{transform:translateY(3px);box-shadow:0 2px 0 var(--redd)}
+.sec{background:var(--soft);color:var(--ink);box-shadow:inset 0 0 0 2px var(--line)}
+.sec:active{transform:scale(.97)}
+.warn{background:transparent;color:#d62f22;box-shadow:inset 0 0 0 2px #d62f22}
+.btn:disabled{opacity:.4;pointer-events:none}
+.btn:focus-visible,.tile:focus-visible,.gate:focus-visible,input:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.kid{background:var(--sun);color:var(--kink);grid-template:"top" auto "stage" minmax(0,1fr) "bot" auto/minmax(0,1fr);padding:max(12px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom))}
+.kid.red{background:var(--red);color:#fff}
+@media(orientation:landscape) and (max-height:620px){.ask{font-size:24px}.stickers{grid-template-columns:repeat(6,minmax(0,1fr));max-width:460px}.donebox{gap:10px;padding-bottom:0}.kid{grid-template:"stage top" auto "stage bot" minmax(0,1fr)/minmax(0,1fr) minmax(250px,36%);column-gap:20px}.kbot{align-self:end}}
+.ktop{grid-area:top;display:flex;align-items:center;gap:14px}
+.prog{flex:1}
+.prog b{font:800 22px "Baloo 2",sans-serif}
+.dots{display:flex;gap:5px;margin-top:4px}
+.dots i{flex:1;height:10px;border-radius:5px;background:rgba(26,21,48,.16)}
+.dots i.d{background:var(--kink)}
+.dots i.n{background:var(--red)}
+.gate{flex:none;width:58px;height:58px;border-radius:50%;border:0;background:rgba(26,21,48,.12);color:inherit;font:800 13px Nunito,sans-serif;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;cursor:pointer}
+.red .gate{background:rgba(255,255,255,.2)}
+.gate.hold{animation:hold 1.2s linear forwards}
+@keyframes hold{from{box-shadow:0 0 0 0 var(--kink)}to{box-shadow:0 0 0 12px var(--kink)}}
+.red .gate.hold{animation-name:holdw}
+@keyframes holdw{from{box-shadow:0 0 0 0 #fff}to{box-shadow:0 0 0 12px #fff}}
+.stage{grid-area:stage;position:relative;display:grid;place-items:center;min-height:0;padding:10px 0}
+.polar{margin:0;background:#fff;padding:10px 10px 34px;border-radius:6px;box-shadow:0 20px 30px -14px rgba(26,21,48,.5);transform:rotate(-2deg)}
+.polar.r{transform:rotate(2deg)}
+.polar img{display:block;width:100%;height:100%;object-fit:contain;background:#f1eee6}
+.kbot{grid-area:bot;display:grid;gap:10px}
+.ask{margin:0;font:800 30px/1.05 "Baloo 2",sans-serif;text-align:center}
+.big{min-height:74px;font-size:22px;border-radius:22px;width:100%}
+.big svg{width:32px;height:32px}
+.ink{background:var(--kink);color:#fff;box-shadow:0 5px 0 #000}
+.donebox{grid-row:2/4;grid-column:1/-1;display:grid;gap:18px;align-content:center;padding-bottom:40px;text-align:center;min-height:0}
+.huge{font-size:clamp(38px,min(13vw,11vh),92px)}
+.donebox p{margin:0;font-size:20px;font-weight:700}
+.stickers{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-content:center;max-width:520px;width:100%;margin:0 auto;min-height:0;overflow:hidden;padding:8px}
+.stickers img{width:100%;aspect-ratio:1;object-fit:contain;background:#fff;border:5px solid #fff;border-radius:6px;box-shadow:0 8px 14px -8px rgba(0,0,0,.5)}
+.stickers img:nth-child(odd){transform:rotate(-4deg)}
+.stickers img:nth-child(even){transform:rotate(3deg)}
+.fld{display:grid;gap:6px;max-width:900px;margin:0 auto;font-weight:800;font-size:14px}
+.fld input{font:700 16px Nunito,sans-serif;min-height:48px;border-radius:12px;border:2px solid var(--line);background:var(--bg);color:var(--ink);padding:0 12px}
+.comp{max-width:900px;margin:14px auto 0;background:var(--soft);border-radius:18px;padding:10px;min-height:220px;display:grid;place-items:center}
+.comp img{display:block;width:100%;border-radius:10px}
+.comp p{color:var(--mute);margin:0}
+.more{max-width:900px;margin:18px auto 0;display:grid;gap:10px}
+.modal{position:fixed;inset:0;background:rgba(10,8,22,.55);display:grid;place-items:center;padding:20px;z-index:20}
+.modal[hidden],.busy[hidden],.toast[hidden],.stamp[hidden]{display:none}
+.mbox{background:var(--bg);color:var(--ink);border-radius:22px;padding:22px;max-width:420px;width:100%;display:grid;gap:12px;box-shadow:0 30px 60px -20px rgba(0,0,0,.6)}
+.mbox h2{font-size:28px}
+.mbox p{margin:0;color:var(--mute)}
+.mbtns{display:grid;gap:10px;margin-top:6px}
+.qrbox{text-align:center}
+.qr{background:#fff;border-radius:16px;padding:10px;width:min(260px,70vw);aspect-ratio:1;margin:4px auto;display:grid;place-items:center}
+.qr svg{width:100%;height:auto;display:block}
+.qrst{font-weight:800;color:var(--ink)!important}
+.qrst.ok{color:#1a9e5a!important}
+.qrst.err{color:#d62f22!important}
+.intro{background:var(--sun);color:var(--kink);grid-template-rows:auto minmax(0,1fr) auto auto;padding:max(12px,env(safe-area-inset-top)) max(20px,5vw) max(18px,env(safe-area-inset-bottom));touch-action:pan-y}
+.itop{display:flex;justify-content:space-between;align-items:center}
+.iskip{background:none;border:0;color:inherit;font:800 16px Nunito,sans-serif;min-height:44px;padding:0 4px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.ilang{background:rgba(26,21,48,.12);border:0;color:inherit;border-radius:999px;min-height:44px;min-width:56px;padding:0 16px;font:800 15px Nunito,sans-serif;cursor:pointer}
+.ipic{display:grid;place-items:center;min-height:0;padding:8px 0}
+.ipic svg{width:100%;max-width:460px;max-height:100%;height:auto;display:block}
+.itext{text-align:center;max-width:540px;margin:0 auto;min-height:150px}
+.itext h2{font-size:clamp(30px,8vw,46px);margin:4px 0 10px}
+.itext p{margin:0;font-size:18px;font-weight:700;line-height:1.4}
+.slide-in{animation:slin .35s ease-out}
+@keyframes slin{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+.idots{display:flex;gap:8px;justify-content:center;margin:14px 0}
+.idots i{width:10px;height:10px;border-radius:5px;background:rgba(26,21,48,.25);transition:width .2s}
+.idots i.n{width:30px;background:var(--kink)}
+.ibtns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:10px;max-width:540px;margin:0 auto}
+.intro .sec{background:rgba(255,255,255,.55);box-shadow:inset 0 0 0 2px rgba(26,21,48,.25);color:var(--kink)}
+@media(orientation:landscape) and (max-height:620px){.intro{grid-template:"top top" auto "pic text" minmax(0,1fr) "pic nav" auto/minmax(0,1fr) minmax(0,1fr);column-gap:24px}.itop{grid-area:top}.ipic{grid-area:pic}.itext{grid-area:text;align-self:center;min-height:0}.inav{grid-area:nav}}
+@media(prefers-reduced-motion:reduce){.slide-in{animation:none}}
+.busy{position:fixed;inset:0;background:rgba(10,8,22,.45);display:grid;place-content:center;justify-items:center;gap:14px;color:#fff;font-weight:800;z-index:25}
+.spin{width:54px;height:54px;border-radius:50%;border:6px solid rgba(255,255,255,.3);border-top-color:#fff;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:var(--kink);color:#fff;padding:12px 18px;border-radius:14px;font-weight:800;z-index:30;max-width:calc(100% - 32px);text-align:center}
+.stamp{position:fixed;left:50%;top:50%;width:230px;height:230px;margin:-115px 0 0 -115px;border-radius:50%;background:#fff;border:10px solid var(--red);color:var(--red);display:grid;place-items:center;font:800 46px "Baloo 2",sans-serif;transform:rotate(-12deg);z-index:22;animation:pop .35s ease-out}
+@keyframes pop{from{transform:rotate(-30deg) scale(1.8);opacity:0}to{transform:rotate(-12deg) scale(1);opacity:1}}
+@media(prefers-reduced-motion:reduce){.stamp,.gate.hold,.spin{animation:none}.gate.hold{box-shadow:0 0 0 8px var(--kink)}}
+</style>
+</head>
+<body>
+
+<section id="v-intro" class="view intro" hidden>
+  <div class="itop"><button id="i-skip" class="iskip" data-i18n="iSkip">Passer</button><button id="i-lang" class="ilang" data-i18n="iLang">EN</button></div>
+  <div class="ipic" id="i-pic"></div>
+  <div class="itext" id="i-text"></div>
+  <div class="inav"><div class="idots" id="i-dots"></div><div class="ibtns"><button id="i-back" class="btn sec" data-i18n="iBack">Retour</button><button id="i-next" class="btn go">Suivant</button></div></div>
+</section>
+<section id="v-setup" class="view papa" hidden>
+  <header class="ph">
+    <div><h1 data-i18n="setupTitle">Préparer la chasse</h1><p class="sub" data-i18n="setupSub">Jusqu'à 12 endroits, dans l'ordre du parcours. 10 ou 12, c'est parfait pour la mosaïque.</p></div>
+    <div class="count" data-i18n-aria="countAria" aria-label="Photos prises"><b id="cnt">0</b><span data-i18n="countOf">sur 12</span></div>
+  </header>
+  <div class="scroll">
+    <div id="grid" class="grid"></div>
+    <p id="hint" class="hint"></p>
+    <div class="more"><button id="b-order" class="btn sec" data-i18n="order" hidden>Choisir l'ordre en touchant les photos</button><button id="b-send" class="btn sec" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/></svg><span data-i18n="send">Envoyer sur le téléphone d'un enfant (QR code)</span></button><div class="two"><button id="b-how" class="btn sec" data-i18n="howTo">Comment ça marche</button><button id="b-lang" class="btn sec" data-i18n="langBtn">English</button></div></div>
+    <p class="sync" data-sync></p>
+  </div>
+  <div id="bar-main" class="bar">
+    <div class="two">
+      <label class="btn sec" for="in-cam"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span data-i18n="cam">Appareil photo</span></label>
+      <label class="btn sec" for="in-gal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/></svg><span data-i18n="imp">Importer</span></label>
+    </div>
+    <button id="b-start" class="btn go">Lancer le défi selfie</button>
+  </div>
+  <div id="bar-sel" class="bar" hidden>
+    <div class="two four">
+      <button id="b-up" data-i18n="up" class="btn sec">◀ Avant</button>
+      <button id="b-down" data-i18n="down" class="btn sec">Après ▶</button>
+      <button id="b-del" data-i18n="del" class="btn warn">Retirer</button>
+      <button id="b-ok" class="btn go">OK</button>
+    </div>
+  </div>
+  <div id="bar-ord" class="bar" hidden>
+    <div class="two three">
+      <button id="o-clear" data-i18n="oClear" class="btn sec">Effacer</button>
+      <button id="o-keep" data-i18n="oKeep" class="btn sec">Garder tel quel</button>
+      <button id="o-ok" class="btn go">Valider</button>
+    </div>
+  </div>
+</section>
+
+<section id="v-play" class="view kid" hidden>
+  <div class="ktop">
+    <div class="prog"><b id="p-num">Endroit 1 sur 12</b><div id="dots" class="dots"></div></div>
+    <button class="gate" data-gate data-i18n="gate" data-i18n-aria="gateAria" aria-label="Menu Papa, maintenir appuyé">Papa</button>
+  </div>
+  <div class="stage" id="p-stage"><figure class="polar" id="p-fig"><img id="p-img" data-i18n-alt="placeAlt" alt="L'endroit à trouver"></figure></div>
+  <div class="kbot">
+    <p class="ask" data-i18n="find">Trouvez cet endroit&nbsp;!</p>
+    <label for="in-selfie" class="btn go big"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span data-i18n="found">Trouvé&nbsp;! On fait le selfie</span></label>
+  </div>
+</section>
+
+<section id="v-shot" class="view kid" hidden>
+  <div class="ktop"><div class="prog"><b id="s-num">Selfie</b></div></div>
+  <div class="stage" id="s-stage"><figure class="polar r" id="s-fig"><img id="s-img" data-i18n-alt="selfieAlt" alt="Votre selfie"></figure></div>
+  <div class="kbot">
+    <p class="ask" data-i18n="nice">Super selfie&nbsp;!</p>
+    <button id="b-keep" data-i18n="keep" class="btn go big">On le garde</button>
+    <label for="in-selfie" class="btn ink big" data-i18n="redo">On recommence</label>
+  </div>
+</section>
+
+<section id="v-done" class="view kid red" hidden>
+  <div class="ktop"><div class="prog"></div><button class="gate" data-gate data-i18n="gate" data-i18n-aria="gateAria" aria-label="Menu Papa, maintenir appuyé">Papa</button></div>
+  <div class="donebox">
+    <h2 class="huge" data-i18n="back">Retournez voir Papa&nbsp;!</h2>
+    <p id="d-sub">Bravo, tous les endroits sont trouvés.</p>
+    <div id="stickers" class="stickers"></div>
+  </div>
+</section>
+
+<section id="v-res" class="view papa" hidden>
+  <header class="ph">
+    <div><h1 data-i18n="resTitle">Photo souvenir</h1><p class="sub" id="r-sub"></p></div>
+    <button id="b-prep" data-i18n="prep" class="btn sec">Préparation</button>
+  </header>
+  <div class="scroll">
+    <label class="fld" for="title"><span data-i18n="titleLbl">Titre de la photo</span><input id="title" maxlength="42" autocomplete="off"></label>
+    <div class="comp" id="comp"><p data-i18n="composing">Composition en cours…</p></div>
+    <p class="hint" id="r-hint" data-i18n="resHint">Sur téléphone, un appui long sur l'image permet aussi de l'enregistrer.</p>
+    <p class="sync" data-sync></p>
+    <div class="more">
+      <button id="b-resume" data-i18n="resume" class="btn sec">Reprendre le jeu</button>
+      <button id="b-replay" data-i18n="replay" class="btn sec">Rejouer : garder les endroits, effacer les selfies</button>
+      <button id="b-new" data-i18n="newHunt" class="btn warn">Nouvelle chasse : tout effacer</button>
+    </div>
+  </div>
+  <div class="bar"><button id="b-share" data-i18n="share" class="btn go" disabled>Partager ou enregistrer</button></div>
+</section>
+
+<input type="file" id="in-cam" class="vh" accept="image/*" capture="environment">
+<input type="file" id="in-gal" class="vh" accept="image/*" multiple>
+<input type="file" id="in-selfie" class="vh" accept="image/*" capture="user">
+
+<div id="modal" class="modal" hidden><div class="mbox" role="dialog" aria-modal="true" aria-labelledby="m-t"><h2 id="m-t"></h2><p id="m-p"></p><div id="m-b" class="mbtns"></div></div></div>
+<div id="qrs" class="modal" hidden><div class="mbox qrbox" role="dialog" aria-modal="true" aria-labelledby="q-t">
+  <h2 id="q-t" data-i18n="qTitle">Envoyer la chasse</h2>
+  <p data-i18n="qText">Avec l'appareil photo du téléphone de l'enfant, scanne ce code. Garde cet écran ouvert pendant l'envoi.</p>
+  <div class="qr" id="q-code"><div class="spin" style="border-color:#ddd;border-top-color:#1a1530"></div></div>
+  <p class="qrst" id="q-st">Préparation du code…</p>
+  <div class="mbtns"><button id="q-copy" data-i18n="qCopy" class="btn sec" disabled>Copier le lien (pour l'envoyer par message)</button><button id="q-close" data-i18n="qClose" class="btn go">Fermer</button></div>
+</div></div>
+<div id="busy" class="busy" hidden><div class="spin"></div><span id="busy-t" data-i18n="wait">Un instant…</span></div>
+<div id="toast" class="toast" hidden></div>
+<div id="stamp" class="stamp" data-i18n="stamp" hidden>Trouvé&nbsp;!</div>
+
+<script>
+{
+const MAX = 12;
+const $ = s => document.querySelector(s);
+const L = {
+fr: {
+  setupTitle: "Préparer la chasse",
+  setupSub: "Jusqu'à 12 endroits, dans l'ordre du parcours. 10 ou 12, c'est parfait pour la mosaïque.",
+  countOf: "sur 12", countAria: "Photos prises",
+  order: "Choisir l'ordre en touchant les photos",
+  send: "Envoyer sur le téléphone d'un enfant (QR code)",
+  howTo: "Comment ça marche", langBtn: "English",
+  cam: "Appareil photo", imp: "Importer",
+  start: "Lancer le défi selfie",
+  startN: n => `Lancer le défi avec ${n} endroit${n > 1 ? 's' : ''}`,
+  resumeN: n => `Reprendre le défi (${n} restant${n > 1 ? 's' : ''})`,
+  up: "◀ Avant", down: "Après ▶", del: "Retirer", ok: "OK",
+  oClear: "Effacer", oKeep: "Garder tel quel", oOk: "Valider", oOkN: (a, n) => `Valider (${a}/${n})`,
+  tileAria: i => `Endroit ${i}`, slotAria: i => `Ajouter l'endroit ${i}`,
+  hintOrd: (a, n) => `Touche les photos dans l'ordre du parcours : la première, puis la deuxième… (${a} sur ${n}). Retouche une photo pour la retirer.`,
+  hintSel: i => `Photo ${i} choisie : touche une autre photo pour la mettre à sa place, ou utilise les flèches.`,
+  hintSome: "Touche une photo pour la déplacer ou la retirer. Les enfants suivront cet ordre.",
+  hintNone: "Touche une case vide pour photographier un endroit, ou « Importer » pour ajouter d'un coup des photos déjà prises.",
+  placeN: (i, n) => `Endroit ${i} sur ${n}`, selfieN: (i, n) => `Selfie ${i} sur ${n}`,
+  gate: "Papa", gateAria: "Menu Papa, maintenir appuyé",
+  placeAlt: "L'endroit à trouver", find: "Trouvez cet endroit !", found: "Trouvé ! On fait le selfie",
+  selfieAlt: "Votre selfie", nice: "Super selfie !", keep: "On le garde", redo: "On recommence",
+  back: "Retournez voir Papa !",
+  doneSub: n => n > 1 ? `Bravo, les ${n} endroits sont trouvés.` : "Bravo, l'endroit est trouvé.",
+  resTitle: "Photo souvenir", prep: "Préparation", titleLbl: "Titre de la photo", composing: "Composition en cours…",
+  resHint: "Sur téléphone, un appui long sur l'image permet aussi de l'enregistrer.",
+  resume: "Reprendre le jeu", replay: "Rejouer : garder les endroits, effacer les selfies", newHunt: "Nouvelle chasse : tout effacer",
+  share: "Partager ou enregistrer",
+  resSub: (d, n) => `${d} selfie${d > 1 ? 's' : ''} sur ${n} endroit${n > 1 ? 's' : ''}`,
+  syncOk: "Les photos restent uniquement sur ce téléphone, rien n'est envoyé en ligne.",
+  syncErr: "Attention : ce navigateur ne garde pas les photos. Ne ferme pas la page.",
+  ordSaved: "Ordre enregistré.",
+  delQ: i => `Retirer la photo ${i} ?`, delSelfie: "Le selfie pris à cet endroit sera retiré aussi.", cancel: "Annuler",
+  full: "Les 12 endroits sont déjà là.",
+  onlyN: r => `Seulement ${r} photo${r > 1 ? 's' : ''} ajoutée${r > 1 ? 's' : ''} : 12 maximum.`,
+  prepPhotos: "Préparation des photos…", badImg: "Une image n'a pas pu être lue.",
+  readyN: n => `${n} endroit${n > 1 ? 's' : ''}, tout est prêt !`,
+  readyP: "Donne le téléphone aux enfants. Pour revenir ici, maintiens le bouton « Papa » appuyé.",
+  go: "C'est parti !", notYet: "Pas encore",
+  developing: "Développement de la photo…", photoFail: "La photo n'a pas marché, on réessaie !",
+  holdHint: "Papa : garde le doigt appuyé sur le bouton.",
+  menu: "Menu Papa", menuRes: "Photo souvenir", menuPrep: "Préparation", menuBack: "Retour au jeu",
+  defTitle: "Chasse au trésor", locale: "fr-FR",
+  mosaicLine: (date, d, n) => `${date} · ${d} endroit${d > 1 ? 's' : ''} trouvé${d > 1 ? 's' : ''} sur ${n}`,
+  mosaicAlt: "Mosaïque : chaque endroit et son selfie", file: "photo-hunt",
+  saved: "Image enregistrée dans les téléchargements.", longPress: "Fais un appui long sur l'image pour l'enregistrer ou la partager.",
+  replayQ: "Rejouer avec les mêmes endroits ?", replayP: "Les selfies seront effacés. Pense à partager la photo souvenir avant.", replayB: "Effacer les selfies",
+  newQ: "Tout effacer ?", newP: "Les photos des endroits et les selfies seront supprimés de ce téléphone. Pense à partager la photo souvenir avant.", newB: "Tout effacer",
+  newDone: "Prêt pour une nouvelle chasse !",
+  qTitle: "Envoyer la chasse", qText: "Avec l'appareil photo du téléphone de l'enfant, scanne ce code. Garde cet écran ouvert pendant l'envoi.",
+  qCopy: "Copier le lien (pour l'envoyer par message)", qClose: "Fermer",
+  qPrep: "Préparation du code…", qNoNet: "Pas de connexion internet : impossible de créer le code.", qWait: "En attente du téléphone de l'enfant…",
+  qCut: "La connexion a coupé. Réessaie de scanner.", qTaken: "Code déjà pris, ferme et rouvre.", qFail: "Connexion impossible. Vérifie internet puis rouvre le code.",
+  qSending: (g, n) => `Envoi des photos : ${g} sur ${n}…`,
+  qSentN: k => k > 1 ? `Envoyé sur ${k} téléphones ! Un autre peut encore scanner.` : "Envoyé ! Un autre téléphone peut encore scanner.",
+  qConn: "Téléphone connecté, envoi des photos…", qCopied: "Lien copié. Il marche tant que cet écran reste ouvert.",
+  jReplaceQ: "Recevoir une nouvelle chasse ?", jReplaceP: "La chasse déjà sur ce téléphone sera remplacée.", jRecv: "Recevoir",
+  jConnecting: "Connexion au téléphone de Papa…", jNoConnT: "Pas de connexion",
+  jNoAnswer: "Le téléphone de Papa ne répond pas. Vérifie que son écran avec le QR code est ouvert, puis rescanne.",
+  jNoNet: "Pas de connexion internet.", jDead: "Ce code n'est plus actif : demande à Papa de rouvrir le QR code.", jFail: "Connexion impossible. Vérifie internet puis rescanne.",
+  jCut: "La connexion a coupé avant la fin. Rescanne le QR code.", jRecvN: (a, n) => `Réception des photos : ${a} sur ${n}`,
+  jArrived: "La chasse est arrivée !", jArrivedP: n => `${n} endroit${n > 1 ? 's' : ''} à trouver. Pour chaque endroit trouvé, prenez un selfie devant.`,
+  stamp: "Trouvé !", wait: "Un instant…",
+  iSkip: "Passer", iNext: "Suivant", iBack: "Retour", iGo: "C'est parti !", iLang: "EN",
+  slides: [
+    ["Une chasse aux selfies", "Prends en photo jusqu'à 12 endroits : un arbre, une porte, un détail du parc…"],
+    ["Dans l'ordre du parcours", "Importe tes photos d'un coup, puis touche-les dans l'ordre où les enfants doivent les trouver."],
+    ["À eux de jouer", "Les enfants voient la photo d'un endroit. Quand ils le trouvent, ils prennent un selfie devant, puis l'endroit suivant apparaît."],
+    ["Sur leur propre téléphone", "Ils ont un téléphone ? Montre-leur un QR code : la chasse passe directement d'un téléphone à l'autre, rien n'est stocké en ligne."],
+    ["Retournez voir Papa !", "À la fin, une photo souvenir réunit chaque endroit et son selfie, prête à partager."]
+  ]
+},
+en: {
+  setupTitle: "Set up the hunt",
+  setupSub: "Up to 12 spots, in trail order. 10 or 12 make a perfect mosaic.",
+  countOf: "of 12", countAria: "Photos taken",
+  order: "Choose the order by tapping the photos",
+  send: "Send to a kid's phone (QR code)",
+  howTo: "How it works", langBtn: "Français",
+  cam: "Camera", imp: "Import",
+  start: "Start the selfie challenge",
+  startN: n => `Start the challenge with ${n} spot${n > 1 ? 's' : ''}`,
+  resumeN: n => `Resume the challenge (${n} left)`,
+  up: "◀ Earlier", down: "Later ▶", del: "Remove", ok: "OK",
+  oClear: "Clear", oKeep: "Keep as is", oOk: "Done", oOkN: (a, n) => `Done (${a}/${n})`,
+  tileAria: i => `Spot ${i}`, slotAria: i => `Add spot ${i}`,
+  hintOrd: (a, n) => `Tap the photos in trail order: the first one, then the second… (${a} of ${n}). Tap a photo again to take it back.`,
+  hintSel: i => `Photo ${i} selected: tap another photo to move it there, or use the arrows.`,
+  hintSome: "Tap a photo to move or remove it. The kids will follow this order.",
+  hintNone: "Tap an empty box to photograph a spot, or “Import” to add photos you already took, several at once.",
+  placeN: (i, n) => `Spot ${i} of ${n}`, selfieN: (i, n) => `Selfie ${i} of ${n}`,
+  gate: "Dad", gateAria: "Dad's menu, press and hold",
+  placeAlt: "The spot to find", find: "Find this spot!", found: "Found it! Selfie time",
+  selfieAlt: "Your selfie", nice: "Great selfie!", keep: "Keep it", redo: "Try again",
+  back: "Go back to Dad!",
+  doneSub: n => n > 1 ? `Well done, all ${n} spots found.` : "Well done, the spot is found.",
+  resTitle: "Souvenir picture", prep: "Setup", titleLbl: "Picture title", composing: "Putting it together…",
+  resHint: "On a phone, you can also press and hold the image to save it.",
+  resume: "Resume the game", replay: "Play again: keep the spots, clear the selfies", newHunt: "New hunt: clear everything",
+  share: "Share or save",
+  resSub: (d, n) => `${d} selfie${d > 1 ? 's' : ''} for ${n} spot${n > 1 ? 's' : ''}`,
+  syncOk: "Photos stay only on this phone, nothing is sent online.",
+  syncErr: "Warning: this browser doesn't keep the photos. Don't close the page.",
+  ordSaved: "Order saved.",
+  delQ: i => `Remove photo ${i}?`, delSelfie: "The selfie taken at this spot will be removed too.", cancel: "Cancel",
+  full: "All 12 spots are already there.",
+  onlyN: r => `Only ${r} photo${r > 1 ? 's' : ''} added: 12 maximum.`,
+  prepPhotos: "Preparing the photos…", badImg: "One image couldn't be read.",
+  readyN: n => `${n} spot${n > 1 ? 's' : ''}, all set!`,
+  readyP: "Hand the phone to the kids. To come back here, press and hold the “Dad” button.",
+  go: "Let's go!", notYet: "Not yet",
+  developing: "Developing the photo…", photoFail: "The photo didn't work, let's try again!",
+  holdHint: "Dad: keep your finger on the button.",
+  menu: "Dad's menu", menuRes: "Souvenir picture", menuPrep: "Setup", menuBack: "Back to the game",
+  defTitle: "Treasure hunt", locale: "en-US",
+  mosaicLine: (date, d, n) => `${date} · ${d} of ${n} spots found`,
+  mosaicAlt: "Mosaic: each spot and its selfie", file: "photo-hunt",
+  saved: "Image saved to your downloads.", longPress: "Press and hold the image to save or share it.",
+  replayQ: "Play again with the same spots?", replayP: "The selfies will be cleared. Share the souvenir picture first.", replayB: "Clear the selfies",
+  newQ: "Clear everything?", newP: "The spot photos and the selfies will be deleted from this phone. Share the souvenir picture first.", newB: "Clear everything",
+  newDone: "Ready for a new hunt!",
+  qTitle: "Send the hunt", qText: "Scan this code with the camera of the kid's phone. Keep this screen open while it sends.",
+  qCopy: "Copy the link (to send it by message)", qClose: "Close",
+  qPrep: "Preparing the code…", qNoNet: "No internet connection: can't create the code.", qWait: "Waiting for the kid's phone…",
+  qCut: "The connection dropped. Try scanning again.", qTaken: "Code already in use, close and reopen.", qFail: "Can't connect. Check the internet, then reopen the code.",
+  qSending: (g, n) => `Sending photos: ${g} of ${n}…`,
+  qSentN: k => k > 1 ? `Sent to ${k} phones! Another one can still scan.` : "Sent! Another phone can still scan.",
+  qConn: "Phone connected, sending the photos…", qCopied: "Link copied. It works while this screen stays open.",
+  jReplaceQ: "Receive a new hunt?", jReplaceP: "The hunt already on this phone will be replaced.", jRecv: "Receive",
+  jConnecting: "Connecting to Dad's phone…", jNoConnT: "No connection",
+  jNoAnswer: "Dad's phone isn't answering. Check that the QR code screen is open, then scan again.",
+  jNoNet: "No internet connection.", jDead: "This code isn't active anymore: ask Dad to reopen the QR code.", jFail: "Can't connect. Check the internet, then scan again.",
+  jCut: "The connection dropped before the end. Scan the QR code again.", jRecvN: (a, n) => `Receiving photos: ${a} of ${n}`,
+  jArrived: "The hunt has arrived!", jArrivedP: n => `${n} spot${n > 1 ? 's' : ''} to find. At each spot you find, take a selfie in front of it.`,
+  stamp: "Found!", wait: "One moment…",
+  iSkip: "Skip", iNext: "Next", iBack: "Back", iGo: "Let's start!", iLang: "FR",
+  slides: [
+    ["A selfie treasure hunt", "Take photos of up to 12 spots: a tree, a door, a detail in the park…"],
+    ["In trail order", "Import your photos in one go, then tap them in the order the kids should find them."],
+    ["Their turn", "The kids see a photo of a spot. When they find it, they take a selfie in front of it, and the next spot appears."],
+    ["On their own phone", "Do they have a phone? Show them a QR code: the hunt goes straight from one phone to the other, nothing is stored online."],
+    ["Go back to Dad!", "At the end, a souvenir picture puts each spot next to its selfie, ready to share."]
+  ]
+}
+};
+
+const FACE = (x, y, r, hair) => `<g><circle cx="${x}" cy="${y}" r="${r}" fill="#f2c9a3"/><path d="M${x - r} ${y - r * 0.15}a${r} ${r} 0 0 1 ${2 * r} 0c-${r * 0.5}-${r * 0.55}-${r * 1.4}-${r * 0.6}-${2 * r} 0z" fill="${hair}"/><circle cx="${x - r * 0.35}" cy="${y + r * 0.08}" r="${r * 0.11}" fill="#1a1530"/><circle cx="${x + r * 0.35}" cy="${y + r * 0.08}" r="${r * 0.11}" fill="#1a1530"/><path d="M${x - r * 0.38} ${y + r * 0.38}q${r * 0.38} ${r * 0.34} ${r * 0.76} 0" stroke="#1a1530" stroke-width="${r * 0.1}" fill="none" stroke-linecap="round"/></g>`;
+const TREE = (x, y, s) => `<g><rect x="${x - 5 * s}" y="${y}" width="${10 * s}" height="${44 * s}" rx="${3 * s}" fill="#8a5a2b"/><circle cx="${x}" cy="${y - 6 * s}" r="${26 * s}" fill="#2fa66a"/><circle cx="${x - 18 * s}" cy="${y + 6 * s}" r="${16 * s}" fill="#38b878"/><circle cx="${x + 18 * s}" cy="${y + 8 * s}" r="${14 * s}" fill="#279a5e"/></g>`;
+const SHADOW = '<ellipse cx="180" cy="246" rx="150" ry="10" fill="rgba(26,21,48,.13)"/>';
+const ART = [
+  // 1. Papa photographs a spot
+  `<svg viewBox="0 0 360 260" aria-hidden="true">${SHADOW}${TREE(280, 150, 1.6)}
+   <g transform="rotate(-8 130 140)"><rect x="70" y="26" width="124" height="214" rx="22" fill="#1a1530"/><rect x="80" y="40" width="104" height="172" rx="12" fill="#bfe3ff"/>
+   <rect x="80" y="178" width="104" height="34" fill="#7cc46b"/>${TREE(132, 132, 1)}
+   <path d="M94 56h14M94 56v14M170 56h-14M170 56v14M94 196v-14M94 196h14M170 196v-14M170 196h-14" stroke="#fff" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+   <circle cx="132" cy="226" r="9" fill="#fff"/></g>
+   <path d="M224 40l6 15 15 6-15 6-6 15-6-15-15-6 15-6z" fill="#fff"/><path d="M250 84l3 8 8 3-8 3-3 8-3-8-8-3 8-3z" fill="#fff"/></svg>`,
+  // 2. tap the photos in order
+  `<svg viewBox="0 0 360 260" aria-hidden="true">${SHADOW}
+   ${[['#ff8a5c', 40, 22, '1'], ['#5cc8ff', 138, 22, ''], ['#9be15d', 236, 22, '3'], ['#ffd65c', 40, 134, ''], ['#c49bff', 138, 134, '2'], ['#5ce1c8', 236, 134, '']].map(([c, x, y, n]) =>
+     `<rect x="${x}" y="${y}" width="84" height="100" rx="14" fill="${c}" ${n ? '' : 'opacity=".55"'}/>${n ? '' : `<rect x="${x + 3}" y="${y + 3}" width="78" height="94" rx="12" fill="none" stroke="#2f80ed" stroke-width="3" stroke-dasharray="8 6"/>`}
+      ${n ? `<circle cx="${x + 22}" cy="${y + 22}" r="16" fill="#2f80ed" stroke="#fff" stroke-width="3"/><text x="${x + 22}" y="${y + 28.5}" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="800" font-size="19" fill="#fff">${n}</text>` : ''}`).join('')}
+   <circle cx="214" cy="196" r="20" fill="none" stroke="#fff" stroke-width="4"/><circle cx="214" cy="196" r="34" fill="none" stroke="#fff" stroke-width="3" opacity=".6"/>
+   <path d="M214 196c-4-18-2-30 8-30s10 12 9 20l18 4c10 2 14 10 12 20l-6 30h-40l-14-26c-4-8 4-14 13-18z" fill="#f2c9a3" stroke="#1a1530" stroke-width="3" stroke-linejoin="round"/></svg>`,
+  // 3. find the spot, take a selfie in front of it
+  `<svg viewBox="0 0 360 260" aria-hidden="true">${SHADOW}
+   <g transform="rotate(-6 92 128)"><rect x="24" y="34" width="136" height="168" rx="6" fill="#fff"/><rect x="34" y="44" width="116" height="122" fill="#bfe3ff"/><rect x="34" y="140" width="116" height="26" fill="#7cc46b"/>${TREE(92, 112, 1.05)}</g>
+   <path d="M168 128h24m-10-10 10 10-10 10" stroke="#1a1530" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+   <g transform="rotate(5 270 128)"><rect x="200" y="34" width="140" height="172" rx="6" fill="#fff"/><rect x="210" y="44" width="120" height="126" fill="#bfe3ff"/><rect x="210" y="146" width="120" height="24" fill="#7cc46b"/>${TREE(300, 104, 0.8)}
+   ${FACE(244, 128, 24, '#6b3d1e')}${FACE(288, 136, 21, '#e8b04a')}</g>
+   <rect x="232" y="196" width="76" height="40" rx="12" fill="#ff4b3e"/><rect x="258" y="190" width="24" height="10" rx="3" fill="#ff4b3e"/><circle cx="270" cy="216" r="11" fill="#fff"/><circle cx="270" cy="216" r="6" fill="#1a1530"/></svg>`,
+  // 4. QR code from Papa's phone to the kid's phone
+  `<svg viewBox="0 0 360 260" aria-hidden="true">${SHADOW}
+   <rect x="34" y="40" width="112" height="196" rx="20" fill="#1a1530"/><rect x="44" y="54" width="92" height="160" rx="10" fill="#fff"/>
+   <g fill="#1a1530">${[[52, 80], [104, 80], [52, 132]].map(([x, y]) => `<rect x="${x}" y="${y}" width="26" height="26"/><rect x="${x + 5}" y="${y + 5}" width="16" height="16" fill="#fff"/><rect x="${x + 9}" y="${y + 9}" width="8" height="8"/>`).join('')}
+   ${[[84, 82], [92, 90], [84, 100], [96, 112], [84, 120], [108, 116], [116, 128], [92, 132], [104, 144], [120, 148], [88, 152], [108, 160], [124, 136]].map(([x, y]) => `<rect x="${x}" y="${y}" width="7" height="7"/>`).join('')}</g>
+   <path d="M152 112c40-50 80-50 110-4" stroke="#1a1530" stroke-width="4" fill="none" stroke-dasharray="2 10" stroke-linecap="round"/><path d="m252 96 12 14-18 4" stroke="#1a1530" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+   <g transform="rotate(-10 196 70)"><rect x="180" y="52" width="34" height="40" rx="3" fill="#fff"/><rect x="184" y="56" width="26" height="24" fill="#9be15d"/></g>
+   <rect x="214" y="40" width="112" height="196" rx="20" fill="#1a1530"/><rect x="224" y="54" width="92" height="160" rx="10" fill="#ffc83d"/>
+   <rect x="238" y="70" width="64" height="80" rx="4" fill="#fff"/><rect x="244" y="76" width="52" height="58" fill="#bfe3ff"/>${TREE(270, 110, 0.55)}
+   <rect x="236" y="168" width="68" height="24" rx="12" fill="#ff4b3e"/></svg>`,
+  // 5. the souvenir mosaic
+  `<svg viewBox="0 0 360 260" aria-hidden="true">${SHADOW}
+   <rect x="40" y="18" width="280" height="222" rx="18" fill="#ffc83d" stroke="#1a1530" stroke-width="4"/>
+   <rect x="58" y="32" width="120" height="14" rx="7" fill="#1a1530"/>
+   ${[0, 1, 2, 3, 4, 5].map(i => { const x = 56 + (i % 3) * 86, y = 58 + Math.floor(i / 3) * 88, c = ['#9be15d', '#5cc8ff', '#ff8a5c', '#c49bff', '#5ce1c8', '#ffd65c'][i];
+     return `<rect x="${x}" y="${y}" width="78" height="78" rx="8" fill="#fff"/><rect x="${x + 4}" y="${y + 4}" width="34" height="70" rx="5" fill="${c}"/><rect x="${x + 40}" y="${y + 4}" width="34" height="70" rx="5" fill="#bfe3ff"/>${FACE(x + 57, y + 42, 12, ['#6b3d1e', '#e8b04a', '#2b1a10'][i % 3])}<circle cx="${x + 10}" cy="${y + 10}" r="8" fill="#ff4b3e" stroke="#fff" stroke-width="2"/>`; }).join('')}
+   <path d="M300 8l7 16 16 7-16 7-7 16-7-16-16-7 16-7z" fill="#fff" stroke="#1a1530" stroke-width="2"/></svg>`
+];
+
+/* ---------- language: follows the phone, Papa can switch, a received hunt brings Papa's ---------- */
+let LANG = /^fr/i.test(navigator.language || '') ? 'fr' : 'en';
+let PREFS = {intro: false, lang: null};
+const t = (k, ...a) => { const v = (L[LANG] || L.fr)[k]; return typeof v === 'function' ? v(...a) : (v == null ? k : v); };
+function applyLang() {
+  document.documentElement.lang = LANG;
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-aria]').forEach(el => el.setAttribute('aria-label', t(el.dataset.i18nAria)));
+  document.querySelectorAll('[data-i18n-alt]').forEach(el => { el.alt = t(el.dataset.i18nAlt); });
+}
+function savePrefs() { IDB.put('kv', 'prefs', PREFS); }
+function setLang(l) {
+  if (!L[l] || l === LANG) return;
+  const old = L[LANG].defTitle;
+  LANG = l; PREFS.lang = l; savePrefs();
+  if (!S.title || S.title === old) { S.title = t('defTitle'); save(); }
+  compSig = ''; applyLang(); render();
+}
+let introOn = false, slide = 0;
+const fresh = () => ({v: 1, phase: 'setup', title: t('defTitle'), places: [], selfies: {}, updated: 0});
+let S = fresh();
+const B = new Map();          // key -> {blob, url}
+let sel = -1, ord = null, pend = null, compBlob = null, compSig = '', compUrl = '';
+const R = {dl: null};
+
+/* ---------- local storage (IndexedDB) ---------- */
+const IDB = {
+  db: null,
+  async open() {
+    try {
+      this.db = await new Promise((res, rej) => {
+        const r = indexedDB.open('chasse-selfies', 1);
+        r.onupgradeneeded = () => { r.result.createObjectStore('kv'); r.result.createObjectStore('blobs'); };
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+      });
+    } catch (e) { this.db = null; }
+  },
+  op(store, mode, fn) {
+    return new Promise((res, rej) => {
+      if (!this.db) return res(undefined);
+      try {
+        const t = this.db.transaction(store, mode), q = fn(t.objectStore(store));
+        t.oncomplete = () => res(q && q.result);
+        t.onerror = t.onabort = () => rej(t.error);
+      } catch (e) { rej(e); }
+    });
+  },
+  get(s, k) { return this.op(s, 'readonly', o => o.get(k)).catch(() => undefined); },
+  put(s, k, v) { return this.op(s, 'readwrite', o => o.put(v, k)).catch(() => {}); },
+  del(s, k) { return this.op(s, 'readwrite', o => o.delete(k)).catch(() => {}); }
+};
+
+const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const items = st => [...st.places, ...Object.values(st.selfies)];
+const url = k => (k && B.get(k)) ? B.get(k).url : '';
+function reg(k, blob) { const o = B.get(k); if (o) URL.revokeObjectURL(o.url); B.set(k, {blob, url: URL.createObjectURL(blob)}); }
+async function keep(k, blob) { reg(k, blob); await IDB.put('blobs', k, await blob.arrayBuffer()); }
+function drop(k) { const o = B.get(k); if (o) URL.revokeObjectURL(o.url); B.delete(k); IDB.del('blobs', k); }
+function save() { S.updated = Date.now(); IDB.put('kv', 'state', S); remoteSoon(); }
+const cur = () => S.places.findIndex(p => !S.selfies[p.k]);
+const doneCount = () => S.places.filter(p => S.selfies[p.k]).length;
+
+function shrink(file, max) {
+  return new Promise((res, rej) => {
+    const u = URL.createObjectURL(file), im = new Image();
+    im.onload = () => {
+      let w = im.naturalWidth, h = im.naturalHeight;
+      const s = Math.min(1, max / Math.max(w, h));
+      w = Math.round(w * s); h = Math.round(h * s);
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      c.getContext('2d').drawImage(im, 0, 0, w, h);
+      URL.revokeObjectURL(u);
+      c.toBlob(b => b ? res({blob: b, w, h}) : rej(new Error('blob')), 'image/jpeg', 0.86);
+    };
+    im.onerror = () => { URL.revokeObjectURL(u); rej(new Error('img')); };
+    im.src = u;
+  });
+}
+
+/* ---------- small UI helpers ---------- */
+let toastT = 0;
+function toast(t) { const el = $('#toast'); el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 2600); }
+function busy(on, t) { $('#busy').hidden = !on; if (t) $('#busy-t').textContent = t; }
+function ask(title, text, btns) {
+  return new Promise(res => {
+    $('#m-t').textContent = title;
+    $('#m-p').textContent = text || ''; $('#m-p').hidden = !text;
+    const box = $('#m-b'); box.innerHTML = '';
+    btns.forEach(b => {
+      const el = document.createElement('button');
+      el.className = 'btn ' + (b.c || 'sec'); el.textContent = b.l;
+      el.onclick = () => { $('#modal').hidden = true; res(b.v); };
+      box.appendChild(el);
+    });
+    $('#modal').hidden = false;
+    box.firstChild && box.firstChild.focus();
+  });
+}
+function fit(stage, fig, w, h) {
+  const W = stage.clientWidth - 16, H = stage.clientHeight - 20;
+  if (W <= 0 || H <= 0 || !w || !h) return;
+  const ar = w / h, mw = W - 20, mh = H - 44;
+  let iw = mw, ih = mw / ar;
+  if (ih > mh) { ih = mh; iw = mh * ar; }
+  fig.style.width = Math.max(60, iw + 20) + 'px';
+  fig.style.height = Math.max(60, ih + 44) + 'px';
+}
+
+/* ---------- rendering ---------- */
+function viewName() {
+  if (introOn) return 'intro';
+  if (S.phase === 'results' && S.places.length) return 'res';
+  if (S.phase === 'play' && S.places.length) return pend ? 'shot' : (cur() < 0 ? 'done' : 'play');
+  return 'setup';
+}
+function render() {
+  const v = viewName();
+  ['intro', 'setup', 'play', 'shot', 'done', 'res'].forEach(n => $('#v-' + n).hidden = n !== v);
+  ({intro: rIntro, setup: rSetup, play: rPlay, shot: rShot, done: rDone, res: rRes})[v]();
+  rSync();
+}
+const PLUS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+const TICK = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#1a9e5a" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>';
+function rIntro() {
+  const sl = t('slides'), n = sl.length;
+  if (slide >= n) slide = n - 1;
+  $('#i-pic').innerHTML = ART[slide];
+  $('#i-text').innerHTML = '<h2></h2><p></p>';
+  $('#i-text h2').textContent = sl[slide][0]; $('#i-text p').textContent = sl[slide][1];
+  ['#i-pic', '#i-text'].forEach(q => { const el = $(q); el.classList.remove('slide-in'); void el.offsetWidth; el.classList.add('slide-in'); });
+  $('#i-dots').innerHTML = sl.map((_, i) => `<i class="${i === slide ? 'n' : ''}"></i>`).join('');
+  $('#i-back').style.visibility = slide ? 'visible' : 'hidden';
+  $('#i-next').textContent = slide === n - 1 ? t('iGo') : t('iNext');
+}
+function endIntro() { introOn = false; PREFS.intro = true; savePrefs(); render(); }
+$('#i-next').onclick = () => { if (slide < ART.length - 1) { slide++; rIntro(); } else endIntro(); };
+$('#i-back').onclick = () => { if (slide > 0) { slide--; rIntro(); } };
+$('#i-skip').onclick = endIntro;
+$('#i-lang').onclick = () => setLang(LANG === 'fr' ? 'en' : 'fr');
+{ let x0 = null; const v = $('#v-intro');
+  v.addEventListener('pointerdown', e => { x0 = e.clientX; });
+  v.addEventListener('pointerup', e => { if (x0 == null) return; const dx = e.clientX - x0; x0 = null;
+    if (Math.abs(dx) < 50 || e.target.closest('button')) return;
+    if (dx < 0) $('#i-next').click(); else if (slide > 0) $('#i-back').click(); }); }
+function rSetup() {
+  const P = S.places, n = P.length;
+  if (sel >= n) sel = -1;
+  if (ord && n < 2) ord = null;
+  $('#cnt').textContent = n;
+  let h = '';
+  for (let i = 0; i < MAX; i++) {
+    if (i < n) {
+      const j = ord ? ord.indexOf(i) : -1, cls = ord ? (j >= 0 ? ' pick' : ' wait') : (i === sel ? ' on' : '');
+      const badge = ord ? (j >= 0 ? `<span class="num">${j + 1}</span>` : '') : `<span class="num">${i + 1}</span>`;
+      h += `<button class="tile${cls}" data-i="${i}" aria-label="${t('tileAria', i + 1)}"><img src="${url(P[i].k)}" alt="">${badge}${S.selfies[P[i].k] ? `<span class="got">${TICK}</span>` : ''}</button>`;
+    } else h += `<label class="tile slot" for="in-cam" aria-label="${t('slotAria', i + 1)}">${PLUS}<span>${i + 1}</span></label>`;
+  }
+  $('#grid').innerHTML = h;
+  $('#grid').classList.toggle('ordering', !!ord);
+  $('#hint').textContent = ord
+    ? t('hintOrd', ord.length, n)
+    : sel >= 0
+    ? t('hintSel', sel + 1)
+    : (n ? t('hintSome') : t('hintNone'));
+  $('#b-order').hidden = !!ord || sel >= 0 || n < 2;
+  $('#b-send').hidden = !!ord || sel >= 0 || !n;
+  $('#b-how').parentNode.hidden = !!ord || sel >= 0;
+  $('#o-ok').textContent = ord && ord.length && ord.length < n ? t('oOkN', ord.length, n) : t('oOk');
+  $('#o-ok').disabled = !ord || !ord.length;
+  $('#bar-ord').hidden = !ord;
+  $('#bar-main').hidden = sel >= 0 || !!ord;
+  $('#bar-sel').hidden = sel < 0 || !!ord;
+  $('#b-up').disabled = sel <= 0;
+  $('#b-down').disabled = sel < 0 || sel >= n - 1;
+  const b = $('#b-start');
+  b.disabled = !n;
+  const left = n - doneCount();
+  b.textContent = doneCount() && left ? t('resumeN', left) : (n && n < MAX ? t('startN', n) : t('start'));
+}
+function rPlay() {
+  const i = cur(), n = S.places.length, p = S.places[i];
+  $('#p-num').textContent = t('placeN', i + 1, n);
+  $('#dots').innerHTML = S.places.map((q, j) => `<i class="${S.selfies[q.k] ? 'd' : (j === i ? 'n' : '')}"></i>`).join('');
+  $('#p-img').src = url(p.k);
+  fit($('#p-stage'), $('#p-fig'), p.w, p.h);
+}
+function rShot() {
+  const i = cur(), n = S.places.length;
+  $('#s-num').textContent = t('selfieN', i + 1, n);
+  $('#s-img').src = pend.url;
+  fit($('#s-stage'), $('#s-fig'), pend.w, pend.h);
+}
+function rDone() {
+  const n = S.places.length;
+  $('#d-sub').textContent = t('doneSub', n);
+  $('#stickers').innerHTML = S.places.map(p => S.selfies[p.k] ? `<img src="${url(S.selfies[p.k].k)}" alt="">` : '').join('');
+}
+function rRes() {
+  const n = S.places.length, d = doneCount();
+  $('#r-sub').textContent = t('resSub', d, n);
+  if (document.activeElement !== $('#title')) $('#title').value = S.title;
+  $('#b-resume').hidden = d >= n;
+  $('#b-replay').hidden = !d;
+  buildComp();
+}
+function rSync() {
+  let tx, err = false;
+  if (IDB.db) tx = t('syncOk');
+  else { tx = t('syncErr'); err = true; }
+  document.querySelectorAll('[data-sync]').forEach(el => { el.textContent = tx; el.classList.toggle('err', err); });
+}
+new ResizeObserver(() => {
+  const v = viewName();
+  if (v === 'play') { const p = S.places[cur()]; fit($('#p-stage'), $('#p-fig'), p.w, p.h); }
+  if (v === 'shot' && pend) fit($('#s-stage'), $('#s-fig'), pend.w, pend.h);
+}).observe(document.body);
+
+/* ---------- Papa: setup ---------- */
+function move(a, b) { const [x] = S.places.splice(a, 1); S.places.splice(b, 0, x); save(); }
+$('#grid').addEventListener('click', e => {
+  const t = e.target.closest('[data-i]'); if (!t) return;
+  const i = +t.dataset.i;
+  if (ord) {
+    const j = ord.indexOf(i);
+    if (j >= 0) ord.splice(j, 1); else ord.push(i);
+    if (ord.length === S.places.length) applyOrder(); else rSetup();
+    return;
+  }
+  if (sel < 0) sel = i; else if (sel === i) sel = -1; else { move(sel, i); sel = i; }
+  rSetup();
+});
+$('#b-up').onclick = () => { if (sel > 0) { move(sel, sel - 1); sel--; rSetup(); } };
+$('#b-down').onclick = () => { if (sel >= 0 && sel < S.places.length - 1) { move(sel, sel + 1); sel++; rSetup(); } };
+$('#b-ok').onclick = () => { sel = -1; rSetup(); };
+function applyOrder() {
+  const P = S.places, rest = P.map((_, i) => i).filter(i => !ord.includes(i));
+  S.places = [...ord, ...rest].map(i => P[i]);
+  ord = null; save(); rSetup(); toast(t('ordSaved'));
+}
+$('#b-order').onclick = () => { sel = -1; ord = []; rSetup(); };
+$('#o-clear').onclick = () => { ord = []; rSetup(); };
+$('#o-keep').onclick = () => { ord = null; rSetup(); };
+$('#o-ok').onclick = () => { if (ord && ord.length) applyOrder(); };
+$('#b-del').onclick = async () => {
+  const i = sel; if (i < 0) return;
+  const ok = await ask(t('delQ', i + 1), S.selfies[S.places[i].k] ? t('delSelfie') : '', [{l: t('del'), v: 1, c: 'warn'}, {l: t('cancel'), v: 0}]);
+  if (!ok) return;
+  const p = S.places.splice(i, 1)[0], s = S.selfies[p.k], ids = [p.a, s && s.a];
+  drop(p.k); if (s) { drop(s.k); delete S.selfies[p.k]; }
+  sel = -1; save(); render(); delAssets(ids);
+};
+async function addFiles(files) {
+  const room = MAX - S.places.length;
+  if (room <= 0) { toast(t('full')); return; }
+  const list = [...files].slice(0, room);
+  if (files.length > room) toast(t('onlyN', room));
+  busy(true, t('prepPhotos'));
+  ord = null; sel = -1;
+  const before = S.places.length;
+  for (const f of list) {
+    try { const r = await shrink(f, 1600), k = uid('p'); await keep(k, r.blob); S.places.push({k, w: r.w, h: r.h, a: null}); }
+    catch (e) { toast(t('badImg')); }
+  }
+  busy(false); save();
+  // several photos at once: let Papa tap them in the order of the course (earlier photos keep their place)
+  if (S.places.length - before >= 2) ord = Array.from({length: before}, (_, i) => i);
+  render();
+}
+const vs = $('#v-setup');
+vs.addEventListener('dragover', e => { e.preventDefault(); vs.classList.add('drag'); });
+vs.addEventListener('dragleave', e => { if (e.target === vs) vs.classList.remove('drag'); });
+vs.addEventListener('drop', e => {
+  e.preventDefault(); vs.classList.remove('drag');
+  const f = [...(e.dataTransfer && e.dataTransfer.files || [])].filter(x => /^image\//.test(x.type));
+  if (f.length) addFiles(f);
+});
+$('#in-cam').onchange = e => { const f = e.target.files; if (f && f.length) addFiles(f); e.target.value = ''; };
+$('#in-gal').onchange = e => { const f = e.target.files; if (f && f.length) addFiles(f); e.target.value = ''; };
+$('#b-start').onclick = async () => {
+  const n = S.places.length; if (!n) return;
+  const go = await ask(t('readyN', n),
+    t('readyP'),
+    [{l: t('go'), v: 1, c: 'go'}, {l: t('notYet'), v: 0}]);
+  if (!go) return;
+  sel = -1; ord = null; S.phase = 'play'; save(); render();
+};
+
+/* ---------- kids: selfies ---------- */
+$('#in-selfie').onchange = async e => {
+  const f = e.target.files && e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  busy(true, t('developing'));
+  try {
+    const r = await shrink(f, 1400);
+    if (pend) URL.revokeObjectURL(pend.url);
+    pend = {blob: r.blob, w: r.w, h: r.h, url: URL.createObjectURL(r.blob)};
+  } catch (err) { toast(t('photoFail')); }
+  busy(false); render();
+};
+$('#b-keep').onclick = async () => {
+  const i = cur(); if (!pend || i < 0) return;
+  const p = S.places[i], k = uid('s');
+  await keep(k, pend.blob);
+  URL.revokeObjectURL(pend.url);
+  S.selfies[p.k] = {k, w: pend.w, h: pend.h, a: null, t: Date.now()};
+  pend = null; save();
+  const st = $('#stamp'); st.hidden = false;
+  setTimeout(() => { st.hidden = true; render(); }, 950);
+};
+
+/* ---------- Papa gate (long press) ---------- */
+document.querySelectorAll('[data-gate]').forEach(g => {
+  let t = 0, fired = false;
+  g.addEventListener('pointerdown', e => {
+    e.preventDefault(); fired = false; g.classList.add('hold');
+    t = setTimeout(() => { fired = true; g.classList.remove('hold'); papaMenu(); }, 1200);
+  });
+  const stop = e => { if (!t) return; clearTimeout(t); t = 0; g.classList.remove('hold'); if (!fired && e.type === 'pointerup') toast(t('holdHint')); };
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => g.addEventListener(ev, stop));
+  g.addEventListener('contextmenu', e => e.preventDefault());
+});
+async function papaMenu() {
+  const v = await ask(t('menu'), '', [{l: t('menuRes'), v: 'results', c: 'go'}, {l: t('menuPrep'), v: 'setup'}, {l: t('menuBack'), v: null}]);
+  if (!v) return;
+  if (pend) { URL.revokeObjectURL(pend.url); pend = null; }
+  S.phase = v; save(); render();
+}
+
+/* ---------- Papa: results, composition, sharing ---------- */
+function loadImg(u) { return u ? new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = u; }) : Promise.resolve(null); }
+function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+function cover(g, img, x, y, w, h, r, fy) {
+  g.save(); rr(g, x, y, w, h, r); g.clip();
+  const iw = img ? img.naturalWidth : 0, ih = img ? img.naturalHeight : 0, k = img ? (iw / ih) / (w / h) : 1;
+  if (img && k > 0.89 && k < 1.12) {
+    // same shape as the box: fill it, the crop is tiny
+    const s = Math.max(w / iw, h / ih), sw = w / s, sh = h / s;
+    g.drawImage(img, (iw - sw) / 2, (ih - sh) * fy, sw, sh, x, y, w, h);
+  } else if (img) {
+    // other shape (phone held sideways…): show the WHOLE photo over a soft blurred copy of itself
+    const bw = Math.max(4, Math.round(iw / 36)), bh = Math.max(4, Math.round(ih / 36));
+    const sm = document.createElement('canvas'); sm.width = bw; sm.height = bh;
+    sm.getContext('2d').drawImage(img, 0, 0, bw, bh);
+    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+    const bs = Math.max(w / bw, h / bh) * 1.15;
+    g.drawImage(sm, x + (w - bw * bs) / 2, y + (h - bh * bs) / 2, bw * bs, bh * bs);
+    g.fillStyle = 'rgba(255,255,255,.3)'; g.fillRect(x, y, w, h);
+    const c = Math.min(w / iw, h / ih), dw = iw * c, dh = ih * c;
+    g.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+  } else {
+    g.fillStyle = '#fff3cf'; g.fillRect(x, y, w, h);
+    g.fillStyle = '#e0c67a'; g.font = `800 ${Math.round(h * 0.4)}px "Baloo 2", sans-serif`;
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('?', x + w / 2, y + h / 2 + h * 0.03);
+  }
+  g.restore();
+}
+// pairs side by side (place | selfie) or stacked (place over selfie): pick the grid closest to a square,
+// with full rows. 12 portrait photos -> 6 x 4 side by side; 10 portrait -> 5 x 4 stacked.
+function layout(n, ar) {
+  let best = null;
+  for (const v of [false, true]) for (let c = 1; c <= n; c++) {
+    const r = Math.ceil(n / c), w = c * (v ? 1 : 2) * ar, h = r * (v ? 2 : 1);
+    const sc = Math.abs(Math.log(w / h)) + (n % c ? 0.3 : 0) + (v ? 0.001 : 0);
+    if (!best || sc < best.sc) best = {c, r, v, sc};
+  }
+  return best;
+}
+async function compose() {
+  const P = S.places, n = P.length;
+  try { await Promise.all([document.fonts.load('800 100px "Baloo 2"'), document.fonts.load('700 40px Nunito')]); } catch (e) {}
+  const pics = await Promise.all(P.map(p => Promise.all([loadImg(url(p.k)), loadImg(S.selfies[p.k] ? url(S.selfies[p.k].k) : '')])));
+  let por = 0, lan = 0;
+  P.forEach(p => { p.h >= p.w ? por++ : lan++; const s = S.selfies[p.k]; if (s) s.h >= s.w ? por++ : lan++; });
+  const ar = por >= lan ? 3 / 4 : 4 / 3, {c, r, v} = layout(n, ar);
+  const M = 70, PG = 36, IG = 10, PAD = 12, HEAD = 280, TARGET = 2400;
+  const tw = v ? Math.floor((TARGET - 2 * M - (c - 1) * PG - c * 2 * PAD) / c)
+               : Math.floor((TARGET - 2 * M - (c - 1) * PG - c * (2 * PAD + IG)) / (2 * c));
+  const th = Math.round(tw / ar);
+  const cw = v ? 2 * PAD + tw : 2 * PAD + 2 * tw + IG, ch = v ? 2 * PAD + 2 * th + IG : 2 * PAD + th;
+  const W = 2 * M + c * cw + (c - 1) * PG, H = HEAD + r * ch + (r - 1) * PG + M;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#ffc83d'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#1a1530'; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+  let fs = 132; const title = (S.title || '').trim() || t('defTitle');
+  do { g.font = `800 ${fs}px "Baloo 2", Nunito, sans-serif`; fs -= 4; } while (g.measureText(title).width > W - 2 * M && fs > 40);
+  g.fillText(title, M, 158);
+  const last = Math.max(0, ...Object.values(S.selfies).map(s => s.t || 0)) || Date.now();
+  const date = new Date(last).toLocaleDateString(t('locale'), {day: 'numeric', month: 'long', year: 'numeric'}), d = doneCount();
+  g.font = '700 52px Nunito, sans-serif';
+  g.fillText(t('mosaicLine', date, d, n), M, 236);
+  P.forEach((p, i) => {
+    const x = M + (i % c) * (cw + PG), y = HEAD + Math.floor(i / c) * (ch + PG);
+    g.fillStyle = 'rgba(26,21,48,.22)'; rr(g, x + 7, y + 10, cw, ch, 24); g.fill();
+    g.fillStyle = '#fff'; rr(g, x, y, cw, ch, 24); g.fill();
+    cover(g, pics[i][0], x + PAD, y + PAD, tw, th, 14, 0.5);
+    if (v) cover(g, pics[i][1], x + PAD, y + PAD + th + IG, tw, th, 14, 0.38);
+    else cover(g, pics[i][1], x + PAD + tw + IG, y + PAD, tw, th, 14, 0.38);
+    const bx = x + PAD + 44, by = y + PAD + 44;
+    g.beginPath(); g.arc(bx, by, 38, 0, Math.PI * 2); g.fillStyle = '#ff4b3e'; g.fill();
+    g.lineWidth = 6; g.strokeStyle = '#fff'; g.stroke();
+    g.fillStyle = '#fff'; g.font = '800 46px Nunito, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(String(i + 1), bx, by + 2);
+    g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+  });
+  return new Promise(res => cv.toBlob(b => res(b), 'image/jpeg', 0.9));
+}
+async function buildComp() {
+  const sig = JSON.stringify([S.title, S.places.map(p => p.k + (S.selfies[p.k] ? S.selfies[p.k].k : ''))]);
+  if (sig === compSig && compBlob) return;
+  compSig = sig; $('#b-share').disabled = true;
+  const blob = await compose();
+  if (sig !== compSig) return;
+  compBlob = blob;
+  if (compUrl) URL.revokeObjectURL(compUrl);
+  compUrl = URL.createObjectURL(blob);
+  $('#comp').innerHTML = `<img src="${compUrl}" alt="${t('mosaicAlt')}">`;
+  $('#b-share').disabled = false;
+}
+let titleT = 0;
+$('#title').addEventListener('input', e => { S.title = e.target.value; clearTimeout(titleT); titleT = setTimeout(() => { save(); buildComp(); }, 600); });
+$('#b-share').onclick = async () => {
+  if (!compBlob) return;
+  const name = t('file') + '-' + new Date().toISOString().slice(0, 10) + '.jpg';
+  try {
+    const f = new File([compBlob], name, {type: 'image/jpeg'});
+    if (navigator.canShare && navigator.canShare({files: [f]})) { await navigator.share({files: [f], title: S.title}); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  try {
+    const a = document.createElement('a'); a.href = compUrl; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); toast(t('saved'));
+  } catch (e) { toast(t('longPress')); }
+};
+$('#b-prep').onclick = () => { S.phase = 'setup'; save(); render(); };
+$('#b-resume').onclick = () => { S.phase = 'play'; save(); render(); };
+$('#b-replay').onclick = async () => {
+  const ok = await ask(t('replayQ'), t('replayP'), [{l: t('replayB'), v: 1, c: 'warn'}, {l: t('cancel'), v: 0}]);
+  if (!ok) return;
+  const ids = Object.values(S.selfies).map(s => s.a);
+  Object.values(S.selfies).forEach(s => drop(s.k));
+  S.selfies = {}; S.phase = 'setup'; compSig = ''; save(); render(); delAssets(ids);
+};
+$('#b-new').onclick = async () => {
+  const ok = await ask(t('newQ'), t('newP'), [{l: t('newB'), v: 1, c: 'warn'}, {l: t('cancel'), v: 0}]);
+  if (!ok) return;
+  const ids = items(S).map(i => i.a);
+  items(S).forEach(i => drop(i.k));
+  S = fresh(); sel = -1; compSig = ''; compBlob = null; save(); render(); delAssets(ids);
+  toast(t('newDone'));
+};
+
+/* ---------- phone to phone (QR code) ----------
+   The two phones talk directly (WebRTC, through PeerJS). The PeerJS broker only introduces them;
+   no photo is stored anywhere. If a direct link is impossible, PeerJS's relay passes the data through. */
+function remoteSoon() {}
+function delAssets() {}
+function peerOpts() {
+  const m = /[?&]peer=([\w.-]+):(\d+)/.exec(location.search);   // test hook: local signalling server
+  return m ? {host: m[1], port: +m[2], path: '/', secure: false, config: {iceServers: []}} : {};
+}
+const libsReady = () => new Promise((res, rej) => {
+  let n = 0; const t = setInterval(() => { if (window.Peer && window.qrcode) { clearInterval(t); res(); } else if (++n > 100) { clearInterval(t); rej(new Error('libs')); } }, 100);
+});
+let sender = null;
+function qrStatus(t, cls) { const el = $('#q-st'); el.textContent = t; el.className = 'qrst' + (cls ? ' ' + cls : ''); }
+async function openSender() {
+  $('#qrs').hidden = false; $('#q-copy').disabled = true;
+  $('#q-code').innerHTML = '<div class="spin" style="border-color:#ddd;border-top-color:#1a1530"></div>';
+  qrStatus(t('qPrep'));
+  try { await libsReady(); } catch (e) { qrStatus(t('qNoNet'), 'err'); return; }
+  const id = 'photo-hunt-' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
+  const peer = new Peer(id, peerOpts());
+  const st = {peer, sent: 0, link: ''};
+  sender = st;
+  peer.on('open', pid => {
+    if (sender !== st) return;
+    st.link = location.origin + location.pathname + location.search + '#join=' + pid;
+    const q = qrcode(0, 'M'); q.addData(st.link); q.make();
+    $('#q-code').innerHTML = q.createSvgTag({cellSize: 6, margin: 0});
+    $('#q-code').dataset.link = st.link;
+    $('#q-copy').disabled = false;
+    qrStatus(t('qWait'));
+  });
+  peer.on('connection', conn => {
+    conn.on('open', () => sendHunt(conn, st));
+    conn.on('error', () => qrStatus(t('qCut'), 'err'));
+  });
+  peer.on('error', e => {
+    if (sender !== st) return;
+    qrStatus(e && e.type === 'unavailable-id' ? t('qTaken') : t('qFail'), 'err');
+  });
+}
+async function sendHunt(conn, st) {
+  const P = S.places.slice(), n = P.length;
+  let got = 0;
+  conn.on('data', m => {
+    if (!m || sender !== st) return;
+    if (m.t === 'got') { got = m.i + 1; qrStatus(t('qSending', got, n)); }
+    if (m.t === 'ok') { st.sent++; qrStatus(t('qSentN', st.sent), 'ok'); }
+  });
+  qrStatus(t('qConn'));
+  conn.send({t: 'hunt', v: 1, title: S.title, n, lang: LANG});
+  for (let i = 0; i < n; i++) {
+    const o = B.get(P[i].k); if (!o) continue;
+    conn.send({t: 'place', i, n, w: P[i].w, h: P[i].h, data: await o.blob.arrayBuffer()});
+  }
+  conn.send({t: 'end', n});
+}
+function closeSender() { $('#qrs').hidden = true; if (sender) { try { sender.peer.destroy(); } catch (e) {} sender = null; } }
+$('#b-send').onclick = openSender;
+$('#b-how').onclick = () => { slide = 0; introOn = true; render(); };
+$('#b-lang').onclick = () => setLang(LANG === 'fr' ? 'en' : 'fr');
+$('#q-close').onclick = closeSender;
+$('#q-copy').onclick = async () => {
+  const l = $('#q-code').dataset.link; if (!l) return;
+  try { await navigator.clipboard.writeText(l); toast(t('qCopied')); }
+  catch (e) { toast(l); }
+};
+
+async function joinHunt(id) {
+  history.replaceState(null, '', location.pathname + location.search);
+  if (S.places.length) {
+    const go = await ask(t('jReplaceQ'), t('jReplaceP'), [{l: t('jRecv'), v: 1, c: 'go'}, {l: t('cancel'), v: 0}]);
+    if (!go) return;
+  }
+  busy(true, t('jConnecting'));
+  const fail = msg => { busy(false); clearTimeout(timer); try { peer && peer.destroy(); } catch (e) {} ask(t('jNoConnT'), msg, [{l: 'OK', v: 0, c: 'go'}]); };
+  let peer = null, done = false;
+  const timer = setTimeout(() => { if (!done) fail(t('jNoAnswer')); }, 30000);
+  try { await libsReady(); } catch (e) { fail(t('jNoNet')); return; }
+  peer = new Peer(undefined, peerOpts());
+  const inc = {title: '', n: 0, places: []};
+  let chain = Promise.resolve();
+  peer.on('error', e => { if (!done) fail(e && e.type === 'peer-unavailable' ? t('jDead') : t('jFail')); });
+  peer.on('open', () => {
+    const conn = peer.connect(id, {reliable: true});
+    conn.on('data', m => { chain = chain.then(() => onMsg(conn, m)).catch(() => {}); });
+    conn.on('close', () => { if (!done) fail(t('jCut')); });
+  });
+  async function onMsg(conn, m) {
+    if (!m || done) return;
+    if (m.t === 'hunt') { if (m.lang && L[m.lang] && m.lang !== LANG) { LANG = m.lang; PREFS.lang = m.lang; savePrefs(); applyLang(); } inc.title = String(m.title || ''); inc.n = Math.min(MAX, m.n | 0); busy(true, t('jRecvN', 0, inc.n)); }
+    else if (m.t === 'place' && m.i >= 0 && m.i < MAX) {
+      const k = uid('p'), buf = m.data instanceof ArrayBuffer ? m.data : m.data.buffer;
+      await keep(k, new Blob([buf], {type: 'image/jpeg'}));
+      inc.places[m.i] = {k, w: m.w | 0, h: m.h | 0, a: null};
+      conn.send({t: 'got', i: m.i});
+      busy(true, t('jRecvN', inc.places.filter(Boolean).length, inc.n));
+    } else if (m.t === 'end') {
+      done = true; clearTimeout(timer);
+      items(S).forEach(it => drop(it.k));
+      S = fresh(); S.title = inc.title || S.title; S.places = inc.places.filter(Boolean); S.phase = 'play';
+      sel = -1; ord = null; pend = null; compSig = ''; compBlob = null;
+      save(); conn.send({t: 'ok'});
+      setTimeout(() => { try { peer.destroy(); } catch (e) {} }, 2000);
+      busy(false); render();
+      const n = S.places.length;
+      await ask(t('jArrived'), t('jArrivedP', n), [{l: t('go'), v: 1, c: 'go'}]);
+    }
+  }
+}
+async function caps() {}
+
+/* ---------- boot ---------- */
+(async () => {
+  await IDB.open();
+  const pr = await IDB.get('kv', 'prefs');
+  if (pr) PREFS = Object.assign(PREFS, pr);
+  if (PREFS.lang && L[PREFS.lang]) LANG = PREFS.lang;
+  const st = await IDB.get('kv', 'state');
+  if (st && st.v === 1) S = st; else S.title = t('defTitle');
+  for (const it of items(S)) {
+    const buf = await IDB.get('blobs', it.k);
+    if (buf) reg(it.k, new Blob([buf], {type: 'image/jpeg'}));
+  }
+  const j = /#join=([\w-]+)/.exec(location.hash);
+  introOn = !PREFS.intro && !j && S.phase === 'setup';
+  applyLang(); render();
+  if (j) joinHunt(j[1]);
+  window.addEventListener('hashchange', () => { const m = /#join=([\w-]+)/.exec(location.hash); if (m) joinHunt(m[1]); });
+})();
+}
+</script>
+</body>
+</html>
